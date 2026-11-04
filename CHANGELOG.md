@@ -13,6 +13,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Added
 
+- Release packaging: `scripts/package-release.sh <tag>` builds a deterministic customer delivery archive from a git tag without tests or developer tooling, with a SHA-256 file and a `BUILD-INFO.json` that keeps the release tag visible in deployments made from the archive.
 - Per-job execution role selection: offline Spark, EMR Serverless, sync, and Flink jobs can run under any IAM role the engine service may assume, as in the AWS console.
 - Execution role picker groups roles into platform default, advisor-generated, and custom, refreshes inside the page, and keeps a manual ARN entry as fallback.
 - Saving a job now preflights the chosen role: trust policy, existence, and permissions on everything the job references. Gaps are listed with action, resource, and reason.

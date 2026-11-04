@@ -29,6 +29,7 @@ Run all of them before you push. They work offline unless noted.
 | Infra types and synth gate | `cd infra && npx tsc --noEmit && npm run synth-gate` |
 | Red-line scan | `bash scripts/redline-scan.sh` |
 | Build gate | `cd platform && npm run build` |
+| Delivery archive | `bash infra/test/package-release/test_package_release.sh` (packages `HEAD`, checks exclusions, determinism and build facts) |
 
 Every new AWS SDK call is registered in `infra/iam/platform-taskrole-calls.json` in the same commit.
 CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the CDK synthesis on every pull request; it never deploys.

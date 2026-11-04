@@ -13,7 +13,10 @@
 //                       🔴 刻意**不带分支名**:同一产品字节在不同分支 / 变基前后应尽量是同一个镜像,分支名只会白白触发重建。
 //   · productCommitAt = 该提交的提交时间(ISO 8601)
 //   · version         = 仓库根 `VERSION` 文件内容
-// 任一取不到(不是 git 克隆 / 没装 git)⇒ 对应值 ""、stderr 一句警告;**不抛**(不能让 synth 因版本标签失败),
+// 不是 git 克隆时(客户部署机解开 `scripts/package-release.sh` 打出的产品包)⇒ 读包根的 `BUILD-INFO.json`
+//   (打包器从被打包的提交写入:指向该提交的全部 tag、产品字节最后一笔提交短哈希 / 时间、VERSION);
+//   选 tag 的规则仍在本文件(`pickReleaseTag` + `RELEASE_TAG_GLOBS` 过滤),文件只提供原始事实,不替平台做判断。
+// git 事实与包事实都取不到 ⇒ 对应值 ""、stderr 一句警告;**不抛**(不能让 synth 因版本标签失败),
 // 页面侧把空值如实显示为「构建信息不可用」,不编一个。
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -50,6 +53,36 @@ export function pickReleaseTag(tags: readonly string[]): string {
 /** 产品字节的目录(与 AGENTS §1「产品字节」口径一致:docs 与根目录 *.md 不算)。 */
 export const PRODUCT_DIRS: readonly string[] = ["platform", "infra", "scripts"];
 
+/** 产品包里的构建事实文件(包根;由 `scripts/package-release.sh` 写入,git 克隆里不存在且被 .gitignore)。 */
+export const BUILD_FACTS_FILE = "BUILD-INFO.json";
+
+/** `git tag --list <glob>` 的 glob 转正则(只认 `*` 与 `[...]` 字符类,其余按字面;与 RELEASE_TAG_GLOBS 同一作者)。 */
+function globToRegExp(glob: string): RegExp {
+  const escaped = glob.replace(/[.+^${}()|\\]/g, "\\$&").replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`);
+}
+
+/** 从产品包的 BUILD-INFO.json 读原始事实;文件缺失 / 不是 JSON / 形态不对 ⇒ null(调用方如实留空)。 */
+function readPackagedFacts(repoRoot: string): BuildFacts | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(path.join(repoRoot, BUILD_FACTS_FILE), "utf8"));
+  } catch {
+    return null;
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const tags = Array.isArray(o.tags) ? o.tags.filter((t): t is string => typeof t === "string") : null;
+  const productCommit = typeof o.productCommit === "string" && /^[0-9a-f]{7,40}$/.test(o.productCommit) ? o.productCommit : null;
+  const productCommitAt =
+    typeof o.productCommitAt === "string" && /^\d{4}-\d{2}-\d{2}T/.test(o.productCommitAt) ? o.productCommitAt : null;
+  const version = typeof o.version === "string" ? o.version.trim() : "";
+  if (!tags || !productCommit || !productCommitAt) return null;
+  const globs = RELEASE_TAG_GLOBS.map(globToRegExp);
+  const releaseTag = pickReleaseTag(tags.filter((t) => globs.some((g) => g.test(t))));
+  return { releaseTag, productCommit, productCommitAt, version };
+}
+
 /** 仓库根(本文件在 infra/lib/shared/)。 */
 export const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
@@ -80,8 +113,13 @@ export function collectBuildFacts(repoRoot: string = REPO_ROOT): BuildFacts {
     // 如实留空
   }
   if (!productCommit) {
+    const packaged = readPackagedFacts(repoRoot);
+    if (packaged) {
+      process.stderr.write(`[build-info] 在 ${repoRoot} 读不到 git 事实,改读产品包的 ${BUILD_FACTS_FILE}\n`);
+      return { ...packaged, version: version || packaged.version };
+    }
     process.stderr.write(
-      `[build-info] 在 ${repoRoot} 读不到 git 事实(不是 git 克隆或没装 git)⇒ 镜像构建信息留空,页面将显示「构建信息不可用」\n`
+      `[build-info] 在 ${repoRoot} 读不到 git 事实(不是 git 克隆或没装 git),也没有 ${BUILD_FACTS_FILE} ⇒ 镜像构建信息留空,页面将显示「构建信息不可用」\n`
     );
   }
   return { releaseTag, productCommit, productCommitAt, version };

@@ -57,11 +57,24 @@ Exact versions: see [supported-versions.md](supported-versions.md).
 
 ### 1.4 Get the code
 
-Always clone the repository and check out a release tag.
+Obtain the code at a release tag, either by cloning the repository or from the delivery archive. Never use a hand-made export.
 
 ```bash
 git clone --branch <release-tag> <repository-url> kingfisher
-cd kingfisher
+```
+
+Alternatively, use the delivery archive produced by the release engineer with `scripts/package-release.sh <release-tag>`. Verify and unpack it:
+
+```bash
+sha256sum -c kingfisher-<release-tag>.tar.gz.sha256
+tar -xzf kingfisher-<release-tag>.tar.gz && cd kingfisher-<release-tag>
+```
+
+The archive contains no tests or developer tooling. Its root holds `BUILD-INFO.json`, so the footer and the public version endpoint still show the release tag. Do not use an archive exported by hand from a web page; it carries no build facts.
+
+Then, inside the code directory (`kingfisher` for a clone, `kingfisher-<release-tag>` for the archive):
+
+```bash
 (cd infra && npm ci)
 (cd platform && npm ci)
 ```
@@ -262,7 +275,7 @@ curl -s https://<platform-host>/api/public/version
 ```
 
 `releaseTag` must equal the tag you checked out. A build from a branch shows the product commit hash and `unreleased`.
-A build that was not made from a git clone reports that build information is unavailable; that indicates the code was not obtained as described in section 1.4.
+A build made from neither a git clone nor a delivery archive with `BUILD-INFO.json` reports that build information is unavailable; that indicates the code was not obtained as described in section 1.4.
 
 ### 4.4 First login and password handling
 

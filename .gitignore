@@ -111,3 +111,6 @@ __pycache__/
 
 # Presentation material (slides, PDFs) is not tracked
 docs/slides/
+
+# Build facts file written only into release packages by scripts/package-release.sh
+BUILD-INFO.json

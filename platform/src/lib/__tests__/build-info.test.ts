@@ -130,3 +130,18 @@ describe("🔴 序 39 二刀 路由真跑", () => {
     expect((await res2.json()).data.known).toBe(false);
   });
 });
+
+describe("🔴 产品包的构建事实文件:打包器写的目录与 infra 作者的 PRODUCT_DIRS 同一口径", () => {
+  it("scripts/package-release.sh 计算产品提交用的目录列表 == infra/lib/shared/build-info.ts 的 PRODUCT_DIRS;文件名两侧一致", () => {
+    const infraSrc = strip(read(path.join(REPO, "infra/lib/shared/build-info.ts")));
+    const dirs = /PRODUCT_DIRS: readonly string\[\] = \[([^\]]+)\]/.exec(infraSrc);
+    expect(dirs, "infra 作者里找不到 PRODUCT_DIRS 字面量").not.toBeNull();
+    const list = (dirs as RegExpExecArray)[1].split(",").map((d) => d.trim().replace(/^"|"$/g, ""));
+    const packager = read(path.join(REPO, "scripts/package-release.sh"));
+    expect(packager).toContain(`--format=%h "$COMMIT" -- ${list.join(" ")}`);
+    expect(packager).toContain(`--format=%cI "$COMMIT" -- ${list.join(" ")}`);
+    const file = /BUILD_FACTS_FILE = "([^"]+)"/.exec(infraSrc);
+    expect(file).not.toBeNull();
+    expect(packager).toContain(`/${(file as RegExpExecArray)[1]}"`);
+  });
+});

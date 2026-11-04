@@ -155,6 +155,11 @@ Each recipe lists the places that must change together. Missing one of them prod
 - Releases are tagged `vX.Y.Z` following Semantic Versioning. The tag, the `VERSION` file and the CHANGELOG heading must agree.
 - `scripts/cut-release.sh <version>` performs the release cut: it bumps `VERSION`, closes the `[Unreleased]` section of `CHANGELOG.md`, creates the release branch and the annotated tag, and pushes them. Without `--yes` it only prints the plan.
 - Release branches are named `release/X.Y.Z`. After the tag is cut they receive documentation and hotfixes only.
+- `scripts/package-release.sh <tag> [--out <dir>] [--verify]` produces the customer delivery archive `kingfisher-<tag>.tar.gz` with a `.sha256` file:
+  - It reads bytes only from `git archive <tag>` and removes the paths listed in `scripts/package-release.exclude`: unit tests, acceptance orchestration, developer tooling and repository configuration.
+  - The archive is deterministic: the same tag always yields the same bytes.
+  - The archive root carries `BUILD-INFO.json`, which the image build reads when no git metadata is present, so the release tag stays visible in the deployed footer.
+  - `--verify` builds the extracted copy to prove it is complete. The engineering repository remains the source of truth; the archive is a projection of one tag.
 - A hotfix increments the patch number. It is fixed on the release branch and cherry-picked back to `main`.
 - Customer deployments always use a tag, never a branch head.
 

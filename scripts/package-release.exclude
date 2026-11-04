@@ -1,0 +1,50 @@
+# scripts/package-release.sh 的排除清单 —— 发版产品包里**不该出现**的路径(一行一个,git pathspec 风格 glob)。
+#   语义:模式锚定在包根;`*` / `?` 不跨目录;`**` 匹配任意多级目录(含零级);`X/**` 连目录 X 自身一起剔;`#` 后为注释。
+#   原则:工程仓库是唯一事实源,这里只写「客户部署机用不到、也不该拿到」的东西;每一行都带理由。
+#   改动本清单 = 改动交付物边界,请同笔跑 `bash infra/test/package-release/test_package_release.sh`。
+
+# ── 单元测试与测试配置:客户部署链(deploy-all / redeploy-platform / 执行环境 CodeBuild)一条都不执行它们;
+#    platform/tsconfig.json 与 next build 已把 __tests__ / vitest 配置排除在类型检查之外,产品代码没有一处 import 测试目录 ──
+**/__tests__/**
+**/*.test.*
+platform/vitest.config.ts
+platform/scripts/**                     # 开发门禁与工具(变异检查 / 命名一致性 / 写者门 / i18n 辅助);package.json 的 build 不用它们
+infra/test/**
+infra/prod-only-layers.json             # 守卫测试用的「生产专用层」登记表,只服务被剔掉的测试
+
+# ── 验收编排与无头浏览器判据:只在开发者自己的测试账号上跑;依赖不入库的 qa-game/ 与 Playwright;客户环境不需要也不该跑 ──
+scripts/31-showcase-region.py           # 用产品 API 建 Showcase 示范对象并跑到成功(验收 / 演示准备)
+scripts/32-verify-all-regions.sh        # 每个执行环境跑一遍七类能力(验收编排)
+scripts/33-verify-regions-headless.py   # 无头浏览器逐区验收
+scripts/34-add-region-headless.py       # 用页面向导加区的无头脚本(验收用;客户在页面上操作即可)
+scripts/35-rebuild-account.sh           # 换测试账号「一条命令」重建(非生产步骤)
+scripts/36-fixture-ledger.py            # 验收夹具台账与清理(import 上面被剔的无头底座,单独留下也跑不起来)
+scripts/37-fixture-reseal.py            # 验收夹具收口工具(Playwright)
+scripts/38-b09-drift-discrim.py         # 判据判别力自检工具(Playwright + 直写表)
+scripts/mr-gate.sh                      # 多区域硬门入口(开发机)
+scripts/kf_headless_lib.py              # 无头脚本共用底座
+
+# ── 开发机专用工具:发版、钩子、历史清洗、文档整理、采集 —— 不在任何部署 / 升级路径上,且多半依赖被剔掉的东西 ──
+scripts/cut-release.sh                  # 切版本 / 打 tag / 推 GitHub(要硬门章 .claude/mr-gate-stamp.json)
+scripts/install-hooks.sh                # 启用 .githooks(钩子目录本身已剔)
+scripts/collect-cfn-exec-actions.sh     # 采集 cfn-exec 角色真实调用集(IAM 收窄用的开发工具)
+scripts/scrub-leaked-secrets-from-history.sh   # 一次性 git 历史清洗,范围写死在历史事故上;不是客户该拿到的工具
+scripts/lib/docs_restructure.py         # Markdown 文档重排 / 格式门禁工具
+scripts/package-release.sh              # 本打包脚本自身
+scripts/package-release.exclude         # 本清单自身
+
+# ── 工程仓库自身的 CI / 钩子 / AI 工具配置 / 本机验收目录 / 编辑器配置 ──
+.github/**
+.githooks/**
+.claude/**
+.kiro/**
+qa-game/**
+.editorconfig
+
+# ── 安全扫描器配置(只给工程侧的 ProtoShield / GitLab 扫描用;放行理由记在内部文档里) ──
+.bandit
+.gitleaks.toml
+.semgrepignore
+
+# ── 工程仓库自己的入口壳(AI 编码工具用),客户部署机不需要 ──
+CLAUDE.md                               # AI 编码工具入口壳(本仓库没有也无妨:0 命中只提示)
