@@ -437,10 +437,15 @@
     },
     {
       "id": "script:cut-release.sh",
-      "what": "在 main 上切版本(改 VERSION + CHANGELOG 标题 ⇒ release/<版本号> 分支 ⇒ 注解 tag v<版本号> ⇒ 推);缺省只演练,--yes 才落;硬门 = 整轮无头硬门章 pass 且章提交与 HEAD 产品字节零差(2026-11-01 用户拍板的发版命名)",
-      "executor": "本机 bash(开发机发版时手工跑一次)",
-      "reason": "local-tooling",
-      "note": "不在客户部署 / 升级 / 执行环境 CodeBuild 的任何路径上;改坏的后果是切不出 tag(当场可见),不会造成生产错误状态"
+      "what": "在 main 上切版本(改 VERSION + CHANGELOG 标题 ⇒ release/<版本号> 分支 ⇒ 注解 tag v<版本号> ⇒ 推);--github-release 再打交付包并 gh release create(正文 = CHANGELOG 该版段逐字 + 交付包 sha256 表,附件 = tar.gz + .sha256);缺省只演练,--yes 才落;硬门 = 整轮无头硬门章 pass 且章提交与 HEAD 产品字节零差、[Unreleased] 段非空(2026-11-01 用户拍板的发版命名;2026-11-04 加 Release)",
+      "executor": "本机 bash + gh(开发机发版时手工跑一次)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/cut-release/test_cut_release.sh",
+        "marker": "✅ cut-release 离线判据全过",
+        "cases": 116
+      },
+      "note": "不在客户部署 / 升级 / 执行环境 CodeBuild 的任何路径上。替身在合成 git 仓库(裸仓当 origin、章 pass @ HEAD)里真跑脚本,gh / curl 为 PATH 替身:用法与未知参数拒、没装 gh / 未登录 / 已有同名 Release 开跑前拒且零改动、演练零改动、真切后 VERSION / CHANGELOG / 提交 / 注解 tag / release 分支 / 远端三者 / 交付包 sha256 / BUILD-INFO tags / gh 参数(tag · 两附件 · --title · --notes-file · --verify-tag)/ 正文逐字 = CHANGELOG 该版段 + sha256 表且不含旧版与 Unreleased、推后 Release 失败如实报 tag 已推并给重试命令、章 fail / 章后产品字节有差 / 不在 main / 脏树 / 领先远端 / 空 Unreleased 一律拒。诚实边界:真 gh 与 GitHub API 不在替身里,首次真发版(v2.2.0)时人盯一次"
     },
     {
       "id": "script:package-release.sh",
@@ -450,9 +455,9 @@
         "kind": "offline-real-run",
         "where": "infra/test/package-release/test_package_release.sh",
         "marker": "✅ package-release 离线判据全过",
-        "cases": 105
+        "cases": 115
       },
-      "note": "工程仓库是唯一事实源,产品包只是它在某个 tag 上的投影;打包脚本与排除清单自身不进包。替身对本仓库 HEAD 真打包、真解包:被剔路径不在(整包零 __tests__ / 零 *.test.ts / 零空目录)、产品骨架与部署脚本与客户文档都在、文件模式归一、同一 ref 两次打包 sha256 逐字节相同、坏 ref / 非 git 目录 / 缺清单 / 空清单 / 未知参数一律拒且不写产物、glob 语义用合成仓库逐条钉、临时目录由 trap 清净。诚实边界:--verify 段要联网 npm ci,替身不跑它,发版时手工跑一次"
+      "note": "工程仓库是唯一事实源,产品包只是它在某个 tag 上的投影;打包脚本与排除清单自身不进包。替身对本仓库 HEAD 真打包、真解包:被剔路径不在(整包零 __tests__ / 零 *.test.ts / 零空目录)、产品骨架与部署脚本与客户文档都在、文件模式归一、同一 ref 两次打包 sha256 逐字节相同、坏 ref / 非 git 目录 / 缺清单 / 空清单 / 未知参数一律拒且不写产物、glob 语义用合成仓库逐条钉、打了 tag 的 ref 退 0 且 BUILD-INFO.json 列全 tag(2026-11-04 抓到:tag 清单经管道喂 heredoc python ⇒ 丢光 + SIGPIPE 退 141,只在真发版那条路上发生)、临时目录由 trap 清净。诚实边界:--verify 段要联网 npm ci,替身不跑它,发版时手工跑一次"
     },
     {
       "id": "script:kf_headless_lib.py",

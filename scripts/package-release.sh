@@ -109,17 +109,20 @@ TOTAL_BEFORE="$(find "$STAGE/$NAME" -type f | wc -l | tr -d ' ')"
 PRODUCT_COMMIT="$(git -C "$ROOT" log -1 --format=%h "$COMMIT" -- platform infra scripts)"
 PRODUCT_COMMIT_AT="$(git -C "$ROOT" log -1 --format=%cI "$COMMIT" -- platform infra scripts)"
 PKG_VERSION="$(git -C "$ROOT" show "$COMMIT:VERSION" 2>/dev/null | tr -d '[:space:]' || true)"
-git -C "$ROOT" tag --points-at "$COMMIT" | python3 -I - "$STAGE/$NAME/BUILD-INFO.json" "$REF" "$COMMIT" "$PRODUCT_COMMIT" "$PRODUCT_COMMIT_AT" "$PKG_VERSION" <<'PY'
+#   tag 清单走参数而不是管道:python 的 stdin 已被 heredoc 占用,管道进去的字节会丢(tags 永远为空),而且 git 写向已关闭的管道会
+#   撞 SIGPIPE(pipefail ⇒ 退 141)—— 恰好只在「被打包的提交上有 tag」时发生,也就是真发版那一次(2026-11-04 离线判据抓到)。
+TAGS_AT="$(git -C "$ROOT" tag --points-at "$COMMIT" | tr '\n' ' ')"
+python3 -I - "$STAGE/$NAME/BUILD-INFO.json" "$REF" "$COMMIT" "$PRODUCT_COMMIT" "$PRODUCT_COMMIT_AT" "$PKG_VERSION" "$TAGS_AT" <<'PY'
 import json, sys
-out, ref, commit, product_commit, product_commit_at, version = sys.argv[1:7]
-tags = sorted(t.strip() for t in sys.stdin.read().split("\n") if t.strip())
+out, ref, commit, product_commit, product_commit_at, version, tags_at = sys.argv[1:8]
+tags = sorted(t for t in tags_at.split() if t)
 facts = {"ref": ref, "commit": commit, "tags": tags, "productCommit": product_commit,
          "productCommitAt": product_commit_at, "version": version}
 with open(out, "w", encoding="utf-8") as f:
     json.dump(facts, f, ensure_ascii=False, indent=2, sort_keys=True)
     f.write("\n")
 PY
-info "BUILD-INFO.json:tags=[$(git -C "$ROOT" tag --points-at "$COMMIT" | tr '\n' ' ')] productCommit=$PRODUCT_COMMIT version=$PKG_VERSION"
+info "BUILD-INFO.json:tags=[$TAGS_AT] productCommit=$PRODUCT_COMMIT version=$PKG_VERSION"
 
 # ── 2. 按排除清单剔除(内嵌 python:pathspec 风格 glob → 正则;目录命中整棵删;逐条打印命中数)─
 #   语义:模式锚定在包根;`*` / `?` 不跨 `/`;`**` 匹配任意多级目录(含零级);`X/**` 同时匹配目录 X 自身。

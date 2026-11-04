@@ -25,7 +25,7 @@ scripts/mr-gate.sh                      # 多区域硬门入口(开发机)
 scripts/kf_headless_lib.py              # 无头脚本共用底座
 
 # ── 开发机专用工具:发版、钩子、历史清洗、文档整理、采集 —— 不在任何部署 / 升级路径上,且多半依赖被剔掉的东西 ──
-scripts/cut-release.sh                  # 切版本 / 打 tag / 推 GitHub(要硬门章 .claude/mr-gate-stamp.json)
+scripts/cut-release.sh                  # 切版本 / 打 tag / 推 GitHub / 建 Release(要硬门章 .claude/mr-gate-stamp.json 与已登录的 gh)
 scripts/install-hooks.sh                # 启用 .githooks(钩子目录本身已剔)
 scripts/collect-cfn-exec-actions.sh     # 采集 cfn-exec 角色真实调用集(IAM 收窄用的开发工具)
 scripts/scrub-leaked-secrets-from-history.sh   # 一次性 git 历史清洗,范围写死在历史事故上;不是客户该拿到的工具

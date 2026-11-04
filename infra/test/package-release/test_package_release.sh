@@ -216,6 +216,16 @@ chk "⑤ 剔除后剩下的文件集合" "BUILD-INFO.json docs/KEEP.md docs/sub/
 #        docs/INTERNAL-NOTES-*.md 的 * 不跨目录 ⇒ docs/sub/ 下同名保留;DRAFT* 前缀通配;行内注释被忽略
 grep -q "剔除 .*  \*\*/__tests__/\*\*" "$TMP/glob.log" && ok "⑤ 逐条打印了每个模式的命中数" || bad "⑤ 没逐条打印命中数:$(cat "$TMP/glob.log")"
 
+echo "== ⑤b 打了 tag 的 ref:BUILD-INFO.json 记全指向该提交的 tag(发版那一次就是这条路;以前 tag 清单经管道进 heredoc 喂的 python ⇒ 丢光 + SIGPIPE 退 141)=="
+( cd "$G" && git tag -a vt1 -m "annotated" && git tag vt0 ) >/dev/null 2>&1 || bad "⑤b 合成仓库打不了 tag"
+"$G/scripts/package-release.sh" vt1 --out "$TMP/out8" >"$TMP/tag.log" 2>&1; rc=$?
+chk "⑤b 对带 tag 的 ref 打包退出码(141 = SIGPIPE 回归)" "0" "$rc"
+[ "$rc" = 0 ] || cat "$TMP/tag.log"
+[ -s "$TMP/out8/kingfisher-vt1.tar.gz" ] && ok "⑤b 产物按 ref 命名:kingfisher-vt1.tar.gz" || bad "⑤b 产物不存在:$(ls "$TMP/out8" 2>/dev/null)"
+X8="$TMP/x8"; mkdir -p "$X8"; tar -xzf "$TMP/out8/kingfisher-vt1.tar.gz" -C "$X8" 2>/dev/null
+chk "⑤b BUILD-INFO.json 的 tags 列全两个 tag(排序)且 ref = vt1" "vt0,vt1|vt1" "$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(",".join(d["tags"])+"|"+d["ref"])' "$X8/kingfisher-vt1/BUILD-INFO.json" 2>/dev/null)"
+grep -q "tags=\[vt0 vt1 \]\|tags=\[vt1 vt0 \]" "$TMP/tag.log" && ok "⑤b 屏幕打印的 tags 与文件一致" || bad "⑤b 屏幕没打印 tags:$(grep BUILD-INFO "$TMP/tag.log")"
+
 echo "== ⑥ 收口:打包器的临时目录由 trap 清掉(成功与失败两条路都清)=="
 LEFT="$(find "$TMPDIR" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')"
 chk "⑥ TMPDIR 下无残留临时目录" "0" "$LEFT"
