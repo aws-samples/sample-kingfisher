@@ -1,0 +1,29 @@
+{
+  // @cookbook/core 独立编译成 CJS 的配置(模块45 P45.5b)。
+  // 与 tsconfig.core.json(@genbi/core)、tsconfig.{paramadvisor,netadvisor}-core.json 同构。
+  // 【只 include 方言 guard 纯子集】core-guard/guard-core/mask/types/seed —— 【故意排除】
+  // registry/store/retrieve/prompt/capability-vocab:它们顶层 import @/lib/aws/dynamodb(store)与其它
+  // @/ alias,tsc 无 tree-shaking 会把 DynamoDB SDK/@/ 编进产物 → GenBI 容器内解析失败。
+  // 纯子集静态图零 @/、零 DynamoDB(guard-core 只依赖 mask+types;core-guard 只依赖 seed+guard-core;
+  // seed/* 只 import type ../types)。
+  // rootDir 保持 src/lib/cookbook 使 seed/ 子目录相对路径编译正确。
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./.tmp-core-build",
+    "rootDir": "./src/lib/cookbook"
+  },
+  "include": [
+    "src/lib/cookbook/core-guard.ts",
+    "src/lib/cookbook/guard-core.ts",
+    "src/lib/cookbook/mask.ts",
+    "src/lib/cookbook/types.ts",
+    "src/lib/cookbook/seed/**/*.ts"
+  ]
+}

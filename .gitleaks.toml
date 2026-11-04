@@ -1,0 +1,19 @@
+# gitleaks 配置:沿用缺省规则,只放行**已核实不是密钥**的模式。
+# 新增放行必须写明理由;真密钥永远不许进仓(scripts/redline-scan.sh 另有一道门)。
+[extend]
+useDefault = true
+
+[allowlist]
+description = "已核实不是密钥的三类模式(2026-11-01 ProtoShield / 2026-11-02 GitLab 扫描)"
+regexes = [
+  # ① 执行环境 CloudFormation 栈名夹具 BgpExecEnv-<slug>-<组件> 含 'api' 字样,被 generic-api-key 当成 API key;它是公开的资源名
+  '''BgpExecEnv-[a-z0-9-]+-(residency-api|redshift|dms|flink|airflow-serverless|mwaa|core|base)''',
+  # ② antd 口令输入框的浏览器自动填充提示 autoComplete="new-password" / "current-password",被 hashicorp-tf-password 当成硬编码口令;它是 HTML 标准属性值
+  '''(new|current)-password''',
+  # ③ 同一行上口令输入框的测试锚点 data-testid="change-password-old|new|confirm" / "reset-password-new|confirm";是 DOM 定位符,不是口令
+  '''(change|reset)-password-(old|new|confirm)''',
+]
+paths = [
+  # ④ B-120 守卫:core-dist 的源文件 sha256 清单(scripts/core-prebuild.sh 生成,单测重算比对)。值是文件哈希,不是任何服务的密钥
+  '''(^|/)core-dist/\.source-manifest\.json$''',
+]

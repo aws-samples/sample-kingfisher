@@ -1,0 +1,22 @@
+{
+  "$comment": "Drift guard: this core-dist was compiled by scripts/core-prebuild.sh from the sources listed below (paths relative to the repository root, values are SHA-256). The unit test platform/src/lib/__tests__/core-dist-source-manifest.test.ts recomputes the hashes; a source change without a rebuild fails it. Generated output, do not edit by hand.",
+  "capability": "cookbook",
+  "tsconfig": "platform/tsconfig.cookbook-core.json",
+  "sources": {
+    "platform/src/lib/cookbook/core-guard.ts": "8d5c3b8b40f4445b03baffab81e9a47a454e19a514daa670aa0120f2edea3bb1",
+    "platform/src/lib/cookbook/guard-core.ts": "c7de67a38840943e4f2a4209b6b1adf754db18c16596799573de6d8f1a7e422b",
+    "platform/src/lib/cookbook/mask.ts": "f3933c90cbd4c9be4e9c0a200638cc45c7b5d067a980a6963d6e4feec92c2cf7",
+    "platform/src/lib/cookbook/seed/athena.ts": "f2ea3c2fde666490b78c078465a8ec82643e2f726246a6d5184f4c10a9e8f5e5",
+    "platform/src/lib/cookbook/seed/emr.ts": "87275a24759764163aa9e40f53878dc5ee8b312686417d7c2f996aaf2934b92a",
+    "platform/src/lib/cookbook/seed/flink.ts": "0d16aa1e76b52dec53ea3944711b97913c44e79dbb0e0f7e4621d121031dee49",
+    "platform/src/lib/cookbook/seed/glue.ts": "856c47e78a37a6644050f0c9929f31e9d5b6ff1b26a1de335462a445aa31b326",
+    "platform/src/lib/cookbook/seed/index.ts": "261277e796d5e0fc02b9e84c0cf9d9eba8dcfe97a94aff824bc0e03d63d87d74",
+    "platform/src/lib/cookbook/seed/redshift.ts": "a9f1752052d317e6a4b72468b13764982f3b062fec42ea1fe669b5b4a6dd4985",
+    "platform/src/lib/cookbook/seed/s3tables-overwrite-facts.ts": "ad6613aab85181f066352cd817c547ac0c940a5eef6cb556539eb9960e494f52",
+    "platform/src/lib/cookbook/seed/s3tables.ts": "8c72829f7f53bf64205dc99b519a3da9ba983e1e48dcfb7ebe443aa91f472e56",
+    "platform/src/lib/cookbook/seed/shared-rules.ts": "5f58233e59592138527019a1fdbc3813ef81e7394e4db0207a1aeb8d89a6d20f",
+    "platform/src/lib/cookbook/seed/sync.ts": "dd3632f11f72ba5d15df708984bc088cd64da0aa9dbbdfeba1ac24d0a810303d",
+    "platform/src/lib/cookbook/seed/warehouse-facts.ts": "76e6dda85a53a0f5a8dd6ff8fd088ad2a1d2bc34c3ca8ec1a7d51206f64994c5",
+    "platform/src/lib/cookbook/types.ts": "c8cd1038f3fbcea94b4e285e342e1e76b74f1e7489274d565055665477e6cb80"
+  }
+}

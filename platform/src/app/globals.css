@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 全局背景 —— 换肤:读 --bgp-body-bg(ThemeProvider 按当前皮肤注入)。
+   默认值 = 改造前青蓝背景(深蓝黑 + 青蓝辉光 + 44px 细网格),未切换时像素级一致。
+   ThemeProvider 挂载后会用 inline style 覆盖 body.background(优先级更高),此处仅兜底首帧。 */
+body {
+  background-color: var(--bgp-bg, #071620);
+  background-image: var(--bgp-body-bg,
+    radial-gradient(1200px 640px at 80% -10%, rgba(86, 224, 242, 0.13), transparent 60%),
+    radial-gradient(1000px 540px at -6% 110%, rgba(55, 172, 205, 0.10), transparent 55%),
+    linear-gradient(rgba(86, 224, 242, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(86, 224, 242, 0.04) 1px, transparent 1px),
+    linear-gradient(180deg, #08131b 0%, #06121c 100%));
+  background-size: var(--bgp-body-bg-size, auto, auto, 44px 44px, 44px 44px, auto);
+  background-attachment: fixed;
+  color: var(--bgp-text, #cfe6f0);
+  min-height: 100vh;
+}
+
+/* 科技感滚动条(换肤:主色驱动) */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: rgba(127, 140, 160, 0.05); }
+::-webkit-scrollbar-thumb {
+  background: var(--bgp-primary, #56e0f2);
+  opacity: 0.6;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--bgp-primary-bright, #56e0f2); background-clip: content-box; }
+
+/* 选区发光点缀(换肤:主色) */
+::selection { background: var(--bgp-primary, #56e0f2); color: #fff; }
+
+/* 页面主标题在暗底上的科技质感（h2/h3 常用于各页标题） */
+h2, h3 { letter-spacing: 0.3px; }
+
+/* ReactFlow（DAG 编辑器 / 血缘图）暗黑适配：消除默认白色小地图/控制条/属性标 */
+.react-flow__minimap {
+  background-color: #08131b !important;
+  border: 1px solid #1d4254;
+  border-radius: 8px;
+}
+.react-flow__minimap-mask { fill: rgba(7, 18, 27, 0.72); }
+.react-flow__controls {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: #0c1c28;
+  border-bottom: 1px solid #1d4254;
+  color: #cfe6f0;
+}
+.react-flow__controls-button:hover { background: #11293a; }
+.react-flow__controls-button svg { fill: #8fb0c2; }
+.react-flow__controls-button:hover svg { fill: #56e0f2; }
+.react-flow__attribution {
+  background: rgba(7, 18, 27, 0.6);
+  border-radius: 4px 0 0 0;
+}
+.react-flow__attribution a { color: #8fb0c2; }
+
+/* 侧边栏菜单区独立滚动（Sidebar.tsx 的 .bgp-sider-scroll 包裹层）：
+   antd Sider 内容包在 .ant-layout-sider-children，需在该层立 flex 列布局，
+   菜单超高时只滚菜单区，logo 与底部收起 trigger 不动 */
+.ant-layout-sider .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.bgp-sider-scroll { scrollbar-width: thin; scrollbar-color: #1d4254 transparent; }
+.bgp-sider-scroll::-webkit-scrollbar { width: 6px; }
+.bgp-sider-scroll::-webkit-scrollbar-thumb { background: #1d4254; border-radius: 3px; }
+
+/* 侧边栏底部折叠触发器（< 箭头）：去掉 antd 写死的深蓝底(#002140),
+   改为透明、箭头跟随皮肤主色、hover 时淡主色高亮做反馈 —— 随换肤一起变。 */
+.ant-layout-sider-trigger {
+  background: transparent !important;
+  color: var(--bgp-primary, #56e0f2) !important;
+  transition: background .16s, color .16s;
+}
+.ant-layout-sider-trigger:hover {
+  background: var(--bgp-sider-active-bg, rgba(34,211,238,0.14)) !important;
+  color: var(--bgp-primary-bright, #7df9ff) !important;
+}
+.bgp-sider-scroll::-webkit-scrollbar-thumb:hover { background: #2a5c75; }
+
+/* 内容区多页签（MultiTabs.tsx）：暗色卡片页签贴科技主题；面板区不留额外内边距 */
+.bgp-multitabs > .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+.bgp-multitabs > .ant-tabs-nav .ant-tabs-tab {
+  background: var(--bgp-panel, rgba(12, 28, 40, 0.7));
+  border: 1px solid var(--bgp-panel-border, #1d4254);
+  border-radius: 8px 8px 0 0;
+}
+.bgp-multitabs > .ant-tabs-nav .ant-tabs-tab-active {
+  background: var(--bgp-sider-active-bg, rgba(34, 211, 238, 0.12));
+  border-color: var(--bgp-primary, #22d3ee);
+}

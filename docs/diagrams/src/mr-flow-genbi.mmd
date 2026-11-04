@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  participant U as 页面 /genbi
+  participant API as /api/genbi/ask(同步)· /api/genbi/tasks(异步 202)
+  participant EX as lib/genbi/execute.ts
+  participant AC as AgentCore Runtime(genbi 容器,Strands)
+  participant IP as 进程内 agent(Bedrock Converse 工具循环)
+  participant DP as 该区 Redshift / Athena(只读 SQL)
+  participant DDB as 历史 / 卡片 / 上下文表
+  U->>API: 提问(带项目、落点)
+  API->>EX: executeGenBiAsk(abortSignal,300s 天花板)
+  EX->>DDB: 接地:业务上下文 · 已发布数据集 · 短期 / 长期记忆
+  alt AgentCore 已接线
+    EX->>AC: InvokeAgentRuntime(sessionId)
+    AC->>DP: 工具:列表 / 取样 / 执行 SQL
+    AC-->>EX: SQL + 结果 + 说明
+  else 回退
+    EX->>IP: runGenBiAgent
+    IP->>DP: 同一套工具
+  end
+  EX->>EX: SQL 血缘解析 · 脱敏 maskRows · 图表建议
+  EX->>DDB: recordGenBiHistory · 记忆追加
+  EX-->>U: 结果(表 / 图 / SQL / _meta 实际模型)
+  U->>DDB: 保存为卡片 · 定时刷新 = 卡片所在区 MWAA Serverless 单节点 platform-action

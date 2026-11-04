@@ -1,0 +1,34 @@
+flowchart TB
+  subgraph EDGE["边缘"]
+    direction LR
+    WAF["BgpWafStack<br/>WebACL(固定 us-east-1)"] --- CF["CloudFront 分发"]
+  end
+  subgraph APP["应用层 · BgpPlatformStack"]
+    direction LR
+    ALB["ALB<br/>安全组只放行 CloudFront 前缀列表"] --> SVC["ECS Fargate 服务<br/>Next.js 页面 + /api/*"] --- TR["TaskRole<br/>按 infra/iam/platform-taskrole-calls.json 授权"]
+  end
+  subgraph STATE["状态与身份"]
+    direction LR
+    DDB[("BgpDatabaseStack<br/>66 表 + FinOps 3 + Platform 2")] --- KMS["BgpKmsStack<br/>CMK alias/bgp-data · alias/bgp-logs"]
+    AUTH["BgpAuthStack<br/>Cognito 用户池 / 客户端"]
+    SSM["SSM 参数<br/>/bgp/deploy-mode · /bgp/wiring/*"]
+  end
+  subgraph META["元数据与智能体"]
+    direction LR
+    OMI["BgpOmIngestionStack<br/>6 类定时采集"] --> OMS["BgpOm{Database,Search,Service}Stack<br/>OpenMetadata"]
+    AGC["BgpAgentCoreStack ×3<br/>Runtime + Memory(容器源 infra/agent/)"]
+  end
+  subgraph DEPLOY["执行环境部署机制 · BgpExecEnvDeployStack"]
+    direction LR
+    BRK["broker Lambda<br/>独家 StartBuild · 三白名单入参"] --> CB["CodeBuild bgp-exec-env-deploy<br/>buildspec/exec-env-deploy.yml"]
+    SRC["源包 = 控制面部署时的 CDK 资产<br/>(按内容哈希)"] --> CB
+  end
+  subgraph HOMEDP["主控区数据面(tgt_home)"]
+    direction LR
+    RS["BgpRedshiftStack"] --- AFS["BgpAirflowServerlessStack"] --- OPT["门控栈:Rds(demo) · Mwaa(classic)<br/>Realtime · Flink · Emr"]
+  end
+  CF --> ALB
+  SVC --> STATE
+  SVC --> META
+  SVC --> DEPLOY
+  SVC --> HOMEDP

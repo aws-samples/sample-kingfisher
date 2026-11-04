@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bgp.flink</groupId>
+    <artifactId>flink-connector-modules-parent</artifactId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>flink-module-iceberg-s3tables</artifactId>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32-CR — Iceberg + S3 Tables catalog 模块。connector id = "iceberg-s3tables"。
+       🔴 采纳【官方已 relocate 的 runtime jar】(§2.4bis/§2.6 实测结论):
+         · iceberg-flink-runtime-1.20:官方 fat jar,内部 Jackson relocate 到 org/apache/iceberg/shaded/,
+           与 kafka 模块【实测 0 同名类冲突】(vs 手工拼 iceberg-core+flink+aws 裸版的 352 冲突)。
+           自带 RESTCatalog/RESTSigV4/hadoop(shaded)。
+         · s3-tables-catalog-for-iceberg-runtime:AWS 官方已 shade 的 S3TablesCatalog(现有直连方式,已跑通)。
+         · iceberg-aws-bundle:AWS SDK + S3FileIO(runtime bundle)。
+       catalog 注册用现有 S3TablesCatalog 直连(已验证跑通、已根治 412);REST 端点未跑通暂不采纳(§2.6)。
+       主类的 catalog 反射注册在薄基础模块(§2.5),本模块无主类、只提供类。 -->
+  <dependencies>
+    <!-- Flink core:provided(不打入) -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+
+    <!-- Iceberg Flink 官方 runtime(已 relocate,0 冲突)。含 RESTCatalog + hadoop(shaded)。 -->
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-flink-runtime-1.20</artifactId><version>${iceberg.version}</version></dependency>
+    <!-- AWS SDK + S3FileIO(iceberg 官方 runtime bundle,已 relocate) -->
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-aws-bundle</artifactId><version>${iceberg.version}</version></dependency>
+    <!-- AWS 官方 S3 Tables catalog(现有直连方式 catalog-impl=S3TablesCatalog;已跑通、已根治 412) -->
+    <dependency><groupId>software.amazon.s3tables</groupId><artifactId>s3-tables-catalog-for-iceberg-runtime</artifactId><version>0.1.8</version>
+      <exclusions><exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion></exclusions></dependency>
+    <!-- 🔴 hadoop-common(2026-07-27 真跑实证补回):官方 iceberg-flink-runtime 只含 iceberg 自己的
+         org/apache/iceberg/hadoop/,【不含裸 org.apache.hadoop.conf.Configuration】;而主类反射注册 catalog
+         需 new Configuration()(FlinkCatalogFactory 强制,§2.6),缺它 → ClassNotFound → 启动失败(实测)。
+         现有已跑通的 s3t 胖包正是靠单独打 hadoop-common 才有此类。exclusion 照抄 s3t(已验证解冲突)。 -->
+    <dependency><groupId>org.apache.hadoop</groupId><artifactId>hadoop-common</artifactId><version>3.4.0</version><!-- 与 <hadoop.version> 同值;写字面量是让依赖扫描器解析到版本(2026-11-02 GitLab grype 把属性引用当成版本未知) -->
+      <exclusions>
+        <exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion>
+        <exclusion><groupId>org.slf4j</groupId><artifactId>slf4j-reload4j</artifactId></exclusion>
+        <exclusion><groupId>org.slf4j</groupId><artifactId>slf4j-log4j12</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-core</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>flink-module-iceberg-s3tables</finalName>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId></plugin>
+    </plugins>
+  </build>
+</project>

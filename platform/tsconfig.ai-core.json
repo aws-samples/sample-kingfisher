@@ -1,0 +1,19 @@
+{
+  // @ai/core 独立编译成 CJS 的配置(模块 51 v2.0 多厂商模型通道)。
+  // 与 tsconfig.core.json(@genbi/core)/ tsconfig.cookbook-core.json 同构:不 extends 主 tsconfig,
+  // 产物给三个 AgentCore 容器的 core-dist/ai 直接 require/import。
+  // 【只 include 三个纯文件】vendors.ts + converse-shape.ts + transient.ts —— 零 @/、零 SDK;__tests__ 不进产物。
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./.tmp-core-build",
+    "rootDir": "./src/lib/ai/core"
+  },
+  "include": ["src/lib/ai/core/vendors.ts", "src/lib/ai/core/converse-shape.ts", "src/lib/ai/core/transient.ts"]
+}

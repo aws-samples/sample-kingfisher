@@ -1,0 +1,27 @@
+sequenceDiagram
+  autonumber
+  participant U as User (offline compute page)
+  participant RT as PUT /api/etl-jobs/[id] · POST run
+  participant LR as lib/lake/routes.ts
+  participant PF as lib/execution-role/preflight.ts
+  participant IAM as IAM SimulatePrincipalPolicy
+  participant JS as lib/etl/job-service.ts ensureGlueJob
+  participant G as Glue (target region)
+  participant S3T as S3 Tables buckets (target region)
+  U->>RT: save job (lakeBuckets[], defaultCatalogAlias, executionRoleArn)
+  RT->>LR: resolveLakeRoutes(targetId) → selectRoutes(declared)
+  LR-->>RT: routes or 400 LAKE_ROUTE_NOT_FOUND
+  RT->>LR: rejectUserCatalogConf(jobParameters["--conf"], routes)
+  LR-->>RT: ok / 400 LAKE_ROUTE_ALIAS_CONFLICT
+  RT->>PF: preflightExecutionRole({engine, roleArn, targetId, lakeRoutes})
+  PF->>IAM: probes = baseline + per-route s3tables read (+ write when writable)
+  IAM-->>PF: allowed / implicitDeny per probe
+  PF-->>RT: PreflightResult (gaps list names bucket ARN and action)
+  RT-->>U: 400 with gaps, or 200 saved
+  U->>RT: run now
+  RT->>JS: ensureGlueJob(job, targetId)
+  JS->>LR: sparkCatalogConf(routes, {engine glue, defaultAlias}) + lakeCatalogsArgument(routes)
+  LR-->>JS: --conf chain (5 properties per route) · --bgp_lake_catalogs
+  JS->>G: CreateJob / UpdateJob (DefaultArguments) → StartJobRun
+  G->>S3T: read detail.ns.table and write agg.ns.table (three-part names)
+  G-->>RT: run status polled → run history row

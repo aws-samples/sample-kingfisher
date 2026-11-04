@@ -1,0 +1,612 @@
+{
+  "$comment": [
+    "🔴🔴 【只有真部署才会执行的层】的显式清单 + 只减不增棘轮(2026-09-15 立)。",
+    "",
+    "【为什么存在 —— 用户 2026-09-15 原话:「这些最关键的环节一定要做到万无一失,这是全球用户使用的生产项目」+「你每次都是边修边产生 bug」】",
+    "同一天的实证:执行环境初始化的 buildspec **build 段**从来没有任何东西执行过它 ——",
+    "`read -r a b c < file` 在文件没有行尾换行时返回非 0(变量其实已赋值),`set -euo pipefail` 当场杀掉整个 build;",
+    "而 tsc 0 / 3305 单测 / 全量 synth 门禁**全绿**,CodeBuild 日志里只有命令原文。",
+    "⇒ 缺陷不是长在代码里,是长在**没有任何离线执行者的那一层**。这类层每暴露一个缺陷要花一次真部署(40–60 分钟)。",
+    "",
+    "【机制】每一层要么有**能离线真跑的替身**(harness),要么写下**封闭理由**(reason,取自下面的枚举)。",
+    "`limit` = 目前**没有替身**(reason=blind)的层数,**只减不增**;门禁断言实数恰好等于它(不是 <=)。",
+    "🔴 门禁还会**自己发现**候选层(4 个机械规则,见 prod-only-layers.test.ts)并要求逐个登记 ——",
+    "   不然这张清单就退化成「我手工维护的一份名单」,而覆盖面就是判据本身(见记忆 manifest-gate-coverage-is-the-criterion)。",
+    "",
+    "🔴 数字**不许为了好看而分类**:凡我没有真的核实过替身存在的,一律 blind。这个数的用途是被**有意识地**减小。"
+  ],
+  "limit": 14,
+  "reasons": {
+    "blind": "**没有替身** —— 只有真部署/真运行才会执行它。棘轮数的就是这一类",
+    "echo-only": "只打印,无判断与副作用(改坏了不会造成错误状态)",
+    "local-tooling": "只在本机开发流程里跑,不在任何生产路径上",
+    "is-the-gate-itself": "它本身就是门禁 / 验收入口",
+    "not-executed-code": "产物是**数据**(配方/种子/文案),不是被别处执行的代码",
+    "covered-by-fresh-account-rebuild": "每次空账号从零重建都会执行它,且失败立即中止整条链(响亮,不静默)"
+  },
+  "harnessKinds": {
+    "offline-real-run": "门禁**真的执行**它(bash/python/js),stub 掉外部依赖 —— 最强",
+    "offline-compile": "离线只验语法(如 python3 -m py_compile)—— 只挡语法类,须与真环境段配套",
+    "hard-gate-segment": "真环境硬门段会执行它(慢,但是真的跑)"
+  },
+  "layers": [
+    {
+      "id": "buildspec:exec-env-deploy:build",
+      "what": "bootstrap → P0-E 闸 → `cdk deploy BgpExecEnv-<slug>-*`(拼 -c 入参的那一段)",
+      "executor": "CodeBuild bash",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/scripts/exec-env-synth-gate.mjs",
+        "marker": "§11e",
+        "cases": 4
+      },
+      "note": "🔴 2026-09-15 之前这一层 **0 例**;真环境第一次建 us-west-2 就死在 read/EOF 上"
+    },
+    {
+      "id": "buildspec:exec-env-deploy:post_build",
+      "what": "打印 CFN Outputs",
+      "executor": "CodeBuild bash",
+      "reason": "echo-only"
+    },
+    {
+      "id": "buildspec:exec-env-deploy:pre_build",
+      "what": "执行环境部署的前置检查(账号护栏 / AZ 两层 preflight / 孤儿表桶清理 / 主控区三件事实发现)",
+      "executor": "CodeBuild bash",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/scripts/exec-env-synth-gate.mjs",
+        "marker": "§11",
+        "cases": 11
+      }
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/emr.ts",
+      "what": "配方种子(数据)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/warehouse-facts.ts",
+      "what": "配方种子(数据):Glue/EMR 连本区数仓的唯一教法 + warn 级判据(B-27)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/s3tables-overwrite-facts.ts",
+      "what": "配方种子(数据):S3 Tables 结果表原子覆盖的唯一教法 + 「先 drop 再建」warn 级判据(序 37 配方根治)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/glue.ts",
+      "what": "配方种子(数据)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/s3tables.ts",
+      "what": "配方种子(数据)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/cookbook/seed/shared-rules.ts",
+      "what": "配方种子(数据)",
+      "executor": "—",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/engines/emr/dag-generator.ts",
+      "what": "EMR 作业 DAG(Python)",
+      "executor": "Airflow",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/etl/dag-generator.ts",
+      "what": "离线作业 DAG(Python)",
+      "executor": "Airflow",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/lineage/spark-lineage.ts",
+      "what": "Spark 血缘解析(读产物,不产出被执行的代码)",
+      "executor": "平台进程内",
+      "reason": "not-executed-code"
+    },
+    {
+      "id": "codegen:platform/src/lib/monitor/run-groups.ts",
+      "what": "运行组确定性键的 Python 片段",
+      "executor": "Airflow(经 runtime-lib 拼入)",
+      "harness": {
+        "kind": "offline-compile",
+        "where": "platform/src/lib/monitor/__tests__/scheduled-run-group-wiring.test.ts",
+        "marker": "py_compile",
+        "cases": 1
+      }
+    },
+    {
+      "id": "codegen:platform/src/lib/requirements/codegen.ts",
+      "what": "需求 → 代码生成",
+      "executor": "各引擎",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/scheduler/action-commands.ts",
+      "what": "「按时跑一次平台动作」的合同:可下发动作白名单 + 命令行属性名 + 纯解析器(WP-28)",
+      "executor": "—",
+      "reason": "not-executed-code",
+      "note": "它不产出任何在别处执行的代码 —— 被发现纯粹因为**注释里**提到 boto3(在解释「为什么传输走 DDB 而不是 SQS」)。规则刻意写宽,所以这里按设计**显式登记排除**,而不是去改窄规则。离线判据:platform/src/lib/scheduler/__tests__/action-commands.test.ts(6 条 / 4 变异全红)"
+    },
+    {
+      "id": "codegen:platform/src/lib/scheduler/serverless/runtime-py.ts",
+      "what": "MWAA Serverless 运行时 Python",
+      "executor": "MWAA Serverless",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/datasource/glue-reach.ts",
+      "what": "数据源表发现脚本(序 38 B-70:经数据源自己的 Glue 连接读 information_schema,结果 JSON 落脚本桶)",
+      "executor": "AWS Glue 5.1 PySpark + boto3",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/datasource/__tests__/discovery-harness.py",
+        "marker": "§discovery",
+        "cases": 6
+      },
+      "note": "序 38(2026-10-13):平台生成的脚本原样 exec,假 awsglue / pyspark / boto3;断结果 JSON(表 / 列序 / 可空 / 缺省 schema 去前缀)、库名护栏真拒、JDBC 失败不写结果 —— discovery-script-behavior.test.ts"
+    },
+    {
+      "id": "codegen:platform/src/lib/sync/glue-script-generator.ts",
+      "what": "同步任务的 Glue PySpark 脚本",
+      "executor": "AWS Glue",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/workflow/dag-generator.ts",
+      "what": "工作流 DAG / MWAA Serverless 定义",
+      "executor": "Airflow / MWAA Serverless",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/workflow/node-exec-py.ts",
+      "what": "工作流节点语义的 Python 单一作者",
+      "executor": "Airflow",
+      "reason": "blind"
+    },
+    {
+      "id": "codegen:platform/src/lib/workflow/job-exec-py.ts",
+      "what": "作业族执行体(台账 / 作业锁 / 软限 / 落点 / 三引擎)的 Python 单一作者:单作业 run_job 与工作流离线作业节点 _exec_job 共用,两载体拼同一份字节(序 73 模块 57)",
+      "executor": "Airflow / MWAA(Serverless 与经典)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/workflow/__tests__/job-node-exec.test.ts",
+        "marker": "⑥ 两载体真分派到同一个执行体",
+        "cases": 13
+      },
+      "note": "python3 真跑:假 boto3 只记录调用;经典 build_dag(stub airflow)与 serverless _run_node_body 都真分派到 _exec_job;锁 / 台账 / 失败 / 落点 fail-closed 逐条断"
+    },
+    {
+      "id": "codegen:platform/src/lib/workflow/runtime-lib.ts",
+      "what": "注进 S3 的 `bgp_runtime.py`(工作流节点在 Airflow 里 import 它)",
+      "executor": "Airflow / MWAA(Serverless 与经典)",
+      "harness": {
+        "kind": "offline-compile",
+        "where": "platform/src/lib/monitor/__tests__/scheduled-run-group-wiring.test.ts",
+        "marker": "py_compile",
+        "cases": 1
+      }
+    },
+    {
+      "id": "lambda:action-dispatcher",
+      "what": "WP-28 平台动作命令分发:DDB Streams(INSERT + pending)→ 平台内部端点 /api/internal/actions/run;交不出去就把命令判 failed",
+      "executor": "Lambda(DynamoDB Streams 事件源)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/action-dispatcher/handler.test.mjs",
+        "marker": "makeHandler",
+        "cases": 7
+      }
+    },
+    {
+      "id": "lambda:cognito-bootstrap",
+      "what": "受限账号下建用户组/用户/改密的引导通道(python);2026-09-17 起同时是 **CFN 自定义资源**(路径C 部署期自愈)",
+      "executor": "Lambda(人工 invoke / CloudFormation 自定义资源)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/cognito-bootstrap/test_handler.py",
+        "cases": 11,
+        "marker": "class CfnPathTests"
+      },
+      "note": "🔴 假 boto3 + 假 urlopen 真跑每条出口:不回响应(CFN 挂 1h)/ 静默成功(栈全绿而没有用户)两种坏法都被钉住;接线由 platform 侧 cognito-bootstrap-cfn.test.ts 保证"
+    },
+    {
+      "id": "lambda:exec-env-broker",
+      "what": "部署 broker:入参白名单 / 会话与锁 / epoch / 起 CodeBuild",
+      "executor": "Lambda(生产路径唯一入口)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/scripts/exec-env-synth-gate.mjs",
+        "marker": "E-49",
+        "cases": 46
+      }
+    },
+    {
+      "id": "lambda:genbi-skills",
+      "what": "GenBI 的 AgentCore skills 处理器",
+      "executor": "Lambda / AgentCore",
+      "reason": "blind"
+    },
+    {
+      "id": "lambda:xregion-peering",
+      "what": "跨区通路 home 侧接线:accept peering / 回程路由 / 读回端点 ENI IP",
+      "executor": "CFN 自定义资源(Lambda)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/exec-env/__tests__/xregion-peering-lambda.test.ts",
+        "marker": "fakeEc2",
+        "cases": 12
+      }
+    },
+    {
+      "id": "script:00-prereqs.sh",
+      "what": "部署前置依赖检查",
+      "executor": "本机 bash",
+      "reason": "covered-by-fresh-account-rebuild"
+    },
+    {
+      "id": "script:01-preflight-account.sh",
+      "what": "换账号后的前置体检(身份/VPC 配额/EIP/IAM 建角色/Cognito 管理写/cdk.out 外账号桶名/Bedrock 真 converse/region 放行的可逆真写探测)",
+      "executor": "本机 bash → AWS",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "2026-09-19 在全新账号真跑过:硬项全过、软提示 3 项(us-west-2 有别人的 workshop-infra / us-east-1 EIP 4-5 / eu-west-1 被组织策略拦)。所有写探测可逆(建角色即删、建 user pool 即删、建桶即删);硬失败非零退出。"
+    },
+    {
+      "id": "script:02-postdeploy-truth.sh",
+      "what": "部署后的「真就位」9 条真值查询(栈全绿 / ECS running==desired / 首页 / 未登录 401 / 能登录且带 admin 组 / 关键表主键与 TTL / 五个 AI 接线 env 非空 / 执行环境部署机制 / home 已 active)",
+      "executor": "本机 bash → AWS",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "2026-09-19 在全新账号真跑过 9/9;写它的时候自己先踩了一次「按语义猜 DDB 键名」导致假红,已在判据旁写明真键名是 pk/sk。任一条不过即非零退出。"
+    },
+    {
+      "id": "script:10-bootstrap-cognito.sh",
+      "what": "建用户池组与账号",
+      "executor": "本机 bash → AWS",
+      "reason": "covered-by-fresh-account-rebuild"
+    },
+    {
+      "id": "script:20-seed-data.sh",
+      "what": "造电商样例数据",
+      "executor": "本机 bash → AWS",
+      "reason": "covered-by-fresh-account-rebuild"
+    },
+    {
+      "id": "script:22-seed-game.sh",
+      "what": "造游戏样例数据(1199 万行)",
+      "executor": "本机 bash → AWS",
+      "reason": "covered-by-fresh-account-rebuild"
+    },
+    {
+      "id": "script:23-seed-game-region.sh",
+      "what": "在某个执行环境**自己的 region** 就地造游戏分析数据集(Parquet 落该区数据湖 + 注册该区 Glue Catalog);桶/角色/region 全从执行环境注册表读",
+      "executor": "本机 bash + 该区 Glue 作业",
+      "reason": "local-tooling",
+      "note": "只在验收/演示准备时手工跑,不在任何部署或运行路径上;`set -euo pipefail` + 逐步显式判断 + 轮询到 SUCCEEDED 才 exit 0(失败响亮,不静默)。产物是**数据**,不是被别处执行的代码。"
+    },
+    {
+      "id": "script:31-showcase-region.py",
+      "what": "用**产品 API** 在某个执行环境建**长期保留**的 Showcase-* 对象并跑到成功(数据源→同步→ETL 三引擎→编排→治理→建模),打每区收官表",
+      "executor": "本机 python3 → 产品 API + AWS",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "2026-09-19 在全新账号两个区各跑过,并**真的把红报出来了**(编排触发撞角色传播窗口;6 个同步并发建同一个 schema 撞 pg_namespace 唯一索引)—— 那两个产品缺陷都是它抓到的。示范对象独占 showcase schema/namespace ⇒ 重跑幂等、零删除。任一环失败即非零退出。"
+    },
+    {
+      "id": "script:32-verify-all-regions.sh",
+      "what": "每个活跃执行环境各跑一遍七类能力(按需造数 → 用产品 API 建长期保留的 Showcase-* 对象并跑到成功 → 每区一张收官表)",
+      "executor": "本机 bash + python3 → 产品 API + AWS",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "2026-09-19 在全新账号两个区各跑过,并且**真的把红报出来了**(主控区编排触发撞 airflow-serverless 角色传播窗口;第二区 6 个同步并发建同一个 schema 撞 pg_namespace 唯一索引)—— 这两个产品缺陷都是它抓到的。任一区失败即非零退出。⚠️ 它 2026-09-18 入库那一笔漏登记本台账(本笔补)。"
+    },
+    {
+      "id": "script:33-verify-regions-headless.py",
+      "what": "🔴 **无头浏览器**逐区验收七类能力 + 产出「能力 × 区域 × 执行方式」三维矩阵(Stop hook 判据 ⑥ 吃它)",
+      "executor": "本机 python3 + playwright(页面驱动)",
+      "reason": "is-the-gate-itself",
+      "note": "用户红线:「只能是无头浏览器验证才有效,因为后续也是人操作页面」。2026-09-19 首轮就抓到 4 个产品缺陷(治理目录搜索失效 / EMR 按钮不复述区且无 testid / 发布后面板与卡片说法不一 / 编排角色传播窗口)。自包含:不 import 不入库的 qa-game/verify/vlib.py。"
+    },
+    {
+      "id": "script:34-add-region-headless.py",
+      "what": "用**页面向导**在一个新 region 从零拉起执行环境:注册 → 自动触发 CodeBuild → 等终态 → 跑 redeploy-platform 放行该 region → 页面「检测初始化」→ 页面「启用」",
+      "executor": "本机 python3 + playwright(页面驱动)+ 子进程调 redeploy-platform.sh",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "🔴 为什么走页面而不是打 API:用户看到的是向导页面,只有页面驱动才发现得了「注册成功但自动触发部署失败」「探活红了页面却不说真因」这类缺陷。🔴 三步顺序写死:注册 → 放行(IAM 的 RequestedRegion 是部署期静态写入,放行清单由 redeploy-platform 从注册表推导 ⇒ 必须在注册之后、且等构建跑完再做)→ 检测初始化 + 启用。2026-09-19 幂等性真验:us-west-2 已 active ⇒ 直接成功返回、零改动。"
+    },
+    {
+      "id": "script:35-rebuild-account.sh",
+      "what": "换账号后的**一条命令**总编排:体检 → 全量部署 → 真就位 → 主控区造数 → 页面向导加第二个区 → 该区造数 → 每区七类能力真跑 → 无头浏览器逐区验收 + 三维矩阵",
+      "executor": "本机 bash(按阶段调其它脚本)",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "用户 2026-09-19:「脚本也要沉淀保存,不能只是放到临时目录,我们后面这样可以快速通过无头浏览器拉起来环境和快速进行无头浏览器验证」。阶段失败即中止(不让后面的阶段在坏地基上白跑),每阶段一份日志;支持 --from/--only/--skip 续跑。2026-09-19 用 --only truth 真跑过编排本身。"
+    },
+    {
+      "id": "script:36-fixture-ledger.py",
+      "what": "验收夹具台账:列清「示范对象(长期保留)vs 验收段夹具(该清)」,并按**逐个指名**经产品 DELETE 接口清理",
+      "executor": "本机 python3 → 平台 API(换账号 / 每轮硬门之后手动跑)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/fixture-ledger-classify/test_classify.py",
+        "marker": "reject_reason",
+        "cases": 26
+      },
+      "note": "🔴 唯一的危险面是「删错东西」,而那一面在真环境上没法安全试(试一次就真删了)⇒ 两个纯函数 classify / reject_reason 由离线 harness 驱动 26 例(通配符拒 / 示范对象拒 / 空 token 拒 + 三种分类的覆盖面自检)。删除一律走产品 DELETE 接口(流作业会真销毁 MSAF 应用、同步任务会真停后台通道),绕过它就是「记录删了、后台还在计费」。"
+    },
+    {
+      "id": "script:37-fixture-reseal.py",
+      "what": "把**所有** drift 非 `ok` 的已发布载体重新发布,让它与当前定义一致(幂等,可反复跑);判据夹具留下副作用时的收口工具",
+      "executor": "本机 python3 + playwright(走产品自己的 publish 通道)",
+      "reason": "is-the-gate-itself",
+      "note": "🔴 它是「判据不许留下副作用」这条纪律的收口工具:B-09 的 `2d` 夹具被 timeout 杀在还原之前,示范对象被留成 stale ⇒ 这个脚本把它收回来。闭合式(不列名单,收所有 drift 非 ok 的)。2026-09-22 真跑过两次:第一次收两个示范对象、第二次收一个残留工作流,都逐层复读确认回到 ok。"
+    },
+    {
+      "id": "script:38-b09-drift-discrim.py",
+      "what": "B-09 载体落后检测的**判别力**验证:改一个验收残留的 cron 而不重发 ⇒ 必须判 stale;含负向控制组(同一次读里别的已发布行仍全 ok)与收口(还原后回 ok)",
+      "executor": "本机 python3 + playwright + DDB(只动验收残留,绝不碰 Showcase-*)",
+      "reason": "is-the-gate-itself",
+      "note": "🔴 每次动 `buildCarrierArtifact` / 归一清单都要重跑它 —— 它回答的是「这条机制到底分不分得清 ok 与 stale」。2026-09-22 真跑 5/5 全绿(①改之前是 ok 排除恒 stale · ②接口真读到改后的 cron · ③落后判 stale · ④负向控制排除「一改就全红」· ⑤还原后回 ok)。"
+    },
+    {
+      "id": "script:collect-cfn-exec-actions.sh",
+      "what": "收集 cfn-exec 角色实际用到的 action",
+      "executor": "本机 bash",
+      "reason": "local-tooling"
+    },
+    {
+      "id": "script:core-prebuild.sh",
+      "what": "core 侧预构建(cookbook/genbi 子目录)",
+      "executor": "本机 bash",
+      "reason": "blind"
+    },
+    {
+      "id": "script:deploy-all.sh",
+      "what": "从零部署整套平台(21 栈 + 造数 + 引导)",
+      "executor": "本机 bash → AWS",
+      "reason": "blind",
+      "note": "🔴 仍是 blind:整条部署流程没有替身。**只有**第 13 步那两个体检函数有离线替身 (infra/test/deploy-all-checks/test_checks.sh,11 例;接线体检 fail-open / 机制体检误诊 / IAM 模拟门把「门未执行」当成「产品红」这三个都在那里钉住)——部分覆盖不许让棘轮变小"
+    },
+    {
+      "id": "script:genbi-core-prebuild.sh",
+      "what": "genbi core 预构建",
+      "executor": "本机 bash",
+      "reason": "blind"
+    },
+    {
+      "id": "script:iam-simulate-gate.py",
+      "what": "IAM 模拟门:按 infra/iam/platform-taskrole-calls.json 清单逐个 action×region 做 SimulatePrincipalPolicy",
+      "executor": "本机 python3 → IAM(redeploy-platform 每次都调)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/iam-gate-classify/test_classify.py",
+        "marker": "classify",
+        "cases": 21
+      },
+      "note": "2026-09-19 每次 redeploy 都真跑。🔴 清单没登记的新调用它查不出来 —— 「覆盖面就是判据本身」,新增 AWS 调用必须同笔提交进清单(同日实证:实时计算那一族 kinesis/Flink 日志组从来没登记 ⇒ 门 95 条里一条都没探过它,第二个区静默无权)。三态裁决(allowed / ⛔ 账号所在组织的 SCP 拦住 / 真红)是纯函数,由上面这个离线 harness 驱动 21 例 + 4 变异 —— 真账号只会产出它恰好有的那几种形状,四道 fail-closed 收窄只能离线验。"
+    },
+    {
+      "id": "script:infra/scripts/deploy-impact.mjs",
+      "what": "changeset → 影响面/planHash/基线漂移(平台侧同源)",
+      "executor": "CodeBuild + 平台进程内",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/exec-env/__tests__/deploy-impact-parity.test.ts",
+        "marker": "normalizeDescribeChangeSet"
+      }
+    },
+    {
+      "id": "script:infra/scripts/exec-env-synth-gate.mjs",
+      "what": "执行环境栈组的 synth 门禁(它自己就是门)",
+      "executor": "本机 node",
+      "reason": "is-the-gate-itself"
+    },
+    {
+      "id": "script:infra/scripts/p0e-gate.mjs",
+      "what": "P0-E 闸:预演 changeset → 逐栈裁决 → 审批比对(补装 / 重部署都过它)",
+      "executor": "CodeBuild(exec-env-deploy 的 build 段)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/exec-env/__tests__/p0e-preview-outcome.test.ts",
+        "marker": "previewVerdict",
+        "cases": 11
+      },
+      "note": "🔴 2026-09-15 之前这一层 **0 例**:CDK 撞 CloudFormation 最终一致性拿到 ChangeSetNotFound ⇒ 闸把「预演失败」按最严拒 ⇒ 补装组件随机整体失败"
+    },
+    {
+      "id": "script:infra/scripts/preview-outcome.mjs",
+      "what": "P0-E 预演结果判定(纯函数:CDK 失败行解析 / changeset 五态 / 瞬态 vs 真错裁决)",
+      "executor": "CodeBuild(被 p0e-gate 调用)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/exec-env/__tests__/p0e-preview-outcome.test.ts",
+        "marker": "REAL_LOG",
+        "cases": 11
+      }
+    },
+    {
+      "id": "script:install-hooks.sh",
+      "what": "装 Claude hooks",
+      "executor": "本机 bash",
+      "reason": "local-tooling"
+    },
+    {
+      "id": "script:cut-release.sh",
+      "what": "在 main 上切版本(改 VERSION + CHANGELOG 标题 ⇒ release/<版本号> 分支 ⇒ 注解 tag v<版本号> ⇒ 推);缺省只演练,--yes 才落;硬门 = 整轮无头硬门章 pass 且章提交与 HEAD 产品字节零差(2026-11-01 用户拍板的发版命名)",
+      "executor": "本机 bash(开发机发版时手工跑一次)",
+      "reason": "local-tooling",
+      "note": "不在客户部署 / 升级 / 执行环境 CodeBuild 的任何路径上;改坏的后果是切不出 tag(当场可见),不会造成生产错误状态"
+    },
+    {
+      "id": "script:kf_headless_lib.py",
+      "what": "仓内无头脚本的共用底座(登录+播导览+钉语种 / 带 ?scope= 开页并等落定 / 点 antd 控件 / 判据台账 + 三维矩阵输出)",
+      "executor": "被 33、34 号脚本 import",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "单一作者:登录、开页、点 antd 控件这几件事只有这一份实现。以前 33 自带一份、加区脚本再抄一份 ⇒ 同一个坑(Radio.Button 不是 button / 导览遮罩 / 出站 IP 决定语种)要修两遍,漏修的那份就是下一次假红。"
+    },
+    {
+      "id": "script:mr-gate.sh",
+      "what": "多区域硬门入口",
+      "executor": "本机 bash",
+      "reason": "is-the-gate-itself"
+    },
+    {
+      "id": "script:preflight-classic-mwaa.sh",
+      "what": "经典 MWAA 栈存在时阻止更新平台栈",
+      "executor": "本机 bash → AWS",
+      "reason": "blind"
+    },
+    {
+      "id": "script:redeploy-platform.sh",
+      "what": "平台栈重部署唯一入口(接线 + SSM + IAM 模拟门)",
+      "executor": "本机 bash → AWS",
+      "reason": "blind",
+      "note": "🔴 仍算 blind:整条部署编排只有真部署才跑得到。但其中**最容易出错的一小段**(IAM 模拟门的三态裁决)已经有离线 harness:`infra/test/redeploy-verdict/test_verdict.sh` 把 `# >>> iam-gate-verdict-block` 标记之间的代码**逐字抽出来**,在同样的 `set -euo pipefail` 下对 rc ∈ {0,1,2,3,4} 各跑一次(14 例 + 1 变异)。2026-09-19 真踩:那段原来写 `iam_gate_verdict \"$RC\"; VERDICT=$?` —— errexit 之下函数回非 0 就把脚本杀了 ⇒ 三态里除「绿」以外的每一句话**一次都没打印过**,而当时的文本判据是绿的(代码里确实有那几句)。⇒ 这类「写了但接不上」只能靠真的在 errexit 下跑一遍抓。**没有把本层翻出 blind**:harness 只覆盖那一段,翻出去会让棘轮数变小而覆盖面没真变大。"
+    },
+    {
+      "id": "script:redeploy-agents.sh",
+      "what": "升级 / 刷新三个 AgentCore 智能体镜像与栈的唯一入口(B-76):--check 只读三态(一致 / 需要刷新 / 读不到)· 重编 core-dist · 构建推送 arm64 镜像 · 逐栈部署 · 回读核对",
+      "executor": "本机 bash → docker buildx + cdk + AWS(与 deploy-all 第 4 / 5 步共用 scripts/lib/agentcore-agents.sh 一份映射表与函数)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/redeploy-agents/test_redeploy_agents.sh",
+        "marker": "✅ redeploy-agents 离线判据全过",
+        "cases": 27
+      },
+      "note": "2026-10-14 立(序 39):替身用假 aws / docker / npx 真跑脚本本体 —— 参数校验(旗标当 profile / 漏参)、凭证核验(坏凭证不许误诊成「栈没建」)、部署模式护栏(SSM 与显式值不同即拒)、--check 三态(一致 / 需要刷新 / 读不到,三态分开说)、本机没有该提交按需要刷新、--only 过滤;由 platform/src/lib/exec-env/__tests__/redeploy-agents-harness.test.ts 在 vitest 里真跑。🔴 诚实边界:构建推送镜像 / cdk 部署 / 回读核对那一段只有真环境能跑(第三十七轮重建链真跑一次,结论回写台账 B-76)。"
+    },
+    {
+      "id": "script:redline-scan.sh",
+      "what": "敏感信息红线扫描",
+      "executor": "本机 bash",
+      "reason": "is-the-gate-itself"
+    },
+    {
+      "id": "script:seed_ecommerce.py",
+      "what": "电商黄金数据集的 Glue 造数脚本(被 20-seed-data.sh 上传到 Glue 作业执行)",
+      "executor": "该区 Glue 作业(python shell/Spark)",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "deploy-all 第 12 步每次空账号重建都跑;2026-09-19 实测 SUCCEEDED。产物是**数据**,但脚本本身是被别处执行的代码 ⇒ 登记在册。"
+    },
+    {
+      "id": "script:seed_game.py",
+      "what": "主控区源库(MySQL)的游戏买量数据集造数脚本,7 表 ≈ 1200 万行(被 22-seed-game.sh 上传到 Glue 执行)",
+      "executor": "该区 Glue 作业",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "🔴 必须与 seed_game_region.py **逐列一致**:不一致会让「同一个作业在每个区都跑」在第二个区当场 column does not exist,而根因离症状很远(2026-09-18 实测)。改一处必须两处同改。2026-09-19 实测 1198 万行。"
+    },
+    {
+      "id": "script:seed_game_region.py",
+      "what": "在**非 home 区**就地生成与主控区**同构**的游戏数据集(Parquet 落该区数据湖 + 注册该区 Glue Catalog)",
+      "executor": "该区 Glue 作业",
+      "reason": "covered-by-fresh-account-rebuild",
+      "note": "零跨区搬运;桶/角色/region 全从执行环境注册表读。🔴 与 seed_game.py 的列必须逐列一致(见上条)。2026-09-19 实测 7 表就位。"
+    },
+    {
+      "id": "script:scrub-leaked-secrets-from-history.sh",
+      "what": "一次性历史清洗:把 2026-09-22 误提交的两份本机配置备份(含 Cognito admin 口令字面量与真实 12 位账号号)从 git 历史的 `16ba619~1..design/50-data-residency` 区间里抹掉,并在 force-push 之前跑五条收口判据",
+      "executor": "本机 bash + git filter-branch(只改写那 6 个提交,祖先 SHA 一个不动)",
+      "reason": "is-the-gate-itself",
+      "note": "🔴 入仓留痕,不是「以后还要跑」的工具(它把范围写死在那次事故上)。收口判据判的是**最终状态**不是「我执行过」:① 提交条数不变 ② **新旧 HEAD 的树逐字节相同**(内容零变化)③ 提交标题序列逐字不变 ④ 分支可达对象里再也没有那两个路径 ⑤ 红线门 `--addable` 绿;任一条不成立就不许 force-push。2026-09-22 真跑:726 → 726 条、树 2bb001e2 不变、命中 0、五条全过 ⇒ force-with-lease 推送成功(636e569 → cc46a51),main 与 feature/multi-region_GPT 的 SHA 一个没动。背景见 docs/BUG-LEDGER.md §8.12 / ROADMAP §2octies.95。"
+    },
+    {
+      "id": "codegen:platform/src/lib/role-advisor/script-scan.ts",
+      "what": "从脚本代码 + 源头/目标绑定 + 配方库**自动推导**「这个作业需要哪些权限」(它**读** boto3 代码,不生成代码 —— 发现规则按 `boto3` 特征词抓层,所以它被抓了进来)",
+      "executor": "平台运行期(角色顾问推荐 / 一键创建)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/role-advisor/__tests__/script-scan.test.ts",
+        "marker": "scanForPermissions",
+        "cases": 10
+      },
+      "note": "2026-09-22 B-21 根治的一部分。夹具是**用户那次真实作业的脚本**;含一条「认不出来的 AWS 调用必须进 unknown、不许静默丢掉」的判据。变异 5/5 抓到。"
+    },
+    {
+      "id": "codegen:platform/src/lib/role-advisor/advise.ts",
+      "what": "角色顾问的**唯一对外入口**:引擎必备基线 + 扫描推导合成一份策略(带逐条证据)",
+      "executor": "平台运行期(/api/role-advisor/recommend · provisionRole)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/role-advisor/__tests__/engine-baseline.test.ts",
+        "marker": "toMatch(/await\\s+adviseRole\\(/)",
+        "cases": 4,
+        "note": "🔴 marker 刻意取**断言本身**而不是断言消息:第一版写 `await adviseRole`,它命中的是消息字符串 `\"provisionRole 必须 await adviseRole(...)\"` ⇒ 把断言改坏、只留消息,指针照样绿(台账在说谎)。"
+      },
+      "note": "接线判据钉「provisionRole 必须 await adviseRole、不许绕回纯规则那层」(剥 import 后查调用位置)。2026-09-22 B-21。"
+    },
+    {
+      "id": "codegen:platform/src/lib/engines/emr/spec.ts",
+      "what": "EMR 的 spark-submit 参数装配:规格 conf + S3 Tables catalog 注入 + **落点事实与执行区环境变量注入**(`bgpLandingParameters` / `regionEnvParameters`)",
+      "executor": "平台运行期(手动提交 provider.ts · 定时扇出 schedule-fanout.ts)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/engines/emr/__tests__/region-injection.test.ts",
+        "marker": "regionEnvParameters(\"us-west-2\")",
+        "cases": 5
+      },
+      "note": "2026-09-22 被发现规则抓进来:本文件的注释里出现了 `boto3.client('redshift-data')`(在解释 NoRegionError 的成因)—— 发现规则按 `boto3` 特征词扫,刻意宽。🔴 它确实是**运行期**装配代码,且判据钉住「driver 与 executor 都注入」「两条提交路径同一个作者」「区域四键是保留键(覆盖=驻留问题)」。B-21 第八层。"
+    },
+    {
+      "id": "script:om-secure-admin.sh",
+      "what": "把 OpenMetadata 出厂管理员口令 admin/admin 换成 Secrets Manager 里的随机口令(幂等,改后验证新口令能登 ∧ 出厂口令不能登)",
+      "executor": "deploy-all 6.4 / redeploy-platform 3b(bash + 内嵌 python)",
+      "reason": "blind",
+      "note": "🔴 生产上线批次 A(2026-10-09)新增,**还没有离线替身也没真跑过** ⇒ 如实记 blind,limit 13→14。关闭条件:补离线替身(本地假 OM HTTP 服务 + PATH 里假 aws,真跑四态:已加固 / 出厂口令可改 / 两个都登不进 / 改后验证不成立),补完 limit 回 13"
+    },
+    {
+      "id": "script:resolve-home-model.sh",
+      "what": "按主控区账号真值为候选链(ai-model.json candidateModelIds:Claude Opus → GLM 5.3 → Kimi K3)逐个选默认大模型:列推理配置 → 用 modelArn 真值反推基础模型 → 本区地理配置 / global. / 基础 id 逐个真 converse 一次,第一个成功的注入 BEDROCK_MODEL_ID;全链失败非零退出并逐条说明(模块 51 v2.0 D14)",
+      "executor": "deploy-all 2) / redeploy-platform 开头(bash + 内嵌 python)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/resolve-model/test_resolve_model.sh",
+        "marker": "✅ 主控区模型解析判据全过",
+        "cases": 24
+      },
+      "note": "生产上线批次 A · h(2026-10-09):出厂默认 us.* 在非美国主控区调不通;假 aws 真跑五态 + 两个部署脚本接线 · 序 40(2026-10-14):候选链 + 真值反推(不写厂商正则),替身 24 例,由 platform/src/lib/ai/__tests__/resolve-home-model-harness.test.ts 在 vitest 里真跑"
+    },
+    {
+      "id": "script:lib/docs_restructure.py",
+      "what": "Markdown 文档机械无损重构与格式门禁(restructure ledger / schedule / generic · check 行 ≤ 300 / 单元格 ≤ 200 · verify 旧文片段逐字在新文 · stats);2026-11-04 用户「所有文档都没有换行,都堆到一起」",
+      "executor": "本机 python3 -I(开发机手工跑一次;之后由 platform/src/lib/__tests__/docs-format-guard.test.ts 用同一口径守住两份文档)",
+      "reason": "local-tooling",
+      "note": "不在客户部署 / 升级 / 执行环境 CodeBuild 的任何路径上;只读写 docs/*.md。改坏的后果是重构失败或 check 误判(当场可见,且 verify 以旧文为据);`--self-test` 用合成台账 / 排期 / generic 样例做正向 + 变异(删片段 / 改字 / 301 字符行 / 201 字符格)判别力自检"
+    },
+    {
+      "id": "script:lib/execution-regions.sh",
+      "what": "放行清单唯一作者(主控区 ∪ 注册表在用区 ∪ 候选区;EXEC_REGION_CANDIDATES 校验 / all-enabled / none;IAM 门探测区挑选与 verdict_code)",
+      "executor": "本机 bash(被 deploy-all.sh / redeploy-platform.sh source)→ AWS(只读 DDB 注册表 + SSM 候选区)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/execution-regions/test_lib.sh",
+        "marker": "放行清单唯一作者",
+        "cases": 42
+      },
+      "note": "2026-11-04 发现规则扩到 scripts/lib 后登记(序 48 立 lib 时替身就在:假 aws 驱动每个分支,42 条判据 0 失败,`bash infra/test/execution-regions/test_lib.sh` 退 0 = 全过)。诚实边界:该 harness 目前不由 vitest 调用,靠开发机 / 硬门手工跑"
+    },
+    {
+      "id": "script:lib/agentcore-agents.sh",
+      "what": "三个 AgentCore 智能体(genbi / netadvisor / paramadvisor)的映射表与构建 / 部署 / 回读共用函数(deploy-all 第 4 / 5 步与 redeploy-agents.sh 的唯一作者)",
+      "executor": "本机 bash(被 deploy-all.sh / redeploy-agents.sh source)→ docker buildx + cdk + AWS",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/redeploy-agents/test_redeploy_agents.sh",
+        "marker": "✅ redeploy-agents 离线判据全过",
+        "cases": 27
+      },
+      "note": "2026-11-04 发现规则扩到 scripts/lib 后登记:同一份 harness 真 `source` 本文件再跑 redeploy-agents.sh 本体(由 platform/src/lib/exec-env/__tests__/redeploy-agents-harness.test.ts 在 vitest 里跑),所以 `script:redeploy-agents.sh` 那层的替身也覆盖本层;诚实边界与那层相同(构建推送 / cdk 部署 / 回读只有真环境)"
+    },
+    {
+      "id": "script:lib/s3tables-catalog.sh",
+      "what": "S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(B-91;deploy-all 第 6.3 步 / redeploy-platform 第 3c 步开通 Glue / Athena 联邦目录)",
+      "executor": "本机 bash(被 deploy-all.sh / redeploy-platform.sh source)→ AWS Glue",
+      "note": "2026-11-04 发现规则扩到 scripts/lib 后才进台账(此前根本不在清单上)。每次空账号从零重建都执行它:deploy-all 第 6.3 步经 run_step 调 `ensure_s3tables_catalog`(失败记账、收尾以非零码退出,响亮不静默;B-91 正是 …7698 全新账号首装暴露的),升级链 redeploy-platform 第 3c 步在 `set -euo pipefail` 下裸调(失败立即中止)。platform/src/lib/aws/__tests__/s3tables-catalog.test.ts 只钉「安装脚本与运行时入参逐字段相同」(文本判据,不执行脚本)⇒ 不算替身;想翻成 harness 要照 execution-regions/test_lib.sh 的手法用假 aws 离线真跑每个分支",
+      "reason": "covered-by-fresh-account-rebuild"
+    }
+  ]
+}

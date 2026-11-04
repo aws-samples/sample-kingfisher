@@ -1,0 +1,113 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+cdk.out/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# CDK
+cdk.context.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test
+coverage/
+e2e/screenshots/
+platform/src/app/api/debug/init-db/
+
+# Local-only session state: live AWS account IDs / resource IDs / URLs / ARNs.
+# Contains sensitive deployment identifiers — MUST NEVER be committed to the public repo.
+.session-state.local.md
+*.local.md
+
+# contract-guard skill: local config holds live URL/credentials; baselines/reports
+# are per-deployment run artifacts (screenshots, measured values) — never commit.
+.claude/skills/contract-guard/config.local.json
+
+# Local-only assets for bringing up environments, seeding data, creating tasks and verifying them.
+# They carry environment details and run screenshots and never go to GitHub: QA / regression reports,
+# evidence screenshots, headless verification scripts and run artifacts are local acceptance material only.
+qa-game/
+QA-GAME-*.md
+*-CHECKPOINT.md
+VERIFY-*-975.md
+scripts/README.md
+scripts/30-seed-tasks.sh
+scripts/*seed-tasks*
+scripts/local-*
+.claude/skills/contract-guard/baselines/
+.claude/skills/contract-guard/reports/
+.claude/skills/contract-guard/__pycache__/
+
+# core prebuild: the temporary compile directory is not committed. The core-dist output IS committed,
+# because CDK fromAsset needs it in place at deployment time.
+platform/.tmp-core-build/
+
+# change-safety review ledger (local review state, not tracked)
+.claude/review-ledger.tsv
+.claude/current-batch
+
+# Temporary backup directory of the mutation-test harness (platform/scripts/mutation-check.mjs; removed when the run ends)
+platform/.mutation-backup/
+
+# Temporary artifacts of the naming single-source-of-truth parity gate (platform/scripts/naming-parity.mjs).
+# Deleted in its finally block on a normal run; may remain after a crash. Generated files, never tracked.
+platform/.naming-parity-runtime.json
+platform/src/lib/aws/__tests__/.naming-parity-emit.test.ts
+infra/_naming_parity_driver.ts
+
+# Temporary artifacts of the execution-region synth gate (infra/scripts/exec-env-synth-gate.mjs; removed after the run, may remain after a crash)
+infra/cdk.out.synth-gate*/
+infra/_exec_env_ctx_driver.ts
+
+# Local state of the multi-region acceptance gate (stamp / escape hatch). Machine-local, never tracked.
+.claude/mr-gate-stamp.json
+.claude/mr-gate-override
+# Hand-over notes must never be written into the escape-hatch file: its meaning is
+#   "exists and is non-empty => the gate passes unconditionally", so using it as a notebook disables the gate.
+.claude/mr-handoff.md
+
+# Local Claude Code permission list (contains real passwords and account ids; never tracked).
+#   Backups of it (.bak, .bak2, ...) have no value in the repository either. A file that is being added for the
+#   first time is not yet tracked and so is outside the default scope of the red-line scan; the staged scan in
+#   .githooks/pre-commit covers that case, but keep these patterns as the first line of defence.
+.claude/settings.local.json
+.claude/settings.local.json.*
+
+# Local Python cache
+scripts/__pycache__/
+
+# Local AWS context self-check script (contains a real account id; never tracked)
+scripts/check_aws_context.sh
+
+# Written into the repository root when the execution-region deployment pre_build step is executed locally
+# (CODEBUILD_SRC_DIR pointing at the checkout). Test artifact, not tracked.
+.exec-env-azs
+# Same mechanism: cross-phase hand-over file carrying the home-region facts for cross-region peering.
+.exec-env-homelink
+
+# Python bytecode cache (created by any offline run; never tracked and never part of a Lambda bundle)
+__pycache__/
+*.pyc
+
+# Presentation material (slides, PDFs) is not tracked
+docs/slides/

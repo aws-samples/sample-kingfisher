@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bgp://place-wire/v1",
+  "title": "PlaceWire v1",
+  "description": "WP-31 L6:落点在运行时之间传递的唯一形状(平台 → AgentCore 容器 → 技能 Lambda;平台 → 调度运行时 / Spark 脚本)。五个运行时各有且只有一个读取函数,契约测试钉「同夹具同结果」。缺 / 多 / 形态不对 ⇒ 拒(PLACE_WIRE_INVALID),任何运行时都不许拿自己进程环境里的区 / 工作组顶上。改本文件 = 改五个读取函数 + 夹具,同一笔提交。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "targetId", "region"],
+  "properties": {
+    "v": { "const": 1 },
+    "targetId": { "type": "string", "pattern": "^tgt_[a-z0-9](?:[a-z0-9_]{0,14}[a-z0-9])?$" },
+    "region": { "type": "string", "pattern": "^[a-z]{2}(-[a-z]+)+-\\d$" },
+    "redshift": {
+      "description": "数仓腿(原 AgentCore 工具入参 rsRegion / rsWorkgroup / rsDatabase / rsSecretArn 四个平面字段合并于此;区 = 顶层 region)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workgroup", "database"],
+      "properties": {
+        "workgroup": { "type": "string", "minLength": 1 },
+        "database": { "type": "string", "minLength": 1 },
+        "secretArn": { "type": "string", "pattern": "^arn:[a-z-]+:secretsmanager:" }
+      }
+    },
+    "athena": {
+      "description": "数据湖腿(原 athRegion / athWorkgroup / athOutput / athCatalogRef 合并于此;区 = 顶层 region)",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workgroup", "outputLocation", "catalogRef"],
+      "properties": {
+        "workgroup": { "type": "string", "minLength": 1 },
+        "outputLocation": { "type": "string", "pattern": "^(s3://.+)?$" },
+        "catalogRef": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  participant T as 触发者(手动 / 调度 / 补数)
+  participant RT as POST /api/sync/[id]/start
+  participant SR as lib/sync/start-run.ts
+  participant G as 该区 Glue
+  participant S as 该区 S3 Tables / Redshift
+  participant DDB as bgp-task-runs
+  participant OM as OpenMetadata
+  T->>RT: 启动(可带业务日期)
+  RT->>RT: 项目守卫 · 章反向卡 · 跨区取数 409 · 通道判定(glue / dms / zero-etl)
+  RT->>SR: startGlueSyncRun
+  SR->>SR: resolveGlueBinding(落点:region · 脚本桶 · 角色 · 表桶 / workgroup)
+  SR->>G: ensureGlueSyncJob:generateGlueScript → PutObject 脚本桶 → CreateJob / UpdateJob
+  SR->>SR: adoptExistingTargetsOnce(升级兼容:记录已有目标表)
+  SR->>G: StartJobRun(Arguments = 15 个业务日期变量)
+  SR->>DDB: putRunRecord(running, triggeredBy)
+  G->>S: PySpark:读源(JDBC 经 Glue 连接)→ 写 Iceberg 表(s3tablescatalog)或 Redshift
+  SR->>G: 后台轮询 GetJobRun
+  SR->>DDB: updateRunRecord(状态 · 行数指标 parseSyncRunMetrics)
+  SR->>OM: pushSyncToOpenMetadata(源 / 目标实体 + 列级血缘,按区 service)
+  SR->>SR: fireDownstreamOnce(触发依赖下游)

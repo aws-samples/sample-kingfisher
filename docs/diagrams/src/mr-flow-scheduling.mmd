@@ -1,0 +1,20 @@
+sequenceDiagram
+  autonumber
+  participant U as 用户(工作流 / 任务页)
+  participant P as lib/workflow/publish-dag.ts
+  participant SL as lib/scheduler/serverless/publish.ts
+  participant MW as 该区 MWAA Serverless
+  participant CMD as bgp-action-commands(主控区)
+  participant DL as 分发 Lambda(action-dispatcher)
+  participant IN as /api/internal/actions/run
+  U->>P: 发布工作流(或启用同步 / 作业 / 治理任务 / 卡片刷新的调度)
+  P->>P: buildCarrierArtifact:DAG 定义 YAML + 代码包
+  P->>SL: publishServerlessWorkflow
+  SL->>MW: PutObject(DAG 桶)→ CreateWorkflow / UpdateWorkflow
+  Note over MW: 到点运行 · 节点类型 sql · python · sync · foreach · branch · join · setvar · external · platform-action
+  MW->>CMD: platform-action 节点 ⇒ 写命令
+  CMD->>DL: DynamoDB Stream 触发
+  DL->>IN: 调平台内部端点(来源头校验)
+  IN->>IN: 执行:治理任务 / 卡片刷新 / 同步启动
+  IN-->>MW: 结果回写
+  U->>MW: 监控页:ListWorkflowRuns · GetTaskInstance · GetLogEvents

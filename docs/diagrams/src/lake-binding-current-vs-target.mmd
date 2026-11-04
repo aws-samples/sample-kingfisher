@@ -1,0 +1,22 @@
+flowchart LR
+  subgraph CUR["Today: one execution region = one platform table bucket"]
+    direction TB
+    T1["Execution target<br/>tgt_&lt;slug&gt;"] --> PB1["Platform table bucket<br/>(descriptor tableBucket / env S3TABLES_BUCKET)"]
+    T1 -. "registered for visibility only<br/>(settings row lake-ext-bucket#…)" .-> XB1["Customer bucket A"]
+    T1 -. "registered for visibility only" .-> XB2["Customer bucket B"]
+    J1["Spark job"] -->|"catalog s3tablescatalog injected"| PB1
+    J1 -. "hand-typed --conf (10 lines)" .-> XB1
+    J1 -. "hand-typed --conf" .-> XB2
+    R1["Read side: catalog / BI / NL2SQL / lineage"] -->|"env bucket only"| PB1
+  end
+  subgraph TGT["Target: one execution region = a routing table of lake routes"]
+    direction TB
+    T2["Execution target<br/>tgt_&lt;slug&gt;"] --> RT["Lake route table (per target)"]
+    RT --> P2["route: alias s3tablescatalog<br/>platform bucket · tier other · writable"]
+    RT --> D2["route: alias detail<br/>customer bucket A · tier detail · read-only"]
+    RT --> A2["route: alias agg<br/>customer bucket B · tier agg · writable"]
+    J2["Spark job<br/>declares subset or ALL routes"] -->|"one Spark catalog per route, injected"| P2 & D2 & A2
+    PF["Preflight by bucket<br/>SimulatePrincipalPolicy per route"] --> J2
+    R2["Read side resolves namespace → route<br/>no fallback"] --> RT
+  end
+  CUR ==>|"this design"| TGT

@@ -1,0 +1,12 @@
+{
+  "$comment": "平台 AI 大模型的【出厂默认】(SSOT 第 ③ 层;模块 51 起角色由「唯一决定者」降为「出厂默认/兜底」)。运行时解析优先级 = ① bgp-settings 运行时配置(管理员在 /settings「AI 模型」卡探测通过后设,秒级热生效)→ ② 环境变量 BEDROCK_MODEL_ID(部署期覆盖)→ ③ 本文件 defaultModelId。① 空时行为与仅有本文件时逐字节一致(零迁移/可回滚);改本文件只改出厂默认,不影响已在页面配置的运行时值。全平台 9 个 AI 能力(GenBI/Copilot 问答/Copilot planner/网络顾问/参数顾问/Flink SQL 生成/需求 codegen/GenBI 检索重排/GenBI 记忆摘要)均经 platform/src/lib/ai/model.ts 解析链取值。",
+  "$consumers": "platform/src/lib/ai/model.ts (运行时侧 re-export) · infra/lib/shared/model.ts (部署期侧 re-export,含 candidateModelIds) · scripts/resolve-home-model.sh 与 scripts/01-preflight-account.sh 第 7 项(部署期候选链逐个真 converse) · 3 个容器 agent.js 由 CDK 注入 env BEDROCK_MODEL_ID(值源自 infra 侧 SSOT)",
+  "$modelPolicy": "选 opus-4-5(us.anthropic.claude-opus-4-5-20251101-v1:0):2026-09-16 在当前账号真实 converse 探测通过。🔴 **同账号实测 opus-4-6 不可用** —— 报「Model access is denied … required AWS Marketplace actions (aws-marketplace:ViewSubscriptions, aws-marketplace:Subscribe)」(受限角色开不了订阅),而它此前是出厂默认 ⇒ 全平台 9 个 AI 能力在新账号里**全部哑火**(症状:GenBI 问数 succeeded 但 steps 里 select_relevant_tables ok=false、rows=0,真因写在 answer 里)。当前账号实测:opus-4-1 ✅ · opus-4-5 ✅ · opus-4-6 ❌(Marketplace)· opus-4-7 / 4-8 / opus-5 ❌(未开通)· sonnet-4-5 / haiku-4-5 ✅ 但**不在目录白名单里**(目录只放厂商档案 platform/src/lib/ai/core/vendors.ts 认的四系列:Claude Opus / GPT-5.6 / GLM 5 / Kimi K3)。换模型必须先真实 invoke/converse 探测 —— list-foundation-models 全 ACTIVE 不可信。🔴 换账号后不必改本文件也能救:模块 51 的运行时配置(/settings「AI 模型」卡,或 PUT /api/admin/model-config)秒级热生效,且服务端会**强制探测**通过才写库;本文件只是出厂默认。",
+  "$candidatePolicy": "模块 51 v2.0(2026-10-14,51 SPEC §7.7)部署期**有序候选链**:scripts/resolve-home-model.sh 逐个候选 → 按账号真值(list-inference-profiles 的 modelArn)展开为本区地理推理配置 / global. / 基础 id → 真 converse 1 个 token,第一个通的注入 BEDROCK_MODEL_ID;一个都不通则拒绝上线。顺序即优先级:Claude Opus 4.5(现网主力)→ GLM 5.3(zai.glm-5.3,Bedrock 上 INFERENCE_PROFILE 专用,须 us./global. 前缀;2026-10-14 临时账号实测**账号级未开放**「not available for this account」)→ Kimi K3(moonshotai.kimi-k3,同为 INFERENCE_PROFILE 专用;实测可用,拒 temperature/topP/stopSequences、恒回 reasoningContent、输出 token ≈ Claude 2.1×,平台按厂商档案整形)。运行时仍以 ① 运行时配置为先,本链只决定部署期 env 层。排障可用 env BGP_MODEL_CANDIDATES 显式覆盖(脚本会打出「候选来自 env」)。",
+  "defaultModelId": "us.anthropic.claude-opus-4-5-20251101-v1:0",
+  "candidateModelIds": [
+    "us.anthropic.claude-opus-4-5-20251101-v1:0",
+    "zai.glm-5.3",
+    "moonshotai.kimi-k3"
+  ]
+}

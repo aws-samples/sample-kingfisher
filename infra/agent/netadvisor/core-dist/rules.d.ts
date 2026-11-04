@@ -1,0 +1,7 @@
+import type { ComputeKind, RuleDef } from "./types";
+export type { RuleDef } from "./types";
+export declare const RULES: RuleDef[];
+export declare const RULE_BY_ID: Record<string, RuleDef>;
+export declare function renderRulesForPrompt(): string;
+export declare function ruleApplies(rule: RuleDef, compute: ComputeKind): boolean;
+export declare const TROUBLESHOOTING_ORDER = "\u8FDE\u901A\u6027\u6392\u969C\u987A\u5E8F\uFF08\u7EDD\u5927\u591A\u6570\u5931\u8D25\u662F\u7F51\u7EDC\u95EE\u9898\uFF0C\u6309\u6B64\u5E8F\u6392\u67E5\uFF09\uFF1A\n1) \u7F51\u7EDC\uFF1A\u5B50\u7F51\u8DEF\u7531\u5230\u76EE\u6807 VPC CIDR \u2192 \u5B89\u5168\u7EC4\uFF08\u8BA1\u7B97\u51FA\u7AD9 + \u81EA\u5F15\u7528 + \u76EE\u6807\u5165\u7AD9\u653E\u884C\u8BA1\u7B97 SG-ID\uFF09\u2192 S3/interface endpoint \u6216 NAT \u2192 NACL \u2192 \u76EE\u6807\u5E93\u9632\u706B\u5899\u3002\n2) \u51ED\u8BC1\uFF1ASecrets Manager \u53EF\u8BFB\u3001\u952E\u540D\u5339\u914D\u3001IAM DB Auth\u3002\n3) \u9A71\u52A8\uFF1AJDBC \u9A71\u52A8 JAR / \u7C7B\u540D / \u7248\u672C\u3002\n4) SSL\uFF1AJDBC_ENFORCE_SSL \u4E00\u81F4\u6027\u3001\u8BC1\u4E66\u4FE1\u4EFB\u5E93\u3002\n\u5E38\u89C1\u9519\u8BEF\u2192\u6839\u56E0\uFF1A\u8FDE\u63A5\u8D85\u65F6\u2192\u8DEF\u7531/SG/NAT \u7F3A\u5931\uFF1BUnableToFindVpcEndpoint\u2192\u7F3A S3 endpoint\uFF1BAccess denied\u2192\u51ED\u8BC1\uFF1BNo suitable driver\u2192\u9A71\u52A8\uFF1BSSL handshake\u2192SSL \u914D\u7F6E\u3002";

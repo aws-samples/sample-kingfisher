@@ -1,0 +1,9 @@
+# 序 65 ProtoShield —— bandit 配置。只排除**不随产品发布**的目录与**有意为之**的规则;产品路径(platform/src 非夹具、infra/lambda、scripts 里跑在 AWS 的脚本)照扫。
+# exclude:
+#   platform/src/lib/sync/__tests__/__golden__ —— 同步脚本生成器的「金样」产物(生成出来的 PySpark 文本),B608 全是模板化 SQL;生成器本体的标识符清洗由其单测钉住
+#   .claude / qa-game / docs —— 开发机工具、无头验收脚本、文档脚本,不进镜像不进部署
+# skips:
+#   B311 —— random 只用于演示造数(scripts/seed_*.py),无任何密码学用途
+[bandit]
+exclude = ./platform/src/lib/sync/__tests__/__golden__,./.claude,./qa-game,./docs,./node_modules,./platform/node_modules,./infra/node_modules
+skips = B311

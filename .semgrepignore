@@ -1,0 +1,5 @@
+# 序 65 ProtoShield —— semgrep 忽略清单:只忽略不随产品发布的目录(与 .bandit 的 exclude 同一口径)
+.claude/
+qa-game/
+docs/
+platform/src/lib/sync/__tests__/__golden__/

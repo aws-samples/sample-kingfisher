@@ -1,0 +1,6 @@
+{
+  "bgpdatasourcesEB05443C": { "TableName": "bgp-datasources" },
+  "bgpsynctasks2CD48E70": { "TableName": "bgp-sync-tasks" },
+  "bgpworkflows96521046": { "TableName": "bgp-workflows" },
+  "bgpredshifttasksEA2C2B2B": { "TableName": "bgp-redshift-tasks" }
+}

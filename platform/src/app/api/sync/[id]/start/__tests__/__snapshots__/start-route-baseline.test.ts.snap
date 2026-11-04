@@ -1,0 +1,795 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-audit 1`] = `
+[
+  {
+    "action": "sync.start",
+    "d": {
+      "detail": {
+        "jobName": "bgp-sync-0000000FX001",
+        "name": "订单同步",
+        "runId": "01RUN000000000000000000001",
+      },
+      "resourceId": "01TASKSYNC00000000000FX001",
+      "resourceType": "sync",
+      "targetId": "tgt_home",
+    },
+  },
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-calls 1`] = `
+[
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
+        "datasourceId": "ds_mysql",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-datasources",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "resolveGlueBinding",
+    "input": {
+      "targetId": "tgt_home",
+    },
+    "svc": "binding",
+  },
+  {
+    "cmd": "resolveRedshiftBinding",
+    "input": {
+      "databaseOverride": undefined,
+      "projectId": "default",
+      "targetId": "tgt_home",
+      "workgroupOverride": undefined,
+    },
+    "svc": "binding",
+  },
+  {
+    "cmd": "glue",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "s3",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "glue",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "s3tables",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "ListTableBucketsCommand",
+    "input": {},
+    "svc": "s3tables",
+  },
+  {
+    "cmd": "GetCatalogCommand",
+    "input": {
+      "CatalogId": "s3tablescatalog",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "ListNamespacesCommand",
+    "input": {
+      "tableBucketARN": "arn:aws:s3tables:us-east-1:123456789012:bucket/bgp-table-bucket",
+    },
+    "svc": "s3tables",
+  },
+  {
+    "cmd": "CreateNamespaceCommand",
+    "input": {
+      "namespace": [
+        "gamedb",
+      ],
+      "tableBucketARN": "arn:aws:s3tables:us-east-1:123456789012:bucket/bgp-table-bucket",
+    },
+    "svc": "s3tables",
+  },
+  {
+    "cmd": "PutObjectCommand",
+    "input": {
+      "Body": "sha256:ec419a53b3fc49d1",
+      "Bucket": "bgp-glue-scripts-123456789012",
+      "Key": "glue-scripts/01TASKSYNC00000000000FX001.py",
+    },
+    "svc": "s3",
+  },
+  {
+    "cmd": "GetJobCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "CreateJobCommand",
+    "input": {
+      "Command": {
+        "Name": "glueetl",
+        "PythonVersion": "3",
+        "ScriptLocation": "s3://bgp-glue-scripts-123456789012/glue-scripts/01TASKSYNC00000000000FX001.py",
+      },
+      "Connections": {
+        "Connections": [
+          "bgp-conn-mysql",
+        ],
+      },
+      "DefaultArguments": {
+        "--TempDir": "s3://bgp-glue-scripts-123456789012/temp/",
+        "--conf": "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog --conf spark.sql.catalog.s3tablescatalog.glue.id=123456789012:s3tablescatalog/bgp-table-bucket --conf spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO --conf spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:us-east-1:123456789012:bucket/bgp-table-bucket",
+        "--datalake-formats": "iceberg",
+      },
+      "GlueVersion": "5.1",
+      "MaxRetries": 0,
+      "Name": "bgp-sync-0000000FX001",
+      "NumberOfWorkers": 2,
+      "Role": "arn:aws:iam::123456789012:role/bgp-glue-role",
+      "Timeout": 60,
+      "WorkerType": "G.1X",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "StartJobRunCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "PutCommand",
+    "input": {
+      "Item": {
+        "glueJobName": "bgp-sync-0000000FX001",
+        "glueJobRunId": "jr_0123456789abcdefghijklmnopqrstuv",
+        "metrics": {
+          "rowsRead": 0,
+          "rowsWritten": 0,
+        },
+        "projectId": "default",
+        "runId": "01RUN000000000000000000001",
+        "startedAt": "2026-10-12T03:04:05.000Z",
+        "status": "running",
+        "targetId": "tgt_home",
+        "taskId": "01TASKSYNC00000000000FX001",
+        "taskType": "sync",
+        "triggeredBy": "manual",
+      },
+      "TableName": "bgp-task-runs",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId)",
+      "ExpressionAttributeNames": {
+        "#s": "status",
+      },
+      "ExpressionAttributeValues": {
+        ":j": "bgp-sync-0000000FX001",
+        ":now": "2026-10-12T03:04:05.000Z",
+        ":r": "01RUN000000000000000000001",
+        ":s": "running",
+      },
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+      "UpdateExpression": "SET #s = :s, glueJobName = :j, lastRunId = :r, updatedAt = :now",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "glue",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "GetJobRunCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+      "RunId": "jr_0123456789abcdefghijklmnopqrstuv",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "logs",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "DescribeLogStreamsCommand",
+    "input": {
+      "descending": true,
+      "limit": 50,
+      "logGroupName": "/aws-glue/jobs/output",
+      "orderBy": "LastEventTime",
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "GetLogEventsCommand",
+    "input": {
+      "limit": 1000,
+      "logGroupName": "/aws-glue/jobs/output",
+      "logStreamName": "jr_0123456789abcdefghijklmnopqrstuv",
+      "nextToken": undefined,
+      "startFromHead": true,
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "GetLogEventsCommand",
+    "input": {
+      "limit": 1000,
+      "logGroupName": "/aws-glue/jobs/output",
+      "logStreamName": "jr_0123456789abcdefghijklmnopqrstuv",
+      "nextToken": "tok",
+      "startFromHead": true,
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "s3",
+    "input": {
+      "region": "us-east-1",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "PutObjectCommand",
+    "input": {
+      "Body": "sha256:ce9d17737fcd2f58",
+      "Bucket": "bgp-glue-scripts-123456789012",
+      "ContentType": "text/plain",
+      "Key": "logs/01TASKSYNC00000000000FX001/01RUN000000000000000000001.log",
+    },
+    "svc": "s3",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId) AND (attribute_not_exists(#k0) OR #k0 <> :gstopped)",
+      "ExpressionAttributeNames": {
+        "#k0": "status",
+        "#k1": "finishedAt",
+        "#k2": "duration",
+        "#k3": "error",
+        "#k4": "logS3Key",
+        "#k5": "metrics",
+        "#k6": "degraded",
+        "#sp": "projectId",
+        "#st": "targetId",
+      },
+      "ExpressionAttributeValues": {
+        ":gstopped": "stopped",
+        ":sp": "default",
+        ":st": "tgt_home",
+        ":v0": "succeeded",
+        ":v1": "2026-10-12T03:04:20.000Z",
+        ":v2": 42,
+        ":v3": null,
+        ":v4": "logs/01TASKSYNC00000000000FX001/01RUN000000000000000000001.log",
+        ":v5": {
+          "rowsRead": 5,
+          "rowsWritten": 5,
+        },
+        ":v6": null,
+      },
+      "Key": {
+        "runId": "01RUN000000000000000000001",
+        "taskId": "01TASKSYNC00000000000FX001",
+      },
+      "TableName": "bgp-task-runs",
+      "UpdateExpression": "SET #k0 = :v0, #k1 = :v1, #k2 = :v2, #k3 = :v3, #k4 = :v4, #k5 = :v5, #k6 = :v6, #sp = if_not_exists(#sp, :sp), #st = if_not_exists(#st, :st)",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId)",
+      "ExpressionAttributeValues": {
+        ":now": "2026-10-12T03:04:20.000Z",
+        ":wm": "77",
+      },
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+      "UpdateExpression": "SET incrementalValue = :wm, updatedAt = :now",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId)",
+      "ExpressionAttributeNames": {
+        "#s": "status",
+      },
+      "ExpressionAttributeValues": {
+        ":now": "2026-10-12T03:04:20.000Z",
+        ":s": "succeeded",
+      },
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+      "UpdateExpression": "SET #s = :s, updatedAt = :now",
+    },
+    "svc": "ddb",
+  },
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-seq 1`] = `
+[
+  "ddb:GetCommand",
+  "ddb:GetCommand",
+  "binding:resolveGlueBinding",
+  "binding:resolveRedshiftBinding",
+  "factory:glue",
+  "factory:s3",
+  "factory:glue",
+  "factory:s3tables",
+  "s3tables:ListTableBucketsCommand",
+  "glue:GetCatalogCommand",
+  "s3tables:ListNamespacesCommand",
+  "s3tables:CreateNamespaceCommand",
+  "s3:PutObjectCommand",
+  "glue:GetJobCommand",
+  "glue:CreateJobCommand",
+  "glue:StartJobRunCommand",
+  "ddb:PutCommand",
+  "ddb:UpdateCommand",
+  "factory:glue",
+  "glue:GetJobRunCommand",
+  "factory:logs",
+  "logs:DescribeLogStreamsCommand",
+  "logs:GetLogEventsCommand",
+  "logs:GetLogEventsCommand",
+  "factory:s3",
+  "s3:PutObjectCommand",
+  "ddb:UpdateCommand",
+  "ddb:UpdateCommand",
+  "ddb:UpdateCommand",
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 作业已存在 ⇒ GetJob 判存在 → UpdateJob(定义以最新为准)再启动;**不再先试 CreateJob** > exists-glue-calls 1`] = `
+[
+  {
+    "cmd": "GetCatalogCommand",
+    "input": {
+      "CatalogId": "s3tablescatalog",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "GetJobCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "UpdateJobCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+      "JobUpdate": {
+        "Command": {
+          "Name": "glueetl",
+          "PythonVersion": "3",
+          "ScriptLocation": "s3://bgp-glue-scripts-123456789012/glue-scripts/01TASKSYNC00000000000FX001.py",
+        },
+        "Connections": {
+          "Connections": [
+            "bgp-conn-mysql",
+          ],
+        },
+        "DefaultArguments": {
+          "--TempDir": "s3://bgp-glue-scripts-123456789012/temp/",
+          "--conf": "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog --conf spark.sql.catalog.s3tablescatalog.glue.id=123456789012:s3tablescatalog/bgp-table-bucket --conf spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO --conf spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:us-east-1:123456789012:bucket/bgp-table-bucket",
+          "--datalake-formats": "iceberg",
+        },
+        "GlueVersion": "5.1",
+        "MaxRetries": 0,
+        "NumberOfWorkers": 2,
+        "Role": "arn:aws:iam::123456789012:role/bgp-glue-role",
+        "Timeout": 60,
+        "WorkerType": "G.1X",
+      },
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "StartJobRunCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 建作业报其它错 ⇒ 500 如实上抛,**不再**「去掉 --conf 重建一次」,不启动、不写 run > other-error-glue-calls 1`] = `
+[
+  {
+    "cmd": "GetCatalogCommand",
+    "input": {
+      "CatalogId": "s3tablescatalog",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "GetJobCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "CreateJobCommand",
+    "input": {
+      "Command": {
+        "Name": "glueetl",
+        "PythonVersion": "3",
+        "ScriptLocation": "s3://bgp-glue-scripts-123456789012/glue-scripts/01TASKSYNC00000000000FX001.py",
+      },
+      "Connections": {
+        "Connections": [
+          "bgp-conn-mysql",
+        ],
+      },
+      "DefaultArguments": {
+        "--TempDir": "s3://bgp-glue-scripts-123456789012/temp/",
+        "--conf": "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog --conf spark.sql.catalog.s3tablescatalog.glue.id=123456789012:s3tablescatalog/bgp-table-bucket --conf spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO --conf spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:us-east-1:123456789012:bucket/bgp-table-bucket",
+        "--datalake-formats": "iceberg",
+      },
+      "GlueVersion": "5.1",
+      "MaxRetries": 0,
+      "Name": "bgp-sync-0000000FX001",
+      "NumberOfWorkers": 2,
+      "Role": "arn:aws:iam::123456789012:role/bgp-glue-role",
+      "Timeout": 60,
+      "WorkerType": "G.1X",
+    },
+    "svc": "glue",
+  },
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 执行角色 ARN 非法 ⇒ 400,零作业副作用 > bad-role-seq 1`] = `
+[
+  "ddb:GetCommand",
+  "ddb:GetCommand",
+  "binding:resolveGlueBinding",
+  "binding:resolveRedshiftBinding",
+  "factory:glue",
+  "factory:s3",
+]
+`;
+
+exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 非 home · 只写数仓 · 执行失败:按落点区取客户端、章盖真落点、失败不扇出不回填 > usw2-redshift-failed-calls 1`] = `
+[
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
+        "datasourceId": "ds_mysql",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-datasources",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "resolveGlueBinding",
+    "input": {
+      "targetId": "tgt_usw2_a",
+    },
+    "svc": "binding",
+  },
+  {
+    "cmd": "resolveRedshiftBinding",
+    "input": {
+      "databaseOverride": undefined,
+      "projectId": "default",
+      "targetId": "tgt_usw2_a",
+      "workgroupOverride": undefined,
+    },
+    "svc": "binding",
+  },
+  {
+    "cmd": "glue",
+    "input": {
+      "region": "us-west-2",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "s3",
+    "input": {
+      "region": "us-west-2",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "PutObjectCommand",
+    "input": {
+      "Body": "sha256:1ea07b78ac940f64",
+      "Bucket": "bgp-glue-scripts-usw2",
+      "Key": "glue-scripts/01TASKSYNC00000000000FX001.py",
+    },
+    "svc": "s3",
+  },
+  {
+    "cmd": "GetJobCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "CreateJobCommand",
+    "input": {
+      "Command": {
+        "Name": "glueetl",
+        "PythonVersion": "3",
+        "ScriptLocation": "s3://bgp-glue-scripts-usw2/glue-scripts/01TASKSYNC00000000000FX001.py",
+      },
+      "Connections": {
+        "Connections": [
+          "bgp-conn-mysql",
+        ],
+      },
+      "DefaultArguments": {
+        "--TempDir": "s3://bgp-glue-scripts-usw2/temp/",
+        "--conf": "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog --conf spark.sql.catalog.s3tablescatalog.glue.id=123456789012:s3tablescatalog/bgp-table-bucket-usw2 --conf spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO --conf spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:us-west-2:123456789012:bucket/bgp-table-bucket-usw2",
+        "--datalake-formats": "iceberg",
+      },
+      "GlueVersion": "5.1",
+      "MaxRetries": 0,
+      "Name": "bgp-sync-0000000FX001",
+      "NumberOfWorkers": 2,
+      "Role": "arn:aws:iam::123456789012:role/bgp-glue-role-usw2",
+      "Timeout": 60,
+      "WorkerType": "G.1X",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "StartJobRunCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "PutCommand",
+    "input": {
+      "Item": {
+        "glueJobName": "bgp-sync-0000000FX001",
+        "glueJobRunId": "jr_0123456789abcdefghijklmnopqrstuv",
+        "metrics": {
+          "rowsRead": 0,
+          "rowsWritten": 0,
+        },
+        "projectId": "default",
+        "runId": "01RUN000000000000000000001",
+        "startedAt": "2026-10-12T03:04:05.000Z",
+        "status": "running",
+        "targetId": "tgt_usw2_a",
+        "taskId": "01TASKSYNC00000000000FX001",
+        "taskType": "sync",
+        "triggeredBy": "manual",
+      },
+      "TableName": "bgp-task-runs",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId)",
+      "ExpressionAttributeNames": {
+        "#s": "status",
+      },
+      "ExpressionAttributeValues": {
+        ":j": "bgp-sync-0000000FX001",
+        ":now": "2026-10-12T03:04:05.000Z",
+        ":r": "01RUN000000000000000000001",
+        ":s": "running",
+      },
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+      "UpdateExpression": "SET #s = :s, glueJobName = :j, lastRunId = :r, updatedAt = :now",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "glue",
+    "input": {
+      "region": "us-west-2",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "GetJobRunCommand",
+    "input": {
+      "JobName": "bgp-sync-0000000FX001",
+      "RunId": "jr_0123456789abcdefghijklmnopqrstuv",
+    },
+    "svc": "glue",
+  },
+  {
+    "cmd": "logs",
+    "input": {
+      "region": "us-west-2",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "DescribeLogStreamsCommand",
+    "input": {
+      "descending": true,
+      "limit": 50,
+      "logGroupName": "/aws-glue/jobs/output",
+      "orderBy": "LastEventTime",
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "GetLogEventsCommand",
+    "input": {
+      "limit": 1000,
+      "logGroupName": "/aws-glue/jobs/output",
+      "logStreamName": "jr_0123456789abcdefghijklmnopqrstuv",
+      "nextToken": undefined,
+      "startFromHead": true,
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "GetLogEventsCommand",
+    "input": {
+      "limit": 1000,
+      "logGroupName": "/aws-glue/jobs/output",
+      "logStreamName": "jr_0123456789abcdefghijklmnopqrstuv",
+      "nextToken": "tok",
+      "startFromHead": true,
+    },
+    "svc": "logs",
+  },
+  {
+    "cmd": "s3",
+    "input": {
+      "region": "us-west-2",
+    },
+    "svc": "factory",
+  },
+  {
+    "cmd": "PutObjectCommand",
+    "input": {
+      "Body": "sha256:ce9d17737fcd2f58",
+      "Bucket": "bgp-glue-scripts-usw2",
+      "ContentType": "text/plain",
+      "Key": "logs/01TASKSYNC00000000000FX001/01RUN000000000000000000001.log",
+    },
+    "svc": "s3",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId) AND (attribute_not_exists(#k0) OR #k0 <> :gstopped)",
+      "ExpressionAttributeNames": {
+        "#k0": "status",
+        "#k1": "finishedAt",
+        "#k2": "duration",
+        "#k3": "error",
+        "#k4": "logS3Key",
+        "#k5": "metrics",
+        "#k6": "degraded",
+        "#sp": "projectId",
+        "#st": "targetId",
+      },
+      "ExpressionAttributeValues": {
+        ":gstopped": "stopped",
+        ":sp": "default",
+        ":st": "tgt_usw2_a",
+        ":v0": "failed",
+        ":v1": "2026-10-12T03:04:20.000Z",
+        ":v2": 42,
+        ":v3": null,
+        ":v4": "logs/01TASKSYNC00000000000FX001/01RUN000000000000000000001.log",
+        ":v5": {
+          "rowsRead": 5,
+          "rowsWritten": 0,
+        },
+        ":v6": null,
+      },
+      "Key": {
+        "runId": "01RUN000000000000000000001",
+        "taskId": "01TASKSYNC00000000000FX001",
+      },
+      "TableName": "bgp-task-runs",
+      "UpdateExpression": "SET #k0 = :v0, #k1 = :v1, #k2 = :v2, #k3 = :v3, #k4 = :v4, #k5 = :v5, #k6 = :v6, #sp = if_not_exists(#sp, :sp), #st = if_not_exists(#st, :st)",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "UpdateCommand",
+    "input": {
+      "ConditionExpression": "attribute_exists(taskId)",
+      "ExpressionAttributeNames": {
+        "#s": "status",
+      },
+      "ExpressionAttributeValues": {
+        ":now": "2026-10-12T03:04:20.000Z",
+        ":s": "error",
+      },
+      "Key": {
+        "taskId": "01TASKSYNC00000000000FX001",
+        "userId": "default-user",
+      },
+      "TableName": "bgp-sync-tasks",
+      "UpdateExpression": "SET #s = :s, updatedAt = :now",
+    },
+    "svc": "ddb",
+  },
+]
+`;

@@ -1,0 +1,10 @@
+{
+  "$comment": "Drift guard: this core-dist was compiled by scripts/core-prebuild.sh from the sources listed below (paths relative to the repository root, values are SHA-256). The unit test platform/src/lib/__tests__/core-dist-source-manifest.test.ts recomputes the hashes; a source change without a rebuild fails it. Generated output, do not edit by hand.",
+  "capability": "ai",
+  "tsconfig": "platform/tsconfig.ai-core.json",
+  "sources": {
+    "platform/src/lib/ai/core/converse-shape.ts": "610e88e1990acbfe82c52db245000640004a62a5d19cb24a39947868cb71d7ee",
+    "platform/src/lib/ai/core/transient.ts": "4cc736e43181f58b58ba096cec06f9a19e9159312fd97f043de0fa9f4911166e",
+    "platform/src/lib/ai/core/vendors.ts": "a9059ab5b2b149ec29458bbecd2329b95594e564a59d6d4b997d1b3a64639c8f"
+  }
+}

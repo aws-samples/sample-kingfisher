@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bgp.flink</groupId>
+    <artifactId>flink-connector-modules-parent</artifactId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>flink-module-kafka</artifactId>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32-CR — MSK/Kafka 源连接器模块。connector id = "kafka"(对齐 connector-modules.ts)。
+       含 flink-sql-connector-kafka;msk-iam-auth(IAM 认证类)是独立模块 "msk-iam-auth",
+       由 resolveModules 在 SQL 含 AWS_MSK_IAM 时追加拼入(§2.1 条件依赖),不在此打入。 -->
+  <dependencies>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-kafka</artifactId><version>${kafka.connector.version}</version></dependency>
+  </dependencies>
+
+  <build>
+    <finalName>flink-module-kafka</finalName>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId></plugin>
+    </plugins>
+  </build>
+</project>

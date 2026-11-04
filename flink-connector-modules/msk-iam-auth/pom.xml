@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bgp.flink</groupId>
+    <artifactId>flink-connector-modules-parent</artifactId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>flink-module-msk-iam-auth</artifactId>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32-CR / P42.6b — MSK IAM 认证模块。connector id = "msk-iam-auth"(对齐 connector-modules.ts)。
+       不是 Flink connector,是纯认证库:提供 software.amazon.msk.auth.iam.{IAMLoginModule,IAMClientCallbackHandler}
+       (§11.3 IAM 展开 SQL 属性引用的两个类)。由 resolveModules 在 finalSql 含 AWS_MSK_IAM 时【追加】拼入
+       (与 kafka 模块并存,不独立成源)。SASL/SCRAM 认证不需要本模块(kafka 模块自带 ScramLoginModule)。
+
+       🔴 aws-msk-iam-auth 通过 AWS SDK v2 做 SigV4 签名,其传递依赖(auth/sts/regions 等)必须【打进 fat jar】
+          (不 provided) —— MSAF 运行时不提供 AWS SDK v2。版本由 parent 的 aws.sdk.bom(2.38.2)统一调解,
+          从源头保证与 iceberg-s3tables 模块(同 BOM)同名类同字节,运行期 mergeJars 合并不撞车(§2.4 约束①)。 -->
+  <dependencies>
+    <!-- Flink core:MSAF 运行时提供(provided,不打入);与其它模块一致。 -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <!-- MSK IAM 认证库(bundled)+ 其 AWS SDK v2 传递依赖(SigV4 签名,bundled)。 -->
+    <dependency><groupId>software.amazon.msk</groupId><artifactId>aws-msk-iam-auth</artifactId><version>${msk.iam.auth.version}</version></dependency>
+  </dependencies>
+
+  <build>
+    <finalName>flink-module-msk-iam-auth</finalName>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId></plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <!-- 🔴 §2.4 约束① 落地(P42.6b 真跑实测逼出):aws-msk-iam-auth 直接依赖 jackson-databind 2.18.3,
+               而 kafka 模块内嵌裸 jackson 2.15.2(flink-sql-connector-kafka 未 relocate Jackson)。二者裸
+               com.fasterxml.jackson 同名类字节分叉 → 运行期 mergeJars(strict) 判为核心库冲突 FAIL(正确拦截)。
+               解法照 iceberg 模块(官方把 Jackson relocate 到 org/apache/iceberg/shaded/,与 kafka 实测 0 冲突):
+               把本模块【私有的】Jackson relocate 到独立包名 → 与 kafka 裸 2.15.2 / iceberg shaded 三者物理隔离,
+               各用各的 Jackson,冲突面归零。aws-msk-iam-auth 内部字节码引用被 shade 同步改写,自洽。
+               只 relocate 本模块的 Jackson,不碰 kafka 已验证模块;不碰 AWS SDK v2 自研 third-party-jackson-core
+               (那本就在 software/amazon/awssdk/thirdparty/ 下,与外界不撞)。 -->
+          <relocations>
+            <relocation>
+              <pattern>com.fasterxml.jackson</pattern>
+              <shadedPattern>com.bgp.shaded.mskiam.jackson</shadedPattern>
+            </relocation>
+            <!-- 🔴 P42.6b 真跑逼出(2026-07-27):flink-sql-connector-kafka 把 kafka-clients relocate 到
+                 org.apache.flink.kafka.shaded.org.apache.kafka.*(shaded uber connector)。Flink KafkaSourceEnumerator
+                 用 shaded ConfigDef 解析 sasl.client.callback.handler.class,要求 handler implements 【shaded 版】
+                 AuthenticateCallbackHandler;而 aws-msk-iam-auth 的 IAMClientCallbackHandler implements 【裸版】
+                 org.apache.kafka.common.security.auth.AuthenticateCallbackHandler(uber-jar 里裸版不存在,全被 connector
+                 relocate 走)→ 运行期 NoClassDefFoundError,SplitEnumerator 启动即崩。
+                 解法:把本模块【对 kafka 的编译期符号引用】也 relocate 到同一 shaded 命名空间,使 IAMClientCallbackHandler
+                 转而 implements shaded 版 → 与 connector 用同一套 Kafka client 接口。已核实 msk 引用的全部 5 个 kafka 类
+                 (AuthenticateCallbackHandler/IllegalSaslStateException/OAuthBearer*)在 kafka 模块 shaded 命名空间均存在。
+                 🔴 msk-iam-auth 自身不含 kafka 类(=0),relocate 纯改引用、不产生重复类;不影响 kafka 模块。 -->
+            <relocation>
+              <pattern>org.apache.kafka</pattern>
+              <shadedPattern>org.apache.flink.kafka.shaded.org.apache.kafka</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

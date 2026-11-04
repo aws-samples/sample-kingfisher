@@ -1,0 +1,20 @@
+{
+  // @paramadvisor/core 独立编译成 CJS 的配置(模块47 L2)。
+  // 与 tsconfig.core.json(@genbi/core)同构,只换 rootDir/include 指向 param-advisor/core。
+  // 【不 extends 主 tsconfig】:主 tsconfig 是 es5 + noEmit + module esnext + @/ paths,
+  // 不适合产出给容器 import 的 CJS。此处独立声明,保证 core 脱离 platform alias 也能编译
+  // (param-advisor/core 已内联 AWS 常量,内部全走相对路径,零 @/ 依赖)。
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./.tmp-core-build",
+    "rootDir": "./src/lib/param-advisor/core"
+  },
+  "include": ["src/lib/param-advisor/core/**/*.ts"]
+}

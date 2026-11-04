@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bgp.flink</groupId>
+    <artifactId>flink-connector-modules-parent</artifactId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>flink-module-kinesis</artifactId>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32-CR — Kinesis 源连接器模块。connector id = "kinesis"(对齐 connector-modules.ts)。
+       fat jar(bundled 连接器 + 传递依赖),无主类;Flink core provided(不打入)。运行期由 mergeJars 拼入。 -->
+  <dependencies>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-aws-kinesis-streams</artifactId><version>${kinesis.connector.version}</version></dependency>
+  </dependencies>
+
+  <build>
+    <finalName>flink-module-kinesis</finalName>
+    <plugins>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId></plugin>
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-shade-plugin</artifactId></plugin>
+    </plugins>
+  </build>
+</project>

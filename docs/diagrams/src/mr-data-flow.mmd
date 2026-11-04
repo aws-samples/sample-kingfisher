@@ -1,0 +1,37 @@
+flowchart LR
+  subgraph SRC["数据源(落在某个执行区)"]
+    J["JDBC:MySQL · PostgreSQL · Oracle · SQL Server"]
+    N["DynamoDB"]
+    O["S3 / Athena 外表"]
+    ST["流:Kinesis · MSK"]
+  end
+  subgraph ING["集成(该区执行)"]
+    GL["Glue 同步作业<br/>全量 / 增量 / 日期变量 / 覆盖 / 合并"]
+    DMS["DMS CDC"]
+    ZE["zero-ETL"]
+    FL["Flink SQL(MSAF)"]
+  end
+  subgraph STORE["存储(该区)"]
+    S3T[("S3 Tables 表桶<br/>bgp-table-bucket · Iceberg")]
+    RS[("Redshift Serverless")]
+  end
+  subgraph META["元数据"]
+    GDC["Glue Data Catalog<br/>联邦目录 s3tablescatalog"]
+    OM["OpenMetadata(主控区,一份)<br/>定时采集 + 事件推送 + 列级血缘"]
+    MIR[("bgp-metadata-mirror<br/>跨区只读镜像")]
+  end
+  subgraph USE["消费"]
+    ATH["Athena 直查"]
+    RSQ["Redshift 查询"]
+    GB["智能问数 / 报表 / 需求工作台"]
+    GOV["治理:目录 · 分级脱敏 · 质量 · 血缘 · 建模"]
+  end
+  J & N & O --> GL --> S3T & RS
+  J --> DMS --> RS
+  J --> ZE --> RS
+  ST --> FL --> S3T
+  S3T --> GDC --> ATH
+  RS --> RSQ
+  S3T & RS --> OM --> MIR
+  ATH & RSQ --> GB
+  OM & RS & S3T --> GOV

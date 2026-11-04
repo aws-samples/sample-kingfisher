@@ -1,0 +1,16 @@
+{
+  "$comment": "Drift guard: this core-dist was compiled by scripts/core-prebuild.sh from the sources listed below (paths relative to the repository root, values are SHA-256). The unit test platform/src/lib/__tests__/core-dist-source-manifest.test.ts recomputes the hashes; a source change without a rebuild fails it. Generated output, do not edit by hand.",
+  "capability": "genbi",
+  "tsconfig": "platform/tsconfig.core.json",
+  "sources": {
+    "platform/src/lib/genbi/core/catalog.ts": "745ba5f973158affa8de12da5a2a7cb756960d189329e2a58b4fbc384ff0470e",
+    "platform/src/lib/genbi/core/chart.ts": "27a93bf2097da83d386629573c03b95f7fc17ace8bc8928a0faa92fed0fd1598",
+    "platform/src/lib/genbi/core/context-format.ts": "61aee67a65474c0aea494ef34470e22e9dc623e9f5eb888cec73c36dc6a5c526",
+    "platform/src/lib/genbi/core/model-client.ts": "27213fd504d98a7f3f1f466c2d32b9979ab90f3981478f0906153810e7e6d557",
+    "platform/src/lib/genbi/core/place-wire.ts": "a1aad4fa201d20d1a6b1cd78e748fdf8670f2ef753e6dc3c0d2c858f84e25dbb",
+    "platform/src/lib/genbi/core/prompt.ts": "8a55ae5cdaffbb9ef07c4737f25ab8b9913afad5652d2e0de4decfd15fb86abc",
+    "platform/src/lib/genbi/core/retrieval-core.ts": "be5797795728593a1192b6682d50afe1be579f4daa3448c0c40323d8cf3847e8",
+    "platform/src/lib/genbi/core/sql-guard.ts": "1016dd95325aae8add39aab195a0918b65a0c2496ccbbb1b739039c1ebf1f9ae",
+    "platform/src/lib/genbi/core/types.ts": "ea7dc871e71ee87409f59881297cf7a03d36d28dba37269dcae824f9eb7228c8"
+  }
+}

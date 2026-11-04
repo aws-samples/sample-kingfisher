@@ -1,0 +1,558 @@
+{
+  "$comment": [
+    "执行环境资源命名的【唯一真源】(模块 50 P50.1a;合同 = 50 DESIGN §3.2 + SPEC §1.1a/§6.5 Q-2 + ACCEPTANCE E-15)。",
+    "",
+    "为什么是一份纯声明式模板表、而不是两侧各写一段逻辑:",
+    "  命名规则要被【运行时侧(platform/Next.js)】和【部署期侧(infra/CDK)】同时消费,而这两侧跨构建边界、",
+    "  物理隔离(照 ai-model.json 先例)。两份手写实现必然漂移,而命名漂移的后果是",
+    "  『部署期建的桶叫 A、运行期去读桶 B』—— 不报错、查不出、要到线上才发现。",
+    "  故这里只放【模板字符串】,两侧各只做一次纯插值(零分支),再由 npm run test:naming-parity 真执行比对。",
+    "",
+    "🔴 变量集封闭:模板里只允许 {account} / {region} / {slug} / {component};插值后若仍残留 `{`,一律抛错",
+    "  (裂缝B 教训:带占位符的字面量流进真实资源名,比报错难查一个量级)。",
+    "",
+    "🔴 本 SSOT 的边界(写清楚,免得被读成『所有名字』):",
+    "  ✅ 收:执行环境栈组按 target 创建/引用的资源 —— 桶 / workgroup / namespace / MWAA / DMS / SG / 流 / 角色 / 栈名。",
+    "  ❌ 不收 DynamoDB 表名:55 张表是控制面 home 单份、规则是『名字不变』,真源已经是",
+    "     platform/src/lib/aws/dynamodb.ts 的 TABLES 常量。放进来 = 制造第二处定义(违 change-safety A1)。",
+    "  ❌ 不收控制面自身资源(ECS 集群 bgp-cluster / user pool / WAF / CloudTrail 桶 / OpenMetadata):",
+    "     它们只在 home 存在一份,没有 target 维度。",
+    "",
+    "🔴 home 豁免 = 逐个抄 infra 现网实名(不是『理论上该叫什么』)。改这里之前先 grep infra/lib 对齐,",
+    "  否则 P50.2 给 home seed 出来的描述符会指向不存在的资源。反向覆盖门禁 naming-coverage.test.ts 钉住这条。",
+    "",
+    "🔴 non-home 一律带 {slug}(= targetSlug,唯一权威 exec-env/target-id.ts#toTargetSlug):",
+    "  见下 nonHomeDimension 的说明 —— 不是只有桶要带,region 级资源同样要带。"
+  ],
+  "version": 1,
+  "prefix": "bgp",
+  "stackPrefix": "BgpExecEnv",
+  "nonHomeDimension": {
+    "key": "targetSlug",
+    "$rationale": [
+      "定案:non-home 资源名的区分维度是 targetSlug(不可变 targetId 的 DNS 安全形态),不是 region、也不是 cellId。",
+      "依据 50 SPEC §6.5 Q-2(v3.0 定案:『FQN 段 / OM service 名 / 审计分片键 / 51 模型键 / 命名 SSOT 全部按 targetId(非 region)派生』)",
+      "+ 50 ACCEPTANCE E-15(v1.7:断言 `bgp-glue-scripts-<账号>-<slug>` 是合法 S3 桶名)。",
+      "",
+      "为什么不用 region:SPEC §6.5 Q-2 明确【允许同 region 多 target】(蓝绿/主备/迁移新旧并存)——",
+      "  这正是不可变 targetId 的存在理由。按 region 派生则同区两 target 的桶名、workgroup 名、MWAA 名全部撞。",
+      "为什么不用 `region + cellId(仅非该 region 首个 target)`:『首个』是【注册顺序】状态,",
+      "  纯命名函数拿不到,要回查注册表才知道自己是不是第一个 ⇒ 名字不再能由描述符独立复现,",
+      "  与 registry.ts『实名资源袋(非派生)』的可审计性冲突。",
+      "为什么不用 `region + slug` 双段:长度会溢出 —— `bgp-glue-scripts-`(17) + 账号(12) + `-` +",
+      "  最长 region(14,如 ap-southeast-4) + `-` + 最长 slug(20) = 65 > S3 的 63 上限。算术见 naming.test.ts。",
+      "",
+      "⚠️ region 级资源(workgroup/MWAA/…)照 DESIGN §3.2 原文本可以『各 region 同名』,该便利已被上面的",
+      "  同区多 target 破掉;且运行时一律读描述符实名(registry.ts:149),跨 region 同名不再带来任何好处。"
+    ]
+  },
+  "kinds": {
+    "datalakeBucket": {
+      "scope": "s3-global",
+      "vars": [
+        "account",
+        "slug"
+      ],
+      "home": "bgp-datalake-{account}",
+      "target": "bgp-datalake-{account}-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/platform-stack.ts:51"
+    },
+    "scriptsBucket": {
+      "scope": "s3-global",
+      "vars": [
+        "account",
+        "slug"
+      ],
+      "home": "bgp-glue-scripts-{account}",
+      "target": "bgp-glue-scripts-{account}-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/platform-stack.ts:52",
+      "$note": "描述符键是 scriptsBucket,资源名历史上叫 glue-scripts(Glue/EMR/Flink 共用)—— 键名与物理名不同,刻意保留存量物理名。"
+    },
+    "dagBucket": {
+      "scope": "s3-global",
+      "vars": [
+        "account",
+        "slug"
+      ],
+      "home": "bgp-mwaa-dags-{account}",
+      "target": "bgp-mwaa-dags-{account}-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/platform-stack.ts:53"
+    },
+    "tableBucket": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-table-bucket",
+      "target": "bgp-table-bucket-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/platform-stack.ts:59",
+      "$note": "S3 Tables 表桶名在 account+region 内唯一 ⇒ 跨 region 可同名,但【同区两 target 会撞】,故 non-home 仍带 slug。"
+    },
+    "athenaWorkgroup": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-athena",
+      "target": "bgp-athena-{slug}",
+      "maxLength": 128,
+      "homeSource": "infra/lib/platform-stack.ts:68"
+    },
+    "redshiftWorkgroup": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-workgroup",
+      "target": "bgp-workgroup-{slug}",
+      "maxLength": 64,
+      "homeSource": "infra/lib/redshift-stack.ts:65",
+      "$note": "这是 30 行 / 23 文件 `|| \"bgp-workgroup\"` 兜底字面量的收编目标(收编本身属 P50.1,不在 P50.1a)。"
+    },
+    "redshiftNamespace": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-namespace",
+      "target": "bgp-namespace-{slug}",
+      "maxLength": 64,
+      "homeSource": "infra/lib/redshift-stack.ts:55"
+    },
+    "redshiftDatabase": {
+      "scope": "namespace",
+      "vars": [],
+      "home": "dev",
+      "target": "dev",
+      "maxLength": 64,
+      "homeSource": "infra/lib/redshift-stack.ts:56",
+      "$note": "库名在 namespace 内作用域,每个 target 各有自己的 namespace ⇒ 全 target 同名不撞,刻意不带 slug(与 ~20 处 `\"dev\"` 默认值一致)。"
+    },
+    "mwaaEnvName": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-mwaa",
+      "target": "bgp-mwaa-{slug}",
+      "maxLength": 80,
+      "homeSource": "infra/lib/mwaa-stack.ts:21"
+    },
+    "dmsInstanceId": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-dms",
+      "target": "bgp-dms-{slug}",
+      "maxLength": 60,
+      "homeSource": "infra/lib/platform-stack.ts:821"
+    },
+    "dmsSubnetGroup": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-dms-subnet-group",
+      "target": "bgp-dms-subnet-group-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/realtime-stack.ts:56"
+    },
+    "dmsSecurityGroup": {
+      "scope": "vpc",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-dms-sg",
+      "target": "bgp-dms-sg-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/realtime-stack.ts:49",
+      "$note": "固定名的用途是【服务层按名查 id】(realtime-stack.ts:49 注释),故 non-home 必须带 slug 才查得准。"
+    },
+    "emrSecurityGroup": {
+      "scope": "vpc",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-emr-sg",
+      "target": "bgp-emr-sg-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/emr-stack.ts:32",
+      "$note": "描述符里存的是 emrSecurityGroupId(真 id),本 kind 给的是【创建/按名查】用的名字。"
+    },
+    "flinkSourceStream": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-flink-source",
+      "target": "bgp-flink-source-{slug}",
+      "maxLength": 128,
+      "homeSource": "infra/lib/platform-stack.ts:829"
+    },
+    "glueRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-glue-role",
+      "target": "BgpExecEnv-{slug}-glue-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/platform-stack.ts:88",
+      "$note": "P50.2 只引用 home 角色(Role.fromRoleName,DESIGN §3.2 第 3 行);per-target 角色随 P50.3 的跨法域硬门(SPEC §6.1)才有调用方。"
+    },
+    "flinkRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-flink-role",
+      "target": "BgpExecEnv-{slug}-flink-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/flink-stack.ts:26"
+    },
+    "emrServerlessRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-emr-serverless-role",
+      "target": "BgpExecEnv-{slug}-emr-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/emr-stack.ts:39"
+    },
+    "redshiftCopyRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-redshift-copy-role",
+      "target": "BgpExecEnv-{slug}-redshift-copy-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/redshift-stack.ts:35"
+    },
+    "dmsKinesisRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-dms-kinesis-role",
+      "target": "BgpExecEnv-{slug}-dms-kinesis-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/realtime-stack.ts:73"
+    },
+    "dataKeyAlias": {
+      "scope": "kms-alias",
+      "vars": [
+        "slug"
+      ],
+      "home": "alias/bgp-data",
+      "target": "alias/bgp-data-{slug}",
+      "maxLength": 256,
+      "homeSource": "infra/lib/kms-stack.ts:26",
+      "$note": [
+        "🔴 P50.2 切片 a 补登记(v1 漏了):KMS 别名是 **region 级唯一**,同区两 target 各自建 CMK 会撞别名。",
+        "漏的原因是反向覆盖门禁 v1 只扫【以 bgp- 开头】的字面量,`\"alias/bgp-data\"` 溜过去了 —— 门禁已加宽。"
+      ]
+    },
+    "logsKeyAlias": {
+      "scope": "kms-alias",
+      "vars": [
+        "slug"
+      ],
+      "home": "alias/bgp-logs",
+      "target": "alias/bgp-logs-{slug}",
+      "maxLength": 256,
+      "homeSource": "infra/lib/kms-stack.ts:34"
+    },
+    "redshiftAdminSecretName": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "redshift!bgp-namespace-admin",
+      "target": "redshift!bgp-namespace-{slug}-admin",
+      "maxLength": 512,
+      "homeSource": "infra/lib/agentcore-stack.ts:55",
+      "$note": [
+        "这不是我们【取】的名字,是 Redshift Serverless 托管 admin secret 的**服务生成规则**",
+        "`redshift!<namespace>-<username>` —— 我们只是**预测**它,以便按名 describe(不能 list_secrets,会 AccessDenied)。",
+        "🔴 因此它必须与 `redshiftNamespace` 保持派生关系:naming.test.ts 断言",
+        "`redshiftAdminSecretName === \"redshift!\" + resourceName(\"redshiftNamespace\") + \"-admin\"`,改一个另一个必须跟。"
+      ]
+    },
+    "residencyAuditTable": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-region-audit-home",
+      "target": "bgp-region-audit-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/exec-env/residency-stack.ts",
+      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域审计表(50 SPEC v3.22 §1.3 D)。🔴 home 法域不装 residency-api ⇒ home 模板永不建,只为 SSOT 完整;infra 侧从本 SSOT 派生(resourceName),非字面量。"
+    },
+    "residencyResultsTable": {
+      "scope": "account-region",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-region-results-home",
+      "target": "bgp-region-results-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/exec-env/residency-stack.ts",
+      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域结果表(50 SPEC v3.22 §1.3a S4)。home 模板永不建,只为 SSOT 完整。"
+    },
+    "residencyBucket": {
+      "scope": "s3-global",
+      "vars": [
+        "account",
+        "slug"
+      ],
+      "home": "bgp-region-results-{account}-home",
+      "target": "bgp-region-results-{account}-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/exec-env/residency-stack.ts",
+      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域结果桶(RETAIN / CMK / deny 复制)。长度:19 + 12 + 1 + 20 = 52 ≤ 63。home 模板永不建。"
+    },
+    "stackName": {
+      "scope": "cfn",
+      "vars": [
+        "slug",
+        "component"
+      ],
+      "home": "BgpExecEnv-{slug}-{component}",
+      "target": "BgpExecEnv-{slug}-{component}",
+      "maxLength": 128,
+      "homeSource": "50 SPEC §1.1a-② / DESIGN §3.5",
+      "$note": [
+        "栈名对 home 也带 slug(= BgpExecEnv-tgt-home-core):home 豁免的理由是【存量资源不改名】,",
+        "而执行环境栈组是【全新栈】,home 上从来没有这些栈 ⇒ 没有存量要豁免。",
+        "另:栈名必须与控制面 21 个存量栈零相交(ACCEPTANCE B3 的 synth 门禁),带前缀正好保证这点。"
+      ]
+    },
+    "mwaaRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-mwaa-role",
+      "target": "BgpExecEnv-{slug}-mwaa-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/exec-env/mwaa-stack.ts",
+      "$note": "@kf-batch 50-WP13-mwaa-region per-target MWAA 执行角色(SPEC v3.26 §3.14)。🔴 home 的 MWAA 角色是 CDK 自动名(mwaa-stack.ts 未取名),改名 = 替换 home 角色 + 更新 home 环境(半小时级停摆)⇒ home 模板永不建、只为 SSOT 完整(同 residencyAuditTable 先例);infra 侧从本 SSOT 派生(resourceName),非字面量。长度 11+20+10=41 ≤ 64。"
+    },
+    "workflowBucket": {
+      "scope": "s3-global",
+      "vars": [
+        "account",
+        "slug"
+      ],
+      "home": "bgp-airflow-sls-{account}",
+      "target": "bgp-airflow-sls-{account}-{slug}",
+      "maxLength": 63,
+      "homeSource": "infra/lib/exec-env/airflow-serverless-stack.ts",
+      "$note": "@kf-batch 50-WP15-airflow-serverless MWAA Serverless 的 workflow 定义 / 代码包桶(SPEC v3.27 §3.15)。🔴 与 workflow 同 region、versioned(服务按 VersionId 快照)、RETAIN。home 模板由施工序 2b 的 BgpAirflowServerlessStack 建;infra 侧从本 SSOT 派生(resourceName)。长度 16+12+1+20=49 ≤ 63。"
+    },
+    "airflowServerlessRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-airflow-sls-role",
+      "target": "BgpExecEnv-{slug}-airflow-sls-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/exec-env/airflow-serverless-stack.ts",
+      "$note": "@kf-batch 50-WP15-airflow-serverless per-target MWAA Serverless 执行角色(SPEC v3.27 §3.15;信任 airflow-serverless.amazonaws.com;控制面回写为唯一跨区例外,同 mwaaRole)。home 模板由施工序 2b 建。长度 11+20+17=48 ≤ 64。"
+    },
+    "airflowServerlessSg": {
+      "scope": "vpc",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-airflow-sls-sg",
+      "target": "bgp-airflow-sls-sg-{slug}",
+      "maxLength": 255,
+      "homeSource": "infra/lib/airflow-serverless-home-stack.ts",
+      "$note": "@kf-batch 50-WP15-airflow-serverless MWAA Serverless 工作 SG(自引用 inbound all + egress all)。描述符存 airflowServerlessSgId(真 id),本 kind 给【创建 / 按名查】用的名字(seed-home 按名查 id,与 emrSecurityGroup 同法)。"
+    },
+    "platformDataRole": {
+      "scope": "iam-global",
+      "vars": [
+        "slug"
+      ],
+      "home": "bgp-platform-data-role",
+      "target": "BgpExecEnv-{slug}-platform-data-role",
+      "maxLength": 64,
+      "homeSource": "infra/lib/shared/platform-data-role.ts",
+      "$note": "@kf-batch 50-WP31-seq5-dataplane-role 平台数据面角色(WP-31 L5「能力即授权」):平台 TaskRole 经它取得该 target 的数据面凭证;策略 = 资源只限本 target ∧ aws:RequestedRegion = 该区。信任 = 本账号平台 TaskRole。home 建在平台栈、非 home 建在执行环境 base 栈,同一个作者 infra/lib/shared/platform-data-role.ts。长度 11+20+19=50 ≤ 64。"
+    }
+  },
+  "notCovered": {
+    "$comment": "显式登记『本 SSOT 刻意不收』的名字,让反向覆盖门禁能区分『漏了』和『不收』。",
+    "ddbTables": {
+      "reason": "控制面 home 单份,规则=名字不变;真源 platform/src/lib/aws/dynamodb.ts 的 TABLES(55 张)",
+      "examples": [
+        "bgp-task-runs",
+        "bgp-projects",
+        "bgp-execution-envs"
+      ],
+      "outsideTablesConstant": {
+        "$comment": [
+          "🔴 反向覆盖门禁附带查出的**既有缺口**(不是本批引入的):这 6 张表在 CDK 与 platform 两侧",
+          "各写一份字面量,**都不在 TABLES 常量里** —— 正是 change-safety A1 说的『同一个值有第二处定义』。",
+          "本批(P50.1a 命名 SSOT)刻意不动它:它属 DDB 表名口径、要改 6+ 个现网文件,归 P50.1 的收编批。",
+          "登记在此是为了让门禁能放行、同时让缺口可见 —— 名单只许缩短,不许悄悄变长。"
+        ],
+        "absorbedBy": "P50.1",
+        "names": [
+          "bgp-budgets",
+          "bgp-copilot-turns",
+          "bgp-cost-daily",
+          "bgp-cost-runs",
+          "bgp-lineage",
+          "bgp-sql-history"
+        ],
+        "sources": [
+          "infra/lib/finops-stack.ts + platform/src/lib/finops/constants.ts",
+          "infra/lib/database-stack.ts + platform/src/lib/copilot/memory.ts",
+          "infra/lib/database-stack.ts + platform/src/lib/governance/lineage-service.ts",
+          "infra/lib/database-stack.ts + platform/src/app/api/redshift/history/route.ts"
+        ]
+      }
+    },
+    "controlPlaneOnly": {
+      "reason": "只在 home 存在一份,无 target 维度(含 P50.2 的 exec-env CodeBuild 项目与部署 broker —— 一个项目/一个 broker 服务全部 target)",
+      "names": [
+        "bgp-action-dispatcher",
+        "bgp-admin",
+        "bgp-analyst",
+        "bgp-cluster",
+        "bgp-cognito-bootstrap",
+        "bgp-developer",
+        "bgp-exec-env-broker",
+        "bgp-exec-env-deploy",
+        "bgp-ingestion-cluster",
+        "bgp-job-role-boundary",
+        "bgp-management-trail",
+        "bgp-manager",
+        "bgp-om-cluster",
+        "bgp-om-ingest-glue",
+        "bgp-om-ingest-profiler",
+        "bgp-om-ingest-redshift",
+        "bgp-om-ingest-s3",
+        "bgp-om-ingest-s3tables",
+        "bgp-om-ingest-sources",
+        "bgp-om-search",
+        "bgp-openmetadata",
+        "bgp-openmetadata-db",
+        "bgp-openmetadata-waf",
+        "bgp-platform",
+        "bgp-platform-waf",
+        "bgp-source-mysql",
+        "bgp-user-pool"
+      ]
+    },
+    "agentcore": {
+      "reason": "AgentCore runtime/gateway/skill 名由 infra/lib/shared/agentcore-base.ts 按 capabilityId 派生;target 绑定随 P50.3/P50.4 的 agentcore 组件",
+      "pattern": "bgp-<capabilityId>-{agent,gateway,skills,memory-role,runtime-role,gateway-role}"
+    },
+    "prose": {
+      "$comment": [
+        "🔴 反向覆盖门禁 v2 按 **token 级**判定(每条字面量里的每个 `bgp-xxx` 都要有归属)。",
+        "这里登记的是**确定不是 AWS 资源名**的 token:文案、正则片段。逐条写原因,不许通配豁免。"
+      ],
+      "tokens": [
+        "bgp-",
+        "bgp-region-audit-",
+        "bgp-region-results-",
+        "bgp-mwaa-",
+        "bgp-job-role-"
+      ],
+      "reasons": {
+        "bgp-region-audit-": "@kf-batch 50-W5-seg1-WP10a platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-audit-*`(通配全部 target 的区域审计表),不是单个资源名;真名由 kind residencyAuditTable 派生",
+        "bgp-region-results-": "@kf-batch 50-W5-seg1-WP10a platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-results-*` / `bgp-region-results-<acct>-*`,不是单个资源名;真名由 kind residencyResultsTable / residencyBucket 派生",
+        "bgp-": "om-ingestion-stack.ts 里嵌入 Python 的容器过滤正则 `['bgp-.*']` 的前缀片段,不是资源名",
+        "bgp-mwaa-": "@kf-batch 50-WP13-mwaa-region platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `environment/bgp-mwaa-*` / `role/bgp-mwaa-*/Admin`(通配全部 per-target MWAA 环境),不是单个资源名;真名由 kind mwaaEnvName 派生",
+        "bgp-job-role-": "@kf-batch 50-WP31-seq5-dataplane-role shared/platform-data-role.ts 平台数据面角色策略里的 IAM 资源模式前缀 `role/bgp-job-role-*`(用户经角色顾问建的作业角色,创建权与边界在平台栈 CreateJobRolesWithBoundary;名字由用户起、全局一份),不是单个资源名"
+      }
+    },
+    "retired": {
+      "$comment": [
+        "🔴 @kf-batch 50-W5-seg2-WP1 已下线能力留下的 RETAIN 表(50 SPEC §3.9c 已下线能力登记):infra 保留表定义(删表要过破坏性变更门),",
+        "platform 代码已不再认识它们(TABLES 常量已删;门禁 lib/__tests__/data-service-retired.test.ts (c) 钉住 infra 里三张表仍在、naming-coverage 钉住不许回 TABLES)。",
+        "登记在此是让反向覆盖门禁能区分『漏登记』和『刻意留在 infra 的已下线表』。名单只许随删表门缩短,不许当成新表的停车位。"
+      ],
+      "reason": "已下线能力(数据服务 data-service,2026-09-05 用户拍板)的 RETAIN 表:控制面 home 单份、名字不变、platform 零引用;删表另过破坏性变更门",
+      "retiredOn": "2026-09-05",
+      "contract": "docs/design/50-multi-region-execution/SPEC.md §3.9c · WORK-PACKAGES.md WP-1 · ACCEPTANCE.md §8tervicies",
+      "names": [
+        "bgp-data-apis",
+        "bgp-data-api-keys",
+        "bgp-data-api-usage"
+      ]
+    },
+    "pendingRegionalization": {
+      "$comment": [
+        "🔴 这一类【将来要带 target 维、但本批还不动】。与上面三类的区别是:上面三类是『本来就没有 target 维』,",
+        "这一类是『有,只是排在后面的批次』。分开登记是为了不让『推迟』被读成『免除』(AUDIT-SCOPE §4)。",
+        "每条必须写清由哪一批吸收 —— 反向覆盖门禁机械校验这一点。"
+      ],
+      "items": [
+        {
+          "name": "bgp-cloudtrail",
+          "form": "bgp-cloudtrail-<acct>(模板,audit-stack.ts)",
+          "reason": "审计桶。50 DESIGN §19 轴D『审计驻留』要求审计数据按法域留区 ⇒ 它最终必须有 target/region 维",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/audit-stack.ts"
+        },
+        {
+          "name": "bgp-management-trail",
+          "form": "bgp-management-trail(定值,audit-stack.ts)",
+          "reason": "同上:CloudTrail trail 本身也随轴D 的审计驻留改造",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/audit-stack.ts"
+        },
+        {
+          "name": "bgp-glue",
+          "form": "OM service 名(嵌入 Python 的 ingestion 配置)",
+          "reason": "OpenMetadata 逻辑 service 名。SPEC §6.5 定稿:OM service 名改按 target 派生 `bgp-glue-<targetId>`、home 保留旧名豁免;元数据 FQN 收口在 §3.10",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/om-ingestion-stack.ts"
+        },
+        {
+          "name": "bgp-redshift",
+          "form": "OM service 名 + FQN 前缀(`bgp-redshift.dev.public.*`)",
+          "reason": "OpenMetadata 逻辑 service 名,且是 FQN 第一段(`bgp-redshift.dev.public.*`)—— 改名必须与 §3.10 权威 FQN 一起动,不能单独改",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/om-ingestion-stack.ts"
+        },
+        {
+          "name": "bgp-s3",
+          "form": "OM service 名",
+          "reason": "OpenMetadata 逻辑 service 名(S3 数据湖 ingestion)。SPEC §6.5 定稿:OM service 名改按 target 派生、home 保留旧名豁免",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/om-ingestion-stack.ts"
+        },
+        {
+          "name": "bgp-s3tables",
+          "form": "OM service 名(S3Tables ingestion)",
+          "reason": "OpenMetadata 逻辑 service 名(S3Tables ingestion)。同 OM service 名一批,按 target 派生随 §3.10 FQN 收口",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/om-ingestion-stack.ts"
+        },
+        {
+          "name": "bgp-sources",
+          "form": "OM service 名(源库 ingestion)",
+          "reason": "OpenMetadata 逻辑 service 名(源库 ingestion)。同 OM service 名一批,按 target 派生随 §3.10 FQN 收口",
+          "absorbedBy": "P50.4",
+          "source": "infra/lib/om-ingestion-stack.ts"
+        }
+      ]
+    }
+  }
+}

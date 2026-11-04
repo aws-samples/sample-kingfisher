@@ -1,0 +1,14 @@
+flowchart LR
+  subgraph T["BgpExecEnv-&lt;slug&gt;-*(infra/lib/exec-env/stack-group.ts)"]
+    B["-base<br/>本区 VPC(私有子网、无 NAT / EIP / IGW)<br/>VPC 接口端点 · CMK · 平台数据面角色"]
+    C["-core<br/>Glue / EMR 执行角色(本区)<br/>脚本桶 · 数据湖桶 · S3 Tables 表桶 · Athena 工作组"]
+    R["-redshift<br/>Redshift Serverless namespace / workgroup"]
+    D["-dms<br/>DMS 复制基建"]
+    F["-flink<br/>MSAF 基建"]
+    A["-airflow-serverless<br/>MWAA Serverless 工作流入口 · DAG 桶"]
+    X["-residency-api<br/>非 home 法域:区域审计 / 区域结果 / 驻留桶"]
+    M["-mwaa(经典,门控)"]
+  end
+  B --> C --> R & D & F & A & X
+  C -.->|"-c classic-mwaa=1"| M
+  P["主控区 ↔ 本区<br/>跨区 VPC peering 私网"] -.-> B

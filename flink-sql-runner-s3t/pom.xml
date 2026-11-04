@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.bgp</groupId>
+  <artifactId>flink-sql-runner-s3t</artifactId>
+  <version>1.0</version>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32 — S3 Tables(托管 Iceberg)连接器包 runner。
+       与基础 runner(../flink-sql-runner)同源、【同为 Flink 1.20(最新)】,只是额外打入 Iceberg +
+       S3 Tables catalog 依赖(包较大 ~115MB,故作为独立"连接器包"预构建,按 sinkType 由后端选择代码 JAR;
+       运行时版本始终是配置文件里的 FLINK_RUNTIME_ENVIRONMENT=FLINK-1_20,与基础 runner 完全一致)。
+       S3 Tables catalog 在【用户代码】注册(见 FlinkSqlRunner.java),规避 MSAF 上 Flink 系统类
+       HadoopUtils 看不到 user-jar Hadoop 的 NoClassDefFoundError —— 该修法与 Flink 版本无关。 -->
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <flink.version>1.20.0</flink.version>
+    <kinesis.connector.version>5.0.0-1.20</kinesis.connector.version>
+    <!-- Flink CDC(MySQL binlog 源):Apache Flink CDC 3.2.1,支持 Flink 1.20。模块32 — 多 source。 -->
+    <flinkcdc.version>3.2.1</flinkcdc.version>
+    <!-- MySQL JDBC 驱动:mysql-cdc 的 Debezium 运行时需 com.mysql.cj.jdbc.Driver(connector fat jar 未内嵌)。 -->
+    <mysql.driver.version>8.4.0</mysql.driver.version>
+    <iceberg.version>1.9.1</iceberg.version>
+    <avro.version>1.12.0</avro.version>
+    <hadoop.version>3.4.0</hadoop.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <!-- 统一 AWS SDK v2 版本(2.38.2):s3-tables-catalog:0.1.8 传递 aws-sdk 2.29.26,而 s3tables:2.38.2
+       需要新版 aws-core 才有的 AuthSchemePreferenceResolver;不锁版本会按声明顺序选到旧版 → NoClassDefFoundError。
+       用官方 BOM 强制全部 aws-sdk v2 模块对齐 2.38.2(与 AWS 官方 S3TableSink 示例一致)。 -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>2.38.2</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!-- Flink core/table:MSAF 运行时提供(not bundled) -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-clients</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-api-java-bridge</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-planner-loader</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+
+    <!-- MSAF runtime properties helper(small, bundled) -->
+    <dependency><groupId>com.amazonaws</groupId><artifactId>aws-kinesisanalytics-runtime</artifactId><version>1.2.0</version><scope>provided</scope></dependency>
+
+    <!-- Source connector(Kinesis,最新 5.0.0-1.20)+ JSON format(bundled) -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-aws-kinesis-streams</artifactId><version>${kinesis.connector.version}</version></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-json</artifactId><version>${flink.version}</version></dependency>
+
+    <!-- Source connector(MySQL CDC,Apache Flink CDC 3.2.1):直接消费 MySQL binlog。模块32 — 多 source。 -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-mysql-cdc</artifactId><version>${flinkcdc.version}</version></dependency>
+    <!-- MySQL JDBC 驱动(bundled):flink-sql-connector-mysql-cdc 的 Debezium 运行时按 com.mysql.cj.jdbc.Driver
+         加载,但该 fat connector 未内嵌驱动 → 运行时 NoClassDefFoundError: com/mysql/cj/jdbc/Driver。显式打入。 -->
+    <dependency><groupId>com.mysql</groupId><artifactId>mysql-connector-j</artifactId><version>${mysql.driver.version}</version></dependency>
+
+    <!-- Flink Iceberg 用 DropWizard metrics(bundled) -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-metrics-dropwizard</artifactId><version>${flink.version}</version></dependency>
+
+    <!-- Iceberg(bundled),Flink 1.20 集成 -->
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-core</artifactId><version>${iceberg.version}</version>
+      <exclusions><exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion></exclusions></dependency>
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-aws</artifactId><version>${iceberg.version}</version>
+      <exclusions><exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion></exclusions></dependency>
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-flink-1.20</artifactId><version>${iceberg.version}</version>
+      <exclusions><exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion></exclusions></dependency>
+    <dependency><groupId>org.apache.iceberg</groupId><artifactId>iceberg-api</artifactId><version>${iceberg.version}</version>
+      <exclusions><exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion></exclusions></dependency>
+
+    <!-- Avro(Iceberg manifest 需要,bundled) -->
+    <dependency><groupId>org.apache.avro</groupId><artifactId>avro</artifactId><version>${avro.version}</version></dependency>
+
+    <!-- S3 Tables catalog + SDK(bundled) -->
+    <dependency><groupId>software.amazon.s3tables</groupId><artifactId>s3-tables-catalog-for-iceberg</artifactId><version>0.1.8</version>
+      <exclusions><exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion></exclusions></dependency>
+    <dependency><groupId>software.amazon.awssdk</groupId><artifactId>s3tables</artifactId><version>2.38.2</version>
+      <exclusions><exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion></exclusions></dependency>
+
+    <!-- Hadoop(Iceberg Configuration / IO 需要,bundled) -->
+    <dependency><groupId>org.apache.hadoop</groupId><artifactId>hadoop-common</artifactId><version>3.4.0</version><!-- 与 <hadoop.version> 同值;写字面量是让依赖扫描器解析到版本(2026-11-02 GitLab grype 把属性引用当成版本未知) -->
+      <exclusions>
+        <exclusion><groupId>org.apache.avro</groupId><artifactId>avro</artifactId></exclusion>
+        <exclusion><groupId>org.slf4j</groupId><artifactId>slf4j-reload4j</artifactId></exclusion>
+        <exclusion><groupId>org.slf4j</groupId><artifactId>slf4j-log4j12</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-classic</artifactId></exclusion>
+        <exclusion><groupId>ch.qos.logback</groupId><artifactId>logback-core</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>flink-sql-runner-s3t</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.11.0</version>
+        <configuration><release>11</release></configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.5.1</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals><goal>shade</goal></goals>
+            <configuration>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <artifactSet>
+                <excludes>
+                  <exclude>org.apache.flink:force-shading</exclude>
+                  <exclude>com.google.code.findbugs:jsr305</exclude>
+                  <exclude>org.slf4j:*</exclude>
+                  <exclude>org.apache.logging.log4j:*</exclude>
+                </excludes>
+              </artifactSet>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>com.bgp.flink.FlinkSqlRunner</mainClass>
+                </transformer>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <filters>
+                <filter><artifact>*:*</artifact><excludes>
+                  <exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude>
+                  <exclude>META-INF/versions/**</exclude>
+                </excludes></filter>
+              </filters>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

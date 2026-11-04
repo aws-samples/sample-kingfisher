@@ -1,0 +1,20 @@
+{
+  "name": "bgp-paramadvisor-agent",
+  "version": "1.0.0",
+  "description": "Managed-service parameter advisor agent on AgentCore Runtime (Strands over Gateway MCP tools)",
+  "main": "index.js",
+  "type": "module",
+  "scripts": { "start": "node index.js" },
+  "dependencies": {
+    "@strands-agents/sdk": "^1.10.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.700.0",
+    "@aws-sdk/credential-provider-node": "^3.700.0",
+    "@aws-sdk/signature-v4": "^3.374.0",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@smithy/protocol-http": "^4.1.0",
+    "undici": "^6.21.0",
+    "zod": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@opentelemetry/api": "^1.9.0"
+  }
+}

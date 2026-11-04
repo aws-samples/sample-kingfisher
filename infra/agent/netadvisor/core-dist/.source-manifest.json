@@ -1,0 +1,9 @@
+{
+  "$comment": "Drift guard: this core-dist was compiled by scripts/core-prebuild.sh from the sources listed below (paths relative to the repository root, values are SHA-256). The unit test platform/src/lib/__tests__/core-dist-source-manifest.test.ts recomputes the hashes; a source change without a rebuild fails it. Generated output, do not edit by hand.",
+  "capability": "netadvisor",
+  "tsconfig": "platform/tsconfig.netadvisor-core.json",
+  "sources": {
+    "platform/src/lib/network-advisor/core/rules.ts": "e72d06dcd133950dd37da0bb33757ea11e211789986a875306234781b00255a7",
+    "platform/src/lib/network-advisor/core/types.ts": "af9bcdd344fb54d356484642f76420cf0ddaff8ca7fd3bbc20a8da25f6480793"
+  }
+}

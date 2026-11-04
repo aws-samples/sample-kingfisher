@@ -1,0 +1,417 @@
+# @kf-batch 50-P50.2b-deploy-isolation
+# 执行环境部署 buildspec(50 DESIGN §12.3 / §12.5)。
+#
+# 【为什么 buildspec 在这里、而不是运行时可改的地方】§12.0 的"同级保护"要求:
+#   buildspec 随控制面 IaC 走 git ⇒ 改它 = 改代码 = 走 PR + 部署,而不是运行时覆写。
+#   CodeBuild 项目用 `fromSourceFilename` 指向本文件,而 source 是**按内容哈希不可变的 CDK asset**
+#   (S3,平台 ECS 角色无写权)⇒ 想改 buildspec 必须重部署控制面。
+#
+# 🔴 入参全部来自 broker 构造的 environmentVariablesOverride(值来自"白名单入参 + 注册表"),
+#    本文件**不接受**任何其它注入点;没有的变量一律 fail-fast,不猜默认值。
+version: 0.2
+
+env:
+  # 🔴 CodeBuild 缺省用 sh(dash)跑命令，而本文件全是 bash 语法（set -o pipefail / ${!v} 间接展开）
+  #    —— 切片 g 真跑第一个 build 在 PRE_BUILD 首行即炸（"set: Illegal option -o pipefail"）。
+  #    声明 shell 为 bash；这行不能删，否则所有 phase 命令静默降级回 dash。
+  shell: bash
+  variables:
+    # 这些只是占位声明,真值由 broker 的 environmentVariablesOverride 覆盖。
+    EXEC_ENV_TARGET: ""
+    EXEC_ENV_REGION: ""
+    EXEC_ENV_ACCOUNT: ""
+    EXEC_ENV_COMPONENTS: ""
+    EXEC_ENV_OPERATION_ID: ""
+    EXEC_ENV_LOCK_EPOCH: "0"
+    # @kf-batch 50-WP23-xregion-peering:本环境 VPC 的地址段(broker 从描述符透传;home 为空 ⇒ 栈组沿用存量段)
+    EXEC_ENV_VPC_CIDR: ""
+    # @kf-batch 50-WP15-airflow-serverless(K-5):NAT 数量(= EIP 数)由 broker 从注册表 networkProfile 派生;缺省 2 与旧行为逐字节相同
+    # 🔴 P0-E ④(SPEC §3.5c v3.6):基线/波次三件套。
+    #    · EXEC_ENV_SOURCE_REF 由**项目定义**注入(deploy-stack.ts 的 environment.environmentVariables),
+    #      这里只写占位声明;它是"本次 build 实际用的源包哈希",不接受 broker override 之外的任何来源。
+    #    · 另两个由 broker 从**注册表描述符**读出后透传(客户端入参白名单里没有它们)。
+    #    ⚠️ 三个都**刻意不进上面的 fail-fast 必填清单**:全新 env 首装时 baselineRef 天然为空,
+    #      "缺基线"是合法形态(判据里 ⇒ disruptive 但不要求审批),不是配置错误。
+    EXEC_ENV_SOURCE_REF: ""
+    EXEC_ENV_BASELINE_REF: ""
+    EXEC_ENV_DESIRED_TEMPLATE_VERSION: ""
+    # @kf-batch 50-WP30-decommission:下线销毁(EXEC_ENV_MODE=destroy)时的最终快照名(broker 只从注册表的删除计划读)
+    EXEC_ENV_FINAL_SNAPSHOT: ""
+
+phases:
+  pre_build:
+    commands:
+      # ── 0. 入参 fail-fast(缺一个就停,绝不用默认值继续)────────────────────
+      - |
+        set -euo pipefail
+        for v in EXEC_ENV_TARGET EXEC_ENV_REGION EXEC_ENV_ACCOUNT EXEC_ENV_COMPONENTS EXEC_ENV_OPERATION_ID; do
+          if [ -z "${!v:-}" ]; then echo "❌ 缺环境变量 $v —— 只能由 broker 注入,不接受默认值"; exit 1; fi
+        done
+        echo "target=$EXEC_ENV_TARGET region=$EXEC_ENV_REGION components=$EXEC_ENV_COMPONENTS op=$EXEC_ENV_OPERATION_ID epoch=$EXEC_ENV_LOCK_EPOCH vpc_cidr=${EXEC_ENV_VPC_CIDR:-<home 沿用存量>}"
+        # @kf-batch 50-WP30-decommission:destroy 分支的入参(home 永不可删 / 最终快照名必须由 broker 从删除计划给)
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          if [ "$EXEC_ENV_TARGET" = "tgt_home" ]; then echo "❌ 主控区执行环境永不可删(mode=destroy 拒 tgt_home)"; exit 1; fi
+          if [ -z "${EXEC_ENV_FINAL_SNAPSHOT:-}" ]; then echo "❌ mode=destroy 缺 EXEC_ENV_FINAL_SNAPSHOT —— 最终快照名只能由 broker 从删除计划注入"; exit 1; fi
+        fi
+        # @kf-batch 50-WP23-xregion-peering:非 home 缺地址段 ⇒ 立刻停(broker 也拦了一道;这里是「不信上游结论」的那一层)
+        # @kf-batch 50-WP30-decommission:只拦**部署**——缺段的存量环境部署不出来,但必须删得掉
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          echo "mode=destroy ⇒ 不要求 EXEC_ENV_VPC_CIDR(销毁按 CFN 删栈,不 synth)"
+        elif [ "$EXEC_ENV_TARGET" != "tgt_home" ] && [ -z "${EXEC_ENV_VPC_CIDR:-}" ]; then
+          echo "❌ 缺 EXEC_ENV_VPC_CIDR —— 非 home 执行环境的 VPC 地址段必须由描述符给(注册时从池里分配)。"
+          echo "   不给就会用 CDK 默认 10.0.0.0/16,与主控区 VPC 逐位相同 ⇒ 跨区 peering 建不出来 ⇒ 台账回写不了(SPEC §3.14ter)。"
+          exit 1
+        fi
+        # 账号护栏:build 跑在控制面账号,目标账号必须与之相同(一期不做跨账号 target)
+        CALLER_ACCT="$(aws sts get-caller-identity --query Account --output text)"
+        if [ "$CALLER_ACCT" != "$EXEC_ENV_ACCOUNT" ]; then
+          echo "❌ 目标账号 $EXEC_ENV_ACCOUNT 与 build 身份所在账号 $CALLER_ACCT 不同 —— 一期不支持跨账号 target"; exit 1
+        fi
+
+      # ── 1. 🔴 AZ preflight **第一层**:AZ 在本账号是否 available ────────────
+      # 栈组为了让 synth 零 context 查找,AZ 名是**显式给的**(`-c exec-env-azs=`,由第 1d 层从交集里挑定后传入)。
+      # 而 AZ 可用性是**账号级**的(个别账号在某 region 缺某 AZ / 需 opt-in)。
+      # 🔴 这一层**不够** —— 见下面的第 1d 块:AZ「在账号里可用」不等于「每个接口端点服务都支持它」。
+      #    2026-09-11 全新账号首装实测:`us-east-1a` 账号级可用、本层放行,而
+      #    `com.amazonaws.us-east-1.redshift-serverless` 在该账号只支持 1b/1c/1d ⇒ base 栈建端点时
+      #    400 `does not support the availability zone of the subnet` ⇒ **整栈回滚,首装直接失败**。
+      - |
+        set -euo pipefail
+        # 🔴 `--output text` 的列表是 **TAB** 分隔;下面的 `case " $AZS "` 按**空格**做词边界匹配
+        #    ⇒ 不归一化就永不命中,us-west-2a/b 明明可用也会被判"不可用"(切片 g 真跑实测,
+        #    第 2 个 buildspec shell 坑)。`tr` 把所有空白压成空格,词边界才成立。
+        AZS="$(aws ec2 describe-availability-zones --region "$EXEC_ENV_REGION" \
+                 --filters Name=state,Values=available \
+                 --query 'AvailabilityZones[].ZoneName' --output text | tr '[:space:]' ' ' || true)"
+        if [ -z "$AZS" ]; then echo "❌ 无法列出 $EXEC_ENV_REGION 的可用 AZ(权限或 region 不可用)"; exit 1; fi
+        echo "该 region 可用 AZ:$AZS"
+        # @kf-batch 50-B29-az-auto
+        # 🔴🔴 B-29(2026-10-01 新账号硬门 w5a 真撞):这里原来**要求 `<region>a` 与 `<region>b` 都存在** ——
+        #   那是第 1d 层(端点服务 × AZ 交集,自动挑 AZ)出现之前的旧守卫。ap-northeast-1 在本账号只有 1a/1c/1d,
+        #   没有 1b ⇒ 部署当场失败,而 1d 层本来会挑出 1a/1c。⇒ 本层只判**真约束**「可用 AZ ≥ 2」,
+        #   挑哪两个交给 1d(多区域自动:不许假设任何区一定有 a/b)。
+        N_AZ="$(printf '%s' "$AZS" | tr ' ' '\n' | grep -c . || true)"
+        if [ "${N_AZ:-0}" -lt 2 ]; then
+          echo "❌ $EXEC_ENV_REGION 在本账号可用的 AZ 不足 2 个(可用:$AZS)—— 私有子网必须跨 AZ,该 region 装不了执行环境"; exit 1
+        fi
+
+      # ── 1b. 🔴 上次失败留下的**空表桶**清理(P50.2g bug #6;用户 2026-09-01 拍板)──────
+      # 【为什么需要】数据类资源刻意 RETAIN(§12 P0-A:删环境不许删客户数据)⇒ core 栈一旦 ROLLBACK,
+      #   S3Tables 表桶留在原地,下一次重建必撞 409 AlreadyExists ⇒ **首次失败毒化所有重试**
+      #   (实测:人工删桶 + 等删除传播,才能继续)。
+      # 【为什么敢自动删】**三条同时满足**才动手,任一条不满就 fail-fast 并给出确切命令:
+      #   ① 该 target 的 core 栈**不存在**(= 没有任何栈拥有它;栈在就说明这是活资源,绝不碰);
+      #   ② 桶内 **0 namespace 且 0 表**(从构造上保证没有客户数据 —— 这是"删的不是数据"的依据);
+      #   ③ 桶名是**命名 SSOT 派生的本 target 名**(从 platform/naming.json 现算,不写字面量)。
+      # 并且**大声留痕**:每一步都 echo,删除动作单独一行(CloudWatch 里可检索)。
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR"
+        SLUG="$(printf '%s' "$EXEC_ENV_TARGET" | tr '_' '-')"
+        CORE_STACK="BgpExecEnv-$SLUG-core"
+        # 桶名从命名 SSOT 现算(naming.json 随源包在;绝不在 buildspec 里写第二处字面量)
+        TABLE_BUCKET="$(node -e 'const n=require("./platform/naming.json");const r=n.kinds.tableBucket;if(!r)throw new Error("naming.json 无 tableBucket kind");process.stdout.write(r.target.split("{slug}").join(process.argv[1]))' "$SLUG")"
+        echo "orphan-preflight: target=$EXEC_ENV_TARGET slug=$SLUG core_stack=$CORE_STACK table_bucket=$TABLE_BUCKET"
+        # @kf-batch 50-WP30-decommission —— 🔴 销毁重试时 core 栈已经删了、空表桶正好满足下面「孤儿」三条件 ⇒
+        #   不在这里拦,重试销毁就会把**要保留**的表桶顺手删掉。destroy 模式一律不做这段清理。
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          echo "orphan-preflight: mode=destroy ⇒ 跳过(表桶是要保留的数据资源,销毁不碰)"
+        elif aws cloudformation describe-stacks --stack-name "$CORE_STACK" --region "$EXEC_ENV_REGION" >/dev/null 2>&1; then
+          echo "orphan-preflight: core 栈已存在 ⇒ 表桶是活资源,不做任何清理(正常路径)"
+        else
+          # 🔴 不许把「调用失败」和「没有桶」混成同一个 None(2026-09-11 synth-gate §11d 抓到:
+          #    s3tables 四个动作压根没授权,而 `2>/dev/null || echo None` 把 AccessDenied 吞成
+          #    「无遗留表桶」⇒ 这段清理从未生效、bug #6 会原样复发)。查不出来就**停**:
+          #    残留表桶会让重建撞 409 AlreadyExists,带着不确定继续只会更难查。
+          if ! TB_ARN="$(aws s3tables list-table-buckets --region "$EXEC_ENV_REGION" \
+                      --query "tableBuckets[?name=='$TABLE_BUCKET'].arn | [0]" --output text 2>&1)"; then
+            echo "❌ 查不到 $EXEC_ENV_REGION 的 S3Tables 表桶清单(原文如下)——无法判断有没有残留表桶,拒绝带着不确定继续:"
+            echo "$TB_ARN"; exit 1
+          fi
+          if [ -z "$TB_ARN" ] || [ "$TB_ARN" = "None" ]; then
+            echo "orphan-preflight: 无遗留表桶,直接部署"
+          else
+            NS="$(aws s3tables list-namespaces --region "$EXEC_ENV_REGION" --table-bucket-arn "$TB_ARN" \
+                    --query 'length(namespaces)' --output text 2>/dev/null || echo unknown)"
+            TB="$(aws s3tables list-tables --region "$EXEC_ENV_REGION" --table-bucket-arn "$TB_ARN" \
+                    --query 'length(tables)' --output text 2>/dev/null || echo unknown)"
+            echo "orphan-preflight: 遗留表桶存在(core 栈不在);namespaces=$NS tables=$TB"
+            if [ "$NS" = "0" ] && [ "$TB" = "0" ]; then
+              echo "orphan-preflight: DELETING empty orphan table bucket $TABLE_BUCKET(三条件全满:栈不存在 / 0 namespace 0 表 / SSOT 本 target 名)"
+              aws s3tables delete-table-bucket --region "$EXEC_ENV_REGION" --table-bucket-arn "$TB_ARN"
+              echo "orphan-preflight: deleted;S3Tables 的删除有传播延迟,等待后再部署"
+              sleep 20
+            else
+              echo "❌ 遗留表桶 $TABLE_BUCKET 里有数据(namespaces=$NS tables=$TB)或查不到数量 —— **绝不自动删**"
+              echo "   人工确认后清理:aws s3tables delete-table-bucket --region $EXEC_ENV_REGION --table-bucket-arn $TB_ARN"
+              exit 1
+            fi
+          fi
+        fi
+
+      # ── 2. 依赖(§12.5 P0-G 第一条:全新环境 npm ci 必做)──────────────────
+      # 🔴 强制 `npm ci` 永不 `npm install`:infra/package.json 是 `^2.170.0` caret,
+      #    npm install 会拉新 CDK ⇒ 对存量栈 synth 出意外 changeset(§12.5 P0-H)。
+      - cd "$CODEBUILD_SRC_DIR/infra" && npm ci --no-audit --no-fund
+
+      # ── 1d. 🔴🔴 AZ preflight **第二层**:接口端点服务 × AZ 交集(2026-09-11 全新账号首装实测抓到)──
+      # 【为什么必须有】零出网的执行环境靠**接口端点**访问一切 AWS 服务,而**每个服务支持的 AZ 集合不同**
+      #   (账号级差异)。VPC 只要用到一个该服务不支持的 AZ,`AWS::EC2::VPCEndpoint` 就 400、整栈回滚。
+      #   第一层只问「AZ 可用吗」⇒ 放行了 `us-east-1a`,然后 redshift-serverless 端点炸掉整个首装。
+      # 【为什么放在 npm ci 之后】服务清单要从**唯一作者** `lib/exec-env/endpoints.ts` 现算
+      #   (在本文件里抄第二份清单 = 迟早漂移),而那要 ts-node ⇒ 依赖装好之后才能跑。
+      # 【存量环境不许换 AZ】base 栈已存在时,**沿用它现在的 AZ**并复核仍满足;不满足就 fail-fast
+      #   —— 换 AZ 会让 CFN **替换子网/VPC**(N0 的判据明确要求 VPC 不被替换)。
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR/infra"
+        # @kf-batch 50-WP30-decommission:destroy 不 synth、不建端点 ⇒ 这一层与它无关(端点服务查询失败不许挡住销毁)
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+        echo "az-preflight-2: mode=destroy ⇒ 跳过(销毁按 CFN 删栈,不需要选 AZ)"
+        printf '%s' "destroy" > "$CODEBUILD_SRC_DIR/.exec-env-azs"
+        else
+        SLUG="$(printf '%s' "$EXEC_ENV_TARGET" | tr '_' '-')"
+        BASE_STACK="BgpExecEnv-$SLUG-base"
+        # 接口端点服务清单(唯一作者 endpoints.ts;含按组件追加的那些)
+        SERVICES="$(npx ts-node -e '
+          const { endpointPlanFor, endpointServiceName } = require("./lib/exec-env/endpoints");
+          const comps = String(process.env.EXEC_ENV_COMPONENTS || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+          if (comps.length === 0) throw new Error("EXEC_ENV_COMPONENTS 为空(broker 必须下发完整组件集)");
+          const region = String(process.env.EXEC_ENV_REGION);
+          const plan = endpointPlanFor({ components: comps, region, homeRegion: process.env.AWS_REGION });
+          process.stdout.write((plan.iface as string[]).map((x: string) => endpointServiceName(x, region)).join(" "));
+        ')"
+        if [ -z "$SERVICES" ]; then echo "❌ 端点服务清单算不出来(endpoints.ts 变了?)"; exit 1; fi
+        echo "本次要建的接口端点服务:$SERVICES"
+        # 每个服务支持的 AZ ⇒ 求交集
+        INTERSECT=""
+        for svc in $SERVICES; do
+          SVC_AZS="$(aws ec2 describe-vpc-endpoint-services --region "$EXEC_ENV_REGION" \
+                       --service-names "$svc" \
+                       --query 'ServiceDetails[0].AvailabilityZones' --output text | tr '[:space:]' ' ')"
+          if [ -z "$(printf '%s' "$SVC_AZS" | tr -d ' ')" ]; then
+            echo "❌ 端点服务 $svc 在 $EXEC_ENV_REGION 查不到支持的 AZ(服务不存在于该 region?)"; exit 1
+          fi
+          if [ -z "$INTERSECT" ]; then
+            INTERSECT="$SVC_AZS"
+          else
+            NEW=""
+            for a in $INTERSECT; do case " $SVC_AZS " in *" $a "*) NEW="$NEW $a";; esac; done
+            INTERSECT="$NEW"
+          fi
+        done
+        INTERSECT="$(printf '%s' "$INTERSECT" | tr -s ' ' | sed 's/^ //;s/ $//')"
+        echo "所有端点服务都支持的 AZ:[$INTERSECT]"
+        # 存量:沿用现有 VPC 的 AZ(绝不静默换 ⇒ 换了会替换子网/VPC)
+        CHOSEN=""
+        if aws cloudformation describe-stacks --stack-name "$BASE_STACK" --region "$EXEC_ENV_REGION" >/dev/null 2>&1; then
+          VPC_ID="$(aws cloudformation describe-stack-resources --stack-name "$BASE_STACK" --region "$EXEC_ENV_REGION" \
+                      --logical-resource-id ExecEnvVpc --query 'StackResources[0].PhysicalResourceId' --output text 2>/dev/null || true)"
+          if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+            CUR="$(aws ec2 describe-subnets --region "$EXEC_ENV_REGION" --filters "Name=vpc-id,Values=$VPC_ID" \
+                     --query 'Subnets[].AvailabilityZone' --output text | tr '[:space:]' ' ' | tr ' ' '\n' | sort -u | tr '\n' ' ')"
+            CUR="$(printf '%s' "$CUR" | tr -s ' ' | sed 's/^ //;s/ $//')"
+            echo "存量 VPC $VPC_ID 当前 AZ:[$CUR] ⇒ 沿用(不许换,换了会替换子网)"
+            # @kf-batch 50-WP23-xregion-peering —— 🔴 存量 VPC 的 **CIDR 同样不许换**:
+            #   换 CIDR ⇒ 所有子网 CidrBlock 变化 ⇒ **子网被替换**(N0-10 明令禁止的破坏性路径),
+            #   连带 Redshift 子网组 / EMR 网络配置 / 端点全部重建。描述符与现网不一致就**停**,交人工决策。
+            CUR_CIDR="$(aws ec2 describe-vpcs --region "$EXEC_ENV_REGION" --vpc-ids "$VPC_ID" \
+                          --query 'Vpcs[0].CidrBlock' --output text)"
+            echo "存量 VPC CIDR:$CUR_CIDR;描述符要求:${EXEC_ENV_VPC_CIDR:-<home 沿用存量>}"
+            if [ -n "${EXEC_ENV_VPC_CIDR:-}" ] && [ "$CUR_CIDR" != "$EXEC_ENV_VPC_CIDR" ]; then
+              echo "❌ 存量 VPC 的 CIDR($CUR_CIDR)与描述符里的 vpcCidr($EXEC_ENV_VPC_CIDR)不一致。"
+              echo "   改 CIDR 会替换全部子网(N0-10 禁止)⇒ 拒绝自动改。要迁移就新注册一个执行环境再下线旧的。"
+              exit 1
+            fi
+            for a in $CUR; do
+              case " $INTERSECT " in
+                *" $a "*) ;;
+                *) echo "❌ 存量 AZ $a 已不被全部端点服务支持(交集 [$INTERSECT])。"
+                   echo "   换 AZ 会让 CFN 替换子网/VPC(N0 判据禁止)⇒ 请人工决策,不自动改。"; exit 1;;
+              esac
+            done
+            CHOSEN="$(printf '%s' "$CUR" | tr ' ' ',')"
+          fi
+        fi
+        if [ -z "$CHOSEN" ]; then
+          # 首装:从交集里挑**字典序前两个**(确定性:同一 region 每次挑到同一对,计划指纹才稳定)
+          CHOSEN="$(printf '%s' "$INTERSECT" | tr ' ' '\n' | sort | head -2 | tr '\n' ',' | sed 's/,$//')"
+          N="$(printf '%s' "$CHOSEN" | tr ',' '\n' | grep -c . || true)"
+          if [ "${N:-0}" -lt 2 ]; then
+            echo "❌ 所有接口端点服务都支持的 AZ 不足 2 个(交集 [$INTERSECT])——私有子网必须跨 AZ。"
+            echo "   逐服务支持面见上面的日志;要么减组件,要么换 region。"; exit 1
+          fi
+        fi
+        echo "选定 AZ:$CHOSEN"
+        # 🔴 跨 phase 传值只能靠文件(CodeBuild 的 env 不跨 phase);build 阶段两处 synth 都读它。
+        printf '%s' "$CHOSEN" > "$CODEBUILD_SRC_DIR/.exec-env-azs"
+        fi
+
+      # ── 1e. 🔴🔴 @kf-batch 50-WP23-xregion-peering:主控区那一侧的三件事实 ──────────────
+      # 非 home 执行环境要建**跨区私网通路**(peering + 主控区同区端点 + 本区私有托管域,SPEC §3.14ter),
+      # 需要:① 主控区 VPC id(peering 对端)② 主控区网段(本区路由目的地)③ 主控区那个 DynamoDB 接口端点 id。
+      # 🔴 只能从**它们的作者** `BgpVpcStack` 的 Outputs 读 —— 跨 region 用不了 CFN Export/ImportValue,
+      #    在这里 describe-vpcs 猜一个「看起来像主控区的 VPC」= 又一处漂移源(挑错了就把 peering 建到别人的 VPC)。
+      # 🔴 读不到就**停**:最常见的原因是主控区跑在**导入的现有 VPC** 上(平台刻意不碰别人的 VPC ⇒
+      #    没有那个端点),那种账号暂不支持非 home 执行环境。带着不确定继续 = 建出一个回写不了的环境。
+      - |
+        set -euo pipefail
+        HOME_LINK_FILE="$CODEBUILD_SRC_DIR/.exec-env-homelink"
+        : > "$HOME_LINK_FILE"
+        # 🔴 主控区 region 只认 CodeBuild 注入的 AWS_REGION(项目建在 home);缺了就停,不猜
+        [ -n "${AWS_REGION:-}" ] || { echo "❌ 缺 AWS_REGION —— 主控区 region 无从得知(它决定 peering 的对端与私有托管域的域名)"; exit 1; }
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          # @kf-batch 50-WP30-decommission:销毁不 synth;对端路由由 base 栈自己的自定义资源在删栈时撤掉
+          echo "homelink: mode=destroy ⇒ 跳过"
+        elif [ "$EXEC_ENV_TARGET" = "tgt_home" ]; then
+          echo "homelink: target 是 home ⇒ 不建跨区通路,跳过"
+        elif [ "$EXEC_ENV_REGION" = "$AWS_REGION" ]; then
+          echo "homelink: 与主控区同区($AWS_REGION)⇒ 台账走本区网关端点,不建 peering / 私有托管域"
+        else
+          out() { aws cloudformation describe-stacks --stack-name BgpVpcStack --region "$AWS_REGION" \
+                    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" --output text; }
+          HOME_VPC_ID="$(out VpcId || true)"
+          HOME_VPC_CIDR="$(out VpcCidr || true)"
+          HOME_DDB_EP="$(out XregionDdbEndpointId || true)"
+          echo "homelink: vpc=$HOME_VPC_ID cidr=$HOME_VPC_CIDR endpoint=$HOME_DDB_EP"
+          for pair in "HOME_VPC_ID:VpcId" "HOME_VPC_CIDR:VpcCidr" "HOME_DDB_EP:XregionDdbEndpointId"; do
+            v="${pair%%:*}"; key="${pair##*:}"
+            if [ -z "${!v:-}" ] || [ "${!v}" = "None" ]; then
+              echo "❌ 主控区 BgpVpcStack 没有输出 $key —— 非 home 执行环境建不出跨区私网通路(SPEC §3.14ter)。"
+              echo "   最常见原因:主控区用的是**导入的现有 VPC**(EXISTING_VPC_ID / -c existingVpcId)⇒"
+              echo "   平台刻意不碰别人的 VPC,也就没有那个 DynamoDB 接口端点 ⇒ 该账号暂不支持非 home 执行环境。"
+              echo "   否则:先重新部署主控区(redeploy-platform)让 BgpVpcStack 输出这三个值,再建执行环境。"
+              exit 1
+            fi
+          done
+          # 🔴 **必须带行尾换行**:没有换行时 `read` 会在读到 EOF 时**返回非 0**(变量其实已赋值),
+          #   而 `set -e` 会把整个 build 当场杀掉 —— 真环境第一次跑就死在这里(2026-09-15)。
+          printf '%s %s %s\n' "$HOME_VPC_ID" "$HOME_VPC_CIDR" "$HOME_DDB_EP" > "$HOME_LINK_FILE"
+        fi
+
+  build:
+    commands:
+      # ── 3. bootstrap 目标 region(§12.3:cdk deploy 要假定 region-B 的 bootstrap 角色)──
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR/infra"
+        # @kf-batch 50-WP30-decommission:destroy 不 synth / 不 deploy ⇒ 不 bootstrap(不在要拆的区里再动 CDKToolkit)
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          echo "bootstrap: mode=destroy ⇒ 跳过"
+        else
+          # 🔴 B-134(2026-10-29 客户现网真撞,B-103 复发):CDK CLI(2.11xx)在**显式给了环境**的 `cdk bootstrap` 下仍会执行 cdk.json 的 app,
+          #   而这一行没带 -c exec-env-target ⇒ app 走控制面分支 ⇒ 「默认大模型地理守卫」在非美主控区必抛(CodeBuild 里没有 BEDROCK_MODEL_ID)
+          #   ⇒ 页面「新建 / 重新部署执行环境」在 bootstrap 一步就炸。bootstrap 根本不需要 app(环境已显式给出)⇒ `--app ''` 让 CLI 不执行
+          #   任何应用代码,与两道控制面守卫彻底无关。离线判据 scripts/exec-env-synth-gate.mjs §1d **真跑这一行**(非美主控区 + 零凭证):
+          #   必须停在 NoCredentials、绝不出现守卫原话;去掉 --app '' 的对照必须撞守卫。
+          npx cdk bootstrap --app '' "aws://$EXEC_ENV_ACCOUNT/$EXEC_ENV_REGION"
+        fi
+
+      # ── 3.5 🔴 P0-E 闸(SPEC §3.5c;**最后一关**)────────────────────────────
+      # changeset 预演(只创建不执行)→ 过唯一判据分类 → 打印机器可读裁决 → 清理干净 →
+      # 需审批而无匹配 planHash ⇒ **build 直接失败,绝不部署**。
+      # 🔴 为什么闸必须在这里:部署强权焊在 CodeBuild 服务角色上,真正能毁数据的那一步在本 build 里;
+      #    平台侧那道闸可能被绕(拿到平台角色即可直接 invoke broker)⇒ build 必须自己重算,不信上游结论。
+      # 🔴 判据两侧同源由 platform 的 deploy-impact-parity 门禁(840 格全交叉积)钉住,不许在这里另写一份。
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR/infra"
+        # @kf-batch 50-WP30-decommission:destroy 的授权是**删除审批单**(平台写进注册表、broker 校验),不是 changeset 指纹
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+        echo "p0e-gate: mode=destroy ⇒ 跳过(销毁不建 change set)"
+        else
+        # 🔴 预演与真部署必须用**同一个** AZ 入参:不同 ⇒ synth 出的 base 栈子网不同 ⇒ 计划指纹必失配
+        #    (与 K-5 那条 NAT 数注释同一个道理)。取不到就停,绝不让两侧各自默认。
+        EXEC_ENV_AZS="$(cat "$CODEBUILD_SRC_DIR/.exec-env-azs")"
+        [ -n "$EXEC_ENV_AZS" ] || { echo "❌ 读不到 pre_build 选定的 AZ(.exec-env-azs 为空)"; exit 1; }
+        export EXEC_ENV_AZS
+        # @kf-batch 50-WP23-xregion-peering:预演与真部署必须同口径(这三个值决定 peering / 路由 / 私有托管域三个资源)
+        read -r HL_VPC HL_CIDR HL_EP < "$CODEBUILD_SRC_DIR/.exec-env-homelink" || true
+        export EXEC_ENV_HOME_VPC_ID="${HL_VPC:-}" EXEC_ENV_HOME_VPC_CIDR="${HL_CIDR:-}" EXEC_ENV_HOME_DDB_ENDPOINT_ID="${HL_EP:-}"
+        node scripts/p0e-gate.mjs
+        fi
+
+      # ── 3.9 @kf-batch 50-WP30-decommission —— 🔴 **下线销毁**(EXEC_ENV_MODE=destroy;WP-30 路 B 施工序 4)──────
+      # 顺序:托管服务先走(Flink / MWAA Serverless / Glue / EMR Serverless / DMS / 经典 MWAA / Redshift 工作组 →
+      #   命名空间带最终快照)→ 组件栈反依赖序 → core → base → 收尾探测 + 列出保留的数据资源。全部在 scripts/exec-env-destroy.sh。
+      # 🔴 删栈顺序的唯一作者是 lib/exec-env/destroy-order.ts(synth-gate 拿真 manifest 依赖图核对它);这里只把它算出来传进去。
+      # 🔴 用 CloudFormation delete-stack 而不是 `cdk destroy`:销毁不需要、也不该依赖「今天的源能对一个装了一半的环境 synth 成功」;
+      #   CFN 自己按栈的真实状态删(DELETE_FAILED 会带出卡住的资源与真因,脚本原样上报)。
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR/infra"
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          EXEC_ENV_DESTROY_SUFFIXES="$(npx ts-node --transpile-only -e 'process.stdout.write(require("./lib/exec-env/destroy-order").execEnvDestroyStackSuffixes().join(" "))')"
+          [ -n "$EXEC_ENV_DESTROY_SUFFIXES" ] || { echo "❌ 算不出删栈顺序(destroy-order.ts 坏了?)"; exit 1; }
+          export EXEC_ENV_DESTROY_SUFFIXES
+          bash "$CODEBUILD_SRC_DIR/infra/scripts/exec-env-destroy.sh"
+        else
+          echo "destroy: mode=${EXEC_ENV_MODE:-deploy} ⇒ 跳过"
+        fi
+
+      # ── 4. 只部署本 target 的栈组(通配精准锁定,绝不碰控制面 21 栈)────────
+      # 栈名 = BgpExecEnv-<targetSlug>-*;slug = targetId 把 `_` 换成 `-`(命名 SSOT 的规则)。
+      # 🔴 `EXEC_ENV_MODE=preview` ⇒ 只出裁决供审批界面用,**不执行部署**(P0-E 的两阶段:先看后批再做)。
+      - |
+        set -euo pipefail
+        cd "$CODEBUILD_SRC_DIR/infra"
+        if [ "${EXEC_ENV_MODE:-deploy}" = "preview" ]; then
+          echo "mode=preview ⇒ 跳过真部署(裁决已由 p0e-gate 打印)"
+          exit 0
+        fi
+        # @kf-batch 50-WP30-decommission:destroy 已在上一步跑完(失败会在那一步就把 build 判红)
+        if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
+          echo "mode=destroy ⇒ 跳过部署(销毁已在 3.9 完成)"
+          exit 0
+        fi
+        SLUG="$(printf '%s' "$EXEC_ENV_TARGET" | tr '_' '-')"
+        # @kf-batch 50-WP23-xregion-peering:两组可选 `-c` 入参用**数组**拼(不用 ${VAR:+...} 那种嵌套引号写法:
+        #   一眼看不出会展开成几个词,而 CDK 收到半个入参时的报错离根因很远)。
+        #   🔴 空数组 + `set -u` 要用 `${arr[@]+"${arr[@]}"}` 展开,直接 "${arr[@]}" 在老 bash 上是 unbound variable。
+        CTX_ARGS=()
+        [ -n "${EXEC_ENV_VPC_CIDR:-}" ] && CTX_ARGS+=(-c "exec-env-vpc-cidr=$EXEC_ENV_VPC_CIDR")
+        if [ -s "$CODEBUILD_SRC_DIR/.exec-env-homelink" ]; then
+          # 🔴🔴 `|| true` 不是保险丝而是**必需**:`read` 读到 EOF 而没有行尾分隔符时返回非 0
+          #   (变量已经赋好值了),`set -e` 会当场杀掉整个 build ——
+          #   真环境第一次跑就是这么死的:phase BUILD FAILED,而日志里只有命令原文、看不出哪一行错。
+          #   写入侧已补换行;这里再兜一层(文件可能是别的版本写的)。读完**必须校验**,不许带空值继续。
+          read -r HL_VPC HL_CIDR HL_EP < "$CODEBUILD_SRC_DIR/.exec-env-homelink" || true
+          if [ -z "${HL_VPC:-}" ] || [ -z "${HL_CIDR:-}" ] || [ -z "${HL_EP:-}" ]; then
+            echo "❌ .exec-env-homelink 内容不完整(vpc=${HL_VPC:-} cidr=${HL_CIDR:-} ep=${HL_EP:-})—— 拒绝用半套入参部署"
+            exit 1
+          fi
+          CTX_ARGS+=(-c "exec-env-home-vpc-id=$HL_VPC" -c "exec-env-home-vpc-cidr=$HL_CIDR" -c "exec-env-home-ddb-endpoint-id=$HL_EP")
+        fi
+        echo "附加 context 入参:${CTX_ARGS[*]-<无>}"
+        # @kf-batch 50-WP13-mwaa-region:控制面 region = CodeBuild 自己所在 region(项目建在 home;不另开入参,broker 白名单不动)。
+        #   只有 mwaa 组件用它(该区 MWAA 回写 home 的运行台账,SPEC §3.14);其余组件忽略。
+        npx cdk deploy "BgpExecEnv-$SLUG-*" \
+          --require-approval never \
+          --outputs-file "$CODEBUILD_SRC_DIR/exec-env-outputs.json" \
+          -c "exec-env-target=$EXEC_ENV_TARGET" \
+          -c "exec-env-region=$EXEC_ENV_REGION" \
+          -c "exec-env-account=$EXEC_ENV_ACCOUNT" \
+          -c "exec-env-components=$EXEC_ENV_COMPONENTS" \
+          -c "exec-env-azs=$(cat "$CODEBUILD_SRC_DIR/.exec-env-azs")" \
+          -c "exec-env-home-region=$AWS_REGION" \
+          ${CTX_ARGS[@]+"${CTX_ARGS[@]}"}
+
+  post_build:
+    commands:
+      # ── 5. 回写描述符 —— ⬜ **本切片刻意不做**(§12.7)────────────────────────
+      # `cdk deploy --outputs-file` 已把各栈 Outputs 落到 exec-env-outputs.json,
+      # 但"把它组装成完整描述符 + 过 §3.1a 整包校验 + 带 epoch 条件写注册表"是
+      # **切片 e** 的内容(那也是 §1.1 部署期 seed 的真调用方、stale 判定第一次有真值的地方)。
+      # 🔴 这里**不做一个半成品的 update-item**:半份描述符写进注册表比不写更糟 ——
+      #    平台会拿着半份资源袋去打不存在的资源(§20.11-N2 已经吃过这个教训)。
+      - |
+        set -euo pipefail
+        echo "===== CFN Outputs(供切片 e 的回写器消费)====="
+        cat "$CODEBUILD_SRC_DIR/exec-env-outputs.json" 2>/dev/null || echo "(无 outputs 文件)"
+        echo "⬜ 描述符回写未实现(归 P50.2 切片 e);本次 build 只保证资源已建、Outputs 已产出。"
+
+artifacts:
+  files:
+    - exec-env-outputs.json
+  base-directory: $CODEBUILD_SRC_DIR
+  discard-paths: yes

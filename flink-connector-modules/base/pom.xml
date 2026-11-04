@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.bgp.flink</groupId>
+    <artifactId>flink-connector-modules-parent</artifactId>
+    <version>1.0</version>
+  </parent>
+  <artifactId>flink-module-base</artifactId>
+  <packaging>jar</packaging>
+
+  <!-- 模块 32-CR — 薄基础 runner(§2.1/§2.5)。
+       只含 FlinkSqlRunner 主类 + MSAF runtime helper;【不打任何连接器】(几 MB)。
+       连接器由运行期 mergeJars 按 resolveModules 结果拼入。
+       主类含 iceberg catalog 拦截,但 iceberg/hadoop 类【反射延迟加载】(§2.5)——
+       SQL 不用 iceberg 时不触碰;用 iceberg 且模块拼入时反射注册,规避 MSAF 系统类加载器 Hadoop 问题。 -->
+
+  <dependencies>
+    <!-- Flink core/table:MSAF 运行时提供(provided,不打入)。与现有两 runner 一致。 -->
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-clients</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-api-java-bridge</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-planner-loader</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+    <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
+
+    <!-- MSAF runtime properties helper(small, bundled;主类读 bgp.sql 用) -->
+    <dependency><groupId>com.amazonaws</groupId><artifactId>aws-kinesisanalytics-runtime</artifactId><version>1.2.0</version></dependency>
+    <!-- 🔴 iceberg/hadoop 主类反射用,不在此声明依赖(反射类由 iceberg-s3tables 模块运行期拼入 classpath) -->
+  </dependencies>
+
+  <build>
+    <finalName>flink-module-base</finalName>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <configuration>
+          <!-- 薄基础带 Main-Class(合并后的 uber-jar 主类来自 base,与 mergeJars「base MANIFEST 优先」一致)。 -->
+          <transformers combine.children="append">
+            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+              <mainClass>com.bgp.flink.FlinkSqlRunner</mainClass>
+            </transformer>
+          </transformers>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

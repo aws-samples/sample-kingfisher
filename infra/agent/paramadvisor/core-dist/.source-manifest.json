@@ -1,0 +1,10 @@
+{
+  "$comment": "Drift guard: this core-dist was compiled by scripts/core-prebuild.sh from the sources listed below (paths relative to the repository root, values are SHA-256). The unit test platform/src/lib/__tests__/core-dist-source-manifest.test.ts recomputes the hashes; a source change without a rebuild fails it. Generated output, do not edit by hand.",
+  "capability": "paramadvisor",
+  "tsconfig": "platform/tsconfig.paramadvisor-core.json",
+  "sources": {
+    "platform/src/lib/param-advisor/core/catalog.ts": "1c232f15f892a0aa2110498933d3dd49f7f55ecb700fcfdeda2bdaf49256b80d",
+    "platform/src/lib/param-advisor/core/prompt.ts": "50c665b60974a50b8df08279a2f9e0d01ceb9b5c47c8f2170aa6fcc9cfcbfe3a",
+    "platform/src/lib/param-advisor/core/types.ts": "4b918418c32ae18834ec61d13e2cc8bcb59b32b442ee62bc4a32aba054947936"
+  }
+}

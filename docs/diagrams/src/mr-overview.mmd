@@ -1,0 +1,21 @@
+flowchart LR
+  U["用户浏览器"] -->|HTTPS| CF["CloudFront + WAF"]
+  subgraph HOME["主控区(客户自选 region)"]
+    CF --> ALB["ALB(只放行 CloudFront)"] --> ECS["平台 Next.js on ECS Fargate<br/>BgpPlatformStack"]
+    ECS --> COG["Cognito"]
+    ECS --> DDB[("DynamoDB<br/>71 张 bgp-* 表")]
+    ECS --> OM["OpenMetadata<br/>ECS + RDS MySQL + OpenSearch"]
+    ECS --> AC["Bedrock AgentCore ×3<br/>问数 / 网络顾问 / 参数顾问"]
+    ECS -->|InvokeFunction| BK["broker Lambda → CodeBuild<br/>BgpExecEnvDeployStack"]
+    HX["主控区自己的执行环境 tgt_home<br/>Redshift Serverless · S3 Tables · Glue<br/>EMR Serverless · MWAA Serverless · DMS · Flink"]
+    ECS --> HX
+  end
+  subgraph RA["执行区 A"]
+    EA["BgpExecEnv-&lt;slug&gt;-{base,core,redshift,dms,flink,airflow-serverless}<br/>本区 VPC 零出网 · 本区调度"]
+  end
+  subgraph RB["执行区 B(可为另一法域)"]
+    EB["同上 + residency-api<br/>区域审计 / 区域结果 / 驻留桶"]
+  end
+  BK -->|"cdk deploy 栈组"| EA & EB
+  ECS -->|"按落点调用该区数据面 API"| EA & EB
+  EA & EB -->|"跨区 peering 私网:只回传运行记录 / 元数据摘要"| DDB

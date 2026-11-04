@@ -1,0 +1,48 @@
+classDiagram
+  class SettingsRow {
+    pk : system
+    sk : lake-ext-bucket prefix + targetId + bucket
+  }
+  class LakeRoute {
+    targetId : string
+    bucket : string
+    region : string
+    alias : string, Spark catalog name, unique per target
+    tier : detail, agg, result, ods, dim, other
+    namespaces : string list, optional explicit ownership
+    writable : boolean
+    platform : boolean, derived, never stored
+    label : string, optional
+    addedBy, addedAt
+    updatedBy, updatedAt, optional
+  }
+  class PlatformRoute {
+    alias : s3tablescatalog, fixed
+    bucket : descriptor tableBucket or env S3TABLES_BUCKET
+    tier : other
+    writable : true
+    source : TargetSparkLanding, not a row
+  }
+  class EtlJob_glueConfig {
+    lakeBuckets : string list, optional, undefined means all routes
+    defaultCatalogAlias : string, optional
+    executionRoleArn : string, optional
+    jobParameters : map, user conf appended
+  }
+  class EmrEngineJob {
+    lakeBuckets : string list, optional
+    defaultCatalogAlias : string, optional
+    sparkConf : map
+  }
+  class SyncTask_s3Config {
+    tableBucket : string, must be a writable route
+  }
+  class FlinkJob {
+    lakeRoute : string, optional bucket, phase 3
+  }
+  SettingsRow "1" --> "1" LakeRoute : stores external routes only
+  LakeRoute <|-- PlatformRoute : implicit default
+  EtlJob_glueConfig "1" --> "0..n" LakeRoute : declares by bucket
+  EmrEngineJob "1" --> "0..n" LakeRoute : declares by bucket
+  SyncTask_s3Config "1" --> "1" LakeRoute : writes
+  FlinkJob "1" --> "0..1" LakeRoute : writes

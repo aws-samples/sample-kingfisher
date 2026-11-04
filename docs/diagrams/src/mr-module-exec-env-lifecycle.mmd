@@ -1,0 +1,10 @@
+stateDiagram-v2
+  [*] --> registered: 注册(写描述符)
+  registered --> initializing: CodeBuild 部署成功 → 检测初始化
+  initializing --> active: 组件全部探活通过 → 启用
+  active --> draining: 停止承接
+  draining --> decommissioning: 审批通过 → destroy 构建
+  decommissioning --> deleted: 栈删完(数据桶 / 表桶 / 快照保留)
+  registered --> failed: 构建失败
+  initializing --> failed: 探活失败
+  failed --> registered: 重新部署

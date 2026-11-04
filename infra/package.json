@@ -1,0 +1,23 @@
+{
+  "name": "bigdata-governance-infra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "cdk": "cdk",
+    "deploy": "cdk deploy --all --profile temp-account",
+    "destroy": "cdk destroy --all --profile temp-account",
+    "diff": "cdk diff --profile temp-account",
+    "synth-gate": "node scripts/exec-env-synth-gate.mjs"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.170.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "aws-cdk": "^2.1147.0",
+    "esbuild": "^0.28.1",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.6.0"
+  }
+}

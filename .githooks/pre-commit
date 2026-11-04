@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# Versioned git pre-commit hook.
+#
+# Runs the red-line scan over the staged changes before every commit, so that real account ids, ARNs,
+# access keys and passwords never reach a tracked file. It turns "remember to scan by hand" into an
+# automatic check at commit time.
+#
+# Enable it once after cloning (or run scripts/install-hooks.sh):
+#   git config core.hooksPath .githooks
+#
+# Bypass (only for a confirmed false positive in an emergency; use with care):
+#   git commit --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+
+if [[ -x "$ROOT/scripts/redline-scan.sh" ]]; then
+  echo "[pre-commit] red-line scan (staged)..."
+  if ! bash "$ROOT/scripts/redline-scan.sh" --staged; then
+    echo ""
+    echo "pre-commit blocked: the staged changes contain what looks like sensitive information."
+    echo "   Use placeholders instead (real values belong in *.local.md). If this is a false positive, add an"
+    echo "   allow-list entry and retry; in an emergency, git commit --no-verify skips the hook at your own risk."
+    exit 1
+  fi
+else
+  echo "[pre-commit] warning: scripts/redline-scan.sh not found, skipping the red-line scan."
+fi

@@ -1,0 +1,19 @@
+{
+  // @genbi/core 独立编译成 CJS 的配置(阶段2)。
+  // 【不 extends 主 tsconfig】:主 tsconfig 是 es5 + noEmit + module esnext + @/ paths,
+  // 不适合产出给 Lambda/容器 require 的 CJS。此处独立声明,保证 core 脱离 platform
+  // alias 也能编译(core 已下沉契约类型,内部全走相对路径,零 @/ 依赖)。
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "lib": ["ES2020"],
+    "declaration": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./.tmp-core-build",
+    "rootDir": "./src/lib/genbi/core"
+  },
+  "include": ["src/lib/genbi/core/**/*.ts"]
+}

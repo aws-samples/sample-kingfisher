@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.bgp.flink</groupId>
+  <artifactId>flink-connector-modules-parent</artifactId>
+  <version>1.0</version>
+  <packaging>pom</packaging>
+
+  <!-- 模块 32-CR — 连接器运行时:统一 version parent(§2.4 约束①)。
+       设计文档:docs/design/32-realtime-compute/DESIGN-connector-runtime-modular.md。
+
+       【为什么是 parent】§2.4 实测:各连接器 fat jar 运行期合并时,同名类若【版本分叉】→ 运行期崩;
+       版本一致→同名即同字节→合并安全(实测抽样 199/200 相同)。此 parent 是【唯一版本源】:
+       所有连接器模块继承它,锁死 Flink/共享库版本,从源头保证"同名=同字节"。
+       🔴 新增模块必须继承此 parent、用这里的 <properties> 版本,禁止自带分叉版本。
+
+       版本严格对齐现有 flink-sql-runner{,-s3t} 已真跑验证的版本(不升级、不臆造):
+        · Flink 1.20.0 / kinesis 5.0.0-1.20 / jdbc 3.3.0-1.20 / mysql 8.4.0(base pom)
+        · flinkcdc 3.2.1 / iceberg 1.9.1 / avro 1.12.0 / hadoop 3.4.0 / aws-sdk BOM 2.38.2(s3t pom)
+        · kafka 3.4.0-1.20 / msk-iam-auth 2.3.7(CR.2 新增,Maven 中央仓实测存在)
+       与 CR.1 connector-modules.ts 的 ConnectorModuleId 一一对应。 -->
+
+  <modules>
+    <module>base</module>
+    <module>kinesis</module>
+    <module>kafka</module>
+    <module>msk-iam-auth</module>
+    <module>files</module>
+    <module>json</module>
+    <module>iceberg-s3tables</module>
+    <!-- ← 后续补齐(结构同构):jdbc / mysql-cdc / avro -->
+  </modules>
+
+  <properties>
+    <maven.compiler.release>11</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- 🔴 统一版本源(与现有两 runner 逐一对齐,不动) -->
+    <flink.version>1.20.0</flink.version>
+    <kinesis.connector.version>5.0.0-1.20</kinesis.connector.version>
+    <kafka.connector.version>3.4.0-1.20</kafka.connector.version>
+    <!-- 🔴 P42.6b 真跑实测(2026-07-27):2.3.7 是 Java 17 编译(class major 61),MSAF Flink 1.20 运行时是
+         Java 11(只认到 major 55)→ UnsupportedClassVersionError,SplitEnumerator 启动即崩。
+         回退 2.2.0(2.x 最高的 Java 8 编译版本,major 52,MSAF 可加载;入口类 IAMLoginModule/
+         IAMClientCallbackHandler 一致)。教训:连接器模块的字节码 Java 版本必须 ≤ MSAF 运行时(Java 11)。 -->
+    <msk.iam.auth.version>2.2.0</msk.iam.auth.version>
+    <jdbc.connector.version>3.3.0-1.20</jdbc.connector.version>
+    <mysql.driver.version>8.4.0</mysql.driver.version>
+    <flinkcdc.version>3.2.1</flinkcdc.version>
+    <iceberg.version>1.9.1</iceberg.version>
+    <avro.version>1.12.0</avro.version>
+    <hadoop.version>3.4.0</hadoop.version>
+    <aws.sdk.bom.version>2.38.2</aws.sdk.bom.version>
+    <shade.plugin.version>3.5.1</shade.plugin.version>
+    <compiler.plugin.version>3.11.0</compiler.plugin.version>
+  </properties>
+
+  <!-- 统一 AWS SDK v2 版本(与 s3t pom 一致):s3-tables-catalog 传递旧 aws-sdk,s3tables:2.38.2 需新版;
+       用官方 BOM 强制全部 aws-sdk v2 模块对齐,避免 NoClassDefFoundError。 -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws.sdk.bom.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- 🔴 §2.4 约束① 的正确落地(2026-07-27 实测校正):不只锁我显式声明的连接器版本,
+           还必须锁【连接器 fat jar 传递带入的公共库】—— 实测 kafka connector 带 Jackson 2.15.2、
+           iceberg 带 2.18.3,不锁则跨模块同名类字节分叉(352 个),运行期合并撞车。
+           用 jackson-bom 统一到 2.18.3(高 minor 向后兼容低版本序列化;与 iceberg 对齐,iceberg 对 Jackson
+           版本更敏感故就高不就低)。这是"统一 version parent"必须管到传递依赖的实证。 -->
+      <dependency>
+        <groupId>com.fasterxml.jackson</groupId>
+        <artifactId>jackson-bom</artifactId>
+        <version>2.18.3</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <!-- 各模块共用的构建配置:compiler(release 11)+ shade(fat jar,统一 filter/transformer)。
+       连接器模块用 shade 打成 fat jar(bundled 连接器 + 传递依赖);Flink core/table 由子模块声明 provided。 -->
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${compiler.plugin.version}</version>
+          <configuration><release>11</release></configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-shade-plugin</artifactId>
+          <version>${shade.plugin.version}</version>
+          <executions>
+            <execution>
+              <phase>package</phase>
+              <goals><goal>shade</goal></goals>
+              <configuration>
+                <createDependencyReducedPom>false</createDependencyReducedPom>
+                <artifactSet>
+                  <excludes>
+                    <exclude>org.apache.flink:force-shading</exclude>
+                    <exclude>com.google.code.findbugs:jsr305</exclude>
+                    <exclude>org.slf4j:*</exclude>
+                    <exclude>org.apache.logging.log4j:*</exclude>
+                  </excludes>
+                </artifactSet>
+                <transformers>
+                  <!-- 🔴 合并 SPI 工厂声明(META-INF/services):连接器被 Flink 发现的关键;
+                       与运行期 mergeJars 的 services 合并语义一致(双保险)。 -->
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                </transformers>
+                <filters>
+                  <filter><artifact>*:*</artifact><excludes>
+                    <exclude>META-INF/*.SF</exclude><exclude>META-INF/*.DSA</exclude><exclude>META-INF/*.RSA</exclude>
+                    <exclude>META-INF/versions/**</exclude>
+                  </excludes></filter>
+                </filters>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>
