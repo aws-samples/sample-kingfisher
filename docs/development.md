@@ -235,7 +235,7 @@ One standard applies to every repository of this project, regardless of audience
 
 | Area | Rule | Enforced by |
 |---|---|---|
-| Language | Documentation is English; UI strings follow the product locale files | `repo-standards-guard.test.ts` |
+| Language | Documentation in English; source comments, test titles and deployment-script output in Chinese (the engineering team's working language); UI strings in both locale files | `repo-standards-guard.test.ts` |
 | Format | Lines up to 300 characters, table cells up to 200, tables up to five columns | `docs-format-guard.test.ts` |
 | Structure | One record per section; version history in its own section | `docs-format-guard.test.ts` |
 | Links | Every relative link resolves to a tracked file | `repo-standards-guard.test.ts` |

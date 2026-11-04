@@ -52,6 +52,7 @@ CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the C
 - Fill in every section of the pull-request template: one-sentence what/why, change type, blast radius, gates run,
   evidence, docs updated, and the no-secrets checklist.
 - Keep a pull request to one concern. A change to a shared module names the callers that were checked.
+- Write documentation in English. Source comments, test titles and deployment-script output are written in Chinese, matching the surrounding code; do not mix languages within one file.
 - Changes to page behaviour are accepted by driving the real page in a headless browser against a deployed test account.
   API responses, logs or database rows are supporting detail, not acceptance evidence.
 - Add a line under `[Unreleased]` in `CHANGELOG.md`. If a runtime, engine, driver or tool version changed,
