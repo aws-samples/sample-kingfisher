@@ -152,6 +152,10 @@ Always pass both positional arguments and always use `--profile`; never run `cdk
 scripts are written in Chinese, the working language of the engineering team. The console ships complete Chinese and English
 locales: the language is suggested from the visitor's location and can be switched by the user at any time.
 
+## Security
+
+See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
+
 ## License
 
-Kingfisher is released under the [MIT License](LICENSE).
+This project is licensed under the MIT-0 License. See the [LICENSE](LICENSE) file.

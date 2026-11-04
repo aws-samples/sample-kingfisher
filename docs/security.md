@@ -276,7 +276,7 @@ Every finding from a scanner, an audit, or a report is classified into exactly o
 
 ## 7. Reporting a vulnerability
 
-- Please report suspected vulnerabilities privately by opening a **GitHub security advisory** on this repository (Security tab, "Report a vulnerability"). Do not open a public issue.
+- Please report suspected vulnerabilities to AWS/Amazon Security through the [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Do not open a public issue or pull request.
 - Include the affected component, a reproduction or proof of concept, the impact you expect, and any suggested fix. Do not include customer data or real credentials.
 - Maintainers acknowledge the report, triage it according to section 6.4, and fix confirmed defects in a patch release. Reporters are credited in the changelog unless they prefer otherwise.
 - Vulnerabilities in AWS services themselves should be reported to AWS Security.

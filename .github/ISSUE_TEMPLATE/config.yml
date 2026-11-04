@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability
-    about: Use a private GitHub security advisory on this repository (Security tab, "Report a vulnerability") as described in SECURITY.md and docs/security.md. Never report a vulnerability in a public issue.
+    url: http://aws.amazon.com/security/vulnerability-reporting/
+    about: Notify AWS/Amazon Security through the vulnerability reporting page, as described in SECURITY.md and CONTRIBUTING.md. Never report a vulnerability in a public issue.

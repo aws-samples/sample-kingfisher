@@ -1,9 +1,49 @@
-# Contributing to Kingfisher
+# Contributing Guidelines
 
-Thank you for taking the time to contribute. This page is the short version.
+Thank you for your interest in contributing to our project. Whether it's a bug report, new feature, correction, or additional
+documentation, we greatly value feedback and contributions from our community.
+
+Please read through this document before submitting any issues or pull requests to ensure we have all the necessary
+information to effectively respond to your bug report or contribution.
 The full engineering guide is [`docs/development.md`](docs/development.md); AI coding tools start from [`AGENTS.md`](AGENTS.md).
 
-## Set up
+
+## Reporting Bugs/Feature Requests
+
+We welcome you to use the GitHub issue tracker to report bugs or suggest features.
+
+When filing an issue, please check existing open, or recently closed, issues to make sure somebody else hasn't already
+reported the issue. Please try to include as much information as you can. Details like these are incredibly useful:
+
+* A reproducible test case or series of steps, including what the console page shows
+* The version of our code being used (shown in the login page footer and by `GET /api/public/version`)
+* The deployment mode and the regions involved
+* Any modifications you've made relevant to the bug
+* Anything unusual about your environment or deployment
+
+Never include AWS account ids, ARNs, passwords, tokens or customer data in an issue.
+
+
+## Contributing via Pull Requests
+Contributions via pull requests are much appreciated. Before sending us a pull request, please ensure that:
+
+1. You are working against the latest source on the *main* branch.
+2. You check existing open, and recently merged, pull requests to make sure someone else hasn't addressed the problem already.
+3. You open an issue to discuss any significant work - we would hate for your time to be wasted.
+
+To send us a pull request, please:
+
+1. Fork the repository.
+2. Modify the source; please focus on the specific change you are contributing. If you also reformat all the code, it will be hard for us to focus on your change.
+3. Ensure local tests pass (see [Gates](#gates) below).
+4. Commit to your fork using clear commit messages.
+5. Send us a pull request, answering any default questions in the pull request interface.
+6. Pay attention to any automated CI failures reported in the pull request, and stay involved in the conversation.
+
+GitHub provides additional document on [forking a repository](https://help.github.com/articles/fork-a-repo/) and
+[creating a pull request](https://help.github.com/articles/creating-a-pull-request/).
+
+### Set up
 
 1. Install Node.js 20 and npm. Every pinned tool and runtime version is listed in [`docs/supported-versions.md`](docs/supported-versions.md).
 2. Clone the repository and install both workspaces, then enable the versioned git hooks:
@@ -17,7 +57,7 @@ The full engineering guide is [`docs/development.md`](docs/development.md); AI c
    The verification path is a deployment into your own test account followed by headless-browser acceptance
    (`docs/development.md`, sections 3 and 11).
 
-## Gates
+### Gates
 
 Run all of them before you push. They work offline unless noted.
 
@@ -34,7 +74,7 @@ Run all of them before you push. They work offline unless noted.
 Every new AWS SDK call is registered in `infra/iam/platform-taskrole-calls.json` in the same commit.
 CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the CDK synthesis on every pull request; it never deploys.
 
-## Branches, commits and releases
+### Branches, commits and releases
 
 - `main` is the trunk. Work on short-lived `feat/<topic>` or `fix/<topic>` branches and open a pull request against `main`.
 - Commit messages follow Conventional Commits in English: `feat(scope): summary`, `fix(scope): summary`,
@@ -47,7 +87,7 @@ CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the C
   and cherry-picked back to `main`.
 - Deployments always use a tag, never a branch head.
 
-## Pull requests
+### Pull request checklist
 
 - Fill in every section of the pull-request template: one-sentence what/why, change type, blast radius, gates run,
   evidence, docs updated, and the no-secrets checklist.
@@ -62,16 +102,23 @@ CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the C
 
 The repository standards in [`docs/development.md`](docs/development.md) section 14 apply to every change. Review items listed there are part of the pull request checklist.
 
-## Reporting
 
-- Bugs and feature requests: use the issue templates. Describe what the page shows, the steps, the platform version shown in the
-  login page footer, the deployment mode and the regions involved.
-- Security vulnerabilities: follow [`SECURITY.md`](SECURITY.md). Never open a public issue for them.
+## Finding contributions to work on
+Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels
+(enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any 'help wanted' issues is a great place to start.
 
-## Code of conduct
 
-Be respectful and constructive, review the change rather than the person, and assume good faith; maintainers may decline contributions that do not.
+## Code of Conduct
+This project has adopted the [Amazon Open Source Code of Conduct](https://aws.github.io/code-of-conduct).
+For more information see the [Code of Conduct FAQ](https://aws.github.io/code-of-conduct-faq) or contact
+opensource-codeofconduct@amazon.com with any additional questions or comments.
 
-## License
 
-By contributing you agree that your contributions are licensed under the [MIT License](LICENSE).
+## Security issue notifications
+If you discover a potential security issue in this project we ask that you notify AWS/Amazon Security via our [vulnerability reporting page](http://aws.amazon.com/security/vulnerability-reporting/). Please do **not** create a public github issue.
+[`SECURITY.md`](SECURITY.md) describes the project's security posture and dependency policy.
+
+
+## Licensing
+
+See the [LICENSE](LICENSE) file for our project's licensing. We will ask you to confirm the licensing of your contribution.
