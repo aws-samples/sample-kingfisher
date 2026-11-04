@@ -240,7 +240,7 @@ One standard applies to every repository of this project, regardless of audience
 | Structure | One record per section; version history in its own section | `docs-format-guard.test.ts` |
 | Links | Every relative link resolves to a tracked file | `repo-standards-guard.test.ts` |
 | Figures | Static PNG or WebP only; every figure is referenced; every Mermaid source is rendered | `repo-standards-guard.test.ts` |
-| Versions | No version numbers in figures or prose outside `supported-versions.md` and `CHANGELOG.md` | Review |
+| Versions | Figures carry no version numbers; prose that names a component version links to `supported-versions.md`, the single source | Review |
 | Privacy | No account ids, ARNs, secrets, customer names or customer network ranges | `scripts/redline-scan.sh`, review |
 | Hygiene | No build output, local tooling, slides, archives or scratch files tracked | `.gitignore`, review |
 | Security | Dependency advisories at high or critical severity are fixed before release | `npm audit` in CI |
