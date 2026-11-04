@@ -16,8 +16,9 @@ export const LINE_LIMIT = 300;
 export const CELL_LIMIT = 200;
 
 /** 受守的文件 = 仓库里**全部**被 git 跟踪的 .md(2026-11-04 用户:所有 .md 都要有格式)。
- *  新增一份 .md 先用 `scripts/lib/docs_restructure.py check` 自查;不走白名单,不许豁免。 */
-export const MACHINE_READ_CONTRACTS: readonly string[] = [];
+ *  新增一份 .md 先用 `scripts/lib/docs_restructure.py check` 自查。
+ *  唯一例外 README.md(2026-11-04 用户:README 保持完整句子与完整单元格,不为长度拆句、不截单元格;GitHub 会自动折行)。 */
+export const MACHINE_READ_CONTRACTS: readonly string[] = ["README.md"];
 export const GUARDED_DOCS: readonly string[] = (() => {
   const { execSync } = require("node:child_process") as typeof import("node:child_process");
   const out = execSync("git ls-files -z -- '*.md'", { cwd: REPO, encoding: "utf8" });
