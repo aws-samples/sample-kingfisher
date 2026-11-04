@@ -1,18 +1,18 @@
-// 模块 32 — AI 辅助生成 Flink SQL。
+// AI 辅助生成 Flink SQL。
 //
-// 复用 GenBI 的 Bedrock Converse 通道(区域来自配置 GENBI.region;模型 @kf-batch 50-W5-seg2-WP8 起改为调用时经
-// 模块 51 解析链求值,能力 key flink-sql,不再读模块加载期 GENBI.modelId),
+// 复用 GenBI 的 Bedrock Converse 通道(区域来自配置 GENBI.region;模型 改为调用时经
+// 解析链求值,能力 key flink-sql,不再读模块加载期 GENBI.modelId),
 // 把用户自然语言意图 → 平台可直接运行的多语句 Flink SQL。
 //
 // 为保证"生成即可跑",系统提示把【源表 DDL + 各 sink 的 DDL 样板 + 占位符约定】固化下来,模型只在
 // 其上改写聚合/窗口/过滤逻辑;占位符(${SOURCE_STREAM_ARN}/${REGION}/${OUTPUT_PATH}/${MYSQL_*}/
 // ${TABLE_BUCKET_ARN}/${S3TABLE_DB})在作业启动时由后端按账号派生注入(见 flink-service)。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { GENBI } from "@/lib/genbi/config";
 import { retrieve, guard, sliceToPromptText } from "@/lib/cookbook";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:调用时求值 + 退避/降级;返回值 `model` 字段(隐藏读取方 :101)一并改为实际用的模型。
+// 调用时求值 + 退避/降级;返回值 `model` 字段(隐藏读取方:101)一并改为实际用的模型。
 import { invokeConverse } from "@/lib/ai/invoke";
 import type { SourceLayer } from "@/lib/ai/capabilities";
 
@@ -76,15 +76,15 @@ export interface AiSqlResult {
   sql: string;
   /** 实际调用的模型(与 `_meta.modelId` 必须相等 —— ACCEPTANCE M14 回归断言) */
   model: string;
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:来源层(供路由组 `_meta.modelSource`)
+  // 来源层(供路由组 `_meta.modelSource`)
   modelSource: SourceLayer;
   usage: { inputTokens: number; outputTokens: number };
-  // 模块45(P45.4):cookbook 方言校验报告(生成后已纠正/待提示的违规),供前端回显。
+  // cookbook 方言校验报告(生成后已纠正/待提示的违规),供前端回显。
   dialect?: { fixed: { ruleId: string; title: string }[]; violations: { ruleId: string; title: string; rule: string; severity: string }[] };
 }
 
 export async function generateFlinkSql(prompt: string, sinkType = "s3"): Promise<AiSqlResult> {
-  // 模块45(生成前引导):注入 cookbook 的 Flink 方言硬规则 + 验证过的窗口/CDC 范式,让模型照正确方言写。
+  // (生成前引导):注入 cookbook 的 Flink 方言硬规则 + 验证过的窗口/CDC 范式,让模型照正确方言写。
   // seed 零 IO;admin 配方首次一次 DynamoDB(之后缓存);guard 纯 CPU——都不加剧 60s 墙。
   let systemText = systemPrompt(sinkType);
   try {
@@ -93,7 +93,7 @@ export async function generateFlinkSql(prompt: string, sinkType = "s3"): Promise
     if (cookbookText) systemText += `\n\n${cookbookText}`;
   } catch { /* cookbook 不可用静默降级,不阻断生成 */ }
 
-  // @kf-batch 50-W5-seg2-WP8:modelId 每次调用求值(flink-sql),经 invokeConverse 退避/降级。
+  // modelId 每次调用求值(flink-sql),经 invokeConverse 退避/降级。
   const inv = await invokeConverse("flink-sql", undefined, bedrock, (modelId) =>
     new ConverseCommand({
       modelId,
@@ -105,11 +105,11 @@ export async function generateFlinkSql(prompt: string, sinkType = "s3"): Promise
   const resp = inv.response;
   const text = (resp.output?.message?.content || []).map((b) => ("text" in b ? b.text : "")).join("").trim();
   const rawSql = stripFences(text);
-  // 模块45(生成后校验,安全网):用同源方言规则校验/纠正模型偶发违规(Flink 是 SQL 引擎,可正则 fix)。
+  // (生成后校验,安全网):用同源方言规则校验/纠正模型偶发违规(Flink 是 SQL 引擎,可正则 fix)。
   const g = guard("flink", rawSql);
   return {
     sql: g.code,
-    // @kf-batch 50-W5-seg2-WP8:隐藏读取方(DESIGN §1.2 #8b / SPEC §3.3)一并改为**实际调用**的模型,流到 ai-sql/route.ts 审计 + 信封。
+    // 隐藏读取方(DESIGN §1.2 #8b / SPEC §3.3)一并改为**实际调用**的模型,流到 ai-sql/route.ts 审计 + 信封。
     model: inv.usedModelId,
     modelSource: inv.usedSource,
     usage: { inputTokens: resp.usage?.inputTokens || 0, outputTokens: resp.usage?.outputTokens || 0 },

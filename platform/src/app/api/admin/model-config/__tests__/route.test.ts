@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 管理路由的**可执行**门禁(51 SPEC §2 PUT 服务端流程;ACCEPTANCE M1 / M3 / M4 / M7 / M10 / M12 / M13 / M13a / M15)。
+// 管理路由的**可执行**门禁(51 SPEC §2 PUT 服务端流程;ACCEPTANCE M1 / M3 / M4 / M7 / M10 / M12 / M13 / M13a / M15)。
 // 真跑 route handler(NextRequest 进、Response 出),只打桩三样:DynamoDB(内存模拟器)、身份、目录 + 探测(零真 AWS)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
@@ -19,7 +18,7 @@ vi.mock("@/lib/aws/dynamodb", async () => {
   return { TABLES: { SETTINGS: "bgp-settings", AUDIT: "bgp-audit" }, docClient: { send: (cmd: any) => st.db.send(cmd) } };
 });
 vi.mock("@/lib/auth/identity", () => ({ resolveIdentity: vi.fn(async () => st.identity) }));
-// @kf-batch 50-WP31-place-first-class —— 目录 / 探测的区改从描述符来(主控区也一样):注册表是真外部(DDB 边界),给一份主控区描述符。
+// 目录 / 探测的区改从描述符来(主控区也一样):注册表是真外部(DDB 边界),给一份主控区描述符。
 //   `homeMissing` = 主控区描述符不存在 ⇒ PUT / probe 必须 409,**不回落** process.env.AWS_REGION。
 const reg = vi.hoisted(() => ({ homeMissing: false, placeCalls: [] as string[] }));
 vi.mock("@/lib/exec-env/registry", async (orig) => {
@@ -68,7 +67,7 @@ const jsonReq = (method: string, body?: unknown, path = url) =>
 
 const OPUS = "global.anthropic.claude-opus-4-8";
 const GPT = "openai.gpt-5.6-sol";
-// @kf-batch 51-v2-multi-vendor —— 四系列(2026-10-14 Bedrock 真实 id;两款都只有推理配置形态能调)
+// 四系列(2026-10-14 Bedrock 真实 id;两款都只有推理配置形态能调)
 const GLM = "us.zai.glm-5.3";
 const KIMI = "global.moonshotai.kimi-k3";
 
@@ -86,7 +85,7 @@ beforeEach(() => {
   delete process.env.BEDROCK_MODEL_ID;
 });
 
-describe("🔴 B-35 同形:目录 / 探测的区来自主控区**描述符**,不是 process.env.AWS_REGION", () => {
+describe("🔴同类缺陷:目录 / 探测的区来自主控区**描述符**,不是 process.env.AWS_REGION", () => {
   it("PUT:目录与探测都拿到主控区描述符的 region(eu-central-1,与本进程 env 无关)", async () => {
     const { fetchCatalog } = await import("@/lib/settings/model-catalog");
     const { probeModel } = await import("@/lib/ai/probe");
@@ -206,7 +205,7 @@ describe("M2 / M15 探测失败不写库", () => {
   });
 });
 
-// @kf-batch 51-v2-multi-vendor —— 51 SPEC §7.4 ③′ / ACCEPTANCE M22
+// 51 SPEC §7.4 ③′ / ACCEPTANCE M22
 describe("M22 ③′ tool-use 门按模型证据(ToolUseUnavailable)", () => {
   it("Kimi K3 探测通过但 toolUseOk:false ⇒ 400 ToolUseUnavailable;已探测、不写库、无审计", async () => {
     st.probeResult = { ok: true, toolUseOk: false, quotaHint: "unknown", probedAt: Date.now() };
@@ -262,9 +261,9 @@ describe("M7 恢复出厂默认(DELETE)", () => {
     expect((await PUT(jsonReq("PUT", { settingScope: "codegen", modelId: OPUS }))).status).toBe(400);
   });
 
-  // @kf-batch 50-WP4-o1-scope —— 50 SPEC v3.34 §2.6.0:旧参数名 `scope` 即拒,**不留兼容别名**。
+  // 50 SPEC v3.34 §2.6.0:旧参数名 `scope` 即拒,**不留兼容别名**。
   // 🔴 为什么必须是「拒」而不是「忽略」:忽略会让旧调用方以为自己指定了作用域(实际落到 global),
-  // 而 P51.3 一旦按 `settingScope=<targetId>#global` 做 per-region 覆盖,那就是静默改错区的模型。
+  // 而一旦按 `settingScope=<targetId>#global` 做 per-region 覆盖,那就是静默改错区的模型。
   it("🔴 旧参数名 scope ⇒ 400 ScopeParamRenamed(query 与 body 两路都拒)", async () => {
     const q = await DELETE(jsonReq("DELETE", undefined, `${url}?scope=global`));
     expect(q.status).toBe(400);
@@ -354,7 +353,7 @@ describe("M13 transport 门控负向(PUT /transport)", () => {
   });
 });
 
-// @kf-batch 51-v3-probe-budget(序 46 / B-106,2026-10-20 真测):保存不再对刚通过的探测二次探 —— Kimi K3 首字延迟 3–39s,
+// (2026-10-20 真测):保存不再对刚通过的探测二次探 —— Kimi K3 首字延迟 3–39s,
 //   原来页面「测试该模型」通过后点「保存」,保存路由重探随机超时 ⇒ 「探测被限流」保存失败(…7237 p46 三跑三红)。
 describe("保存认 10 分钟内同区通过的探测缓存(freshProbeFromCache),不再二次探", () => {
   it("页面 /probe 刚通过(toolUseOk:true)⇒ PUT 不再调 probeModel,仍 200 写库,配置项 probedAt = 缓存那次", async () => {

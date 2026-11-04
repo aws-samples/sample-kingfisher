@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.1-D4
 // 平台 Cognito 组名的**唯一定义处**(纯常量,零依赖 ⇒ 前端组件也能安全 import)。
 //
 // 【为什么单独一个文件】原来这三个常量定义在 `identity.ts`,而那个文件 import 了
@@ -12,7 +11,7 @@
 
 /** 平台管理员组 → 跨全部项目的超级用户。 */
 export const PLATFORM_ADMIN_GROUP = "bgp-admin";
-/** 模块 22 — 数据产品/研发经理组(受理/指派/验收需求);D4 起也是项目空间创建/配置管理的必要组。 */
+/** 数据产品/研发经理组(受理/指派/验收需求);D4 起也是项目空间创建/配置管理的必要组。 */
 export const MANAGER_GROUP = "bgp-manager";
 /** 研发组(承接被指派的需求)。🔴 D4 起**不再**能创建项目空间。 */
 export const DEVELOPER_GROUP = "bgp-developer";

@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 推进泵(WP-9 ④-2):只做「一次 Query + 回环 POST」;选主 / 停泵 / 缺密钥三种不跑的情形都必须真的不跑。
+// 推进泵(④-2):只做「一次 Query + 回环 POST」;选主 / 停泵 / 缺密钥三种不跑的情形都必须真的不跑。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FakeDdb, DDB_SPECS } from "./fake-ddb";
 
@@ -43,7 +42,7 @@ const deps = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-// @kf-batch 50-WP31-place-first-class —— 序 31 第三刀 ①:缺省读钥匙的那条路(deps.loadKey 不注入时真走的)。
+// 缺省读钥匙的那条路(deps.loadKey 不注入时真走的)。
 //   只 mock 真外部(Secrets Manager SDK 的客户端类);工厂 sdkClient 走真实现 ⇒ 证的是「控制面构造 + 主控区 + 5 分钟缓存」。
 describe("loadInternalDispatchKey(缺省读法)", () => {
   it("🔴 经控制面工厂在主控区建 Secrets Manager 客户端(不注入数据面角色),读到即缓存 5 分钟", async () => {
@@ -73,7 +72,7 @@ describe("loadInternalDispatchKey(缺省读法)", () => {
       expect(await loadInternalDispatchKey()).toBe("k-from-sm");
       expect(await loadInternalDispatchKey(), "5 分钟内第二次读走缓存").toBe("k-from-sm");
       expect(sends).toBe(1);
-      // 控制面工厂原样 new(数据面工厂会注入 credentials 字段);序 57 / B-129 ③ 起唯一多出的两个键 = 网络预算(建连 5 s / 空闲 60 s / 3 次有界重试)
+      // 控制面工厂原样 new(数据面工厂会注入 credentials 字段);③ 起唯一多出的两个键 = 网络预算(建连 5 s / 空闲 60 s / 3 次有界重试)
       expect(ctorConfigs).toEqual([{ region: "us-east-1", requestHandler: { connectionTimeout: 5000, socketTimeout: 60000 }, maxAttempts: 3 }]);
       expect(Object.keys(ctorConfigs[0]).sort()).toEqual(["maxAttempts", "region", "requestHandler"]);
       expect(ctorConfigs[0]).not.toHaveProperty("credentials");

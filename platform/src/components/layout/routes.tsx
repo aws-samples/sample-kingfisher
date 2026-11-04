@@ -33,7 +33,7 @@ import {
   GlobalOutlined,
 } from "@ant-design/icons";
 
-// @kf-batch 50-WP4-o1-scope —— 🔴 `key` 的类型 = 「执行范围能力登记表」的 keyof
+// 🔴 `key` 的类型 = 「执行范围能力登记表」的 keyof
 // (`lib/scope/route-scope.ts` 的 `MENU_ROUTE_SCOPE`):**菜单里加一页而没登记能力 ⇒ `tsc` 直接红**,
 // 不会出现「新页面悄悄按全部渲染」(A4:非法状态无法表达)。逐路由取值与理由见 INTERACTION §9.6 表 A;
 // 不在菜单树里的 9 条见 `lib/scope/capability.ts` 的 `EXTRA_ROUTE_SCOPE`。
@@ -54,7 +54,7 @@ export type Node = Leaf | Group;
 export const menuTree: Node[] = [
   { key: "/", icon: <HomeOutlined />, label: "首页" },
   {
-    // 模块 44 — 智能中枢:贯穿全平台的 AI 能力入口(不属于任一单一模块)。置顶,与首页同区。
+    // 智能中枢:贯穿全平台的 AI 能力入口(不属于任一单一模块)。置顶,与首页同区。
     // 现有 Copilot 计划中心;未来 GenBI 问数、网络/参数顾问等 AI 能力可陆续收入此组。
     key: "g-ai",
     icon: <RobotOutlined />,
@@ -82,7 +82,7 @@ export const menuTree: Node[] = [
       { key: "/redshift", icon: <ConsoleSqlOutlined />, label: "Redshift 查询" },
       { key: "/athena", icon: <CloudOutlined />, label: "Athena 查询" },
       { key: "/realtime-compute", icon: <ThunderboltOutlined />, label: "实时计算" },
-      // @kf-batch 50-W5-seg2-WP1 — 「数据服务」leaf 已于 2026-09-05 随能力下线摘除(50 SPEC §3.9c / WP-1;页面 / 管理 API / lib 同批删)。
+      // 「数据服务」leaf 已于 2026-09-05 随能力下线摘除(50 SPEC §3.9c;页面 / 管理 API / lib 同批删)。
     ],
   },
   {
@@ -94,7 +94,7 @@ export const menuTree: Node[] = [
       { key: "/skills", icon: <ApiOutlined />, label: "技能 Skills" },
       { key: "/observability", icon: <DashboardOutlined />, label: "可观测看板" },
       { key: "/bi", icon: <FundProjectionScreenOutlined />, label: "报表搭建器" },
-      // 「指标中台」已收敛到「数据建模 → 指标体系」(模块39)——移除导航入口,页面/API/数据保留可回滚。
+      // 「指标中台」已收敛到「数据建模 → 指标体系」——移除导航入口,页面/API/数据保留可回滚。
       { key: "/requirements", icon: <SolutionOutlined />, label: "需求工作台" },
     ],
   },
@@ -118,7 +118,7 @@ export const menuTree: Node[] = [
       // 2026-07-13 收敛:调度管理→任务监控「调度配置」Tab;SLA→告警中心 Tab;可观测看板→智能分析组。
       // 排序=运行(monitor/backfill)→ 检测配置(alerting/finops)→ 洞察沉淀(ops/incidents)。
       { key: "/monitor", icon: <DashboardOutlined />, label: "任务监控" },
-      // @kf-batch 50-P50.3-matrix — 模块 50 版本一致性矩阵(INTERACTION §3.1)。
+      // 版本一致性矩阵(INTERACTION §3.1)。
       // 放「调度运维」组:它回答的是"要不要管"(漏发/版本不齐/失败),属运维视角;
       // 与「执行环境」(系统管理组,回答"环境建没建好")刻意分开。
       { key: "/multi-region", icon: <GlobalOutlined />, label: "多 Region 看板" },
@@ -135,7 +135,7 @@ export const menuTree: Node[] = [
     label: "系统管理",
     children: [
       { key: "/projects", icon: <AppstoreOutlined />, label: "项目空间" },
-      // 模块 50 P50.2 切片 d — 执行环境管理页(多 region;INTERACTION §1)。
+      // 切片 d — 执行环境管理页(多 region;INTERACTION §1)。
       { key: "/exec-envs", icon: <GlobalOutlined />, label: "执行环境" },
       { key: "/admin/users", icon: <UserOutlined />, label: "用户管理" },
       { key: "/audit", icon: <FileSearchOutlined />, label: "审计日志" },
@@ -148,7 +148,7 @@ export function isGroup(n: Node): n is Group {
   return (n as Group).children !== undefined;
 }
 
-// @kf-batch 50-WP4-o1-scope —— 导出给 ScopeGate 与门禁用(范围能力的登记面 = 这 31 条 + capability.ts 的 9 条)。
+// 导出给 ScopeGate 与门禁用(范围能力的登记面 = 这 31 条 + capability.ts 的 9 条)。
 export const menuLeaves: Leaf[] = menuTree.flatMap((n) => (isGroup(n) ? n.children : [n]));
 const allLeaves: Leaf[] = menuLeaves;
 

@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg2-WP10a
 // GET /api/admin/exec-envs/[targetId]/acks —— 回查该执行目标的全部免责告知同意记录(50 SPEC v3.23 §2.1 / §3.2;bgp-admin)。
 // 首行 = 注册时 admin 的同意(来自描述符 `residencyAck`,source=register);其余来自 S13 同意留存表的 GSI byTarget(source=ack)。
 // 只读;详情页「已同意告知」卡读它。home 法域 target ⇒ 空列表(不是错误:没有需要同意的东西)。

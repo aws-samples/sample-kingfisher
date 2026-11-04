@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4-o1-scope
-// WP-4 O1 —— 「执行范围」的**服务端**读取器 / 校验器 / 过滤器。
+// O1 —— 「执行范围」的**服务端**读取器 / 校验器 / 过滤器。
 //
 // 合同:SPEC v3.34 §2.6.2(readScope)· §2.6.3(写路由忽略 scope)· §2.6.4(scopeFilter 两类资源)
 //      · §2.6.5(四种拒因,一律不回落)。文法在 `@/lib/scope/scope`(前后端共用,零依赖)。
@@ -137,24 +136,24 @@ export function scopeErrorResponse(r: ScopeRejection): NextResponse {
 export const SCOPE_SCALAR_ATTR = {
   /** run 行(SPEC §1.2;`lib/monitor/run-records.ts` 的 `RUN_STAMP_ATTRS`) */
   run: "targetId",
-  /** 成本行(WP-0 T1) */
+  /** 成本行(T1) */
   cost: "targetId",
   /** 数据源落点(`lib/datasource/placement-shared.ts` 的 `DATASOURCE_OWNER_TARGET_ATTR`) */
   datasource: "ownerTargetId",
-  // @kf-batch 50-WP4ter-coverage —— 问数历史行(`lib/genbi/history.ts` 由 `executeGenBiAsk` 回的落点盖章;
-  // 工单 SC-6)。🔴 单独一个 kind 而不是复用 `run`:属性名眼下一样,但两者的**写侧作者不同**
+  // 问数历史行(`lib/genbi/history.ts` 由 `executeGenBiAsk` 回的落点盖章;
+  //)。🔴 单独一个 kind 而不是复用 `run`:属性名眼下一样,但两者的**写侧作者不同**
   // (run 是 `run-records.ts`,问数历史是 `recordGenBiHistory`),合并会让「谁盖的章」这个问题没有答案。
   genbi: "targetId",
-  // @kf-batch 50-WP4ter-coverage —— 审计条目(`lib/audit.ts` 的派生规则 + 数据面显式传;工单 SC-12)
+  // 审计条目(`lib/audit.ts` 的派生规则 + 数据面显式传)
   audit: "targetId",
-  // @kf-batch 50-WP4ter-coverage —— 告警事件(`lib/alerting/events.ts` 从 trigger.targetId 盖;工单 SC-10)
+  // 告警事件(`lib/alerting/events.ts` 从 trigger.targetId 盖)
   alert: "targetId",
-  // @kf-batch 50-WP4quater-reads —— SQL 执行历史(`app/api/redshift/history` 的 POST 从 body.targetId 盖;工单 SC-35)。
+  // SQL 执行历史(`app/api/redshift/history` 的 POST 从 body.targetId 盖)。
   // 🔴 同样单独一个 kind:写侧作者是那条路由自己(不是 run-records),合并 kind 就没法回答「谁盖的章」。
   sqlHistory: "targetId",
-  // @kf-batch 50-WP4quater-reads —— 保存的 SQL 查询任务(工单 SC-35)。落点由 workgroup 派生后盖在行上。
+  // 保存的 SQL 查询任务。落点由 workgroup 派生后盖在行上。
   redshiftTask: "targetId",
-  // @kf-batch 54-genbi-session-cards —— 问数会话卡片的**中央指针行**(写侧作者 = `lib/genbi/cards-store.ts`;
+  // 问数会话卡片的**中央指针行**(写侧作者 = `lib/genbi/cards-store.ts`;
   // 章 = 这段对话取数的那个 target)。🔴 同样单独一个 kind:属性名与 run 一样,但写侧作者不同,
   // 合并 kind 就没法回答「谁盖的章」——与 `genbi` / `sqlHistory` 同一条纪律。
   genbiCard: "targetId",
@@ -167,7 +166,7 @@ export type ScopeScalarKind = keyof typeof SCOPE_SCALAR_ATTR;
  * 由 `scope-filter-parity` 单测逐行比对。
  *
  * 🔴 **缺属性 ⇒ 归 home**:存量行(T1/T2 落章之前写的)没有这个属性,若把它们判成「不属于任何区」,
- * home 视角就会比 DDB 少报 —— 而 E-150/E-151 是拿 DDB 逐行核对的,少报即 FAIL。
+ * home 视角就会比 DDB 少报 —— 而是拿 DDB 逐行核对的,少报即 FAIL。
  * 这条与 `projectFilter` 对默认工作区的存量兜底、`bindingTargets` 的三级回落是**同一个模式**。
  */
 export function scalarTargetOf(row: Record<string, unknown>, kind: ScopeScalarKind): string {
@@ -199,7 +198,7 @@ export function scopeFilter(scope: TargetScope, kind: ScopeScalarKind): ScopeFil
   const ors = ids.map((id, i) => {
     values[`:scopeT${i}`] = id;
     if (id !== HOME_TARGET_ID) return `#scopeAttr = :scopeT${i}`;
-    // 🔴 点名 home 时要多捞两种行,否则 home 视角比 DDB 少报(E-150/E-151 是逐行核对的):
+    // 🔴 点名 home 时要多捞两种行,否则 home 视角比 DDB 少报(是逐行核对的):
     //   ① **没有该属性**的存量行(T1/T2 落章之前写的);
     //   ② **属性是空串**的行 —— 这不是理论洁癖:`attribute_not_exists` 在 DDB 里**不匹配空串**
     //      (空串是"存在且为空"),而内存侧 `scalarTargetOf` 把空串判成 home。两侧若不一致,
@@ -213,7 +212,6 @@ export function scopeFilter(scope: TargetScope, kind: ScopeScalarKind): ScopeFil
 }
 
 /**
- * @kf-batch 50-WP4bis-p1-scope
  * B 类绑定列表的**默认字段名**。个别模块历史上叫别的名字(实测:补数计划行是 `execTargets`,
  * 见 `lib/backfill/types.ts` 的 `BACKFILL_PLAN_BINDING_ATTR`)。
  *
@@ -253,7 +251,6 @@ export function filterRowsByScope<T extends Record<string, unknown>>(
 }
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-37)
  * **C 类:治理约定的「适用区」过滤** —— 与 B 类 `filterRowsByScope` 只差一点,但那一点很关键:
  *
  * 🔴 **没声明 `targets` ⇒ 对所有区可见**(不是「归主控区」)。
@@ -297,7 +294,6 @@ export function countRowsByBinding(
 }
 
 /**
- * @kf-batch 50-WP4ter-coverage
  * **A 类的内存过滤**(与 `scopeFilter` 的 DDB 表达式同一条规则,由 `scope-filter-parity` 覆盖)。
  *
  * 🔴 什么时候用内存版而不是下推 DDB:那张表的唯一读法是**全表 Scan 后在内存里聚合**

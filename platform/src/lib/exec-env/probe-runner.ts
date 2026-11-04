@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // 执行环境**真实探活**(DESIGN §4.1 step4 / INTERACTION §1.3:探活项由已装 components 集驱动)。
 //
 // 【本文件的三条承重】
@@ -10,24 +9,24 @@
 //    而 probe.ok 是 `enableTarget` 的前置 —— fail-closed 是这里唯一安全的方向。
 import { homeRegion } from "@/lib/place/home-region";
 import { S3Client, HeadBucketCommand, GetBucketReplicationCommand } from "@aws-sdk/client-s3";
-// @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 的区域表真探
+// residency-api 片 1 的区域表真探
 import { DynamoDBClient, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { S3TablesClient, ListTableBucketsCommand } from "@aws-sdk/client-s3tables";
 import { AthenaClient, GetWorkGroupCommand } from "@aws-sdk/client-athena";
-// @kf-batch 50-WP16-zero-egress:零出网探活要读路由表 / NAT / 端点(都是**只读**、跨区调用)
+// 零出网探活要读路由表 / NAT / 端点(都是**只读**、跨区调用)
 import {
   EC2Client,
   DescribeSecurityGroupsCommand,
   DescribeRouteTablesCommand,
   DescribeNatGatewaysCommand,
-  // @kf-batch 50-WP23-xregion-peering:形态从「跨区端点」换成「跨区 peering」⇒ 这里不再读端点
+  // 形态从「跨区端点」换成「跨区 peering」⇒ 这里不再读端点
   //   (DescribeVpcEndpoints 随之从探活的授权面里撤掉,见 infra/iam/platform-taskrole-calls.json)
   DescribeVpcPeeringConnectionsCommand,
 } from "@aws-sdk/client-ec2";
 import { Route53Client, ListResourceRecordSetsCommand, GetHostedZoneCommand } from "@aws-sdk/client-route-53";
 import { IAMClient, GetRoleCommand } from "@aws-sdk/client-iam";
 import { RedshiftServerlessClient, GetWorkgroupCommand } from "@aws-sdk/client-redshift-serverless";
-// 序 48:候选区内在页面新建的执行区不再经 redeploy-platform.sh 放行 ⇒ 该区的 S3 Tables 联邦目录由「检测初始化」幂等开通(作者仍是 B-91 那一个函数)
+// 候选区内在页面新建的执行区不再经 redeploy-platform.sh 放行 ⇒ 该区的 S3 Tables 联邦目录由「检测初始化」幂等开通(作者仍是那一个函数)
 import { GlueClient } from "@aws-sdk/client-glue";
 import { ensureS3TablesFederatedCatalog, S3TABLES_FEDERATED_CATALOG_ID } from "@/lib/aws/s3tables-catalog";
 import { MWAAClient, GetEnvironmentCommand } from "@aws-sdk/client-mwaa";
@@ -37,12 +36,12 @@ import {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
 import type { ProbeResult } from "@/lib/exec-env/registry";
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色键的 SSOT 判据(角色名必须是本 target 名)
+// 执行角色键的 SSOT 判据(角色名必须是本 target 名)
 import { expectedExecRoleName, isExecRoleResourceKey, roleNameOfArn, type ExecRoleResourceKey } from "@/lib/exec-env/exec-roles";
 import { isHome } from "@/lib/exec-env/target-id";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤ —— 探活是一条请求里第一批打到目标区的调用,落点决策要记在第一个 AWS 调用之前:
+// 探活是一条请求里第一批打到目标区的调用,落点决策要记在第一个 AWS 调用之前
 //   已启用环境的「检测初始化」不需 finalize ⇒ reconcileOneTarget 不经 readBuildStatus(那是此前唯一的记账点)⇒ 整条流程零决策,
 //   观测器把 CFN / S3 / EC2 / Redshift / Glue / DMS / Athena 的目标区探活全记成未归因(2026-10-23 测试账号 observe 复验抓到)
 import { notePlaceDecision } from "@/lib/place/context";
@@ -66,10 +65,9 @@ async function probeOne(name: string, fn: () => Promise<void>): Promise<Item> {
 
 /** 资源字段缺失 ⇒ 直接红(描述符没回写完就来探,红得明明白白,而不是拿 undefined 去打 AWS)。 */
 /**
- * @kf-batch 50-W5-seg1-WP3
  * 探一个 per-target 执行角色:IAM GetRole(全局服务,client 用 home region)+ **角色名 = 命名 SSOT 的本 target 名**
  * (非 home)。🔴 只在描述符**有**该键时才出项:键缺省不出项 —— 「非 home 必须有」这道前置由准入(`hasPerTargetExecRoles`,
- * WP-10a)判,不由探活判;否则存量 `tgt_usw2_a` 在重新部署前的周期探活会把整个健康 region 探红。
+ * )判,不由探活判;否则存量 `tgt_usw2_a` 在重新部署前的周期探活会把整个健康 region 探红。
  */
 function probeExecRole(target: ExecutionTarget, key: ExecRoleResourceKey, itemName: string, arn: unknown): Promise<Item> | null {
   if (typeof arn !== "string" || !arn) return null;
@@ -102,7 +100,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
 
   // ── core(components 必含 core —— 若真缺,产出一条红而不是空结果)────────────
   if (components.includes("core")) {
-    // 序 48 · 数据湖直查 / 问数的区级前提:S3 Tables 联邦目录 s3tablescatalog(序 43 B-91)。它不是 CDK 资源,
+    // 数据湖直查 / 问数的区级前提:S3 Tables 联邦目录 s3tablescatalog。它不是 CDK 资源,
     //   原来由 redeploy-platform.sh 第 3c 步在「放行」时对每个已注册执行区开通;候选区内的执行区不再经那一步 ⇒ 这里在
     //   「检测初始化」时幂等开通(有则「已在」;无则 CreateCatalog;建不成 ⇒ 本项红并带 aws 原话,不假装绿)。
     //   home 也探(首装 6.3 步已建 ⇒ 恒「已在」)。所用权限 glue:GetCatalog / CreateCatalog / PassConnection 已在 TaskRole 的
@@ -181,19 +179,19 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
           })
         : Promise.resolve(missingItem("glueRoleArn"))
     );
-    // @kf-batch 50-W5-seg1-WP3:EMR 执行角色(core 键;有才探,见 probeExecRole 的说明)
+    // EMR 执行角色(core 键;有才探,见 probeExecRole 的说明)
     const emrProbe = isExecRoleResourceKey("emrExecutionRoleArn") ? probeExecRole(target, "emrExecutionRoleArn", "emrExecutionRoleArn", res.emrExecutionRoleArn) : null;
     if (emrProbe) jobs.push(emrProbe);
   } else {
     jobs.push(Promise.resolve({ name: "core", ok: false, error: "components 不含 core(描述符坏了,§1.1 要求必含)" }));
   }
 
-  // ── @kf-batch 50-WP16-zero-egress:零出网两项(SPEC §3.16-F;INTERACTION v2.21 探活列表)────
+  // ──:零出网两项(SPEC §3.16-F;INTERACTION v2.21 探活列表)────
   // 🔴 **诚实边界(必须写在这里,别让人误读)**:这两项只断**控制面观测得到**的事实。
   //   真正的端到端证据是「该区调度任务真跑成功且 run 台账回写到 home」(ACCEPTANCE N0-7)——
   //   因为「VPC 内解析 dynamodb.<home>.amazonaws.com 到端点 ENI」这件事,控制面(home 的 ECS)
   //   **在网络上就做不到**:它不在那个 VPC 里,私有托管域对它不生效。所以这里不假装能证明它。
-  // 🔴 **退避重试**:接口端点 `State=available` 之后仍有约 2–3 分钟私有 DNS 传播窗口(spike S-8),
+  // 🔴 **退避重试**:接口端点 `State=available` 之后仍有约 2–3 分钟私有 DNS 传播窗口(spike),
   //   一次红就判「缺端点」= 把好产品报成缺陷。探活本身由 reconciler 周期性重跑 ⇒ 天然带重试;
   //   这里只保证**单次判定不因传播中途而误红**:端点处于 pending* 视为「还在建」,不算失败。
   // 🔴🔴 **灰度门:只对「已经切到零出网底座」的 target 出这两项**(判据 = 资源袋里有 `endpointIds`,
@@ -231,7 +229,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
         })
       );
       const homeLinkZone = typeof res.homeLinkHostedZoneId === "string" ? res.homeLinkHostedZoneId : "";
-      // @kf-batch 50-WP23-xregion-peering:形态换了 —— 从「本区的跨区端点」换成「跨区 peering + 主控区同区端点 + 本区私有托管域」
+      // 形态换了 —— 从「本区的跨区端点」换成「跨区 peering + 主控区同区端点 + 本区私有托管域」
       const pcxId = typeof res.homeLinkPeeringId === "string" ? res.homeLinkPeeringId : "";
       jobs.push(
         probeOne("network:home-link", async () => {
@@ -273,7 +271,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
           const assoc = (zone.VPCs ?? []).some((v: { VPCId?: string }) => v.VPCId === vpcId);
           if (!assoc) throw new Error(`私有托管域 ${homeLinkZone} 没有关联本 target 的 VPC ${vpcId} —— 对该区任务不生效`);
           const rrs = await r53.send(new ListResourceRecordSetsCommand({ HostedZoneId: homeLinkZone, MaxItems: 10 }));
-          // 🔴 WP-23 起是**A 记录 + 主控区端点 ENI 的私有 IP**(跨 region 拿不到 DnsEntries 做 ALIAS)
+          // 🔴 是**A 记录 + 主控区端点 ENI 的私有 IP**(跨 region 拿不到 DnsEntries 做 ALIAS)
           //    ⇒ 判据不能只认 AliasTarget(只认它 = 对着旧形态判红)。
           const hasAnswer = (rrs.ResourceRecordSets ?? []).some(
             (r: { Type?: string; AliasTarget?: unknown; ResourceRecords?: Array<{ Value?: string }> }) =>
@@ -285,7 +283,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
     }
   }
 
-  // ── 非 core 组件(P50.2e2 补真探;此前是"未实现=红"的 fail-closed 占位,home seed 一上就撞到)──
+  // ── 非 core 组件(补真探;此前是"未实现=红"的 fail-closed 占位,home seed 一上就撞到)──
   // 每组件探"服务级存在性 + 描述符实名对得上",与 core 同口径:资源字段缺 ⇒ missingItem 红。
   for (const comp of components) {
     if (comp === "core") continue;
@@ -299,7 +297,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
           if (out.workgroup?.status !== "AVAILABLE") throw new Error(`workgroup ${wg} 状态 ${out.workgroup?.status ?? "?"}(非 AVAILABLE)`);
         }));
       }
-      // @kf-batch 50-W5-seg1-WP3:COPY 角色(组件可选键;有才探)
+      // COPY 角色(组件可选键;有才探)
       const copyProbe = probeExecRole(target, "redshiftCopyRoleArn", "redshift:copy-role", res.redshiftCopyRoleArn);
       if (copyProbe) jobs.push(copyProbe);
     } else if (comp === "mwaa") {
@@ -313,7 +311,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
         }));
       }
     } else if (comp === "airflow-serverless") {
-      // @kf-batch 50-WP15-airflow-serverless:三样实名资源逐个真探(桶存在 / 角色存在 / SG 存在);缺键 ⇒ missingItem 红
+      // 三样实名资源逐个真探(桶存在 / 角色存在 / SG 存在);缺键 ⇒ missingItem 红
       const wb = res.workflowBucket;
       if (typeof wb !== "string" || !wb) jobs.push(Promise.resolve(missingItem("workflowBucket")));
       else {
@@ -352,7 +350,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
           if ((out.ReplicationSubnetGroups?.length ?? 0) === 0) throw new Error(`DMS 子网组 ${grp} 不存在`);
         }));
       }
-      // @kf-batch 50-W5-seg1-WP3:DMS 角色(组件可选键;有才探)
+      // DMS 角色(组件可选键;有才探)
       const dmsRoleProbe = probeExecRole(target, "dmsKinesisRoleArn", "dms:kinesis-role", res.dmsKinesisRoleArn);
       if (dmsRoleProbe) jobs.push(dmsRoleProbe);
     } else if (comp === "flink") {
@@ -366,7 +364,7 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
         }));
       }
     } else if (comp === "agentcore") {
-      // agentcore(P50.2e3 补真探,用户实测反馈驱动):字段在 §1.1 的顶层 agentcore 袋、不在 resources。
+      // agentcore(补真探,用户实测反馈驱动):字段在 §1.1 的顶层 agentcore 袋、不在 resources。
       // 三项分探(runtime READY / memory ACTIVE / gateway READY——状态字面值 2026-09-01 真环境核过),
       // 缺字段 ⇒ 红得明白,不拿 undefined 去打 AWS。
       const ac = (target.agentcore ?? {}) as Record<string, unknown>;
@@ -405,8 +403,8 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
         }));
       }
     } else if (comp === "residency-api") {
-      // @kf-batch 50-W5-seg1-WP10a —— residency-api 片 1 三项真探(SPEC v3.22 §1.3a S4):两张区域表 ACTIVE + 结果桶在且**没有复制配置**
-      //    (E2 / E-182:结果留区是产品能力;桶策略 deny 复制,这里再从真实配置侧证一次)。字段缺 ⇒ missingItem 红。
+      // residency-api 片 1 三项真探(SPEC v3.22 §1.3a S4):两张区域表 ACTIVE + 结果桶在且**没有复制配置**
+      //    (E2:结果留区是产品能力;桶策略 deny 复制,这里再从真实配置侧证一次)。字段缺 ⇒ missingItem 红。
       const ddb = sdkClient("data-plane", DynamoDBClient, { region });
       for (const [key, itemName] of [["residencyAuditTable", "residency-api:audit-table"], ["residencyResultsTable", "residency-api:results-table"]] as const) {
         const tbl = res[key];

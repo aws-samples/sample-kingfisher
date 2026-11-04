@@ -1,13 +1,13 @@
-// 模块 44 — Copilot 进程内 agent(Bedrock Converse tool-use 循环)。
+// Copilot 进程内 agent(Bedrock Converse tool-use 循环)。
 // 既是【默认后端】(COPILOT_BACKEND=inprocess,零基建即可用),也是 AgentCore 的【失败回退】
 // (标准契约 7:try Runtime → catch 回退 inprocess,不让本可用功能 500)。
 // 与将来 AgentCore 容器共享同一份工具注册表声明(防两处漂移)。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand, type Message, type Tool } from "@aws-sdk/client-bedrock-runtime";
 import { COPILOT } from "./config";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:两处 Converse 的 modelId 改调用处求值(循环外解析一次候选层,经 invokeConverse 退避/降级),
+// 两处 Converse 的 modelId 改调用处求值(循环外解析一次候选层,经 invokeConverse 退避/降级),
 // 不再读模块加载期常量 COPILOT.modelId(COPILOT 其余字段不动)。
 import { resolveLayered } from "@/lib/ai/model";
 import { invokeConverse } from "@/lib/ai/invoke";
@@ -39,7 +39,7 @@ export interface CopilotAskOutput {
   answer: string;
   steps: CopilotStep[];
   usage: { inputTokens: number; outputTokens: number };
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显:实际用的模型(agentcore 路径由容器回执;copilot 容器不在本仓,可缺省)。
+  // `_meta` 回显:实际用的模型(agentcore 路径由容器回执;copilot 容器不在本仓,可缺省)。
   model?: AiModelUse;
 }
 
@@ -71,7 +71,7 @@ export async function runCopilot(input: CopilotAskInput): Promise<CopilotAskOutp
   let inTok = 0, outTok = 0;
   const deadlineMs = COPILOT.deadlineMs;
   const startedAt = Date.now();
-  // @kf-batch 50-W5-seg2-WP8:循环外求值一次候选层;`used` = 最近一次实际用的模型(降级则为回落层)。
+  // 循环外求值一次候选层;`used` = 最近一次实际用的模型(降级则为回落层)。
   const layers = await resolveLayered("copilot");
   let used: AiModelUse = { modelId: layers[0].modelId, modelSource: layers[0].source };
   const converse = async (msgs: Message[], withTools: boolean) => {
@@ -100,7 +100,7 @@ export async function runCopilot(input: CopilotAskInput): Promise<CopilotAskOutp
       return { answer, steps, usage: { inputTokens: inTok, outputTokens: outTok }, model: used };
     }
 
-    // 执行模型请求的工具(P44.1 全为只读)。
+    // 执行模型请求的工具(全为只读)。
     const toolResults: any[] = [];
     for (const blk of out?.content || []) {
       const tu = (blk as any).toolUse;
@@ -111,7 +111,7 @@ export async function runCopilot(input: CopilotAskInput): Promise<CopilotAskOutp
       if (!tool) {
         res = { success: false, error: `unknown tool: ${tu.name}` };
       } else {
-        // 安全兜底:进程内 agent 只执行 read/create 工具;绝不存在 execute。P44.1 仅 read。
+        // 安全兜底:进程内 agent 只执行 read/create 工具;绝不存在 execute。仅 read。
         try { res = await tool.handler(tu.input || {}, caller); }
         catch (e: any) { res = { success: false, error: String(e?.message || e).slice(0, 300) }; }
       }

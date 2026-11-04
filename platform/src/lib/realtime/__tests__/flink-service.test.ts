@@ -213,7 +213,7 @@ describe("estimateKpu(资源规整回归保护)", () => {
   });
 });
 
-// ── 模块42 P42.6b:MSK/Kafka 源认证注入(§11.3)+ 裸占位符 guard 兼容(§11.4)──
+// ──:MSK/Kafka 源认证注入(§11.3)+ 裸占位符 guard 兼容(§11.4)──
 describe("buildKafkaAuthProps(MSK 认证块展开·纯函数·§11.3)", () => {
   const BS = "b-1.demo.kafka:9098,b-2.demo.kafka:9098";
 

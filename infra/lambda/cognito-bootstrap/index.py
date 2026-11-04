@@ -139,7 +139,7 @@ def _cfn_send(event, status, reason, data=None):
             "Data": data or {},
         }
     ).encode("utf-8")
-    # 序 65 ProtoShield:回执地址只接受 CloudFormation 事件里的 https 预签名 URL(自定义资源协议),拒绝其它 scheme。
+    # ProtoShield:回执地址只接受 CloudFormation 事件里的 https 预签名 URL(自定义资源协议),拒绝其它 scheme。
     if not str(event.get("ResponseURL", "")).startswith("https://"):
         raise ValueError("ResponseURL 不是 https 地址,拒绝回执")
     req = urllib.request.Request(

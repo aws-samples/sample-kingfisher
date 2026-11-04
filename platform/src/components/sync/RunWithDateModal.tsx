@@ -1,6 +1,6 @@
 "use client";
 
-// @kf-batch 37-sync-backfill —— 序 37 ⑥:同步任务「指定业务日期运行」(列表页与详情页共用)。
+// 同步任务「指定业务日期运行」(列表页与详情页共用)。
 // 发 `POST /api/sync/<id>/start`,请求体 `{ runDate: "YYYY-MM-DD" }`;不用这个入口(直接点「启动」)= 不带请求体 = 改动前的行为
 // (脚本按任务的业务时区取今天)。日期变量的含义与取值规则的唯一作者是 lib/sync/run-vars.ts。
 import React, { useEffect, useState } from "react";

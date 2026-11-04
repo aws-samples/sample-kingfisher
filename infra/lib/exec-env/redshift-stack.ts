@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3a-component-stacks
 // 执行环境 **redshift 组件**栈(50 SPEC §1.1 的 `redshift` 资源袋:workgroup / database / adminSecret)。
 //
 // 【与 home 的 `infra/lib/redshift-stack.ts` 是刻意的两份实现】
@@ -32,7 +31,7 @@ import { Construct } from "constructs";
 import { resourceName } from "../shared/naming";
 import { ExecEnvStack, type ExecEnvStackProps } from "./exec-env-stack";
 import { boundStatement, bucketArnPair, perTargetExecRole, serviceTrust, tableBucketAnyArn } from "./exec-roles";
-// @kf-batch 50-WP16-zero-egress —— 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
+// 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
 import { execEnvPrivateSubnets } from "./private-subnets";
 
 export interface ExecEnvRedshiftStackProps extends ExecEnvStackProps {
@@ -74,10 +73,10 @@ export class ExecEnvRedshiftStack extends ExecEnvStack {
       "kms:CreateGrant"
     );
 
-    // ── @kf-batch 50-W5-seg1-WP3:per-target COPY 角色(SPEC v3.21 §6.1 段二)──────────────────
+    // ──:per-target COPY 角色(SPEC v3.21 §6.1 段二)──────────────────
     // 【为什么本栈要建它】home 的 `redshift-stack.ts` 把 `bgp-redshift-copy-role` 挂在 namespace 的 `iamRoles` +
     //   `defaultIamRoleArn` 上,于是 `COPY … IAM_ROLE default` 与同步脚本的 `discover_copy_role()` 都成立。
-    //   本栈此前 namespace **没挂任何角色** ⇒ 非 home 的 COPY 必炸(WP-3 开包勘定)。
+    //   本栈此前 namespace **没挂任何角色** ⇒ 非 home 的 COPY 必炸(开包勘定)。
     //   动作集照抄 home 那份(读数据湖 staging + S3Tables/Glue 目录只读 + 解密),资源面改指**本 target** 的桶 / 表桶。
     const p = cdk.Aws.PARTITION;
     const copyRole = perTargetExecRole(this, "RedshiftCopyRole", {
@@ -95,7 +94,7 @@ export class ExecEnvRedshiftStack extends ExecEnvStack {
     copyRole.addToPolicy(
       boundStatement(ctx, {
         actions: ["s3tables:GetTableData", "s3tables:GetTable", "s3tables:GetNamespace", "s3tables:GetTableBucket", "s3tables:ListTables", "s3tables:ListNamespaces"],
-        // B-127:只读动作不变,资源面从「本区平台表桶」放到「本区任意表桶」—— 同步写进已登记自有表桶的表,数仓侧同样要读得到(区仍由 ARN 绑死)
+        // 只读动作不变,资源面从「本区平台表桶」放到「本区任意表桶」—— 同步写进已登记自有表桶的表,数仓侧同样要读得到(区仍由 ARN 绑死)
         resources: tableBucketAnyArn(ctx, p),
       })
     );
@@ -115,7 +114,7 @@ export class ExecEnvRedshiftStack extends ExecEnvStack {
       adminUsername: "admin",
       manageAdminPassword: true,
       kmsKeyId: dataKey.keyId,
-      // 🔴 WP-3:挂本 target 的 COPY 角色(与 home 同形:iamRoles + defaultIamRoleArn)。对存量 namespace 是原地
+      // 🔴 挂本 target 的 COPY 角色(与 home 同形:iamRoles + defaultIamRoleArn)。对存量 namespace 是原地
       //    UpdateNamespace(No interruption),不替换、不动数据;P0-E 会把它判成「原地改属性」(disruptive、不需审批)。
       iamRoles: [copyRole.roleArn],
       defaultIamRoleArn: copyRole.roleArn,
@@ -141,7 +140,7 @@ export class ExecEnvRedshiftStack extends ExecEnvStack {
     // 🔴 名字不是 ARN(见文件头):平台侧回写前必须 DescribeSecret 换成真 ARN。
     new cdk.CfnOutput(this, "redshiftSecretName", { value: nameOf("redshiftAdminSecretName") });
     new cdk.CfnOutput(this, "redshiftNamespace", { value: namespaceName });
-    // 🔴 WP-3:组件**可选**键(平台 `COMPONENT_OPTIONAL_RESOURCES.redshift`,读到才进袋;不追溯存量必填)
+    // 🔴 组件**可选**键(平台 `COMPONENT_OPTIONAL_RESOURCES.redshift`,读到才进袋;不追溯存量必填)
     new cdk.CfnOutput(this, "redshiftCopyRoleArn", { value: copyRole.roleArn });
   }
 }

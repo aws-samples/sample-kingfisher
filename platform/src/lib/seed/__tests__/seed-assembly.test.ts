@@ -1,4 +1,3 @@
-// @kf-batch 50-CAPSEED-seed-dispatch
 // 登记 CAP-SEED(「在该区下发一次造数」)的**装配层**判据。
 // 只 mock 真外部:DynamoDB(文档客户端 —— 命令表 / run 台账 / 审计都落它)· 执行环境注册表(DDB 边界)· Glue SDK(网络)。
 // seed-job / run-once / seed-http / action-commands / action-dispatch / action-handlers / run-records / audit /

@@ -1,4 +1,4 @@
-// 模块 33-A — 离线多引擎 SPI:通用引擎类型（引擎无关）。
+// 离线多引擎 SPI:通用引擎类型（引擎无关）。
 //
 // 设计红线：引擎走 SPI 插件化——新引擎 = 独立目录纯增量 + registry 注册一行；老代码零改动。
 // 照抄样板：lib/versions/version-service.ts（表驱动注册表 Record<type,meta> + 类型守卫）。
@@ -23,7 +23,7 @@ export interface EngineJobBase {
   lastRunId?: string;
   lastRunStatus?: string;
   lastRunAt?: string;
-  // 模块 33-A 补齐:MWAA 周期调度(与 etl-job 一致)。schedule 路由维护。
+  // 补齐:MWAA 周期调度(与 etl-job 一致)。schedule 路由维护。
   cronExpression?: string;
   scheduleEnabled?: boolean;
   airflowDagId?: string;

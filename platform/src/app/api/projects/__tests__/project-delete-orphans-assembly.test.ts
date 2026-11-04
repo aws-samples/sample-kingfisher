@@ -1,4 +1,3 @@
-// @kf-batch 50-project-delete-orphans
 // 🔴🔴 **装配层判据**:删项目空间 ⇒ 不许留下孤儿(真环境清理 128 个夹具项目时抓到的四类)。
 //
 // 只 mock **真外部**:DynamoDB(内存假表,真求值条件 / 过滤表达式、真分页)· Secrets Manager / Redshift Data
@@ -46,7 +45,7 @@ const h = vi.hoisted(() => ({
 h.ddb = new FakeDdb(SPECS as never);
 h.aws = new FakeAws();
 
-// 序 50 第二批:DELETE 经 submitLongOp(kind project-delete)⇒ 任务表 bgp-long-ops 交给内存夹具(真求值条件写 / 租约释放),其余表走 FakeDdb
+// DELETE 经 submitLongOp(kind project-delete)⇒ 任务表 bgp-long-ops 交给内存夹具(真求值条件写 / 租约释放),其余表走 FakeDdb
 vi.hoisted(() => {
   // 驱动器的进程内等待预算是 import 时读的 env(产品值 45s):判据缩到 5s(FakeDdb 盘点毫秒级就做完;「STARTED 两次后 FINISHED」要等 500+750+1125ms ⇒ 仍在同步路径),
   // 「数仓一直唤醒中」的用例靠它在 5s 后拿到 202;天花板放到 10 分钟,免得 150 轮 ≈ 296s 的盘点被 300s abort 抢先判 timeout
@@ -389,7 +388,7 @@ describe("④ 系统代管的 per-project 凭证:删项目后自动回收(作业
     expect(h.aws.secrets.has(name)).toBe(false);
   });
 
-  it("🔴 B-48 已删除且从没装出数仓的环境 ⇒ 一步成功、标 never-supplied(不再留一条重试 6 次的失败作业);负向:已删除但有数仓的照样真删、在用但缺资源的照样重试", async () => {
+  it("🔴 已删除且从没装出数仓的环境 ⇒ 一步成功、标 never-supplied(不再留一条重试 6 次的失败作业);负向:已删除但有数仓的照样真删、在用但缺资源的照样重试", async () => {
     const APN1 = { targetId: "tgt_apn1_a", region: "ap-northeast-1", status: "deleted" };
     const USE1 = { targetId: "tgt_use1_a", region: "us-east-1", status: "deleted", resources: { redshiftWorkgroup: "bgp-wg-use1-a", redshiftDatabase: "dev" } };
     const EUW1 = { targetId: "tgt_euw1_a", region: "eu-west-1", status: "active" };
@@ -422,10 +421,10 @@ describe("④ 系统代管的 per-project 凭证:删项目后自动回收(作业
   });
 });
 
-// 序 49 ③ B-95 → 序 50 第二批 —— 数仓冷启动:盘点语句一直没出结果 ⇒ 整条删除由统一框架转 202 `protocol:"long-op/1"`(项目一个字节没动),
+// → —— 数仓冷启动:盘点语句一直没出结果 ⇒ 整条删除由统一框架转 202 `protocol:"long-op/1"`(项目一个字节没动),
 //   执行体在后台等到 150 轮预算用尽 ⇒ 任务终态 failed 400「无法核实」(fail-closed 不变,只是不再在 45s 处放弃);醒了 ⇒ 同一条 DELETE 直接 200;
 //   语句 FAILED ⇒ 仍 400 fail-closed。真外部只有 FakeAws 的 Redshift Data(pendingPolls 脚本)与内存 bgp-long-ops;路由 ↔ 驱动器 ↔ 执行体 ↔ 盘点 ↔ 阻断算法真装配。
-describe("⑤ B-95 数仓正在唤醒 ⇒ 202 统一长操作协议(不再是删项目专用 warming 协议);醒了同一请求 200;失败仍 400", () => {
+describe("⑤ 数仓正在唤醒 ⇒ 202 统一长操作协议(不再是删项目专用 warming 协议);醒了同一请求 200;失败仍 400", () => {
   const SCHEMA_WAIT_MS = 300_000; // 150 轮 ≈ 296s 盘点等待(见 lib/projects/__tests__/b95-delete-warming.test.ts)
   // 任务行(不是租约行:租约行也带 kind)按 taskId 取
   const taskRow = (taskId: string) => memLongOps.rows.get(taskId);

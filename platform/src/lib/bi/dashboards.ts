@@ -1,4 +1,4 @@
-// 模块 37 — 仪表盘 CRUD(bgp-bi-dashboards)。键式隔离:pk=projectId, sk=dashboardId(ULID)。
+// 仪表盘 CRUD(bgp-bi-dashboards)。键式隔离:pk=projectId, sk=dashboardId(ULID)。
 // 布局(引用 widget)+ 筛选器内嵌;更新走 version 乐观锁。widget 为弱引用(不做外键约束)。
 
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";

@@ -1,7 +1,6 @@
-// @kf-batch 56-B128-channel-reconcile
 // 装配判据:`GET /api/sync` 列表 → 读时对账(真 reconcile / dms-service / zeroetl-service / run-records / task-write)→ 落库 → 响应。
 // 只 mock 真外部(DynamoDB 文档客户端、AWS 客户端工厂)与请求身份(requireProject)/ 执行环境注册表(与 scope-route 同一组边界);
-// 🔴 **不** mock `@/lib/sync/reconcile` —— 那正是 B-128 要焊的接缝(改动前列表把 DMS / Zero-ETL 行原样放过)。
+// 🔴 **不** mock `@/lib/sync/reconcile` —— 那正是要焊的接缝(改动前列表把 DMS / Zero-ETL 行原样放过)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -130,7 +129,7 @@ beforeEach(() => {
   h.glueRuns.set("bgp-sync-g", [{ JobRunState: "SUCCEEDED", ExecutionTime: 3 }]);
 });
 
-describe("GET /api/sync 列表读时对账(B-128)", () => {
+describe("GET /api/sync 列表读时对账", () => {
   it("🔴 DMS 侧 failed 的行列表直接显示 failed(不用先打开详情页);running 带残留 lastFailure 的行不动;zero-etl failed ⇒ error;glue 照旧", async () => {
     const byId = Object.fromEntries((await listRows()).map((r) => [r.taskId, r]));
     expect(byId["d-failed"].status).toBe("failed");

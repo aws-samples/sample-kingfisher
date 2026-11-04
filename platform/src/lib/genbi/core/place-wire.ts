@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 4(L6)—— **PlaceWire v1 的 JS 读取函数**(形状见 platform/place-wire.schema.json)。
+// **PlaceWire v1 的 JS 读取函数**(形状见 platform/place-wire.schema.json)。
 //
 // 为什么放在 genbi/core:这里是平台 TS 唯一会被**编译进别的运行时**的目录(scripts/core-prebuild.sh 把它编成 CJS,
 // 拷进 AgentCore 容器与技能 Lambda 的 core-dist/)⇒ 平台 / 容器 / Lambda 三个 JS 运行时读的是**同一份源**;
@@ -7,7 +6,7 @@
 //
 // 🔴 本文件零依赖(core 规矩:不许 `@/`、不许 SDK),只做三件事:解析 · 按 schema 校验 · 归一。
 //    缺 / 多 / 形态不对 ⇒ 抛 PlaceWireInvalid(带 JSON 路径),**没有任何缺省值**:读不到落点的运行时只许报错,
-//    不许拿自己进程环境里的区 / 工作组顶上(技能 Lambda 原来就是那样静默回落主控区的,B-26)。
+//    不许拿自己进程环境里的区 / 工作组顶上(技能 Lambda 原来就是那样静默回落主控区的)。
 
 export interface PlaceWireRedshift {
   readonly workgroup: string;

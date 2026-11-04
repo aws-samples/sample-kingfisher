@@ -1,5 +1,4 @@
-// @kf-batch 50-P50.2c-control-api
-// P50.2 切片 e —— 部署回写 / ready 置位 / 探活写入 / 启用 的窄写通道单测。
+// 切片 e —— 部署回写 / ready 置位 / 探活写入 / 启用 的窄写通道单测。
 //
 // 【本文件的四条承重】
 // ① **缺一个 CFN Output 就一个字节都不写**(§20.11-N2:半份描述符比没有更糟);
@@ -105,7 +104,7 @@ const FULL_RESOURCES = {
   tableBucket: "bgp-table-bucket-tgt-usw2-a",
   athenaWorkgroup: "bgp-athena-tgt-usw2-a",
   glueRoleArn: `arn:aws:iam::${ACCT}:role/bgp-glue-role`,
-  // @kf-batch 50-W5-seg1-WP3:core 栈从此吐 EMR 执行角色(本 target 名)
+  // core 栈从此吐 EMR 执行角色(本 target 名)
   emrExecutionRoleArn: `arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-emr-role`,
   emrSecurityGroupId: "sg-0123456789abcdef0",
   emrSubnetIds: ["subnet-0123456789abcdef0", "subnet-0123456789abcdef1"],
@@ -126,7 +125,7 @@ function stockOutputs(): { base: Record<string, string>; core: Record<string, st
       tableBucket: FULL_RESOURCES.tableBucket,
       athenaWorkgroup: FULL_RESOURCES.athenaWorkgroup,
       glueRoleArn: FULL_RESOURCES.glueRoleArn,
-      // @kf-batch 50-W5-seg1-WP3:core 栈从此必吐 EMR 执行角色(本 target 名;缺则 finalize 整轮拒)
+      // core 栈从此必吐 EMR 执行角色(本 target 名;缺则 finalize 整轮拒)
       emrExecutionRoleArn: FULL_RESOURCES.emrExecutionRoleArn,
       emrSecurityGroupId: FULL_RESOURCES.emrSecurityGroupId,
       emrSubnetIds: FULL_RESOURCES.emrSubnetIds.join(","),
@@ -216,7 +215,7 @@ describe("finalizeTargetResources(CFN Outputs → 资源袋 → 经 reconcileTar
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  // ── P50.3a:可选组件栈 → observed 组件回写 ──────────────────────────────────
+  // ──:可选组件栈 → observed 组件回写 ──────────────────────────────────
   it("🔴 读到组件栈 ⇒ 资源袋合并该组件的实名 + `components` 按 **observed** 回写(core + 真读到的)", async () => {
     readOutputsMock.mockResolvedValue({
       ...stockOutputs(),
@@ -247,9 +246,8 @@ describe("finalizeTargetResources(CFN Outputs → 资源袋 → 经 reconcileTar
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  // @kf-batch 50-WP23-xregion-peering
-  // 🔴🔴 **一个「写了没接上」的真缺陷**:base 栈从 WP-16 起就输出 `endpointIds` /
-  //    `homeLinkHostedZoneId`(以及 WP-23 的 `homeLinkPeeringId` / `vpcCidr`),探活也照它们写了
+  // 🔴🔴 **一个「写了没接上」的真缺陷**:base 栈从 就输出 `endpointIds` /
+  //    `homeLinkHostedZoneId`(以及  `homeLinkPeeringId` / `vpcCidr`),探活也照它们写了
   //    `network:egress-none` / `network:home-link` 两项 —— 而资源袋的组装是一张**写死的键清单**,
   //    压根没装它们 ⇒ `res.endpointIds` 恒为 undefined ⇒ 探活灰度门恒 false ⇒ **那两项从来没跑过**。
   //    两边各自都对,单测与门禁全绿。这条判据就是那个接缝。
@@ -474,7 +472,7 @@ describe("enableTarget(verifying→ready;只消费本次 fresh probe 的 EnableL
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 P50.3a 窄通道 mergeComponentResources —— 给**已启用**的 target 补充部署时回写
+// 🔴 窄通道 mergeComponentResources —— 给**已启用**的 target 补充部署时回写
 // 【为什么需要它】reconcileTarget 的维修态门要求 ready=false;而"给 active 环境加组件"是
 // §2.1/§4.6 明文认可的操作 ⇒ 门缺通道(真跑实测:dms 栈建成了、回写被拒、组件永远进不了注册表)。
 // 修法不是放宽那道门,而是另开只增不改的窄通道 —— 四条硬约束逐条钉在下面。
@@ -530,7 +528,7 @@ describe("🔴 mergeComponentResources(补充部署窄通道:只增不改;§21.3
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  // ── @kf-batch 50-WP18e-setvalued-resource:**集合型**观测键按集合判,不按字节判 ──────────────
+  // ──:**集合型**观测键按集合判,不按字节判 ──────────────
   // 🔴 真环境实测(2026-09-16,段 w3h 之后):重新部署给 us-west-2 多建了一个接口端点(12 → 13),
   //   finalize 报「拒绝改写已有资源 resources.endpointIds」⇒ 不 finalize ⇒ target 停在 upgrading
   //   且**部署锁一直不放**⇒ 之后任何运维动作都被拒(「必须走 finalize/probe」而 probe 正好 finalize 不了)
@@ -576,14 +574,14 @@ describe("🔴 mergeComponentResources(补充部署窄通道:只增不改;§21.3
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  // ── @kf-batch 50-W5-seg1-WP3:执行角色键的唯一例外(SPEC v3.21 §3.1a 规则 ②)────────────────────────
-  // 【为什么必须有例外】WP-3 把 core 栈的 glueRoleArn 从 home 名切成本 target 名、并新增 emrExecutionRoleArn;
+  // ──:执行角色键的唯一例外(SPEC v3.21 §3.1a 规则 ②)────────────────────────
+  // 【为什么必须有例外】把 core 栈的 glueRoleArn 从 home 名切成本 target 名、并新增 emrExecutionRoleArn;
   //   已启用 target 的回写只有本通道,而 ①② 恰好把这两种写都拒掉 ⇒ 「重新部署切角色」根本写不进描述符(开工勘出)。
   //   例外由命名 SSOT 判定:「新增本 target 名」或「home 名 → 本 target 名」;桶 / workgroup / 凭证一个字节都碰不到。
   const PER_GLUE = `arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-glue-role`;
   const PER_EMR = `arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-emr-role`;
 
-  it("🔴 E-147 切换:glueRoleArn home 名 → 本 target 名 ⇒ 放行(map 路径写该键;其余键一个不碰)", async () => {
+  it("🔴 切换:glueRoleArn home 名 → 本 target 名 ⇒ 放行(map 路径写该键;其余键一个不碰)", async () => {
     const item = bug11Item(); // FULL_RESOURCES.glueRoleArn = home 的 bgp-glue-role
     getMock.mockResolvedValue({ Item: item });
     await merge(item, { components: ["core"], resources: { glueRoleArn: PER_GLUE } });
@@ -594,7 +592,7 @@ describe("🔴 mergeComponentResources(补充部署窄通道:只增不改;§21.3
     expect(call.UpdateExpression).not.toMatch(/#res = /);
   });
 
-  it("🔴 E-147 新增:emrExecutionRoleArn(core 新键)= 本 target 名 ⇒ 放行(不算「非组件资源键」)", async () => {
+  it("🔴 新增:emrExecutionRoleArn(core 新键)= 本 target 名 ⇒ 放行(不算「非组件资源键」)", async () => {
     const item = bug11Item({ resources: { ...FULL_RESOURCES, emrExecutionRoleArn: undefined } }); // 存量:还没有这个键
     getMock.mockResolvedValue({ Item: item });
     await merge(item, { components: ["core"], resources: { emrExecutionRoleArn: PER_EMR } });

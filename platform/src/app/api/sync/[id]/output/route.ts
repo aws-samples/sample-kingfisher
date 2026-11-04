@@ -5,7 +5,7 @@ import { ListObjectsV2Command } from "@aws-sdk/client-s3";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP7-sync-pushdown —— 产物桶在任务章说的那个区(S3 客户端跨区列桶会被 301 重定向拒)。
+// 产物桶在任务章说的那个区(S3 客户端跨区列桶会被 301 重定向拒)。
 import { bindingTargets, regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import { s3ClientFor } from "@/lib/exec-env/target-clients";
 

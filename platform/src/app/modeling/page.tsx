@@ -1,17 +1,17 @@
 "use client";
 
 import { fetchExecTargets } from "@/lib/exec-env/exec-targets-client";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 列类型候选与数据目录建表 / 改表同一份(客户端安全清单)
+// 列类型候选与数据目录建表 / 改表同一份(客户端安全清单)
 import { DDL_TYPE_CHOICES } from "@/lib/modeling/ddl-type-choices";
 import React, { useState, useEffect } from "react";
 import { Card, Button, Space, Modal, Input, InputNumber, Select, Empty, Spin, message, Table, Tag, Tabs, Popconfirm, Tooltip, Radio, Checkbox, Divider, Alert } from "antd";
 import { ApartmentOutlined, PlusOutlined, ReloadOutlined, ThunderboltOutlined, CheckCircleOutlined, CodeOutlined, TableOutlined } from "@ant-design/icons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-P50.3-modeling —— 建模逐 target 落地面板 + 与服务端**同一份**判态纯函数。
+// 建模逐 target 落地面板 + 与服务端**同一份**判态纯函数。
 import LandingPanel from "@/components/modeling/LandingPanel";
 import { landedStateOf, type LandedRecord, type LandedState } from "@/lib/modeling/landing-shared";
-// @kf-batch 50-WP11b-shared-writer —— 码表物理落点的兜底显示也经唯一作者(不在页面里再拼一遍名字)
+// 码表物理落点的兜底显示也经唯一作者(不在页面里再拼一遍名字)
 import { codeTableLandingFqn } from "@/lib/modeling/landing-fqn";
 
 const HOME_TARGET = "tgt_home";
@@ -20,7 +20,7 @@ const LAND_TAG: Record<LandedState, { text: string; color?: string }> = {
   ok: { text: "✓", color: "green" },
   stale: { text: "⚠ 版本不齐", color: "orange" },
   drift: { text: "🔴 drift", color: "red" },
-  "credential-gap": { text: "⊘ 待重新落地" }, // @kf-batch 50-WP11b-shared-writer —— 只剩交付前的旧记录
+  "credential-gap": { text: "⊘ 待重新落地" }, // 只剩交付前的旧记录
   failed: { text: "✗ 失败", color: "red" },
   "never-landed": { text: "⚠ 未落", color: "orange" },
 };
@@ -50,19 +50,19 @@ function LandedTags({ row, t }: { row: any; t: (s: string, v?: any) => string })
 }
 
 import ModelingGuide from "./ModelingGuide";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
+// 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
 import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 
-// 模块 35 — 数据建模:数仓分层 / 数据域(主题域)/ 数据标准 / 码表。
+// 数据建模:数仓分层 / 数据域(主题域)/ 数据标准 / 码表。
 export default function ModelingPage() {
   const { getToken, user, loading: authLoading } = useAuth();
   const t = useT();
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState("layers");
   const [loading, setLoading] = useState(false);
-  // 模块 55 / 序 50 UX ⑥(用户 2026-10-21 拍板):整页 Spin 只在**首载**;之后建 / 改 / 删 / 落地 / 刷新只重拉本页签那一张清单,
+  // UX ⑥(用户 2026-10-21 拍板):整页 Spin 只在**首载**;之后建 / 改 / 删 / 落地 / 刷新只重拉本页签那一张清单,
   //   表格留在 DOM(Spin 盖在页签内),滚动位置与展开态不丢;量具 p43j 曾因整页卸载假红。
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({});
@@ -78,11 +78,11 @@ export default function ModelingPage() {
   const [modal, setModal] = useState<{ kind: string; editing?: any } | null>(null);
   const [form, setForm] = useState<any>({});
   const [saving, setSaving] = useState(false);
-  // @kf-batch 50-P50.3-modeling —— 原来的 `landingId`/`applyingId`/`landCodeTable`/`applyDDL` 已删:
+  // 原来的 `landingId`/`applyingId`/`landCodeTable`/`applyDDL` 已删
   // 落地/应用统一走 `LandingPanel`(它自己打端点)。留着就是死代码,而死代码会被下一个人当成"还有别的路径"。
   const [ddlModal, setDdlModal] = useState<{ name: string; ddl: string } | null>(null); // DDL 预览
   const [computingId, setComputingId] = useState<string>(""); // D4 计算中
-  // @kf-batch 50-WP4bis-p1-scope —— 当前执行范围(顶栏选的那个;URL 是权威)。
+  // 当前执行范围(顶栏选的那个;URL 是权威)。
   // 🔴 只有**码表**与**维度建模**两类有区域维(定义行上的 `targets[]` = 绑定/已落地的区);
   //    分层 / 数据域 / 数据标准 / 指标是平台级定义,**不分区** —— 这一点必须在页面上说出来,
   //    否则用户切了区发现「分层一点没变」,只能怀疑是不是切换没生效。
@@ -100,7 +100,7 @@ export default function ModelingPage() {
     return res;
   };
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 🔴 六类**全部**带执行范围。
+  // 🔴 六类**全部**带执行范围。
   // 上一版只带两条,理由写的是「其余四类无区域维」;用户 2026-09-10 驳回了那个说法。
   // 语义分两种,服务端各自处理:
   //   · 分层 / 数据域 / 数据标准 = **治理约定** ⇒ 行上可声明「适用区」,未声明 = 全平台通用
@@ -135,7 +135,7 @@ export default function ModelingPage() {
       if (token) { try { const p = JSON.parse(atob(token.split(".")[1] || "")); setIsAdmin((p["cognito:groups"] || []).includes("bgp-admin")); } catch {} }
     })();
     loadAll();
-    // @kf-batch 50-WP4bis-p1-scope —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)。
+    // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, scopeQs]);
 
@@ -168,7 +168,7 @@ export default function ModelingPage() {
     } finally { setSaving(false); }
   };
 
-  // @kf-batch 50-W5-seg1-WP11a —— 删定义**受控**(50 SPEC v3.20 §3.8):仍有落地产物 ⇒ 服务端 409 DECISION_REQUIRED,
+  // 删定义**受控**(50 SPEC v3.20 §3.8):仍有落地产物 ⇒ 服务端 409 DECISION_REQUIRED,
   //   这里弹窗列出各区物理表,只给两条出口:去落地面板逐区清理 / 输入确认串显式保留物理表只删定义。
   const [deleteDecision, setDeleteDecision] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -199,7 +199,7 @@ export default function ModelingPage() {
     if (d?.success) { message.success(t("已预置 {count} 个标准分层", { count: d.data.count })); loadKind("layers"); } else message.error(d?.error?.message || t("预置失败"));
   };
 
-  // @kf-batch 50-P50.3-modeling —— 落地面板状态 + 可下推目标清单(来自服务端,前端不拼)
+  // 落地面板状态 + 可下推目标清单(来自服务端,前端不拼)
   const [landPanel, setLandPanel] = useState<any>(null);
   const [execTargets, setExecTargets] = useState<Array<{ targetId: string; region: string; isHome: boolean }>>([]);
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function ModelingPage() {
   const computeMetric = async (id: string) => {
     setComputingId(id);
     try {
-      // @kf-batch 50-WP31-place-first-class —— 🔴 原来 body 恒为 `{}` ⇒ 在 us-west-2 视角点「计算」也在**主控区**算,
+      // 🔴 原来 body 恒为 `{}` ⇒ 在 us-west-2 视角点「计算」也在**主控区**算,
       //   而「最近值」列读 `lastValue`(最近一次,不分区)⇒ 把主控区的数字当成当前区的显示出来。
       //   落点 = 单区视角那个区;分组 / 全部 = 主控区(显式写明,后端缺 targetId ⇒ 400)。
       const res = await authedFetch(`/api/modeling/model-metrics/${id}/compute`, {
@@ -285,7 +285,7 @@ export default function ModelingPage() {
     { title: t("码表名"), dataIndex: "name" },
     { title: t("编码"), dataIndex: "code", render: (v: string) => <code>{v}</code> },
     { title: t("枚举项"), dataIndex: "values", render: (v: any[]) => <span>{t("{n} 项", { n: (v || []).length })} {(v || []).slice(0, 4).map((x) => <Tag key={x.value}>{x.value}={x.label}</Tag>)}{(v || []).length > 4 ? "…" : ""}</span> },
-    // @kf-batch 50-P50.3-modeling —— 🔴 逐 target 观测态(原来是一个 bool「已落地/未落地」,
+    // 🔴 逐 target 观测态(原来是一个 bool「已落地/未落地」,
     // 多区之后那个 bool 会把 drift / 只落了一个区 都显示成"已落地" = 假绿)。
     { title: t("落地(逐区观测态)"), key: "landed", width: 300, render: (_: any, r: any) => <LandedTags row={r} t={t} /> },
     {
@@ -293,7 +293,7 @@ export default function ModelingPage() {
       render: (_: any, r: any) => isAdmin ? (
         <Space>
           <a onClick={() => openEdit("codetables", r)}>{t("编辑")}</a>
-          {/* @kf-batch 50-P50.3-modeling —— 落地改成开**面板**(逐区观测态 + 检测 + drift 差异 + 强制重建),
+          {/* 落地改成开**面板**(逐区观测态 + 检测 + drift 差异 + 强制重建),
               而不是一个"点了就落 home"的按钮:多区之后那个按钮说不清"落到哪、现在是什么状态"。 */}
           <Button size="small" type="link" icon={<ThunderboltOutlined />}
             onClick={() => setLandPanel({ kind: "code-table", id: r.codeTableId, name: r.name,
@@ -314,7 +314,7 @@ export default function ModelingPage() {
     { title: t("归属"), key: "binding", render: (_: any, r: any) => <span><Tag color="blue">{layerName(r.layerId)}</Tag>{domainName(r.domainId) !== "—" && <Tag color="purple">{domainName(r.domainId)}</Tag>}</span> },
     { title: t("物理表"), key: "phys", render: (_: any, r: any) => <code>{r.schema}.{r.physicalTable}</code> },
     { title: t("列数"), dataIndex: "columns", width: 70, render: (v: any[]) => (v || []).length },
-    // @kf-batch 50-P50.3-modeling —— 同码表:逐 target 观测态取代那个 bool。
+    // 同码表:逐 target 观测态取代那个 bool。
     { title: t("应用(逐区观测态)"), key: "applied", width: 300, render: (_: any, r: any) => <LandedTags row={r} t={t} /> },
     {
       title: t("操作"), key: "op", width: 260,
@@ -345,7 +345,7 @@ export default function ModelingPage() {
     },
     { title: t("业务口径"), key: "caliber", ellipsis: true, render: (_: any, r: any) => r.caliber ? <span style={{ fontSize: 12 }}>{r.caliber}</span> : <span style={{ color: "#bbb" }}>{t("未填")}</span> },
     { title: t("单位"), dataIndex: "unit", width: 70, render: (v: string) => v || <span style={{ color: "#bbb" }}>—</span> },
-    // @kf-batch 50-WP31-place-first-class —— 单区视角读服务端按区解析好的 `value`(该区没算过 ⇒ —,不拿别区的数字顶上);
+    // 单区视角读服务端按区解析好的 `value`(该区没算过 ⇒ —,不拿别区的数字顶上);
     //   全局 / 分组视角仍是「最近一次」并标出它是哪个区算的。
     { title: t("最近值"), key: "val", width: 140, render: (_: any, r: any) => {
       const single = scope.kind === "target";
@@ -358,7 +358,7 @@ export default function ModelingPage() {
       title: t("操作"), key: "op", width: 220,
       render: (_: any, r: any) => (
         <Space size="small">
-          {/* 🔴 P52.1:计算指标改平台 admin 专用(端点会跑 Redshift 聚合、fqn 任意 ⇒ 可借道读别的项目)。
+          {/* 🔴 计算指标改平台 admin 专用(端点会跑 Redshift 聚合、fqn 任意 ⇒ 可借道读别的项目)。
               与同一行的编辑/删除保持一致的门控写法;真授权在服务端(403)。 */}
           {isAdmin && (
             <Button size="small" type="link" icon={<ThunderboltOutlined />} loading={computingId === r.modelMetricId} onClick={() => computeMetric(r.modelMetricId)}>{t("计算")}</Button>
@@ -411,9 +411,9 @@ export default function ModelingPage() {
       children: (
         <Spin spinning={!!tabLoading.codetables}><div data-testid="modeling-tab-codetables">
           <Space style={{ marginBottom: 12 }}>{addBtn("codetables", t("新建码表"))}</Space>
-          {/* @kf-batch 50-WP4bis-p1-scope —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
+          {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
           <OtherScopesHint resources={["code-table"]} />
-          {/* @kf-batch 50-WP4bis-p1-scope —— 无头验收按容器数行(空态时容器仍在,行数 0) */}
+          {/* 无头验收按容器数行(空态时容器仍在,行数 0) */}
           <div data-testid="codetable-table">
             {codetables.length === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<ScopeEmptyHint resources={["code-table"]} noun={t("码表")} />} /> :
               <Table rowKey="codeTableId" size="small" pagination={false} dataSource={codetables} columns={codetableCols} style={{ marginTop: 12 }} />}
@@ -426,7 +426,7 @@ export default function ModelingPage() {
       children: (
         <Spin spinning={!!tabLoading.dimensions}><div data-testid="modeling-tab-dimensions">
           <Space style={{ marginBottom: 12 }}>{addBtn("dimensions", t("新建维度/事实表"))}</Space>
-          {/* @kf-batch 50-WP4bis-p1-scope —— 护栏 1 同码表 */}
+          {/* 护栏 1 同码表 */}
           <OtherScopesHint resources={["model-table"]} />
           <div data-testid="dimension-table">
             {dimensions.length === 0 ? (
@@ -627,7 +627,7 @@ export default function ModelingPage() {
       </div>
       <p style={{ color: "#888", marginTop: 0 }}>{t("数仓规划:分层(ODS/DWD/DWS/ADS)+ 主题域/数据域 + 数据标准 + 码表(可落地 Redshift)。")}{!isAdmin && t("（管理需平台管理员)")}</p>
       <ModelingGuide />
-      {/* @kf-batch 50-WP4bis-p1-scope —— 🔴 逐类如实说明「哪几个 Tab 会跟着切、哪几个不会」。
+      {/* 🔴 逐类如实说明「哪几个 Tab 会跟着切、哪几个不会」。
           不说清的代价:用户切到别的区,看见分层/数据域一字未变,只能怀疑切换根本没生效。 */}
       {scope.kind !== "global" && (
         <Alert
@@ -654,7 +654,7 @@ export default function ModelingPage() {
         <p style={{ color: "#888", marginBottom: 0 }}>{t("该 DDL 由列定义安全生成(类型白名单 + 标识符校验)。点列表「应用」按钮即在 Redshift 执行建表。")}</p>
       </Modal>
 
-      {/* @kf-batch 50-P50.3-modeling —— 落地面板(逐 target 观测态 / 重新检测 / drift 字段级差异 / 强制重建) */}
+      {/* 落地面板(逐 target 观测态 / 重新检测 / drift 字段级差异 / 强制重建) */}
       {landPanel ? (
         <LandingPanel
           open
@@ -671,7 +671,7 @@ export default function ModelingPage() {
         />
       ) : null}
 
-      {/* @kf-batch 50-W5-seg1-WP11a —— 删定义受控:仍有落地产物 ⇒ 两条出口(逐区清理 / 显式保留),平台不代劳 */}
+      {/* 删定义受控:仍有落地产物 ⇒ 两条出口(逐区清理 / 显式保留),平台不代劳 */}
       <Modal title={t("该定义仍有已落地的物理表")} open={!!deleteDecision} onCancel={() => setDeleteDecision(null)} footer={null} width={680} destroyOnClose>
         {deleteDecision ? (() => {
           const r = deleteDecision.row || {};

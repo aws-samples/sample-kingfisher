@@ -1,6 +1,6 @@
-// 模块 55 — 闸门 ② ③ ⑤(55 DESIGN §2.7):三条只减不增的棘轮。
+// 闸门 ② ③ ⑤(55 DESIGN §2.7):三条只减不增的棘轮。
 //   ② 「循环等外部终态」的本地原语只许出现在基线文件里(基线 = 2026-10-21 盘点 §10 的 30 个文件减去已迁出的 landing.ts、再减去扫描词表不计的两处有界重试 / 内联短轮询 = 27;
-//      第二批迁出 6 个 ⇒ 21;序 58 B-130 把 datasource-service 的内存重试迁为泵作业 ⇒ 20;迁到 awaitTerminal / 泵一个就从基线删一个;新文件出现即红);
+//      第二批迁出 6 个 ⇒ 21;把 datasource-service 的内存重试迁为泵作业 ⇒ 20;迁到 awaitTerminal / 泵一个就从基线删一个;新文件出现即红);
 //   ③ 后台等待者上下文 runAsBackgroundWaiter( 只许在登记的循环入口文件里建,app/api/** 出现即红;owner 字面 ∈ BACKGROUND_WAITERS(第二批首个:flink-service 的删除收尾);
 //   ⑤ app/api/** 直接调用长服务入口(LONG_SERVICE_ENTRYPOINTS)的路由文件 ⊆ 基线(第一批把建模 / 目录 / 审批十条迁出;第二批再迁出 14 条路由 / 9 个基线文件)。
 // 🔴 两张基线都**只许删行**。想加一行 = 想在请求路径里再写一条同步等终态 = 正是本模块要根治的那一类缺陷。
@@ -49,7 +49,7 @@ const AWAIT_TERMINAL_BASELINE = new Set<string>([
   "lib/seed/run-once.ts",
   "lib/datasource/glue-reach.ts",
   "lib/datasource-spi/stream/kinesis.ts",
-  // 序 58 B-130:datasource-service 的 deletePlatformSecurityGroupWithRetry(内存 sleep 循环等网卡释放)已迁为泵作业 sg-cleanup ⇒ 从基线删掉
+  // datasource-service 的 deletePlatformSecurityGroupWithRetry(内存 sleep 循环等网卡释放)已迁为泵作业 sg-cleanup ⇒ 从基线删掉
   "lib/scheduler/mwaa-endpoint.ts",
   "lib/scheduler/serverless/workflow-client.ts",
 ]);
@@ -95,21 +95,21 @@ const SECOND_BATCH_MIGRATED = [
   "app/api/datasources/[id]/s3-external/route.ts", "app/api/modeling/model-metrics/[id]/compute/route.ts", "app/api/metrics/[id]/compute/route.ts",
 ];
 
-describe("模块 55 闸门 ②:等待终态的轮询原语只许一个作者", () => {
+describe("闸门 ②:等待终态的轮询原语只许一个作者", () => {
   it("自己写 sleep 循环等外部状态的文件 ⊆ 基线(只减不增);lib/modeling/landing.ts 已迁出不在其中", () => {
     const offenders = FILES.filter(([rel, src]) => rel !== "lib/long-ops/await-terminal.ts" && SLEEP_LIKE.test(src) && STATUS_PROBE.test(src)).map(([rel]) => rel);
     const fresh = offenders.filter((rel) => !AWAIT_TERMINAL_BASELINE.has(rel));
     expect(fresh, `新出现了自己写 sleep 循环等外部终态的文件(请改经 lib/long-ops/await-terminal.ts,并在该路由接入 submitLongOp):\n${fresh.join("\n")}`).toEqual([]);
     expect(offenders).not.toContain("lib/modeling/landing.ts");
     for (const rel of SECOND_BATCH_AWAIT_TERMINAL_MIGRATED) expect(offenders, `${rel} 第二批已迁出,不许再写本地轮询`).not.toContain(rel);
-    expect(AWAIT_TERMINAL_BASELINE.size).toBe(20); // 序 58 B-130:datasource-service 迁为泵作业 ⇒ 21 → 20
+    expect(AWAIT_TERMINAL_BASELINE.size).toBe(20); // datasource-service 迁为泵作业 ⇒ 21 → 20
     // 基线里已经干净的文件要从基线删掉(棘轮只减不增的另一半:不许留着已修好的名额)
     const stale = [...AWAIT_TERMINAL_BASELINE].filter((rel) => !offenders.includes(rel));
     expect(stale, `这些基线文件已不再自己写轮询循环,请从 AWAIT_TERMINAL_BASELINE 删掉:\n${stale.join("\n")}`).toEqual([]);
   });
 });
 
-describe("模块 55 闸门 ③:后台等待者上下文只许在登记的循环入口建", () => {
+describe("闸门 ③:后台等待者上下文只许在登记的循环入口建", () => {
   it("runAsBackgroundWaiter( 调用点文件 === BACKGROUND_WAITER_ENTRYPOINTS;app/api/** 不许出现;owner 字面 ∈ BACKGROUND_WAITERS", () => {
     const sites = FILES.filter(([rel, src]) => rel !== "lib/long-ops/context.ts" && /\brunAsBackgroundWaiter\(/.test(src));
     expect(sites.map(([rel]) => rel).sort()).toEqual([...BACKGROUND_WAITER_ENTRYPOINTS].sort());
@@ -120,7 +120,7 @@ describe("模块 55 闸门 ③:后台等待者上下文只许在登记的循环�
   });
 });
 
-describe("模块 55 闸门 ⑤:路由层直接 await 长服务的文件只减不增", () => {
+describe("闸门 ⑤:路由层直接 await 长服务的文件只减不增", () => {
   it("app/api/** 直接调用 LONG_SERVICE_ENTRYPOINTS 的文件 ⊆ 基线;第一批十条路由已不在其中", () => {
     const re = new RegExp(`\\b(?:${LONG_SERVICE_ENTRYPOINTS.join("|")})\\(`);
     const direct = FILES.filter(([rel, src]) => rel.startsWith("app/api/") && re.test(src.replace(/^import .*$/gm, ""))).map(([rel]) => rel);

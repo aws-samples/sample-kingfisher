@@ -1,10 +1,10 @@
 "use client";
-// 序 41 B-117 —— 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
+// 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
 import { deleteJson } from "@/lib/http/delete-json";
 
-// @kf-batch 50-WP13-mwaa-region —— 缺 MWAA 警示卡(在调度区当场列全 + 直达补装)
+// 缺 MWAA 警示卡(在调度区当场列全 + 直达补装)
 import { fetchExecTargets } from "@/lib/exec-env/exec-targets-client";
-// @kf-batch 50-WP5-rungroup —— O2:运行前问「在哪些区跑」(默认跟随视角)+ 多区联动运行组行
+// O2:运行前问「在哪些区跑」(默认跟随视角)+ 多区联动运行组行
 import { RunTargetsModal, RunGroupsPanel } from "@/components/monitor/RunGroupPanel";
 import MwaaMissingNotice from "@/components/scheduler/MwaaMissingNotice";
 import { runNowLabel } from "@/lib/scope/run-now-label";
@@ -24,15 +24,15 @@ import { ETL_GLUE_TEMPLATE, ETL_REDSHIFT_TEMPLATE, type EtlJob } from "@/types/e
 import { EMR_PYSPARK_TEMPLATE, type EngineJobView } from "@/types/engine-job";
 import VersionHistoryDrawer from "@/components/common/VersionHistoryDrawer";
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
-// 序 72 B-139:执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
+// 执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import EmrJobPanel from "@/components/engines/EmrJobPanel";
-// 序 73 模块 57(R3):运行历史「触发」格(工作流回链)唯一作者;`?jobId=&tab=runs` 深链(工作流节点详情点回来)
+// 运行历史「触发」格(工作流回链)唯一作者;`?jobId=&tab=runs` 深链(工作流节点详情点回来)
 import RunTriggerCell from "@/components/monitor/RunTriggerCell";
 import { useSearchParams } from "next/navigation";
 import { isEtlJobsTab, type EtlJobsTab } from "@/lib/workflow/back-links";
-// @kf-batch 50-WP4-o1-scope —— 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)。
+// 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)。
 // 🔴 列表请求带上 `?scope=`,并按护栏 1 常驻「别处还有 N 条」提示 + 空态说清楚。
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
@@ -40,30 +40,28 @@ import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 import { groupsFromToken } from "@/lib/auth/roles";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { GLUE_WORKER_TYPES, GLUE_MAX_WORKERS, FLEX_CAPABLE_WORKER_TYPES } from "@/lib/etl/worker-types";
-// 序 53:Glue 版本清单 / 缺省 / 下拉文案的单一作者(缺省最高,用户可降版)
+// Glue 版本清单 / 缺省 / 下拉文案的单一作者(缺省最高,用户可降版)
 import { GLUE_VERSIONS, GLUE_VERSION_DEFAULT, GLUE_VERSION_FOR_UNVERSIONED_RECORDS, glueVersionLabel } from "@/lib/sync/glue-version";
 import PromoteButton from "@/components/common/PromoteButton";
-// @kf-batch 50-SEQ47a-promote-ux —— 作业所在环境标签 + 各环境发布状态(客户 2026-10-19:找不到 dev → prod 的发布入口与结果)
+// 作业所在环境标签 + 各环境发布状态(客户 2026-10-19:找不到 dev → prod 的发布入口与结果)
 import EnvTag from "@/components/common/EnvTag";
 import EnvPromotionStatus from "@/components/common/EnvPromotionStatus";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
 import { useT } from "@/lib/i18n/useT";
 import { CodegenGroundedOn, type CodegenGroundedOnValue } from "@/components/ai/CodegenGroundedOn";
-// @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+// 免责告知弹窗(409 驱动,同意后重试)
 import { useResidencyAck } from "@/components/residency/useResidencyAck";
 import { fetchWithResidencyAck } from "@/lib/residency/client";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
-// @kf-batch 50-P50.1-workgroup-ssot
 // 前端默认值也收编到命名 SSOT(与改动前**同值**,零行为变化)。
-// 🔴 P50.3 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
+// 🔴 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
 //    客户端拿不到)—— 届时改这一个 import 的用法即可,不必再回来找字面量。
 
-// 模块 33-A — EMR 作业(engine=emr-serverless)在列表里的合并展示类型:老 EtlJob 无 engine 字段,
+// EMR 作业(engine=emr-serverless)在列表里的合并展示类型:老 EtlJob 无 engine 字段,
 // EMR 作业带 engine。用一个联合视图渲染列表;选中后按 engine 分派到 EmrJobPanel 或老 Glue/Redshift UI。
 const EMR_ENGINE = "emr-serverless";
 
-// @kf-batch 50-P50.3-fanout
 // home target 常量 + 绑定归一 —— 🔴 与服务端 `bindingTargets()` **同一口径**:
 // 三种形态(合同 `targets[]` / W3-a 落过的单值 `targetId` / 存量两个都没有)必须映到同一个答案,
 // 否则"这个作业绑了哪些区"前后端会有两个说法(而界面显示的那个才是用户相信的)。
@@ -80,12 +78,12 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false 
 const { Title, Text } = Typography;
 
 const STATUS_COLOR: Record<string, string> = {
-  // @kf-batch 50-WP18b-fanout-seam —— `stopped`(用户取消)此前**不在表里** ⇒ 取消掉的 run
+  // `stopped`(用户取消)此前**不在表里** ⇒ 取消掉的 run
   // 在台账里显示成一个无色灰标签,与「不认识的状态」长得一模一样。色值与 EmrJobPanel 同款(单一约定)。
   succeeded: "green", running: "blue", failed: "red", stopped: "orange", draft: "default", ready: "gold",
 };
 
-/** @kf-batch 50-WP15-airflow-serverless:一个作业的台账里出现过的调度器种类(去重;缺省 mwaa)。 */
+/** 一个作业的台账里出现过的调度器种类(去重;缺省 mwaa)。 */
 function schedulerTagsOf(j: { deployments?: Record<string, { scheduler?: string } | undefined> | null }): string[] {
   const out: string[] = [];
   for (const rec of Object.values(j?.deployments ?? {})) {
@@ -96,23 +94,23 @@ function schedulerTagsOf(j: { deployments?: Record<string, { scheduler?: string 
 }
 
 export default function EtlJobsPage() {
-  // @kf-batch 50-WP4-o1-scope —— 当前执行范围(顶栏选的那个;URL 是权威)+ 已装好的执行环境清单(拿 region 做按钮复述)。
+  // 当前执行范围(顶栏选的那个;URL 是权威)+ 已装好的执行环境清单(拿 region 做按钮复述)。
   const { scope, targets: scopeTargets } = useScope();
-  // @kf-batch 50-WP4quater-reads —— 上提到这里:本页有**两处**取数要用(作业列表 + Glue 连接候选),
+  // 上提到这里:本页有**两处**取数要用(作业列表 + Glue 连接候选),
   // 原先只在下方定义,新加的候选取数只能靠 TDZ 侥幸成立 ⇒ 一份定义,谁都能用。
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
   const t = useT();
-  // @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+  // 免责告知弹窗(409 驱动,同意后重试)
   const { residencyModal, resolveAckRequired } = useResidencyAck();
   const [jobs, setJobs] = useState<EtlJob[]>([]);
-  const [emrJobs, setEmrJobs] = useState<EngineJobView[]>([]); // 模块 33-A：EMR 引擎作业(独立表 bgp-engine-jobs)
+  const [emrJobs, setEmrJobs] = useState<EngineJobView[]>([]); // ：EMR 引擎作业(独立表 bgp-engine-jobs)
   const [selEmr, setSelEmr] = useState<EngineJobView | null>(null); // 选中的 EMR 作业(与 sel 互斥)
   const [sel, setSel] = useState<EtlJob | null>(null);
-  // 序 73 模块 57(R3):右侧作业面板当前页签(ETL 的 Tabs 与 EMR 面板共用一份;深链 `?tab=runs` 落到这里)
+  // 右侧作业面板当前页签(ETL 的 Tabs 与 EMR 面板共用一份;深链 `?tab=runs` 落到这里)
   const [jobTab, setJobTab] = useState<EtlJobsTab>("edit");
   // 深链 `/etl-jobs?jobId=<id>&tab=runs`(工作流实例「节点详情」点回来):列表到了再选中那个作业并切页签;
-  // 🔴 只在挂载后的 effect 里读 query(首帧与服务端一致,B-138);同一组参数只应用一次(用户之后点别的作业不被拉回)
+  // 🔴 只在挂载后的 effect 里读 query(首帧与服务端一致);同一组参数只应用一次(用户之后点别的作业不被拉回)
   const searchParams = useSearchParams();
   const appliedDeepLinkRef = useRef<string>("");
   const [script, setScript] = useState("");
@@ -121,7 +119,7 @@ export default function EtlJobsPage() {
   // Glue 连接候选:平台已建 Glue Connection 的数据源(访问 VPC 内私有源如 RDS 时,作业须引用其连接借 ENI 进 VPC)。
   // Glue 作业本身不选子网/SG(那是 Connection 资源的属性,在数据源层建);此处只选「引用哪个已有连接」。
   const [dsConns, setDsConns] = useState<Array<{ datasourceId: string; name: string; glueConnectionName: string }>>([]);
-  // @kf-batch 50-WP4quater-reads —— 🔴 Glue 连接候选必须按执行范围过滤:在 us-west-2 建作业却从
+  // 🔴 Glue 连接候选必须按执行范围过滤:在 us-west-2 建作业却从
   // 主控区的数据源里挑连接,建出来的作业引用的是**另一个区的 Connection**,提交即失败(而下拉里
   // 明明有得选 ⇒ 看着像平台 bug)。`/api/datasources` 已支持 `?scope=`,此前只是没传。
   useEffect(() => {
@@ -135,19 +133,19 @@ export default function EtlJobsPage() {
   const { getToken } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   useEffect(() => { (async () => { try { setIsAdmin(groupsFromToken(await getToken()).includes("bgp-admin")); } catch { /* 非登录态忽略 */ } })(); }, [getToken]);
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴 落点默认值一个都不给(原来打底 home 的 workgroup/database 常量):
+  // 🔴 落点默认值一个都不给(原来打底 home 的 workgroup/database 常量):
   // 编辑框里空 = 服务端按作业绑定的执行目标解析(唯一作者 resolveRedshiftBinding;home 空值 == 旧缺省)。
-  // 前端保留 home 常量 = 在客户端造第二个落点真值源,在别的区视角下显示的就是主控区的名字(向导 E-218 同族)。
+  // 前端保留 home 常量 = 在客户端造第二个落点真值源,在别的区视角下显示的就是主控区的名字(向导同族)。
   const [rsCfg, setRsCfg] = useState<any>({ workgroupName: "", database: "" });
-  // @kf-batch 50-P50.3-dataplane —— 执行目标(P50.3 数据面下推:这个作业在哪个区域跑)。
+  // 执行目标(数据面下推:这个作业在哪个区域跑)。
   // 🔴 清单**必须来自服务端**(`/api/exec-targets`),不在前端拼 —— 前端拼等于第二个判据源,
   //    而"哪些目标可下推"是准入 + 组件 + 法域三条判据的合成,只有服务端知道。
   const [execTargets, setExecTargets] = useState<Array<{ targetId: string; region: string; isHome: boolean }>>([]);
-  // @kf-batch 50-P50.3-fanout —— 绑定是**多值**(50 SPEC §1.3a-S1 `targets?: string[]`)。
+  // 绑定是**多值**(50 SPEC §1.3a-S1 `targets?: string[]`)。
   // 🔴 W3-a 曾把它做成单值,于是「一个定义跑多个区」根本表达不出来,版本一致性矩阵每行也只会有
   // 一个格子有值 ⇒ 那张看板是假的。这里与服务端**同一个归一口径**(缺省 `["tgt_home"]`)。
   const [targets, setTargets] = useState<string[]>([HOME_TARGET]);
-  // @kf-batch 50-WP5-rungroup —— O2:运行对话框 + 组行刷新键
+  // O2:运行对话框 + 组行刷新键
   const [runPick, setRunPick] = useState(false);
   const [groupKey, setGroupKey] = useState(0);
   const [targetsErr, setTargetsErr] = useState<string>("");
@@ -155,7 +153,7 @@ export default function EtlJobsPage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  // @kf-batch 50-WP13-mwaa-region —— 缺 MWAA 的 target(发布 409 / 预览行 code 两处同一张卡);成功即清
+  // 缺 MWAA 的 target(发布 409 / 预览行 code 两处同一张卡);成功即清
   const [mwaaMissing, setMwaaMissing] = useState<MwaaMissingPayload | null>(null);
   useEffect(() => {
     // 🔴 读法单一作者(lib/exec-env/exec-targets-client.ts);读失败要显式说出来:静默留空 = 界面上只剩 home 可选,用户会以为第二区域没建好。
@@ -178,14 +176,14 @@ export default function EtlJobsPage() {
   const [bfEnd, setBfEnd] = useState("");
   const [lineageOpen, setLineageOpen] = useState(false);
   const [lineagePreview, setLineagePreview] = useState<any>(null);
-  // 模块12 AI 辅助：自然语言 → 生成 ETL 代码。
+  // AI 辅助：自然语言 → 生成 ETL 代码。
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiUseCurrent, setAiUseCurrent] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{ code: string; explanation: string; usage?: any; groundedOn?: CodegenGroundedOnValue; dialect?: { fixed: { ruleId: string; title: string }[]; violations: { ruleId: string; title: string; rule: string; severity: string }[] } } | null>(null);
   // Fix A: 运行日志/输出/错误查看。
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6):serverless run 的日志来自 CloudWatch,标题要写明日志组(INTERACTION §2.2b)
+  // serverless run 的日志来自 CloudWatch,标题要写明日志组(INTERACTION §2.2b)
   const [logModal, setLogModal] = useState<{ open: boolean; runId: string; logs: string[]; loading: boolean; status?: string; error?: string | null; logGroup?: string; scheduler?: string; runType?: string }>({ open: false, runId: "", logs: [], loading: false });
   const pollRef = useRef<any>(null);
 
@@ -202,8 +200,8 @@ export default function EtlJobsPage() {
     }
   };
 
-  // @kf-batch 50-WP4-o1-scope —— 两条列表请求都带当前执行范围;`global` 时 `toScopeParam` 回 null
-  // ⇒ **URL 与改动前逐字节相同**(判据 E-158 的回滚点),不会凭空多出一个 `?scope=global`。
+  // 两条列表请求都带当前执行范围;`global` 时 `toScopeParam` 回 null
+  // ⇒ **URL 与改动前逐字节相同**(判据 回滚点),不会凭空多出一个 `?scope=global`。
   // 护栏 2 用:作业只绑一个区时,那个区的 region(拿不到就退回原文案,绝不显示 targetId 充数)
   const runTargetRegion =
     targets.length === 1 ? scopeTargets?.find((x) => x.targetId === targets[0])?.region || "" : "";
@@ -214,13 +212,13 @@ export default function EtlJobsPage() {
   const selEmrLive = liveRowOf(emrJobs, selEmr, "jobId");
   const fetchJobs = () => {
     fetch(`/api/etl-jobs${scopeQs}`).then((r) => r.json()).then((d) => setJobs(d?.success ? d.data : [])).catch(() => {});
-    // 模块 33-A：并发拉 EMR 引擎作业(独立 API + 独立表);合并到同一列表展示。
+    // ：并发拉 EMR 引擎作业(独立 API + 独立表);合并到同一列表展示。
     fetch(`/api/engines/${EMR_ENGINE}${scopeQs}`).then((r) => r.json()).then((d) => setEmrJobs(d?.success ? d.data : [])).catch(() => {});
   };
   const fetchRuns = (id: string) =>
     fetch(`/api/etl-jobs/${id}/runs`).then((r) => r.json()).then((d) => setRuns(d?.success ? d.data : [])).catch(() => {});
 
-  // @kf-batch 50-WP4-o1-scope —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉数据(护栏 4)。
+  // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉数据(护栏 4)。
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchJobs(); return () => clearInterval(pollRef.current); }, [scopeQs]);
 
@@ -233,14 +231,14 @@ export default function EtlJobsPage() {
     setScript(j.script || "");
     setCron(j.cronExpression || "");
     setMwaaMissing(null);
-    // 序 53:选中**存量**作业:行里没存 Glue 版本的,编辑框显示(并在保存时写回)它被写下时的缺省 5.1,与运行侧 glueVersionOfRecord 同一口径;
+    // 选中**存量**作业:行里没存 Glue 版本的,编辑框显示(并在保存时写回)它被写下时的缺省 5.1,与运行侧 glueVersionOfRecord 同一口径;
     //   不许让新缺省 6.0 顶上去 —— 用户只改别的字段点保存,作业就被静默换版本。新建作业的缺省仍是 GLUE_VERSION_DEFAULT(state 初值)。
     if (j.type === "glue") setGlueCfg({ ...glueCfg, ...(j.glueConfig || {}), glueVersion: j.glueConfig?.glueVersion || GLUE_VERSION_FOR_UNVERSIONED_RECORDS });
     else if (j.glueConfig) setGlueCfg({ ...glueCfg, ...j.glueConfig });
     // 先归零再套作业自己的配置:原来是 `if (j.redshiftConfig) 合并`,选到一个没有 redshiftConfig 的作业时
     // 编辑框里留着的是**上一个作业**的落点值,再按保存就把别人的 workgroup 写进这个作业。
     setRsCfg({ workgroupName: "", database: "", ...(j.redshiftConfig || {}) });
-    // @kf-batch 50-P50.3-fanout —— 走**归一口**。🔴 真环境验收 W3a-15 就是被这一行咬的:
+    // 走**归一口**。🔴 真环境验收 W3a-15 就是被这一行咬的
     // 字段迁到 `targets[]` 之后这里还直读 `j.targetId` ⇒ 拿到 undefined ⇒ 界面把一个绑了
     // us-west-2 的作业显示成 home,**再按保存就把它改回 home 了**(静默改绑)。
     setTargets(bindingTargetsOf(j));
@@ -265,11 +263,11 @@ export default function EtlJobsPage() {
 
   const doCreate = async () => {
     if (!newName.trim()) { message.warning(t("请输入作业名称")); return; }
-    // 模块 33-A：EMR 引擎走独立 engines API（创建时后端建 per-作业 application）；Glue/Redshift 走老 API。
+    // ：EMR 引擎走独立 engines API（创建时后端建 per-作业 application）；Glue/Redshift 走老 API。
     if (newType === EMR_ENGINE) {
       const res = await fetch(`/api/engines/${EMR_ENGINE}`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-WP31-place-first-class —— 🔴 新建落点 = 当前视角(单区 = 那个区;全部 = 主控区,显式)。
+        // 🔴 新建落点 = 当前视角(单区 = 那个区;全部 = 主控区,显式)。
         //   原来不带 ⇒ 后端绑主控区、在主控区建 application,作业从 us-west-2 视角消失(段 wp31 W31-E1/E2)。
         body: JSON.stringify({ name: newName, script: EMR_PYSPARK_TEMPLATE, targets: [landingOfScope(scope)] }),
       });
@@ -298,14 +296,13 @@ export default function EtlJobsPage() {
       jobParams.forEach(({ k, v }) => { const key = k.trim(); if (key) jobParameters[key] = v; });
       payload.glueConfig = { ...glueCfg, jobParameters };
     } else {
-      // @kf-batch 50-P50.3-dataplane
       // 🔴 非 home 时把 workgroup/database **清空**再存:非 home 的落点只能来自该目标的描述符
       // (服务端 `assertNoWarehouseConflict` 会拒掉不一致的值)。这里清空而不是"填成目标的值",
-      // 是为了不在前端造第二个落点真值源 —— 那正是 P50.1 收编兜底字面量时消灭的东西。
+      // 是为了不在前端造第二个落点真值源 —— 那正是收编兜底字面量时消灭的东西。
       payload.redshiftConfig = nonHomeTarget ? { ...rsCfg, workgroupName: "", database: "" } : rsCfg;
     }
-    // @kf-batch 50-P50.3-fanout —— 写入侧只写 `targets`(单值字段已废,两个都写就有两个说法)。
-    // @kf-batch 50-WP15-airflow-serverless —— W3e-11 真撞第二层:这一行原在 Redshift 分支里,Glue 作业保存**从不发绑定区**
+    // 写入侧只写 `targets`(单值字段已废,两个都写就有两个说法)。
+    // W3e-11 真撞第二层:这一行原在 Redshift 分支里,Glue 作业保存**从不发绑定区**
     //    ⇒ 选择器显示 3 个区、存下去仍只有 home(API 能绑、页面存不进 = 假多区域)。两种类型一视同仁。
     payload.targets = targets;
     const res = await fetch(`/api/etl-jobs/${sel.jobId}`, {
@@ -313,7 +310,7 @@ export default function EtlJobsPage() {
     });
     const d = await res.json();
     if (d?.success) { message.success(t("已保存")); setSel(d.data); fetchJobs(); return true; }
-    // 序 72 B-139:保存被拒(如执行角色预检 400「缺 s3:GetObject → 哪个桶 → 为什么要 → 出路」)时把服务端拒因**原话**给用户看 ——
+    // 保存被拒(如执行角色预检 400「缺 s3:GetObject → 哪个桶 → 为什么要 → 出路」)时把服务端拒因**原话**给用户看
     //   改动前一句「保存失败」把拒因全吞了,用户只能去猜;多行 / 长文走对话框(pre-wrap),短的仍走轻提示。调用方据返回值决定还要不要继续
     //   (运行 / 试运行 / 补数 / 发布原来不看保存结果照样提交 ⇒ 跑的是**旧定义**而用户不知道)。
     const reason = String(d?.error?.message || "").trim();
@@ -340,8 +337,7 @@ export default function EtlJobsPage() {
     }, 6000);
   };
 
-  // @kf-batch 50-WP5-rungroup
-  // 🔴 绑了**多个**区时先弹对话框问「这次在哪些区跑」(默认跟随视角,E-165);
+  // 🔴 绑了**多个**区时先弹对话框问「这次在哪些区跑」(默认跟随视角);
   //    单绑定直接跑 —— 存量动线逐字节不变(多弹一个框会让所有单区用户多点一次)。
   const runOrAsk = () => {
     if (!sel) return;
@@ -358,11 +354,11 @@ export default function EtlJobsPage() {
       if (o.targets?.length) payload.targets = o.targets;
       // 🔴 重试链只由服务端给的计划驱动(`/retry-failed` 是「哪些区失败」的权威),前端不自己挑
       if (o.retryOfRunGroupId) payload.retryOfRunGroupId = o.retryOfRunGroupId;
-      // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 首次运行 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
+      // 跨法域 target 首次运行 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
       const { body: d, cancelled } = await fetchWithResidencyAck(`/api/etl-jobs/${sel.jobId}/run`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }, resolveAckRequired);
       if (cancelled) return;
       if (d?.success) {
-        // @kf-batch 50-P50.3-fanout —— 🔴 逐区回报:提示里点名**哪几个区各起了一条 run**。
+        // 🔴 逐区回报:提示里点名**哪几个区各起了一条 run**。
         // 只说"已提交运行"的话,多区域执行这件事在界面上不可见(用户实测反馈)。
         const rs: any[] = d.data.runs || [];
         const where = rs.map((x) => x.targetId).filter(Boolean).join("、");
@@ -430,7 +426,7 @@ export default function EtlJobsPage() {
     try {
       const d = await aiFetchJson("/api/etl-jobs/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-B27-codegen-place —— 按作业的章生成(多区作业取第一个,页面回显并提示其余区须同构)
+        // 按作业的章生成(多区作业取第一个,页面回显并提示其余区须同构)
         body: JSON.stringify({ prompt: aiPrompt, targetType: sel.type, currentCode: aiUseCurrent ? script : undefined, targetId: targets[0] }),
       });
       if (d?.success) setAiResult({ code: d.data.code, explanation: d.data.explanation, usage: d.data.usage, dialect: d.data.dialect, groundedOn: d.data.groundedOn });
@@ -457,7 +453,6 @@ export default function EtlJobsPage() {
     else message.error(d?.error?.message || t("解析失败"));
   };
 
-  // @kf-batch 50-P50.3-fanout
   // 发布下推分两步(INTERACTION §2.2 机制B):**先预览**(GET,纯读、零副作用)→ 确认后再 POST 下发。
   // 🔴 单绑时不弹预览:存量作业全是单绑,给它们凭空加一次确认 = 白白多一次点击(便利性 §8.2)。
   const doSchedule = async () => {
@@ -514,7 +509,7 @@ export default function EtlJobsPage() {
     } finally { setBusy(false); }
   };
 
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6)—— 〔触发一次调度〕:对已发布的 target 立刻跑一次调度产物(S-7;serverless ⇒ StartWorkflowRun)。
+  // 〔触发一次调度〕:对已发布的 target 立刻跑一次调度产物(serverless ⇒ StartWorkflowRun)。
   const doTrigger = async () => {
     if (!sel) return;
     setBusy(true);
@@ -548,7 +543,7 @@ export default function EtlJobsPage() {
       await deleteJson(`/api/etl-jobs/${id}`);
       message.success(t("已删除")); if (sel?.jobId === id) setSel(null); fetchJobs();
     } catch (e) {
-      // 序 41 B-117:服务端拒绝 ⇒ 原话呈现(此前无条件提示「已删除」)
+      // 服务端拒绝 ⇒ 原话呈现(此前无条件提示「已删除」)
       message.error((e as Error).message || t("删除失败"));
     }
   };
@@ -558,7 +553,7 @@ export default function EtlJobsPage() {
       {residencyModal}
       <Title level={3}><CodeOutlined /> {t("离线计算")}</Title>
       <Text type="secondary">{t("写代码方式的 ETL 开发：自写 Glue PySpark / Redshift SQL / EMR Serverless PySpark 作业，立即运行或用 MWAA 定时调度。多引擎可选，各引擎参数齐全暴露。")}</Text>
-      {/* @kf-batch 50-WP4-o1-scope —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」(INTERACTION §9.3-1)。
+      {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」(INTERACTION §9.3-1)。
           🔴 这一条是本包最要紧的交互:AWS 式切区的最大痛点就是切错区后「东西不见了」而界面一个字都不说。 */}
       <OtherScopesHint resources={["etl-job", "engine-job"]} />
 
@@ -567,25 +562,25 @@ export default function EtlJobsPage() {
         <Card size="small" title={t("作业")} style={{ width: 280, flexShrink: 0 }}
           extra={<Button type="primary" size="small" data-testid="etl-new-btn" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>{t("新建")}</Button>}>
           {jobs.length === 0 && emrJobs.length === 0 ? (
-            // @kf-batch 50-WP4-o1-scope —— 空态不许只说「暂无作业」:target 视角要说清「这个区没有、别处有几条」
-            // 并给一键切「全部」(判据 E-151 断的就是这段文案里的数字)。
+            // 空态不许只说「暂无作业」:target 视角要说清「这个区没有、别处有几条」
+            // 并给一键切「全部」(判据断的就是这段文案里的数字)。
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={<ScopeEmptyHint resources={["etl-job", "engine-job"]} noun={t("作业")} />} />
           ) : (
             <Space direction="vertical" style={{ width: "100%" }}>
               {jobs.map((j) => (
-                // @kf-batch 50-WP15-airflow-serverless(T-15)🔴 无头验收要能**认准对象**:原来只有边框颜色表示选中,
+                // 🔴 无头验收要能**认准对象**:原来只有边框颜色表示选中,
                 // 而作业名在一张大卡里 ⇒ 脚本只能按文本模糊点,真环境实测点到了容器中心 = 选中**别的作业**,
-                // 于是「下线」下到了另一个作业上(S-7/S-8/S-10/S-11 连锁假红,还留下孤儿 workflow)。
+                // 于是「下线」下到了另一个作业上(连锁假红,还留下孤儿 workflow)。
                 // ⇒ 给每行一个稳定 testid + 把选中态显式暴露成 data-selected(纯附加属性,零视觉变化)。
                 <div key={j.jobId} onClick={() => selectJob(j)}
                   data-testid={`job-row-${j.jobId}`} data-selected={sel?.jobId === j.jobId ? "true" : "false"}
                   style={{ cursor: "pointer", padding: 8, borderRadius: 6, border: sel?.jobId === j.jobId ? "1px solid #22d3ee" : "1px solid #1d4254" }}>
-                  {/* @kf-batch 50-W5-seg1-WP10a —— 作业名**独占一行**并省略,标签行可换行。
+                  {/* 作业名**独占一行**并省略,标签行可换行。
                       2026-09-05 真环境(三个 target)抓到:标签 + 名字挤在一个不换行的 Space 里,名字被顶出卡片外(看不见也点不到)。 */}
                   <div style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={j.name}>{j.name}</div>
                   <Space wrap size={[4, 4]} style={{ marginTop: 4 }}>
                     <Tag color={j.type === "glue" ? "purple" : "geekblue"} style={{ marginInlineEnd: 0 }}>{j.type === "glue" ? "Glue" : "Redshift"}</Tag>
-                    {/* @kf-batch 50-P50.3-fanout —— 非 home 的绑定**逐个**挂标,一眼看出在哪些区跑。
+                    {/* 非 home 的绑定**逐个**挂标,一眼看出在哪些区跑。
                         home 刻意**不挂标**:存量作业全是 home,挂满标反而把真正需要注意的那几个淹没。
                         🔴 走归一口 `bindingTargetsOf`,不直读字段(直读的那一版把迁移后的绑定显示成了 home)。 */}
                     {bindingTargetsOf(j)
@@ -596,14 +591,14 @@ export default function EtlJobsPage() {
                     {bindingTargetsOf(j).length > 1 ? <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>🌐</Tag> : null}
                   </Space>
                   <div><Text type="secondary" style={{ fontSize: 12 }}>{j.scheduleEnabled ? `⏱ ${j.cronExpression}` : t("未调度")} · {j.lastRunStatus || t("未运行")}</Text>
-                    {/* @kf-batch 50-WP15-airflow-serverless —— 哪个调度器在跑,页面必须说(INTERACTION §2.2b) */}
+                    {/* 哪个调度器在跑,页面必须说(INTERACTION §2.2b) */}
                     {schedulerTagsOf(j).map((sch) => (
                       <Tag key={sch} data-testid="job-scheduler-tag" color={sch === "serverless" ? "gold" : "default"} style={{ marginInlineStart: 6, fontSize: 11 }}>{sch === "serverless" ? "Serverless" : "MWAA"}</Tag>
                     ))}
                   </div>
                 </div>
               ))}
-              {/* 模块 33-A：EMR 引擎作业(独立表)合并展示,选中走 EmrJobPanel。 */}
+              {/* ：EMR 引擎作业(独立表)合并展示,选中走 EmrJobPanel。 */}
               {emrJobs.map((j) => (
                 <div key={j.jobId} onClick={() => selectEmrJob(j)}
                   data-testid={`engine-job-row-${j.jobId}`} data-selected={selEmr?.jobId === j.jobId ? "true" : "false"}
@@ -628,7 +623,7 @@ export default function EtlJobsPage() {
 
         {/* 右：编辑器 */}
         <div style={{ flex: 1 }}>
-          {/* 模块 33-A：选中 EMR 引擎作业 → 独立 EmrJobPanel（老 Glue/Redshift UI 零改动）。 */}
+          {/* ：选中 EMR 引擎作业 → 独立 EmrJobPanel（老 Glue/Redshift UI 零改动）。 */}
           {selEmr ? (
             <EmrJobPanel
               job={selEmrLive || selEmr}
@@ -679,10 +674,10 @@ export default function EtlJobsPage() {
                               ]} />
                           </>
                         ) : null}
-                        {/* @kf-batch 50-WP15-airflow-serverless —— W3e-11 页面驱动真撞:执行区域多选原来只在 Redshift 分支渲染(三元的 else 侧),
+                        {/* W3e-11 页面驱动真撞:执行区域多选原来只在 Redshift 分支渲染(三元的 else 侧),
                             Glue 作业在页面上根本绑不了第二个区 —— API 能绑、页面不能 = 界面上的「假多区域」。清单与按钮对两种类型一视同仁。 */}
                         <>
-                            {/* @kf-batch 50-P50.3-fanout —— 执行目标**多选**(一个定义可绑多个区域,
+                            {/* 执行目标**多选**(一个定义可绑多个区域,
                                 INTERACTION §2.1)。清单只含服务端判定「可下推」的目标(准入 + 组件 + 法域)。 */}
                             {/* 🔴 必须有可见的标签:多选 Select 在只勾了一个值时**长得跟单选一模一样**,
                                 用户第一反应就是"只能选一个区域"(2026-09-04 用户实测反馈)。
@@ -764,7 +759,7 @@ export default function EtlJobsPage() {
                                   ]} />
                                 <InputNumber size="small" min={1} max={100} value={glueCfg.maxConcurrentRuns ?? 3} onChange={(v) => setGlueCfg({ ...glueCfg, maxConcurrentRuns: v })} addonBefore={t("最大并发")} style={{ width: 160 }} />
                               </Space>
-                              {/* 序 72 B-139:执行角色 = 账号内任何 glue.amazonaws.com 可承担的角色(与 AWS 一致),平台默认 / 顾问生成 / 自建三组,可刷新、可手填、保存前可检查权限 */}
+                              {/* 执行角色 = 账号内任何 glue.amazonaws.com 可承担的角色(与 AWS 一致),平台默认 / 顾问生成 / 自建三组,可刷新、可手填、保存前可检查权限 */}
                               <div>
                                 <Text type="secondary" style={{ fontSize: 12 }}>{t("执行角色")}</Text>
                                 <ExecutionRolePicker
@@ -844,10 +839,10 @@ export default function EtlJobsPage() {
                         <PromoteButton type="etl-job" id={sel.jobId} />
                         <EnvPromotionStatus type="etl-job" id={sel.jobId} />
                         <Input addonBefore={t("业务日期")} value={runDate} onChange={(e) => setRunDate(e.target.value)} style={{ width: 220 }} placeholder="YYYY-MM-DD" />
-                        {/* @kf-batch 50-P50.3-fanout —— 🔴 按钮上必须写清"会跑几个区":
+                        {/* 🔴 按钮上必须写清"会跑几个区":
                             扇出本来就发生在服务端(绑 N 个区 ⇒ N 条 run),但按钮不说的话用户
                             根本看不出"多区域一起执行"这件事发生了(2026-09-04 用户实测反馈)。 */}
-                        {/* @kf-batch 50-WP4-o1-scope —— 护栏 2「写操作在按钮上复述目标」(INTERACTION §9.3-2;判据 E-155):
+                        {/* 护栏 2「写操作在按钮上复述目标」(INTERACTION §9.3-2;判据):
                             单区时把 **region** 写进按钮文案(「立即运行 · us-west-2」)。
                             🔴 复述的是**作业自己的绑定**(`targets`),不是顶栏当前视角 —— 真跑落在哪个区由绑定决定,
                             按钮要说的是"这一下会发生什么",说成视角就是误导。 */}
@@ -894,7 +889,6 @@ export default function EtlJobsPage() {
                       <Table size="small" rowKey="runId" dataSource={runs} pagination={{ pageSize: 10 }}
                         columns={[
                           { title: t("状态"), dataIndex: "status", width: 90, render: (v: string) => <Tag color={STATUS_COLOR[v] || "default"}>{v}</Tag> },
-                          // @kf-batch 50-P50.3-fanout
                           // 🔴 **这一列是"多区域一起执行"唯一的可见证据**:扇出后同一次点击产生 N 条 run,
                           // 没有这一列的话它们在界面上完全无法区分,用户只会觉得"还是单区域"(用户实测反馈)。
                           // 值取 run 记录的章(`targetId`),不是作业当前的绑定 —— 那样改了绑定会把历史改写。
@@ -905,7 +899,7 @@ export default function EtlJobsPage() {
                                 ? <Tag>{t("本地")}</Tag>
                                 : <Tag color="cyan">{v}</Tag>,
                           },
-                          // @kf-batch 50-W5-seg2-WP10a —— 跨法域 run 的区域审计 ID(全量留在该区;home 为空)
+                          // 跨法域 run 的区域审计 ID(全量留在该区;home 为空)
                           {
                             title: t("审计"), dataIndex: "residencyAuditId", width: 100,
                             render: (v: string) => v && !String(v).startsWith("pending#")
@@ -913,10 +907,10 @@ export default function EtlJobsPage() {
                               : "-",
                           },
                           { title: t("类型"), dataIndex: "taskType", width: 130 },
-                          // @kf-batch 50-WP15-airflow-serverless —— 运行历史每行带调度器 tag(Serverless / MWAA)。
-                          // 🔴 T-13:不再在行上显示 SCHEDULED / ON_DEMAND —— worker 侧分不出触发来源(实测 cron 与手动完全同形),
+                          // 运行历史每行带调度器 tag(Serverless / MWAA)。
+                          // 🔴 不再在行上显示 SCHEDULED / ON_DEMAND —— worker 侧分不出触发来源(实测 cron 与手动完全同形),
                           //   台账里刻意不存这个派生值;真值在服务侧,放在「日志」弹窗里按需展示(那里本来就要调服务)。
-                          // 序 73 模块 57(R3):工作流触发的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者 RunTriggerCell)
+                          // 工作流触发的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者 RunTriggerCell)
                           { title: t("触发"), dataIndex: "triggeredBy", width: 200, render: (_v: string, r: any) => <RunTriggerCell run={r} /> },
                           { title: t("业务日期"), dataIndex: "runDate", width: 110, render: (v: string) => v || "-" },
                           { title: t("开始"), dataIndex: "startedAt", render: (v: string) => v?.slice(0, 19).replace("T", " ") },
@@ -934,7 +928,7 @@ export default function EtlJobsPage() {
                   ),
                 },
                 {
-                  // @kf-batch 50-WP5-rungroup —— O2:一次点击跑了多个区 ⇒ 这里出现一行「联动运行」
+                  // O2:一次点击跑了多个区 ⇒ 这里出现一行「联动运行」
                   key: "rungroups", label: t("联动运行"), children: (
                     <RunGroupsPanel kind="etl-job" definitionId={sel.jobId} refreshKey={groupKey}
                       onRetry={async (plan) => {
@@ -978,7 +972,7 @@ export default function EtlJobsPage() {
         />
       )}
 
-      {/* @kf-batch 50-P50.3-fanout —— **下发预览**(INTERACTION §2.2 机制B「影响预览」)。
+      {/* **下发预览**(INTERACTION §2.2 机制B「影响预览」)。
           🔴 摆出「往哪些区、发什么产物、写哪个桶、用哪个 workgroup/DB、什么身份」——
           全部取自各区 ExecutionEnv 描述符,让运维看清**烘焙进产物的值**,而不是事后去 S3 里翻。 */}
       <Modal
@@ -1017,7 +1011,7 @@ export default function EtlJobsPage() {
             { title: t("执行目标"), dataIndex: "targetId", render: (v: string, r: any) => <Space><Tag color={r.home ? "default" : "cyan"}>{v}</Tag>{r.home ? <Text type="secondary">{t("本地")}</Text> : null}</Space> },
             { title: t("region"), dataIndex: "region", width: 110 },
             { title: t("产物 DAG"), dataIndex: "dagId", ellipsis: true },
-            // @kf-batch 50-WP15-airflow-serverless —— 预览行要说清走哪个调度器、落到哪(serverless:workflow <dag_id>;mwaa:桶 · 环境)
+            // 预览行要说清走哪个调度器、落到哪(serverless:workflow <dag_id>;mwaa:桶 · 环境)
             { title: t("调度器"), dataIndex: "scheduler", width: 100, render: (v: string) => v ? <Tag data-testid="preview-scheduler" color={v === "serverless" ? "gold" : "default"}>{v === "serverless" ? "Serverless" : "MWAA"}</Tag> : "—" },
             { title: t("桶 / 环境"), key: "env", ellipsis: true, render: (_: any, r: any) => <Text style={{ fontSize: 12 }}>{r.scheduler === "serverless" ? r.envName : `${r.bucket} · ${r.envName}`}</Text> },
             { title: "workgroup", dataIndex: "workgroup", width: 190 },
@@ -1041,7 +1035,7 @@ export default function EtlJobsPage() {
 
       <Modal title={<Space><FileTextOutlined /> {t("运行日志")} {logModal.status && <Tag color={STATUS_COLOR[logModal.status] || "default"}>{logModal.status}</Tag>}
           {logModal.scheduler === "serverless" ? <Text type="secondary" style={{ fontSize: 12 }} data-testid="run-log-source">CloudWatch · {logModal.logGroup || "/aws/mwaa-serverless/"}</Text> : null}
-          {/* @kf-batch 50-WP15-airflow-serverless(T-13)触发来源只认服务侧真值(worker 侧分不出 cron 与手动),拿不到就不显示 */}
+          {/* 触发来源只认服务侧真值(worker 侧分不出 cron 与手动),拿不到就不显示 */}
           {logModal.runType ? <Tag data-testid="run-log-trigger" color={logModal.runType === "SCHEDULED" ? "blue" : "purple"} style={{ fontSize: 11 }}>{logModal.runType === "SCHEDULED" ? t("本次触发:定时(服务侧)") : t("本次触发:手动(服务侧)")}</Tag> : null}</Space>}
         open={logModal.open} onCancel={() => setLogModal({ ...logModal, open: false })} width={1000}
         footer={[
@@ -1085,7 +1079,7 @@ export default function EtlJobsPage() {
                 <MonacoEditor height="300px" language={sel?.type === "glue" ? "python" : "sql"} theme="vs-dark" value={aiResult.code}
                   options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13 }} />
               </div>
-              {/* 模块45:cookbook 方言校验回显——已自动修正(绿)/ 检出违规(橙)。规则标题是数据不翻译,框架文案走 t()。 */}
+              {/* cookbook 方言校验回显——已自动修正(绿)/ 检出违规(橙)。规则标题是数据不翻译,框架文案走 t()。 */}
               <div style={{ margin: "6px 0" }}><CodegenGroundedOn value={aiResult.groundedOn} boundTargets={targets} /></div>
               {aiResult.dialect && aiResult.dialect.fixed.length > 0 && (
                 <Alert type="success" showIcon style={{ marginBottom: 8 }}
@@ -1135,7 +1129,7 @@ export default function EtlJobsPage() {
         )}
       </Modal>
 
-      {/* @kf-batch 50-WP5-rungroup —— O2:运行对话框(默认跟随执行范围视角,E-165) */}
+      {/* O2:运行对话框(默认跟随执行范围视角) */}
       <RunTargetsModal
         open={!!runPick && !!sel}
         bindings={sel ? bindingTargetsOf(sel) : []}

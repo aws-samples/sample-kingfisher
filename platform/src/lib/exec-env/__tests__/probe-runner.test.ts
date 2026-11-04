@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // probe-runner 单测(真实探活的判定逻辑;client 全 mock)。
 //
 // 【本文件的三条承重】
@@ -64,19 +63,19 @@ vi.mock("@aws-sdk/client-ec2", () => ({
   DescribeSecurityGroupsCommand: class {
     constructor(public input: { GroupIds: string[] }) {}
   },
-  // @kf-batch 50-WP16-zero-egress:零出网两项要读路由表 / NAT / 端点
+  // 零出网两项要读路由表 / NAT / 端点
   DescribeRouteTablesCommand: class {
     constructor(public input: unknown) {}
   },
   DescribeNatGatewaysCommand: class {
     constructor(public input: unknown) {}
   },
-  // @kf-batch 50-WP23-xregion-peering:形态换成跨区 peering ⇒ 读它的状态与对端网段
+  // 形态换成跨区 peering ⇒ 读它的状态与对端网段
   DescribeVpcPeeringConnectionsCommand: class {
     constructor(public input: unknown) {}
   },
 }));
-// @kf-batch 50-WP16-zero-egress:私有托管域(Route 53 全局)
+// 私有托管域(Route 53 全局)
 vi.mock("@aws-sdk/client-route-53", () => ({
   Route53Client: class {
     send = r53Send;
@@ -111,7 +110,7 @@ vi.mock("@aws-sdk/client-iam", () => ({
     constructor(public input: { RoleName: string }) {}
   },
 }));
-// 序 48:S3 Tables 联邦目录(区级)由「检测初始化」幂等开通 —— 只 mock 真外部 Glue 客户端,ensure 逻辑(lib/aws/s3tables-catalog.ts)真跑
+// S3 Tables 联邦目录(区级)由「检测初始化」幂等开通 —— 只 mock 真外部 Glue 客户端,ensure 逻辑(lib/aws/s3tables-catalog.ts)真跑
 const { glueSend } = vi.hoisted(() => ({ glueSend: vi.fn() }));
 vi.mock("@aws-sdk/client-glue", () => ({
   GlueClient: class {
@@ -129,14 +128,14 @@ vi.mock("@aws-sdk/client-glue", () => ({
 }));
 
 import { runProbe, PROBE_RUNNER_VIA } from "@/lib/exec-env/probe-runner";
-// 序 31 二刀 ⑤:探活在第一个 AWS 调用之前记落点决策(真账本,不 mock)
+// 探活在第一个 AWS 调用之前记落点决策(真账本,不 mock)
 import { __setRequestStoreProvider, decisionsOfCurrentRequest } from "@/lib/place/context";
-// B-105:探活器产物 ↔ 组件归属契约必须装配在一起判(两边各自的单测都绿过,装起来却是坏的)
+// 探活器产物 ↔ 组件归属契约必须装配在一起判(两边各自的单测都绿过,装起来却是坏的)
 import { componentForProbeItem, isGreenProbeForComponents } from "@/lib/exec-env/component-contract";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
 
 const ACCT = "123456789012";
-// agentcore 控制面(P50.2e3):一个 client 发 3 种命令,按命令类名分发。
+// agentcore 控制面:一个 client 发 3 种命令,按命令类名分发。
 const { acSend } = vi.hoisted(() => ({ acSend: vi.fn() }));
 vi.mock("@aws-sdk/client-bedrock-agentcore-control", () => ({
   BedrockAgentCoreControlClient: class {
@@ -177,16 +176,15 @@ const RESOURCES = {
   athenaWorkgroup: "bgp-athena-tgt-usw2-a",
   glueRoleArn: `arn:aws:iam::${ACCT}:role/bgp-glue-role`,
   emrSecurityGroupId: "sg-0123456789abcdef0",
-  // @kf-batch 50-WP16-zero-egress:底座资源袋的零出网键(SPEC §3.16-E)
+  // 底座资源袋的零出网键(SPEC §3.16-E)
   vpcId: "vpc-0123456789abcdef0",
   endpointIds: "vpce-aaa,vpce-bbb,vpce-ccc",
-  // @kf-batch 50-WP23-xregion-peering:跨区通路从「本区的跨区端点」换成「跨区 peering」
+  // 跨区通路从「本区的跨区端点」换成「跨区 peering」
   //   (老形态 `crossRegionDdbEndpointId` 被组织 SCP 拦死、在本组织永远建不出来 ⇒ 判据不许再钉它)
   homeLinkPeeringId: "pcx-0123456789abcdef0",
   homeLinkHostedZoneId: "Z02066582K5P8SB5ZQ2GD",
 };
 
-// @kf-batch 50-WP23-xregion-peering
 const HOME_CIDR = "10.0.0.0/16";
 /** 本区两张私有子网路由表:都关联了子网、都有到主控区的 peering 路由(健康形态)。 */
 let ROUTE_TABLES: () => Array<Record<string, unknown>> = () => [
@@ -228,7 +226,7 @@ function allHealthy() {
   s3Send.mockResolvedValue({});
   s3tSend.mockResolvedValue({ tableBuckets: [{ name: RESOURCES.tableBucket }] });
   athenaSend.mockResolvedValue({ WorkGroup: { State: "ENABLED" } });
-  // @kf-batch 50-WP16-zero-egress:一个 EC2 client 现在发 4 种命令 ⇒ 按命令类名分发
+  // 一个 EC2 client 现在发 4 种命令 ⇒ 按命令类名分发
   //   (原来 mockResolvedValue 一把梭,新命令会拿到 SecurityGroups 形状的响应 ⇒ 判据读到 undefined 而假绿/假红)
   ec2Send.mockImplementation(async (cmd: { constructor: { name: string } }) => {
     switch (cmd.constructor.name) {
@@ -260,14 +258,14 @@ function allHealthy() {
       case "GetHostedZoneCommand":
         return { VPCs: [{ VPCId: RESOURCES.vpcId, VPCRegion: "us-west-2" }] };
       case "ListResourceRecordSetsCommand":
-        // @kf-batch 50-WP23:A 记录 + 主控区端点 ENI 的私有 IP(跨 region 拿不到 DnsEntries 做 ALIAS)
+        // A 记录 + 主控区端点 ENI 的私有 IP(跨 region 拿不到 DnsEntries 做 ALIAS)
         return { ResourceRecordSets: [{ Type: "A", ResourceRecords: [{ Value: "10.0.2.31" }, { Value: "10.0.3.17" }] }] };
       default:
         throw new Error(`测试没给 ${cmd.constructor.name} 备响应`);
     }
   });
   iamSend.mockResolvedValue({ Role: {} });
-  // 序 48:联邦目录已在(GetCatalog 成功)⇒ 该项绿且不建
+  // 联邦目录已在(GetCatalog 成功)⇒ 该项绿且不建
   glueSend.mockImplementation(async (cmd: { constructor: { name: string } }) => {
     if (cmd.constructor.name === "GetCatalogCommand") return { Catalog: { Name: "s3tablescatalog" } };
     throw new Error(`测试没给 ${cmd.constructor.name} 备响应`);
@@ -285,9 +283,9 @@ describe("core 全绿", () => {
     expect(r.items.map((i) => i.name).sort()).toEqual(
       [
         "athenaWorkgroup", "datalakeBucket", "emrSecurityGroupId", "glueRoleArn", "scriptsBucket", "tableBucket",
-        // @kf-batch 50-WP16-zero-egress:非 home 的 core 必出这两项(home 不出 —— home 保留 NAT,见 WP-16 非目标)
+        // 非 home 的 core 必出这两项(home 不出 —— home 保留 NAT,非目标)
         "network:egress-none", "network:home-link",
-        // 序 48:该区 S3 Tables 联邦目录(候选区内加区不再经 redeploy-platform 第 3c 步 ⇒ 检测初始化幂等开通)
+        // 该区 S3 Tables 联邦目录(候选区内加区不再经 redeploy-platform 第 3c 步 ⇒ 检测初始化幂等开通)
         "lake:s3tablescatalog",
       ].sort()
     );
@@ -298,11 +296,11 @@ describe("core 全绿", () => {
     expect(clientRegions.glue).toBe("us-west-2");
   });
 
-  // 🔴 B-105(2026-10-19 …7237 序 48 真环境演练抓到):探活器新加了 `lake:s3tablescatalog`,但「探活项 → 组件」的唯一作者
+  // 🔴 (2026-10-19 …7237 真环境演练抓到):探活器新加了 `lake:s3tablescatalog`,但「探活项 → 组件」的唯一作者
   //   component-contract.ts 没登记它 ⇒ isGreenProbeForComponents 对**所有**环境恒 false ⇒ 新区探活 18 项全绿却
   //   `probe-coverage-mismatch`,相位永远停在 provisioning(页面「部署中」、「启用」灰);存量在用区几个 tick 后全部掉成 degraded。
   //   两侧各自的单测全绿(本文件钉了项名、契约测试手抄了项名)—— 接缝只能在装配层钉:探活器真跑、契约真判,只 mock AWS。
-  it("🔴 B-105 装配:全绿探活的每一项都归属到声明组件,且精确覆盖判定为 true(新项没登记契约 ⇒ 这里红)", async () => {
+  it("🔴 装配:全绿探活的每一项都归属到声明组件,且精确覆盖判定为 true(新项没登记契约 ⇒ 这里红)", async () => {
     allHealthy();
     rssSend.mockResolvedValue({ workgroup: { status: "AVAILABLE" } });
     dmsSend2.mockResolvedValue({ ReplicationSubnetGroups: [{}] });
@@ -325,7 +323,7 @@ describe("core 全绿", () => {
     expect(isGreenProbeForComponents(components, r.items)).toBe(true);
   });
 
-  // 序 48:目录不在 ⇒ 当场开通(CreateCatalog 真被调、入参指向本区)⇒ 项绿;开通被拒 ⇒ 项红带 aws 原话,不假装绿
+  // 目录不在 ⇒ 当场开通(CreateCatalog 真被调、入参指向本区)⇒ 项绿;开通被拒 ⇒ 项红带 aws 原话,不假装绿
   it("联邦目录不在 ⇒ CreateCatalog 开通后该项绿;CreateCatalog 被拒 ⇒ 该项红带原话,其余项不受影响", async () => {
     allHealthy();
     const created: unknown[] = [];
@@ -364,7 +362,7 @@ describe("core 全绿", () => {
   });
 });
 
-describe("🔴 @kf-batch 50-WP16-zero-egress 灰度门:零出网两项只对**已切换**的 target 出", () => {
+describe("🔴 灰度门:零出网两项只对**已切换**的 target 出", () => {
   it("没切换(资源袋无 endpointIds)⇒ **不出**这两项,状态不因此掉成降级", async () => {
     allHealthy();
     const { endpointIds, homeLinkPeeringId, homeLinkHostedZoneId, ...legacy } = RESOURCES;
@@ -400,14 +398,13 @@ describe("🔴 @kf-batch 50-WP16-zero-egress 灰度门:零出网两项只对**�
     expect(item?.error).toContain("NAT");
   });
 
-  it("home 永不出这两项(WP-16 非目标:主控区 VPC 的 NAT 另立包)", async () => {
+  it("home 永不出这两项(非目标:主控区 VPC 的 NAT 另立包)", async () => {
     allHealthy();
     const r = await runProbe(target({ targetId: "tgt_home", sk: "tgt_home", region: "us-east-1" }));
     expect(r.items.map((i) => i.name)).not.toContain("network:egress-none");
   });
 });
 
-// @kf-batch 50-WP23-xregion-peering
 // 🔴🔴 `network:home-link` 改判:老形态(本区的**跨区**端点)被组织 SCP 拦死、在本组织永远建不出来
 //    ⇒ 判据钉的必须是新形态(peering active + **每张**子网路由表都有回程路由 + 私有托管域有带值的 A 记录)。
 //    这一组每条都对应一个「部署全绿、回写静默超时」的形状。
@@ -513,7 +510,7 @@ describe("🔴 单项失败不掀翻整轮", () => {
     const red = r.items.filter((i) => !i.ok);
     expect(red.map((i) => i.name).sort()).toEqual(["datalakeBucket", "scriptsBucket"]);
     expect(red[0].error).toContain("404");
-    // @kf-batch 50-WP16-zero-egress:4 → 6(零出网两项与桶无关,必须照常绿 —— 这正是「单项失败不掀翻整轮」);序 48 联邦目录项 ⇒ 7
+    // 4 → 6(零出网两项与桶无关,必须照常绿 —— 这正是「单项失败不掀翻整轮」);联邦目录项 ⇒ 7
     expect(r.items.filter((i) => i.ok)).toHaveLength(7);
     expect(r.ok).toBe(false);
   });
@@ -536,7 +533,7 @@ describe("🔴 单项失败不掀翻整轮", () => {
 });
 
 describe("🔴 components 驱动 + 资源缺失", () => {
-  it("已装 redshift ⇒ 真探 workgroup(AVAILABLE 绿 / 非 AVAILABLE 红带状态)—— P50.2e2 从占位红升级为真探", async () => {
+  it("已装 redshift ⇒ 真探 workgroup(AVAILABLE 绿 / 非 AVAILABLE 红带状态)—— 从占位红升级为真探", async () => {
     allHealthy();
     rssSend.mockResolvedValue({ workgroup: { status: "AVAILABLE" } });
     const ok = await runProbe(target({ components: ["core", "redshift"], resources: { ...RESOURCES, redshiftWorkgroup: "bgp-workgroup", redshiftDatabase: "dev", redshiftSecretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:x" } }));
@@ -585,7 +582,7 @@ describe("🔴 components 驱动 + 资源缺失", () => {
   });
 });
 
-describe("🔴 agentcore 真探(P50.2e3;字段在顶层 agentcore 袋,不在 resources)", () => {
+describe("🔴 agentcore 真探(字段在顶层 agentcore 袋,不在 resources)", () => {
   it("runtime READY + memory ACTIVE + gateway READY ⇒ 三项全绿", async () => {
     allHealthy();
     agentcoreHealthy();
@@ -622,8 +619,8 @@ describe("🔴 agentcore 真探(P50.2e3;字段在顶层 agentcore 袋,不在 res
   });
 });
 
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色键探活(有才探;名必须是本 target 名)
-describe("🔴 WP-3 执行角色探活:键在才出项;非 home 的角色名必须是命名 SSOT 的本 target 名", () => {
+// 执行角色键探活(有才探;名必须是本 target 名)
+describe("🔴 执行角色探活:键在才出项;非 home 的角色名必须是命名 SSOT 的本 target 名", () => {
   const PER_EMR = `arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-emr-role`;
   it("描述符没有 emrExecutionRoleArn ⇒ 不出项(前置由准入判,不由探活把存量 target 探红)", async () => {
     allHealthy();
@@ -670,10 +667,10 @@ describe("🔴 WP-3 执行角色探活:键在才出项;非 home 的角色名必�
   });
 });
 
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤(2026-10-23 …9435 observe 复验抓到):已启用环境点「检测初始化」⇒ reconcileOneTarget
+// (2026-10-23 …9435 observe 复验抓到):已启用环境点「检测初始化」⇒ reconcileOneTarget
 //   不需 finalize ⇒ 不经 readBuildStatus(此前整条流程唯一的记账点)⇒ runProbe 打到目标区的 CFN / S3 / EC2 / Redshift / Glue / DMS / Athena
 //   全被观测器记成未归因(20 条 / 次)。修 = runProbe 自己在第一个 AWS 调用之前记决策;四个调用方(reconcile / enable / retire-components / seed-home)一并受益。
-describe("🔴 序 31 二刀 ⑤:runProbe 在第一个 AWS 调用之前记落点决策", () => {
+describe("🔴 runProbe 在第一个 AWS 调用之前记落点决策", () => {
   it("有请求账本 ⇒ 第一次 send 时账本里已有 {tgt_usw2_a, runProbe};探活结果不受影响", async () => {
     const store = {};
     __setRequestStoreProvider(() => store);

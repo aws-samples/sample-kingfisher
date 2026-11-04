@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 43-C — 补数中心。发起补数计划(向导:目标→日期范围→级联→并发→dry-run 预览→确认)+
+// 补数中心。发起补数计划(向导:目标→日期范围→级联→并发→dry-run 预览→确认)+
 // 计划列表 + 进度矩阵(日期×节点状态色块)+ 控制(暂停/恢复/取消/续跑)。前端刷新驱动 tick 推进。
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
@@ -15,11 +15,11 @@ import {
 import dayjs from "dayjs";
 import { useT } from "@/lib/i18n/useT";
 import FeatureGuide from "@/components/common/FeatureGuide";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
+// 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
 import { toScopeParam } from "@/lib/scope/scope";
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101):实例抽屉(行数 / 错误原话 / 日志 / 去监控页),「运行日志」弹窗与监控页同一作者
+// 实例抽屉(行数 / 错误原话 / 日志 / 去监控页),「运行日志」弹窗与监控页同一作者
 import RunLogModal from "@/components/monitor/RunLogModal";
 import { resourcePath } from "@/lib/env/resource-path";
 import type { ResourceType } from "@/lib/versions/version-service";
@@ -47,7 +47,7 @@ export default function BackfillPage() {
   const [detail, setDetail] = useState<any | null>(null); // {plan,instances,matrix}
   const [detailPlanId, setDetailPlanId] = useState<string>("");
   const tickTimer = useRef<NodeJS.Timeout>(undefined);
-  // @kf-batch 50-WP4bis-p1-scope —— 当前执行范围(顶栏选的那个;URL 是权威)。
+  // 当前执行范围(顶栏选的那个;URL 是权威)。
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   // `global` 时回 null ⇒ URL 与改动前逐字节相同(回滚点),不会凭空多出 `?scope=global`。
@@ -76,9 +76,9 @@ export default function BackfillPage() {
     setPreview(null);
     form.resetFields();
     setWizardOpen(true);
-    // @kf-batch 50-WP4quater-reads(工单 SC-36)—— 目标下拉按执行范围过滤:否则在 us-west-2 视角
+    // 目标下拉按执行范围过滤:否则在 us-west-2 视角
     // 也能选到只在主控区能跑的作业,补数计划建出来必然失败。
-    // @kf-batch 37-sync-backfill —— 序 37 ⑦:显式要同步任务(`include=sync-task`;不带时接口与改动前逐字节相同,SLA 面板也读它)。
+    // 显式要同步任务(`include=sync-task`;不带时接口与改动前逐字节相同,SLA 面板也读它)。
     const tq = new URLSearchParams();
     if (scopeParam) tq.set("scope", scopeParam);
     tq.set("include", "sync-task");
@@ -89,7 +89,7 @@ export default function BackfillPage() {
 
   // dry-run 预览。
   const doPreview = async () => {
-    const v = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const v = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!v) return;
     const tgt = targets.find((x) => x.id === v.targetId);
     if (!tgt) return;
@@ -112,7 +112,7 @@ export default function BackfillPage() {
 
   // 确认落库。
   const doConfirm = async () => {
-    const v = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const v = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!v) return;
     const tgt = targets.find((x) => x.id === v.targetId);
     if (!tgt) return;
@@ -129,7 +129,7 @@ export default function BackfillPage() {
     if (!res.ok) { message.error(d?.error || t("创建失败")); return; }
     message.success(t("补数计划已创建"));
     setWizardOpen(false);
-    // @kf-batch 50-WP4bis-p1-scope —— 护栏 1:计划的执行区来自**所选作业自己的绑定**(服务端 `execTargets`),
+    // 护栏 1:计划的执行区来自**所选作业自己的绑定**(服务端 `execTargets`),
     // 与顶栏视角无关(写路径不读 scope)。若建出来的计划不落在当前视角,列表会「毫无变化」——
     // 那正是「东西不见了而界面一个字不说」。⇒ 用**实际拉回来的列表**判一次,看不见就当场说清。
     const after = await fetchPlans();
@@ -195,7 +195,7 @@ export default function BackfillPage() {
   ];
 
   const tgtSel = selectedTarget();
-  // @kf-batch 37-wf-sync-backfill —— 含数据同步节点的工作流:服务端会把并发强制成 1(lib/backfill/types.ts forcedBackfillConcurrency),
+  // 含数据同步节点的工作流:服务端会把并发强制成 1(lib/backfill/types.ts forcedBackfillConcurrency),
   //   这里提前说明并锁住并发框(与同步任务目标同一套 UX);`nodeTypes` 来自 /api/backfill/targets。
   const wfHasSyncNode = tgtSel?.scope === "workflow" && Array.isArray(tgtSel?.nodeTypes) && tgtSel.nodeTypes.includes("sync");
   const concurrencyForced = tgtSel?.kind === "sync-task" || wfHasSyncNode;
@@ -228,9 +228,9 @@ export default function BackfillPage() {
         />
         <Alert style={{ marginBottom: 16 }} type="info" showIcon
           message={t("补数产生的运行以 backfill 标记,不计入在线成功率/SLA 基线,不污染在线统计。")} />
-        {/* @kf-batch 50-WP4bis-p1-scope —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
+        {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
         <OtherScopesHint resources={["backfill-plan"]} />
-        {/* @kf-batch 50-WP4bis-p1-scope —— 同 /datasources:包一层 testid 容器,无头验收只数计划表 */}
+        {/* 同 /datasources:包一层 testid 容器,无头验收只数计划表 */}
         <div data-testid="backfill-table">
           <Table rowKey="planId" size="small" loading={loading} columns={planColumns as any} dataSource={plans} pagination={{ pageSize: 10 }}
             style={{ marginTop: 12 }}
@@ -250,7 +250,7 @@ export default function BackfillPage() {
             <Select showSearch optionFilterProp="label" placeholder={t("选择任务或工作流")}
               options={targets.map((x) => ({
                 value: x.id,
-                // @kf-batch 37-sync-backfill —— 同步任务:补不了的(没用日期变量 / 增量)置灰并把原因写在选项上,不让人选了再报错
+                // 同步任务:补不了的(没用日期变量 / 增量)置灰并把原因写在选项上,不让人选了再报错
                 label: x.kind === "sync-task"
                   ? `${x.name}（${t("同步任务")}）${x.unavailableReason ? ` — ${t("不可补数")}:${x.unavailableReason}` : ""}`
                   : `${x.name}（${x.scope === "workflow" ? t("工作流") : x.taskType}）`,
@@ -319,7 +319,7 @@ function planStatusLabel(v: string): string {
   return ({ planned: "已规划", running: "运行中", paused: "已暂停", cancelled: "已取消", succeeded: "已完成", "partially-failed": "部分失败" } as Record<string, string>)[v] || v;
 }
 
-// 序 47b:成功但写入 0 行 —— 只认 succeeded ∧ 行数已知 ∧ 为 0(行数未上报 ≠ 0 行;判定与服务端 run-facts.ts 同口径)
+// 成功但写入 0 行 —— 只认 succeeded ∧ 行数已知 ∧ 为 0(行数未上报 ≠ 0 行;判定与服务端 run-facts.ts 同口径)
 function isZeroRowSuccess(inst: any): boolean {
   return inst?.status === "succeeded" && !!inst?.run && inst.run.rowsWritten === 0;
 }
@@ -340,7 +340,7 @@ function PlanDetail({ detail, t, onControl, onRefresh }: { detail: any; t: (s: s
   const byKey: Record<string, any> = {};
   for (const i of instances) byKey[`${i.date}#${i.nodeId}`] = i;
   const isWorkflow = plan.target?.scope === "workflow";
-  // 序 47b:选中的实例(抽屉);抽屉内容随 6s 刷新取最新那一份(按 日期#节点 重取,不拿陈旧快照)
+  // 选中的实例(抽屉);抽屉内容随 6s 刷新取最新那一份(按 日期#节点 重取,不拿陈旧快照)
   const [selKey, setSelKey] = useState<string>("");
   const [logOpen, setLogOpen] = useState(false);
   const sel = selKey ? byKey[selKey] || null : null;
@@ -384,7 +384,7 @@ function PlanDetail({ detail, t, onControl, onRefresh }: { detail: any; t: (s: s
         <Col span={4}><Statistic title={t("待跑")} value={(p.pending || 0) + (p.blocked || 0)} /></Col>
         <Col span={4}><Statistic title={t("跳过")} value={p.skipped || 0} /></Col>
       </Row>
-      {/* 序 47b:计划级写入行数 —— 只汇总行数已知的成功实例;未上报的单独计数,不混进总和当 0 */}
+      {/* 计划级写入行数 —— 只汇总行数已知的成功实例;未上报的单独计数,不混进总和当 0 */}
       {rowsSum && (
         <Row gutter={16} style={{ marginBottom: 12 }}>
           <Col span={8}>
@@ -423,7 +423,7 @@ function PlanDetail({ detail, t, onControl, onRefresh }: { detail: any; t: (s: s
       <div data-testid="backfill-matrix-hint" style={{ color: "#8c8c8c", fontSize: 12, marginBottom: 6 }}>{t("点色块查看该实例的写入行数 / 错误原话 / 运行日志")}</div>
       <Table size="small" columns={columns} dataSource={rows} pagination={false} scroll={{ x: "max-content", y: 380 }} bordered />
 
-      {/* 序 47b:实例抽屉 */}
+      {/* 实例抽屉 */}
       <Drawer open={!!sel} onClose={() => setSelKey("")} width={560} data-testid="backfill-instance-drawer"
         title={sel ? `${t("补数实例")} · ${sel.date} · ${sel.nodeName}` : t("补数实例")}>
         {sel && <InstanceDetail inst={sel} t={t} taskPath={taskPath} monitorHref={monitorHref} onViewLog={() => setLogOpen(true)} />}

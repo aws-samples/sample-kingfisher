@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-xregion-peering
 // **跨区私网通路的 home 侧接线**(CFN 自定义资源;50 SPEC §3.14ter)。
 //
 // 【它为什么必须是自定义资源,而不是 buildspec 里的几行 aws cli】

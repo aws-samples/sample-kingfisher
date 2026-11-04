@@ -1,4 +1,3 @@
-// @kf-batch 50-B51-backfill-pump
 // 内部推进端点:只收补数推进泵这一个来源;推进调的是与页面**同一个** tick;计划不存在 ⇒ 404 不推。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";

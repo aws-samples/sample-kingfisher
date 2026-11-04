@@ -1,6 +1,6 @@
-// 模块 55 长操作统一框架 —— 协议常量(🔴 零 import:浏览器拦截器、判据与服务端共用这一份)。
+// 长操作统一框架 —— 协议常量(🔴 零 import:浏览器拦截器、判据与服务端共用这一份)。
 //
-// 为什么要一个「协议记号」:平台里已有三种 202 —— GenBI `{taskId,status:"pending",async:true}`、B-95 `{status:"warming"}`、
+// 为什么要一个「协议记号」:平台里已有三种 202 —— GenBI `{taskId,status:"pending",async:true}`、`{status:"warming"}`、
 // 治理 schema-sync `{runId,state:"running"}`。客户端传输层只认带 `protocol:"long-op/1"` 的 202,其余原样放行,互不干扰。
 
 export const LONG_OP_PROTOCOL = "long-op/1" as const;

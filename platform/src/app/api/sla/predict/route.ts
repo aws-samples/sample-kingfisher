@@ -6,7 +6,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { getSla, saveLastPrediction, pushBreachAlert } from "@/lib/baseline/sla-service";
 import { getBaseline } from "@/lib/baseline/learn";
-// @kf-batch 50-WP4quater-reads(工单 SC-15)—— 🔴 预测必须用**这条 run 所在区**的基线。
+// 🔴 预测必须用**这条 run 所在区**的基线。
 // 用合计基线的后果不是「差一点」:两个区的时长分布混在一起,ETA 对两个区都不准,
 // 而破线预警看起来一切正常(它有数字、只是那个数字属于别的区)。
 import { baselineFor } from "@/lib/baseline/target-baseline";

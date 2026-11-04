@@ -1,4 +1,3 @@
-// @kf-batch 50-WP9a-durable-jobs
 // 测试用的**内存 DynamoDB**(只 mock 真外部;本包的装配层判据都用它)。
 //
 // 🔴 为什么要一个真求值器,而不是像别处那样「只认得几条写死的 ConditionExpression」:
@@ -218,7 +217,7 @@ export class FakeDdb {
   /** 下一次对某表的某个操作直接抛(模拟 DDB 挂了) */
   failNext: { op: string; table?: string; error: Error } | null = null;
   /**
-   * @kf-batch 50-project-delete-orphans —— 不带 `Limit` 时一页多少行(真 DDB 是「1MB 一页」)。
+   * 不带 `Limit` 时一页多少行(真 DDB 是「1MB 一页」)。
    * 缺省 1000(与改动前逐字等价);判「翻页到底 / 翻不完就抛」的用例把它调小,让多页**真的出现**。
    */
   pageSize = 1000;
@@ -301,7 +300,7 @@ export class FakeDdb {
         if (i.Select === "COUNT") return { Count: filtered.length, ...base };
         return { Items: filtered.map(clone), Count: filtered.length, ...base };
       }
-      // @kf-batch 50-project-delete-orphans —— Scan(删项目盘点的 attr 型计数走它):过滤**在分页之后**生效、
+      // Scan(删项目盘点的 attr 型计数走它):过滤**在分页之后**生效、
       //   Select COUNT 只回本页过滤后的数(与真 DDB 一致 —— 不翻页就数少,判据靠它看得见)。
       case "ScanCommand": {
         const items = [...rows.values()];

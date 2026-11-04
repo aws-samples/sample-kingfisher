@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
 // GET /api/admin/exec-envs/[targetId]/jobs?kind=supply|canary —— 该执行环境的数据面长作业(新的在前)。
 //
 // 🔴 回的是 DTO(`toPublicJob` 允许列表):lease / runToken / revision / 私有 state(含 statementId 与审计 id)永不出去。

@@ -1,6 +1,6 @@
-// @kf-batch 37-sync-capability —— 同步向导「提交整形」的唯一作者(纯函数,判据见 __tests__/sync-task-payload.test.ts)。
+// 同步向导「提交整形」的唯一作者(纯函数,判据见 __tests__/sync-task-payload.test.ts)。
 //
-// 从 SyncTaskModal.handleSubmit 原样抽出(改动前的输出被判据钉住),再加上序 37 新字段的整形:
+// 从 SyncTaskModal.handleSubmit 原样抽出(改动前的输出被判据钉住),再加上新字段的整形
 //   🔴 存量任务零影响:编辑一个**没有**新字段的老任务、原样保存,请求体里**不许**多出任何新字段的缺省值
 //      (overwriteScope:"table" / allowEmptyOverwrite:false / derivedColumns:[] / partitionKeys:[] / businessTimezone:"")。
 //   🔴 但 PUT 是逐键 SET 合并(没出现在请求体里的字段保持原值)⇒ 老任务**原来就有**的新字段,用户把它改回
@@ -23,7 +23,7 @@ export interface BuildSyncTaskPayloadInput {
   selectedTables: string[];
   /** 带日期变量的源表名模板(不在源库表清单里,单独维护) */
   templateTables?: string[];
-  /** 序 56:模板 → 样例表(只用来读列结构;不传 = 表单值里有什么用什么,没有就不写这个键) */
+  /** 模板 → 样例表(只用来读列结构;不传 = 表单值里有什么用什么,没有就不写这个键) */
   templateSamples?: Record<string, string>;
   /** 每张表的列映射 */
   fieldMappings: Record<string, FieldMappingRow[] | undefined>;
@@ -32,8 +32,8 @@ export interface BuildSyncTaskPayloadInput {
 }
 
 /**
- * 序 37 新字段里有「缺省值」概念、需要零影响整形的那几个(whereClause 是存量字段,不在此列)。mergeKeys = B-61:只在 merge 时带。
- * templateSampleTables = 序 56:只带「仍在模板清单里且选了样例」的项,空 ⇒ 不写(存量任务零影响)。
+ * 新字段里有「缺省值」概念、需要零影响整形的那几个(whereClause 是存量字段,不在此列)。mergeKeys =:只在 merge 时带。
+ * templateSampleTables =:只带「仍在模板清单里且选了样例」的项,空 ⇒ 不写(存量任务零影响)。
  */
 export const SYNC_CAPABILITY_SHAPED_KEYS = ["businessTimezone", "derivedColumns", "overwriteScope", "partitionKeys", "allowEmptyOverwrite", "mergeKeys", "templateSampleTables"] as const;
 
@@ -86,7 +86,7 @@ function effectiveValue(key: (typeof SYNC_CAPABILITY_SHAPED_KEYS)[number], v: Re
       return keys.length ? keys : undefined;
     }
     case "templateSampleTables": {
-      // 序 56:只保留「仍在源表清单里的带变量表名 → 非空样例」;模板被删 / 样例被清 ⇒ 这一项不带
+      // 只保留「仍在源表清单里的带变量表名 → 非空样例」;模板被删 / 样例被清 ⇒ 这一项不带
       if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
       const templates = Array.isArray(v.sourceTables) ? v.sourceTables.filter((x) => typeof x === "string" && x.includes("$" + "{")) : [];
       const out: Record<string, string> = {};
@@ -112,9 +112,9 @@ const EXPLICIT_DEFAULT: Record<(typeof SYNC_CAPABILITY_SHAPED_KEYS)[number], unk
 export function buildSyncTaskPayload(input: BuildSyncTaskPayloadInput): Record<string, unknown> {
   const { formValues, selectedTables, templateTables = [], templateSamples, fieldMappings, original } = input;
   const values: Record<string, unknown> = { ...formValues };
-  // 序 56:样例表是向导状态(不在 Form 里),先放进 values 再由下面的整形按模板清单过滤
+  // 样例表是向导状态(不在 Form 里),先放进 values 再由下面的整形按模板清单过滤
   if (templateSamples !== undefined) values.templateSampleTables = templateSamples;
-  // @kf-batch 44-sync-switch-datasource —— 编辑时换了数据源:表单里预填的 sourceDatabase 是**旧源的库名**,不许带回去
+  // 编辑时换了数据源:表单里预填的 sourceDatabase 是**旧源的库名**,不许带回去
   //   (服务端按新源重算;…7698 探针 2026-10-15:换到 sys 库后 PUT 仍带 sourceDatabase=ecommerce 并被原样落库)。
   if (original && original.datasourceId !== undefined && values.datasourceId !== original.datasourceId) delete values.sourceDatabase;
   // ── 改动前的整形(原样):源表 = 勾选的表;列映射只带 include 的列 ──
@@ -123,7 +123,7 @@ export function buildSyncTaskPayload(input: BuildSyncTaskPayloadInput): Record<s
   const fm: Record<string, FieldMappingRow[]> = {};
   sourceTables.forEach((tbl) => { fm[tbl] = fieldMappings[tbl]?.filter((f) => f.include) || []; });
   values.fieldMappings = fm;
-  // ── 序 37 新字段:等于缺省且原任务没有这个键 ⇒ 剔除;原任务有 ⇒ 显式写回缺省 ──
+  // ── 新字段:等于缺省且原任务没有这个键 ⇒ 剔除;原任务有 ⇒ 显式写回缺省 ──
   for (const key of SYNC_CAPABILITY_SHAPED_KEYS) {
     const eff = effectiveValue(key, values);
     if (eff !== undefined) { values[key] = eff; continue; }

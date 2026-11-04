@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 规划异步任务执行体。claim → 跑 planner(Strands,不受 60s 墙)→ createPlan 落库 → finalize。
+// Copilot 规划异步任务执行体。claim → 跑 planner(Strands,不受 60s 墙)→ createPlan 落库 → finalize。
 // 照 GenBI 异步执行体:挂 AbortController 到天花板主动 abort;心跳保活;终态条件写(防僵尸/防回退)。
 // 由提交路由 fire-and-forget 触发(不 await),也可由轮询端点在 pending 时补触发(自愈,防执行体没起来)。
 
@@ -22,8 +22,8 @@ export async function runPlanTask(task: PlanTaskRow, token: string): Promise<voi
   }, PLAN_CEILING_MS);
 
   try {
-    // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 落点随任务行走(建出来的 draft 就落这个区)
-    // 🔴 @kf-batch 50-B39-plan-target:落点经唯一作者解析(B-39 之前的存量行无章 = 主控区),计划记录与发现工具用同一个值
+    // 落点随任务行走(建出来的 draft 就落这个区)
+    // 🔴 落点经唯一作者解析(此前的存量行无章 = 主控区),计划记录与发现工具用同一个值
     const targetId = targetOfStamp(task.targetId);
     const caller: CopilotCaller = { token, projectId: task.projectId, env: task.env, targetId };
     // 异步执行:planner 软上限给 200s(<240s 任务天花板),不受 CloudFront 60s 墙约束——
@@ -31,7 +31,7 @@ export async function runPlanTask(task: PlanTaskRow, token: string): Promise<voi
     const { spec, degraded, model } = await runPlanner({ prompt: task.prompt, caller, deadlineMs: 200_000 });
     // 落库计划(即便 degraded=steps 空,也落一条计划,前端能看到"未能规划"的诚实结论)。
     const plan = await createPlan({ projectId: task.projectId, createdBy: task.createdBy, prompt: task.prompt, spec, targetId });
-    // @kf-batch 50-W5-seg2-WP8:任务项落实际用的模型(模块 51 `_meta` 的异步落点⑧)。
+    // 任务项落实际用的模型(`_meta` 的异步落点⑧)。
     await finalize(task.taskId, runToken, { status: "succeeded", planId: plan.planId, degraded: !!degraded, usedModelId: model?.modelId, usedModelSource: model?.modelSource });
   } catch (e: any) {
     await finalize(task.taskId, runToken, { status: "failed", error: String(e?.message || e).slice(0, 400) }).catch(() => {});

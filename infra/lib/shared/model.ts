@@ -21,7 +21,7 @@ const cfg = JSON.parse(
 export const DEFAULT_MODEL_ID: string = cfg.defaultModelId;
 
 /**
- * @kf-batch 51-v2-multi-vendor —— 部署期候选链(51 SPEC §7.7):部署脚本 `scripts/resolve-home-model.sh` 按它逐个展开
+ * 部署期候选链(51 SPEC §7.7):部署脚本 `scripts/resolve-home-model.sh` 按它逐个展开
  * 本区推理配置并真 converse,第一个通的注入 BEDROCK_MODEL_ID。旧 json 没有 `candidateModelIds` ⇒ 退回 `[defaultModelId]`(向后兼容)。
  */
 export const CANDIDATE_MODEL_IDS: readonly string[] =
@@ -31,7 +31,6 @@ export const CANDIDATE_MODEL_IDS: readonly string[] =
 export const resolveModelId = (explicit?: string): string =>
   explicit || process.env.BEDROCK_MODEL_ID || DEFAULT_MODEL_ID;
 
-// @kf-batch 50-PROD-A-launch-hardening(h)
 // 🔴 主控区自选后,出厂默认 `us.*`(美国跨区推理配置)在欧洲 / 亚太主控区**调不通**。部署脚本会按账号真值
 //   选好再经 env BEDROCK_MODEL_ID 注入(scripts/resolve-home-model.sh);这里兜「裸 cdk deploy」:
 //   地理前缀与主控区**明确不匹配**就当场拒(只拒确定错的三种;其余前缀 / 基础 id 交给部署期真调用判)。

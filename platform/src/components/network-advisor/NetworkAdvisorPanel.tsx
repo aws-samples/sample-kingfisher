@@ -5,7 +5,7 @@
 // 多轮对话：用户可追加约束（"最小权限"/"免 NAT"），面板带 conversationId 复用上下文。
 // 一键预填：拿到建议后点"应用建议"，把通道原生的网络配置回传给消费方。
 //
-// @kf-batch 41-B115-netadvisor-place —— 🔴 顾问分析的是**某一个执行环境所在区**的网络(VPC / 子网 / 安全组都是区域资源):
+// 🔴 顾问分析的是**某一个执行环境所在区**的网络(VPC / 子网 / 安全组都是区域资源):
 //   消费方把对象绑定的执行环境传进来(`targetIds`);恰好一个就用它,多个让用户在面板里选,一个都没有就不许分析 ——
 //   **不默认主控区**(原来服务端永远探主控区:数据源在别的区时,建议按错的 VPC 给)。
 
@@ -16,7 +16,7 @@ import VerdictBadge from "./VerdictBadge";
 import RemediationCard from "./RemediationCard";
 import type { ConnectivityRequest, ConnectivityRecommendation, Constraints, EnvironmentFacts, Prefill } from "@/lib/network-advisor";
 import { useT } from "@/lib/i18n/useT";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 // 只为把 targetId 显示成「名字 · region」(护栏 2:这份网络事实属于哪个区必须一眼可见);拿不到就显示 targetId 原文
 import { fetchExecTargets, type ExecTargetOption } from "@/lib/exec-env/exec-targets-client";

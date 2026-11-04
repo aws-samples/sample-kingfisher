@@ -22,8 +22,8 @@ interface IncidentHit {
   resolution?: { verifiedBy?: string; verifiedAt?: string; markdown?: string } | null;
 }
 
-// 模块 25 — 用 AWS DevOps Agent 对一次失败运行发起故障诊断，并轮询展示生成的报告。
-// 模块 43-A.2 — 诊断落 done 时若命中知识库【人工已验证】的历史修复(usedIncidentHistory=true),
+// 用 AWS DevOps Agent 对一次失败运行发起故障诊断，并轮询展示生成的报告。
+// 诊断落 done 时若命中知识库【人工已验证】的历史修复(usedIncidentHistory=true),
 // 报告顶部展示"同类故障历史"Alert,引用上次的已验证修复并跳转 /incidents 查详情(复利闭环可见化)。
 export default function DiagnosisButton({ taskId, runId, size = "small", label }: Props) {
   const t = useT();
@@ -60,7 +60,7 @@ export default function DiagnosisButton({ taskId, runId, size = "small", label }
           if (rec.status === "done") {
             setReport(rec.report || "");
             setLoading(false);
-            // 模块 43-A.2 — 命中知识库已验证历史修复 → 顶部展示引用。
+            // 命中知识库已验证历史修复 → 顶部展示引用。
             if (rec.usedIncidentHistory && rec.incidentSignature) loadIncident(rec.incidentSignature);
             return;
           }
@@ -103,7 +103,7 @@ export default function DiagnosisButton({ taskId, runId, size = "small", label }
           </div>
         )}
         {err && <Text type="danger">{err}</Text>}
-        {/* 模块 43-A.2 — 同类故障历史引用(命中知识库已验证修复时)。 */}
+        {/* 同类故障历史引用(命中知识库已验证修复时)。 */}
         {!loading && incident && incident.hasVerifiedFix && (
           <Alert
             type="success"

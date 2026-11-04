@@ -14,7 +14,7 @@
 //     只碰平台自己那份内联策略 `bgp-least-privilege`;上限仍由 PermissionsBoundary 兜着 ⇒ 不可能提权。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   IAMClient, GetRoleCommand, CreateRoleCommand, PutRolePolicyCommand, AttachRolePolicyCommand,

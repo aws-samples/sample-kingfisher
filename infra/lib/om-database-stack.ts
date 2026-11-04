@@ -18,7 +18,7 @@ export class OmDatabaseStack extends cdk.Stack {
 
     this.db = new rds.DatabaseInstance(this, "OmDb", {
       instanceIdentifier: "bgp-openmetadata-db",
-      // 序 51(用户 2026-10-25 拍板):MySQL 8.0 → **8.4**。RDS 对 MySQL 8.0 自 2026-08-01 起收「扩展支持」费
+      // (用户 2026-10-25 拍板):MySQL 8.0 → **8.4**。RDS 对 MySQL 8.0 自 2026-08-01 起收「扩展支持」费
       //   ($0.10 / vCPU·h,本实例 Multi-AZ 4 vCPU ⇒ ≈ $292 / 月,docs/COST-MODEL.md §7 第 1 条),8.4 在标准支持内。
       //   只钉大版本(与原 VER_8_0 同一口径):CloudFormation 收到 "8.4" 由 RDS 选该大版本的默认小版本,小版本自动升级照旧。
       //   存量环境升级 = RDS 原地大版本升级(Multi-AZ 实例一次停机窗口约 10–20 分钟,RDS 升级前自动留快照;回滚 = 从快照恢复),
@@ -36,7 +36,7 @@ export class OmDatabaseStack extends cdk.Stack {
         excludeCharacters: "'\"{}[]#&*?|>!%@\\/ :;=+`$^(),<.~",
       }),
       allocatedStorage: 20,
-      // 模块 27: WS2 Multi-AZ 去单点 + WS1 CMK 静态加密 + WS3 备份/RETAIN/删除保护。
+      // WS2 Multi-AZ 去单点 + WS1 CMK 静态加密 + WS3 备份/RETAIN/删除保护。
       multiAz: true,
       storageEncrypted: true,
       storageEncryptionKey: props.dataKey,

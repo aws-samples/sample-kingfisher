@@ -1,4 +1,3 @@
-// @kf-batch 53-guide-v1
 // 🔴 结构门(53 ACCEPTANCE G-1..G-4):每个菜单叶子都有「本页怎么用」;步骤 ≥ 3;相关页 / 动线路径都是真菜单叶子;文案不嵌 ASCII 双引号;壳层三处接线在。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -42,7 +41,7 @@ describe("🔴 操作指引内容(单一作者 lib/guide/content.ts)", () => {
     for (const s of MULTI_REGION_FLOW) texts.push(s.title, s.desc);
     expect(texts.filter((x) => x.includes(String.fromCharCode(34)))).toEqual([]);
   });
-  it("G-5 执行环境文案跟上产品(序 36):不写死某个账号的 region 放行事实 · 不说选 / 勾组件(完整一套,只读)· 讲了删除", () => {
+  it("G-5 执行环境文案跟上产品:不写死某个账号的 region 放行事实 · 不说选 / 勾组件(完整一套,只读)· 讲了删除", () => {
     const texts: string[] = [];
     for (const g of Object.values(PAGE_GUIDES)) texts.push(g.what, ...g.steps, ...(g.tips ?? []));
     for (const j of JOURNEYS) for (const s of j.steps) texts.push(s.title, s.desc, s.hint ?? "");

@@ -4,17 +4,17 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { listCodeTables, listCodeTablesEnriched, createCodeTable } from "@/lib/modeling/service";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围(50 SPEC §2.6;WP-4bis 阶段 1)
+// 执行范围(50 SPEC §2.6;当前阶段 1)
 import { filterRowsByScope, requireScope } from "@/lib/exec-env/scope";
 import { getActiveProjectId } from "@/lib/projects/guard";
 
-// 模块 35: 码表。GET 列表(登录可读);POST 建(仅平台管理员)。
+// 码表。GET 列表(登录可读);POST 建(仅平台管理员)。
 export async function GET(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   try {
-    // @kf-batch 50-P50.3-modeling —— 带上 defHash/物理落点,前端才能判「版本不齐」(判据与服务端同源)
-    // @kf-batch 50-WP4bis-p1-scope —— 按执行范围过滤「落点」。
+    // 带上 defHash/物理落点,前端才能判「版本不齐」(判据与服务端同源)
+    // 按执行范围过滤「落点」。
     // 🔴 建模定义是**平台级全局**的(本路由走 `resolveIdentity`,没有 `requireProject` 上下文),
     //    但 target 上可能挂项目白名单 ⇒ 校验用**当前活跃项目头**(与界面所在项目同一个),
     //    不是硬塞 null:塞 null 会让白名单 target 在建模页恒 403。

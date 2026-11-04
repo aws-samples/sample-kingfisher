@@ -12,7 +12,7 @@ import {
   type LongOpRow,
 } from "@/lib/long-ops/store";
 
-// 模块 55 长操作统一框架 —— 轮询 + 抢占驱动执行 + 读时对账(强制结束)。= 序 46 B-107 `GET /api/ai/tasks/[taskId]` 泛化
+// 长操作统一框架 —— 轮询 + 抢占驱动执行 + 读时对账(强制结束)。= `GET /api/ai/tasks/[taskId]` 泛化
 // (那条路径保留一版当别名,同一个 handler)。照 GET /api/genbi/tasks/[taskId]。
 //
 // GET /api/long-ops/[taskId]:全局 fetch 拦截器(lib/long-ops/client/follow.ts)收到 202 后每 ~2s 轮询。

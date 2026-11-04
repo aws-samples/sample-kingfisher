@@ -7,7 +7,7 @@ import { recordAudit } from "@/lib/audit";
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
 import { resourceKey } from "@/lib/long-ops/kinds";
 
-// 模块 35: 码表 详情 / 改 / 删。
+// 码表 详情 / 改 / 删。
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);
@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   if (!identity.isPlatformAdmin) return apiError("仅平台管理员可管理码表", 403);
-  // 模块 55 §2.8 对象租约:落地 / 解绑进行中不许改定义(否则后续步骤核的是另一份定义)
+  // §2.8 对象租约:落地 / 解绑进行中不许改定义(否则后续步骤核的是另一份定义)
   const busy = await resourceBusyResponse([resourceKey("codetable", params.id)]);
   if (busy) return busy;
   const body = await req.json().catch(() => ({}));
@@ -41,10 +41,10 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   if (!identity.isPlatformAdmin) return apiError("仅平台管理员可管理码表", 403);
-  // @kf-batch 50-W5-seg1-WP11a —— 删定义**受控**(50 SPEC v3.20 §3.8):仍有落地产物 ⇒ 409 DECISION_REQUIRED,
+  // 删定义**受控**(50 SPEC v3.20 §3.8):仍有落地产物 ⇒ 409 DECISION_REQUIRED,
   //   出口 = 逐区〔解绑并清理〕/ `?keepTables=1&confirm=<code>` 显式保留物理表只删定义(审计逐表登记)。
   //   修之前:只删 DDB 一行,每个区的物理表原地成孤儿、平台从此不知道它们。
-  // 模块 55 §2.8 对象租约:落地 / 解绑进行中不许删定义(2026-10-22 实测:落地中被删 ⇒ 目标区留物理表孤儿)
+  // §2.8 对象租约:落地 / 解绑进行中不许删定义(2026-10-22 实测:落地中被删 ⇒ 目标区留物理表孤儿)
   const busy = await resourceBusyResponse([resourceKey("codetable", params.id)]);
   if (busy) return busy;
   const sp = req.nextUrl.searchParams;

@@ -1,6 +1,6 @@
 // DS-05 — data source connectivity heartbeat.
 //
-// 模块 42:改为委托数据源 SPI(getProvider(type).ping)。MySQL 走到的仍是同一段 SELECT 1 +
+// 改为委托数据源 SPI(getProvider(type).ping)。MySQL 走到的仍是同一段 SELECT 1 +
 // connectTimeout(现收编在 lib/datasource-spi/jdbc/mysql.ts,逐字不变);PostgreSQL/Oracle/
 // SQLServer 现在也能探活。canPing=false 的 provider 返回 reachable=null(不改状态,与原
 // 「非 mysql 返 reachable:null」语义一致)。保留原导出类型,调用方零改动。

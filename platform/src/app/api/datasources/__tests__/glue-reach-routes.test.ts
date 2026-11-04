@@ -1,4 +1,4 @@
-// 序 38 B-70 —— 数据源「检测」(heartbeat)与「浏览表」(tables)两条路由经 Glue 连接的装配层判据。
+// 数据源「检测」(heartbeat)与「浏览表」(tables)两条路由经 Glue 连接的装配层判据。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】源库在客户 VPC,控制面 ECS 在平台 VPC,无 peering:
 //   「检测」把源刷成 unreachable、「浏览表」0 张;同一条 Glue 连接跑的同步作业却成功。
@@ -134,7 +134,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("🔴 B-70 heartbeat POST(探测 = 发现作业)", () => {
+describe("🔴 heartbeat POST(探测 = 发现作业)", () => {
   const post = async () => { const m: any = await import("@/app/api/datasources/[id]/heartbeat/route"); return m.POST(req(`/api/datasources/${DS_ID}/heartbeat`, "POST"), { params: { id: DS_ID } }); };
   const get = async () => { const m: any = await import("@/app/api/datasources/[id]/heartbeat/route"); return m.GET(req(`/api/datasources/${DS_ID}/heartbeat`), { params: { id: DS_ID } }); };
 
@@ -278,7 +278,7 @@ describe("🔴 B-70 heartbeat POST(探测 = 发现作业)", () => {
   });
 });
 
-describe("🔴 B-70 列表 / 单条读取也把「验证中」推进到结论(页面不再轮询时用户仍能看到)", () => {
+describe("🔴 列表 / 单条读取也把「验证中」推进到结论(页面不再轮询时用户仍能看到)", () => {
   const SRC = (p: string) => fs.readFileSync(path.join(process.cwd(), p), "utf8");
   it("接线判据:列表 GET 与单条 GET 的**调用点**都在(不是只 import)", () => {
     const list = SRC("src/app/api/datasources/route.ts");
@@ -316,7 +316,7 @@ describe("🔴 B-70 列表 / 单条读取也把「验证中」推进到结论(�
   });
 });
 
-describe("🔴 B-70 tables GET", () => {
+describe("🔴 tables GET", () => {
   const get = async (qs = "?database=gamedb") => { const m: any = await import("@/app/api/datasources/[id]/tables/route"); return m.GET(req(`/api/datasources/${DS_ID}/tables${qs}`), { params: { id: DS_ID } }); };
 
   it("auto + 直连读到 ⇒ 数组应答(存量逐字不变),零 Glue 调用", async () => {

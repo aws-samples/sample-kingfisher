@@ -2,7 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
 
-// 模块 27 (WS1) — 加密底座:客户托管 CMK。
+// 加密底座:客户托管 CMK。
 //
 // 设计:按"数据域"分两把 CMK,而非一把通吃——便于按域审计/轮换/隔离访问。
 //  - dataKey:湖仓与数据库静态加密(RDS / Redshift / OpenSearch / DynamoDB / S3)。
@@ -42,7 +42,7 @@ export class KmsStack extends cdk.Stack {
       new cdk.aws_iam.ServicePrincipal(`logs.${cdk.Stack.of(this).region}.amazonaws.com`)
     );
 
-    // 模块 27 (WS4b-1): CloudTrail 用本 key 加密日志文件,需 key policy 授权 cloudtrail 服务主体
+    // (WS4b-1): CloudTrail 用本 key 加密日志文件,需 key policy 授权 cloudtrail 服务主体
     // (GenerateDataKey* + DescribeKey)。否则建 Trail 报 "Insufficient permissions to access KMS key"。
     // 用 SourceArn 条件限定为本账号的 trail,收敛授权面。
     this.logsKey.addToResourcePolicy(new cdk.aws_iam.PolicyStatement({

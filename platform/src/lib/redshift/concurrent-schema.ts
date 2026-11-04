@@ -1,4 +1,3 @@
-// @kf-batch 50-concurrent-schema-create
 // **`CREATE SCHEMA IF NOT EXISTS` 在 Redshift 不是并发安全的** —— 这一类缺陷的唯一作者。
 //
 // 🔴 2026-09-19 真环境(全新账号,第二个 region):6 个同步任务并发跑,每个都先建自己的目标 schema

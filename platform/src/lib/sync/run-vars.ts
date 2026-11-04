@@ -1,23 +1,23 @@
-// @kf-batch 37-sync-capability —— 序 37「数据同步能力补齐」的**契约单一作者**。
+// 「数据同步能力补齐」的**契约单一作者**。
 //
 // 同步任务的新能力(全部可选;不填 = 改动前的行为)都在这里定义合法形态,建任务 / 改任务路由、
 // 脚本生成器、补数中心、向导界面引同一份,不各自再写一遍规则:
-//   · whereClause          B-52:源端过滤条件(JDBC 源下推成子查询),可用日期变量
+//   · whereClause:源端过滤条件(JDBC 源下推成子查询),可用日期变量
 //   · 源表名模板            ④:sourceTables 里的表名可带日期变量(如 cf_point_${bizmonth}),必须显式给目标表名
 //   · businessTimezone     ⑥:运行时没带业务日期参数时,按这个时区取「今天」(缺省 UTC,与平台 todayDs 同口径)
 //   · derivedColumns       ⑤:派生列(如 create_date → month,格式 yyyyMM),写入前加到数据上
 //   · overwriteScope       ⑤:覆盖写入的范围,table(缺省 = 整表)或 partitions(只覆盖本批涉及的分区)
 //   · partitionKeys        ⑤:overwriteScope=partitions 时按哪些列判定「本批涉及的分区」
-//   · allowEmptyOverwrite  B-53:覆盖写入读到 0 行默认失败;显式置 true 才允许清空
+//   · allowEmptyOverwrite:覆盖写入读到 0 行默认失败;显式置 true 才允许清空
 //   · sourceColumns        只读指定的源列(JDBC 投影下推;对应客户库 Reader 的 column 清单)。不填 = 全列(现状)。
 //                          覆盖写进**已有** S3 Tables 表时按列名对齐,列集合 / 类型不一致就失败 —— 原来按位置 INSERT,
 //                          列序不同会把值写进别的列(客户现有表的列序是客户自己配的,切换时必炸)。
-//   · mergeKeys            B-61:writeMode=merge 时**必填**的合并键(按这些列 upsert)。🔴 没有缺省:缺键的 merge 任务
+//   · mergeKeys:writeMode=merge 时**必填**的合并键(按这些列 upsert)。🔴 没有缺省:缺键的 merge 任务
 //                          建 / 改都是 400,生成器也拒 —— 原来 merge 静默退化成 append(重复行),正是「有静默合法默认值的参数」
 //                          那一类缺陷。非 merge 任务带了它不报错、也不读。
-//   · templateSampleTables 序 56(客户 2026-10-27 反馈):带日期变量的源表名 → 样例表(源库里一张同结构的真表)。样例表只用来
+//   · templateSampleTables:带日期变量的源表名 → 样例表(源库里一张同结构的真表)。样例表只用来
 //                          读列结构(向导第 1 步字段映射 / 建表预览 / 派生列候选),**不会被同步**;键必须是本任务里带变量的源表名。
-//   · 目标表名撞车守卫      序 56:任意两张源表(普通 / 带变量)解析并规范化后的目标表名相同 ⇒ 拒。客户为了「看列」把模板的某个
+//   · 目标表名撞车守卫:任意两张源表(普通 / 带变量)解析并规范化后的目标表名相同 ⇒ 拒。客户为了「看列」把模板的某个
 //                          月表也勾成普通表、两者目标名都是 ods_xxx ⇒ 同一次运行向同一张目标表写两次(覆盖模式下互相覆盖)。
 //
 // 🔴 日期变量的取值有两个作者:这里的 `syncRunVars`(TS,预览 / 校验用)与 `SYNC_RUN_VARS_PY`
@@ -107,7 +107,7 @@ export interface DerivedColumn {
 export const OVERWRITE_SCOPES = ["table", "partitions"] as const;
 export type OverwriteScope = (typeof OVERWRITE_SCOPES)[number];
 
-/** 序 37 新字段在任务行上的形态(全部可选)。 */
+/** 新字段在任务行上的形态(全部可选)。 */
 export interface SyncCapabilityFields {
   whereClause?: string;
   businessTimezone?: string;
@@ -116,7 +116,7 @@ export interface SyncCapabilityFields {
   partitionKeys?: string[];
   allowEmptyOverwrite?: boolean;
   sourceColumns?: Record<string, string[]>;
-  /** B-61:合并键(writeMode=merge 时必填,非空;大小写不敏感去重) */
+  /** 合并键(writeMode=merge 时必填,非空;大小写不敏感去重) */
   mergeKeys?: string[];
 }
 
@@ -213,7 +213,7 @@ function targetNamingOf(task: TaskLike): TargetNamingConfig {
   };
 }
 
-/** 任务的「带变量源表名 → 样例表」(序 56;只做规整不做校验,非对象 ⇒ {})。 */
+/** 任务的「带变量源表名 → 样例表」(只做规整不做校验,非对象 ⇒ {})。 */
 export function templateSampleTablesOf(task: { templateSampleTables?: unknown }): Record<string, string> {
   const raw = task.templateSampleTables;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -223,7 +223,7 @@ export function templateSampleTablesOf(task: { templateSampleTables?: unknown })
 }
 
 /**
- * 序 56 守卫:两张源表(普通 / 带日期变量)解析后的目标表名相同 ⇒ 同一次运行向同一张目标表写两次
+ * 守卫:两张源表(普通 / 带日期变量)解析后的目标表名相同 ⇒ 同一次运行向同一张目标表写两次
  * (覆盖模式下后写的盖掉先写的,追加模式下行数翻倍)。比较口径 = 生成器 Python 侧的 `_san`
  * (小写 + 非 [a-z0-9_] 换 _ + 数字开头补 _;TS 唯一作者 sanitizeS3TablesIdentifier),与真跑时落到哪张表一致。
  * 典型成因:为了看列结构,把模板的某个月表也勾成了普通表,两者的目标名都是 ods_xxx。返回说明文案;没有撞车 ⇒ null。
@@ -247,7 +247,7 @@ export function targetTableNameCollision(task: TaskLike): string | null {
 }
 
 /**
- * 校验序 37 新字段。返回第一条不合法的说明(中文,直接回给用户),全合法返回 null。
+ * 校验新字段。返回第一条不合法的说明(中文,直接回给用户),全合法返回 null。
  * `paradigm`(数据源范式)已知时多校一条:过滤条件与表名模板只支持 JDBC 源。
  * 只看新字段;不带任何新字段的存量任务恒返回 null。
  */
@@ -278,7 +278,7 @@ export function validateSyncCapabilityFields(task: TaskLike, paradigm?: string):
       return `源表名「${tpl}」带日期变量,必须为它指定一个固定的目标表名(不能带变量)`;
     }
   }
-  // 序 56:样例表只用来读列结构 —— 键必须是本任务里带变量的源表名,值是源库里一张真表(不带变量)
+  // 样例表只用来读列结构 —— 键必须是本任务里带变量的源表名,值是源库里一张真表(不带变量)
   if (t.templateSampleTables !== undefined && t.templateSampleTables !== null) {
     if (typeof t.templateSampleTables !== "object" || Array.isArray(t.templateSampleTables)) {
       return "样例表(templateSampleTables)必须是「带日期变量的源表名 → 样例表名」的对象";
@@ -290,7 +290,7 @@ export function validateSyncCapabilityFields(task: TaskLike, paradigm?: string):
       }
     }
   }
-  // 序 56:目标表名撞车(普通表 vs 模板的固定目标名 / 两张普通表规范化后同名)⇒ 拒,不等到真跑写两次
+  // 目标表名撞车(普通表 vs 模板的固定目标名 / 两张普通表规范化后同名)⇒ 拒,不等到真跑写两次
   const collision = targetTableNameCollision(task);
   if (collision) return collision;
   if (t.businessTimezone !== undefined && t.businessTimezone !== null && t.businessTimezone !== "" && !isValidBusinessTimezone(t.businessTimezone)) {
@@ -331,7 +331,7 @@ export function validateSyncCapabilityFields(task: TaskLike, paradigm?: string):
     }
     if (paradigm && paradigm !== "jdbc") return `指定源列(sourceColumns)目前只支持 JDBC 类数据源(当前数据源范式 ${paradigm})`;
   }
-  // B-61:合并写入必须给合并键。只对走 Glue 脚本的任务判(实时 DMS 的 merge 是 CDC 自己的语义,不用这个字段);
+  // 合并写入必须给合并键。只对走 Glue 脚本的任务判(实时 DMS 的 merge 是 CDC 自己的语义,不用这个字段);
   //   非 merge 带了 mergeKeys 不报错(生成器不读)。🔴 不给缺省、不猜主键 —— 猜错就是把别的行合并掉。
   if (task.writeMode === "merge" && usesGlueWriteMode(task)) {
     if (t.mergeKeys !== undefined && t.mergeKeys !== null && !Array.isArray(t.mergeKeys)) return "合并键(mergeKeys)必须是列名数组";

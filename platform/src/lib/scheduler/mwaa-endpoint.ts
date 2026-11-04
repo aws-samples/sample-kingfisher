@@ -1,4 +1,3 @@
-// @kf-batch 50-WP13-mwaa-region
 // **MWAA 端点解析器 —— 「哪个 target 用哪一套 Airflow(环境名 + DAG 桶 + region)」的唯一作者**(50 SPEC v3.26 §3.14)。
 //
 // 【为什么必须单独一个文件】用户拍板(2026-09-06,DESIGN §18 决策 6sexies):「每个区域的定时任务都是自己区域的 MWAA 执行的,
@@ -11,15 +10,15 @@
 // 【非 home fail-closed】描述符 `components ∌ mwaa` 或资源袋缺 `dagBucket` / `mwaaEnvName` ⇒ 抛 `MwaaNotInstalled`,
 //   绝不回落 home(回落 = 把该区任务塞回 home 调度 = 用户明令禁止的跨区域调度)。
 // 【一次列全】`requireMwaaForTargets` 把所有缺失 target 一起列(交互宪法 B6「前置校验提前告知」),路由据此回 409 + 直达补装。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import { MWAAClient, CreateCliTokenCommand } from "@aws-sdk/client-mwaa";
 import { apiError } from "@/lib/api-response";
 import { getTargetRaw, type ExecutionTarget } from "@/lib/exec-env/registry";
 import { HOME_TARGET_ID, assertTargetId, isHome } from "@/lib/exec-env/target-id";
-// @kf-batch 50-WP31-place-first-class 序 31 第二刀 ②:端点解析 = 「这个工作流的产物在哪个区」的落点决策 ⇒ 在唯一作者这里记账。
-//   第四十三轮 observe:DELETE /api/workflow/<id> 撤 DAG 的 s3.DeleteObject 落在该区的 workflow 桶上(没越区),
+// 端点解析 = 「这个工作流的产物在哪个区」的落点决策 ⇒ 在唯一作者这里记账。
+//   DELETE /api/workflow/<id> 撤 DAG 的 s3.DeleteObject 落在该区的 workflow 桶上(没越区),
 //   却因为撤回链只经 bindingTargets()(纯解析,不记决策)⇒ 未归因。发布 / 触发 / 取日志同一条链,一处记齐。
 import { notePlaceDecision } from "@/lib/place/context";
 
@@ -43,15 +42,15 @@ export interface MwaaMissing {
   reason: string;
 }
 
-// @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §2.1 订正):拒因泛化为「缺**任一**调度组件」⇒ 码改 SCHEDULER_NOT_INSTALLED;
+// (SPEC v3.27 §2.1 订正):拒因泛化为「缺**任一**调度组件」⇒ 码改 SCHEDULER_NOT_INSTALLED;
 //    旧码 MWAA_NOT_INSTALLED 作别名保留一版(客户端两个都认:lib/scheduler/mwaa-missing.ts)。
 export const SCHEDULER_NOT_INSTALLED_CODE = "SCHEDULER_NOT_INSTALLED" as const;
 export const LEGACY_MWAA_NOT_INSTALLED_CODE = "MWAA_NOT_INSTALLED" as const;
-/** 历史名(WP-13 引入):值已随 v3.27 改为 SCHEDULER_NOT_INSTALLED。 */
+/** 历史名(引入):值已随 v3.27 改为 SCHEDULER_NOT_INSTALLED。 */
 export const MWAA_NOT_INSTALLED_CODE = SCHEDULER_NOT_INSTALLED_CODE;
 export const SCHEDULER_OPTIONS = ["airflow-serverless", "mwaa"] as const;
 
-/** @kf-batch 50-WP15-airflow-serverless:MWAA Serverless 端点(该 target 的定义桶 / 角色 / SG / 子网;workflow 由平台按作业建)。 */
+/** MWAA Serverless 端点(该 target 的定义桶 / 角色 / SG / 子网;workflow 由平台按作业建)。 */
 export interface ServerlessEndpoint {
   kind: "serverless";
   targetId: string;
@@ -62,7 +61,7 @@ export interface ServerlessEndpoint {
   subnetIds: string[];
   home: boolean;
 }
-/** 调度端点联合:经典 MWAA(无 kind 字段,保留 WP-13 形状)或 serverless。 */
+/** 调度端点联合:经典 MWAA(无 kind 字段,保留形状)或 serverless。 */
 export type SchedulerEndpoint = MwaaEndpoint | ServerlessEndpoint;
 export function isServerlessEndpoint(ep: SchedulerEndpoint): ep is ServerlessEndpoint {
   return (ep as { kind?: unknown }).kind === "serverless";
@@ -120,7 +119,7 @@ export function mwaaMissingReason(t: Pick<ExecutionTarget, "components" | "resou
   return null;
 }
 
-// @kf-batch 50-WP15-airflow-serverless ────────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────
 /** 描述符 → serverless 缺失原因(null = 装齐)。纯函数,单测直接打。 */
 export function serverlessMissingReason(t: Pick<ExecutionTarget, "components" | "resources">): string | null {
   const comps = Array.isArray(t.components) ? t.components : [];
@@ -149,7 +148,7 @@ function serverlessEndpointOf(t: ExecutionTarget, home: boolean): ServerlessEndp
   };
 }
 
-// @kf-batch 50-WP15-airflow-serverless(施工序 6):值域 SSOT 搬到叶子模块 lib/exec-env/scheduler-preference.ts(zod / 写通道 / 前端同源)
+// 值域 SSOT 搬到叶子模块 lib/exec-env/scheduler-preference.ts(zod / 写通道 / 前端同源)
 export type { SchedulerPreference } from "@/lib/exec-env/scheduler-preference";
 import type { SchedulerPreference } from "@/lib/exec-env/scheduler-preference";
 
@@ -210,10 +209,10 @@ export async function mwaaEndpointFor(targetId: string): Promise<MwaaEndpoint> {
 
 /**
  * 一次核全部 target,缺的**一起**列(宪法 B6);全齐 ⇒ 返回 targetId → endpoint 的表。
- * 🔴 调用方必须在**任何写副作用之前**调它(S3 Put / Glue 建作业 / application):缺 MWAA 时零产物(ACCEPTANCE E-208)。
+ * 🔴 调用方必须在**任何写副作用之前**调它(S3 Put / Glue 建作业 / application):缺 MWAA 时零产物(ACCEPTANCE)。
  */
 export async function requireMwaaForTargets(targets: readonly string[]): Promise<Map<string, SchedulerEndpoint>> {
-  // @kf-batch 50-WP15-airflow-serverless:名字沿用(wiring 守卫钉的就是它),语义 = 「任一调度组件」(schedulerEndpointFor)
+  // 名字沿用(wiring 守卫钉的就是它),语义 = 「任一调度组件」(schedulerEndpointFor)
   const out = new Map<string, SchedulerEndpoint>();
   const missing: MwaaMissing[] = [];
   for (const tid of Array.from(new Set(targets))) {
@@ -245,7 +244,7 @@ export function mwaaErrorResponse(e: MwaaNotInstalled) {
 
 // ── Airflow CLI(CreateCliToken 在 **endpoint 所在 region**)────────────────────────────
 const clients = new Map<string, MWAAClient>();
-// @kf-batch 50-WP4quater-reads(工单 SC-3)—— 导出:编排的任务日志路由要用 `InvokeRestApi`,
+// 导出:编排的任务日志路由要用 `InvokeRestApi`,
 // 那是本文件的 `mwaaCli`(CLI 通道)覆盖不到的第二种调用形态。让它复用**同一份按区客户端缓存**,
 // 而不是在那个路由里再 new 一个(new 一个就又多了一处「默认主控区」的来源)。
 export function mwaaClientFor(region: string): MWAAClient {
@@ -292,7 +291,7 @@ export async function unpauseWhenLoaded(
   dagIds: readonly string[],
   opts: { attempts?: number; intervalMs?: number } = {}
 ): Promise<string[]> {
-  // @kf-batch 50-WP15-airflow-serverless:serverless workflow 建时即 TriggerMode=scheduled,无「解挂」概念
+  // serverless workflow 建时即 TriggerMode=scheduled,无「解挂」概念
   if (isServerlessEndpoint(ep)) return [...dagIds];
   const attempts = opts.attempts ?? 18;
   const intervalMs = opts.intervalMs ?? 10_000;

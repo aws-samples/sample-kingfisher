@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 50-P50.2c-control-api
 // 创建执行环境向导(50 INTERACTION §1.2:三步 = 选 region+命名预览 → 选组件 → 确认并一键部署)。
 //
 // 点「开始部署」后:POST register(服务端生成 targetId)→ POST deploy(经窄权 broker)→
@@ -11,16 +10,15 @@ import { ReloadOutlined, RocketOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { resourceName } from "@/lib/aws/naming";
 import { COMPONENT_META, deployTarget, getCandidateRegions, previewTargetId, registerTarget } from "./api";
-// @kf-batch 50-WP15-airflow-serverless(K-5 网络规模)
+// (K-5 网络规模)
 import { requiredComponentsFor } from "@/lib/exec-env/implemented-components";
-// @kf-batch 50-W5-seg1-WP10a —— 法域格式 + 免责告知(单作者;INTERACTION v2.17 §1.2 / §4bis.4)
+// 法域格式 + 免责告知(单作者;INTERACTION v2.17 §1.2 / §4bis.4)
 import { JURISDICTION_RE, HOME_JURISDICTION } from "@/lib/exec-env/residency";
 import { DISCLAIMER_TEXT, DISCLAIMER_VERSION, currentDisclaimerAck } from "@/lib/residency/disclaimer";
 import BuildProgress from "./BuildProgress";
 
 const { Text } = Typography;
 
-// @kf-batch 50-WP27b-n-region-auto
 // 🔴🔴 **这里原来是一份写死的 7 个区候选表 + 默认值 `us-west-2`,已删。**
 //   用户 2026-09-20:「不能硬编码两个,应该是多区域自动的……即便是开 N 个区域,也是一样的。」
 //   勘定:**后端本来就是 N 区自动的**(`registerTarget` 只校验 region 形态,任何合法区都收),
@@ -58,29 +56,29 @@ export default function CreateWizard({
   const [regionSrcErr, setRegionSrcErr] = useState<string | null>(null);
   /** 候选区清单最近一次真查的时刻 / 正在查 / 手动刷新计数(每点一次「刷新」就真查一次账号) */
   const [regionQueriedAt, setRegionQueriedAt] = useState<string | null>(null);
-  /** 序 48:账号清单里控制面已放行(含预授权候选区)的区数 —— 选区下方一行只读说明 */
+  /** 账号清单里控制面已放行(含预授权候选区)的区数 —— 选区下方一行只读说明 */
   const [preauthCount, setPreauthCount] = useState<number>(0);
   const [regionLoading, setRegionLoading] = useState(false);
   const [regionReload, setRegionReload] = useState(0);
   const [jurisdiction, setJurisdiction] = useState("home");
-  /** @kf-batch 50-W5-seg1-WP10a:跨法域时 Step 3 的免责告知勾选(不勾 ⇒〔开始部署〕禁用;服务端另核一次) */
+  /** 跨法域时 Step 3 的免责告知勾选(不勾 ⇒〔开始部署〕禁用;服务端另核一次) */
   const [ackChecked, setAckChecked] = useState(false);
   const crossJurisdiction = jurisdiction !== HOME_JURISDICTION;
   const jurisdictionValid = JURISDICTION_RE.test(jurisdiction);
   const [cellId, setCellId] = useState("");
   const [stage, setStage] = useState("");
-  // @kf-batch 50-WP16-zero-egress:K-5 的「网络规模」单选与 EIP 配额预检**已删除** ——
+  // K-5 的「网络规模」单选与 EIP 配额预检**已删除**
   //   执行环境零出网(SPEC §3.16):不建 NAT、不占 EIP ⇒ 既没有档可选,也没有 EIP 配额要预检。
   //   Step1 只留 region / 法域 / cellId / stage,底部一行只读说明(INTERACTION v2.21 §1.1)。
   const [submitting, setSubmitting] = useState(false);
   /**
-   * @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 组件**不可选**(用户 2026-10-10:「不做精简区域,所有区域都必须要完整」)。
+   * ② —— 🔴🔴 组件**不可选**(用户 2026-10-10:「不做精简区域,所有区域都必须要完整」)。
    * 组件集由法域唯一决定(SSOT `requiredComponentsFor`;服务端注册逐项核对同一份),向导只读展示。
    */
   const required = useMemo(() => requiredComponentsFor({ isHome: false, jurisdiction }), [jurisdiction]);
   /** register+deploy 成功后置位 ⇒ Step3 原地切进度视图。 */
   const [deployed, setDeployed] = useState<{ targetId: string; buildId: string } | null>(null);
-  /** @kf-batch 50-init-region-enablement 注册响应里的「控制面尚未放行该 region」提示(有则 Step3 结果区渲染) */
+  /** 注册响应里的「控制面尚未放行该 region」提示(有则 Step3 结果区渲染) */
   const [regionNotice, setRegionNotice] = useState<string | null>(null);
 
 
@@ -101,7 +99,7 @@ export default function CreateWizard({
     });
   }, [previewId, t]);
 
-  // @kf-batch 50-WP27b-n-region-auto —— 打开向导时取**账号真值**的候选区。
+  // 打开向导时取**账号真值**的候选区。
   // 🔴 拿不到就**响亮报错**,绝不回落到一份写死的清单(那正是本刀要消灭的东西)。
   // 打开向导与点「刷新」都**真查一次**账号(路由 no-store,这里也 no-store;不在前端留缓存)。
   useEffect(() => {
@@ -114,10 +112,10 @@ export default function CreateWizard({
         if (!alive) return;
         setRegionQueriedAt(d.queriedAt);
         const occ = new Map(d.occupied.map((o) => [o.region, o]));
-        // @kf-batch 50-B40-candidate-blocked —— 组织策略拦住的区同样「列出来但点不动」,并写明被拦的动作(拒因层 = 组织 SCP)
+        // 组织策略拦住的区同样「列出来但点不动」,并写明被拦的动作(拒因层 = 组织 SCP)
         const blk = new Map((d.blocked ?? []).map((b) => [b.region, b]));
         const unv = new Map((d.orgPolicy?.unverified ?? []).map((u) => [u.region, u]));
-        // 序 48:控制面已放行(含安装 / 升级时预授权的候选区)的区 —— 建完即可用;其余区构建后还要运维跑一次放行命令。
+        // 控制面已放行(含安装 / 升级时预授权的候选区)的区 —— 建完即可用;其余区构建后还要运维跑一次放行命令。
         //   在选区那一刻就说清,不让用户等 25 分钟构建完才在「检测初始化」撞见。
         const cpe = new Set(d.controlPlaneEnabled ?? []);
         setPreauthCount(cpe.size);
@@ -179,15 +177,15 @@ export default function CreateWizard({
         region,
         // accountId/partition 服务端自取(带上会被 400)—— 严格控制面同账号。
         jurisdiction,
-        // @kf-batch 50-W5-seg1-WP10a:跨法域注册必带当前版本的免责告知同意(服务端逐字核对,SPEC §2.1 v3.22)
+        // 跨法域注册必带当前版本的免责告知同意(服务端逐字核对,SPEC §2.1 v3.22)
         ...(crossJurisdiction ? { residencyAck: currentDisclaimerAck() } : {}),
         ...(cellId ? { cellId } : {}),
         ...(stage ? { stage } : {}),
-        // @kf-batch 50-PROD-B-seq33 ②:完整组件集(SSOT 派生,服务端逐项核对;不提供精简形态)
+        // ②:完整组件集(SSOT 派生,服务端逐项核对;不提供精简形态)
         components: required,
       });
       message.success(t("已注册:{id}", { id: reg.targetId }));
-      // @kf-batch 50-init-region-enablement —— 当场说清接下来会卡在哪(init 段 I-4:否则要到「检测初始化」才见 9 行红)
+      // 当场说清接下来会卡在哪(init 段 I-4:否则要到「检测初始化」才见 9 行红)
       setRegionNotice(reg.controlPlaneRegionEnabled === false && reg.notice ? reg.notice : null);
       try {
         const dep = await deployTarget(reg.targetId);
@@ -280,7 +278,7 @@ export default function CreateWizard({
             tooltip={t("缺省 home。非 home 法域(如 eu-sim)须装 residency-api(区域审计 / 结果存储)—— 这是技术前置,不是审批;格式小写字母开头、[a-z0-9-]、2–32 位")}
             validateStatus={jurisdictionValid ? undefined : "error"}
             help={jurisdictionValid ? undefined : t("格式非法:小写字母开头、只含 a-z / 0-9 / -,2–32 位(如 home / eu-sim;不收 EU / Home)")}
-            // @kf-batch 50-PROD-B-seq33 ④:只提示不拦截(用户 2026-10-10)—— 法域标记不由 region 推导,只能靠人改
+            // ④:只提示不拦截(用户 2026-10-10)—— 法域标记不由 region 推导,只能靠人改
             extra={<span data-testid="wizard-jurisdiction-hint">{t("执行区与主控区不在同一法域时,请修改法域标记")}</span>}
           >
             <Input value={jurisdiction} onChange={(e) => setJurisdiction(e.target.value.trim() || "home")} style={{ maxWidth: 320 }} />
@@ -293,7 +291,7 @@ export default function CreateWizard({
               <Input value={stage} onChange={(e) => setStage(e.target.value.trim())} style={{ width: 200 }} />
             </Form.Item>
           </Space>
-          {/* @kf-batch 50-WP16-zero-egress:取代原「网络规模」单选 + EIP 配额预检的只读说明 */}
+          {/* 取代原「网络规模」单选 + EIP 配额预检的只读说明 */}
           <Alert
             data-testid="wizard-zero-egress-note"
             type="info"
@@ -338,7 +336,7 @@ export default function CreateWizard({
 
       {step === 1 && (
         <div>
-          {/* @kf-batch 50-PROD-B-seq33 ②:只读清单 —— 每个执行环境都装齐,没有勾选 */}
+          {/* ②:只读清单 —— 每个执行环境都装齐,没有勾选 */}
           <div data-testid="wizard-components-readonly">
             {COMPONENT_META.filter((c) => required.includes(c.key)).map((c) => (
               <div key={c.key} data-testid={`wizard-component-${c.key}`} style={{ padding: "6px 0", borderBottom: "1px solid rgba(0,0,0,0.04)" }}>
@@ -387,7 +385,7 @@ export default function CreateWizard({
             message={t("点击后平台经 CodeBuild 自动部署(部署权隔离,§12.0),无需手敲命令;向导将原地显示实时进度")}
           />
           {crossJurisdiction && (
-            // @kf-batch 50-W5-seg1-WP10a —— 免责告知(INTERACTION v2.17 §4bis.4 时点 ①):文案单作者 disclaimer.ts,
+            // 免责告知(INTERACTION v2.17 §4bis.4 时点 ①):文案单作者 disclaimer.ts,
             //    不勾 ⇒〔开始部署〕禁用;勾了 ⇒ 注册请求带 residencyAck,服务端核对版本 / 文本哈希后写进描述符(可回查)。
             <Alert
               style={{ marginTop: 12 }}
@@ -442,7 +440,7 @@ export default function CreateWizard({
               description={regionNotice}
             />
           )}
-          {/* 显式带 buildId:绕开「首拉 vs broker 回写 lastBuildId」竞态(P50.2e3 实测:竞态输了会
+          {/* 显式带 buildId:绕开「首拉 vs broker 回写 lastBuildId」竞态(实测:竞态输了会
               拿到 phase="none" 被当终态停轮询,进度页永远「当前无构建」) */}
           <BuildProgress targetId={deployed.targetId} buildId={deployed.buildId || undefined} />
           <div style={{ textAlign: "right", marginTop: 16 }}>

@@ -1,4 +1,4 @@
-// 序 58 B-130 —— 平台自建安全组持久清理作业的 handler 判据(与 runner 的装配在 app/api/datasources/__tests__/delete-guard-assembly.test.ts)。
+// 平台自建安全组持久清理作业的 handler 判据(与 runner 的装配在 app/api/datasources/__tests__/delete-guard-assembly.test.ts)。
 //   只 mock 真外部(EC2 / Glue / RDS 客户端工厂);handler ↔ datasource-service(count / delete)之间不 mock。
 //   判据:
 //     ① 网卡 > 0 且在预算内 ⇒ wait 30 s,**不发 Delete**,证据记 eniCount;
@@ -58,7 +58,7 @@ beforeEach(() => {
   h.groups = { "sg-plat": "bgp-ds-12345678", "sg-cust": "customer-db-access" };
 });
 
-describe("🔴 B-130 sg-cleanup handler:按网卡事实收口", () => {
+describe("🔴 sg-cleanup handler:按网卡事实收口", () => {
   it("① 网卡 2 张、入队 1 分钟 ⇒ wait 30 s,不发 Delete,证据 eniCount=2", async () => {
     h.enis = 2;
     const r = await sgCleanupJobHandler.step(ctx(job()));

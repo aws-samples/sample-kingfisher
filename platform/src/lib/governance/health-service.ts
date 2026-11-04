@@ -1,4 +1,4 @@
-// 模块 36 (E2) — 治理健康分 / 工作台聚合服务。
+// (E2) — 治理健康分 / 工作台聚合服务。
 //
 // 把散落的治理信号聚合成一个"治理健康总分"(0–100,加权)+ 分维度分 + 资产榜 + 待办工作台。
 // **纯聚合读,零新表**:数据源全是现有表(分级/质量结果/血缘 + 最近一次敏感扫描)。表全集取自
@@ -11,11 +11,10 @@ import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { introspectSchema } from "@/lib/genbi/schema";
 import { listAllClassifications } from "@/lib/governance/classification";
-// @kf-batch 50-WP4quater-reads(工单 SC-8)
 import { parseScopedFqn, displayFqn } from "@/lib/governance/scoped-fqn";
 import { resolveRedshiftBinding } from "@/lib/exec-env/data-plane-target";
 import { getLatestScan } from "@/lib/governance/sensitive/scan";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
 
 const WORKGROUP = homeWorkgroup();
@@ -42,7 +41,7 @@ function bareKey(fqn: string): string {
 }
 
 // i18n:后端只出 key + params(不拼中文成品串),前端按语种 t(key, params) 渲染。
-// 与模块 34 告警消息 msgKey/msgParams 同一约定 —— 面向全球用户,避免英文模式残留中文。
+// 与告警消息 msgKey/msgParams 同一约定 —— 面向全球用户,避免英文模式残留中文。
 export interface I18nText {
   key: string;
   params?: Record<string, string | number>;
@@ -82,7 +81,7 @@ export interface GovernanceHealth {
 }
 
 // 进程内缓存 ~60s(避免每次刷屏都全量聚合)。
-// @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 缓存必须按 target 分键:
+// 🔴 缓存必须按 target 分键
 // 一个全局缓存会让「切到 us-west-2」在 60 秒内看到主控区的健康分 —— 而那个数字看起来完全正常。
 const _cache = new Map<string, { at: number; data: GovernanceHealth }>();
 const CACHE_MS = 60_000;
@@ -94,7 +93,7 @@ async function latestQualityByTable(wantTarget: string): Promise<Map<string, { s
     .send(new ScanCommand({ TableName: TABLES.QUALITY_RESULTS, FilterExpression: "kind = :k", ExpressionAttributeValues: { ":k": "summary" } }))
     .catch(() => ({ Items: [] as any[] }));
   for (const it of Items as any[]) {
-    // 🔴 按键上的区筛:落 SC-8 之后 fqn 是 `<targetId>::<fqn>`(home 裸 fqn)。
+    // 🔴 按键上的区筛:落此后 fqn 是 `<targetId>:<fqn>`(home 裸 fqn)。
     // 不筛的话两个区的质量结果混算成一个平均分 —— 用户的词是「串味」。
     const { fqn, targetId } = parseScopedFqn(String(it.fqn || ""));
     if (targetId !== wantTarget) continue;
@@ -125,10 +124,10 @@ async function tablesWithLineage(wantTarget: string): Promise<Set<string>> {
   return set;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 落点与项目都必填:原来 `targetId?` + `|| HOME_TARGET_ID`,且非主控区不带项目
+// 落点与项目都必填:原来 `targetId?` + `|| HOME_TARGET_ID`,且非主控区不带项目
 //   ⇒ `resolveRedshiftBinding` 必抛、被 `.catch(() => null)` 吞成「表全集为空」⇒ 健康分在空分母上照常算出一个看着正常的数。
 export async function computeHealth(refresh: boolean, targetId: string, projectId: string | null): Promise<GovernanceHealth> {
-  // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 健康分按区算。用户 2026-09-10 点名:
+  // 🔴 健康分按区算。用户 2026-09-10 点名
   // 「治理健康分依赖质量 / 血缘 / 分类三路信号,而它们的键里没有区维(按 fqn 聚合)——
   //  同名表跨区会互相顶,按区出分会串味;必须先给这三路加区维」。三路已加(scopedFqn),这里按区聚合。
   const wantTarget = targetId;
@@ -156,7 +155,7 @@ export async function computeHealth(refresh: boolean, targetId: string, projectI
     listAllClassifications().catch(() => []),
     latestQualityByTable(wantTarget),
     tablesWithLineage(wantTarget),
-    // @kf-batch 50-WP28-platform-action-node —— 🔴 敏感扫描也按区取(原来全表取最新 ⇒ 别的区的扫描进了本区的分)
+    // 🔴 敏感扫描也按区取(原来全表取最新 ⇒ 别的区的扫描进了本区的分)
     getLatestScan({ targetId: wantTarget }).catch(() => null),
   ]);
   // 🔴 分级也按键上的区筛,并把区前缀剥掉再比(表全集用的是不带前缀的 OM 约定 fqn)

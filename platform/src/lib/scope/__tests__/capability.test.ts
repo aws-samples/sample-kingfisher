@@ -1,7 +1,6 @@
-// @kf-batch 50-WP4-o1-scope
 // `scope-capability-guard` + `capabilityForPath` 的单测(合同 SPEC v3.35 §2.6.7;矩阵 INTERACTION §9.6)。
 //
-// 🔴 本门禁要防的是**盲区**:平台有 40 个页面路由,WP-4 只接 6 个单元。
+// 🔴 本门禁要防的是**盲区**:平台有 40 个页面路由,只接 6 个单元。
 // 少登记一条 = 那一页静默按「全部」渲染,用户切到 us-west-2 却看到全平台数据。
 
 import { describe, it, expect } from "vitest";
@@ -14,7 +13,6 @@ import {
   capabilityForPath,
   isFollows,
   isNoGate,
-  // @kf-batch 50-WP4ter-coverage
   GLOBAL_REASONS,
   isNotWired,
 } from "../capability";
@@ -82,7 +80,7 @@ describe("scope-capability-guard —— 登记面必须盖满真实路由", () =
     expect(REGISTERED_MENU_KEYS.length + Object.keys(EXTRA_ROUTE_SCOPE).length).toBe(ROUTES.length);
   });
 
-  // @kf-batch 50-WP4ter-coverage —— 原判据「global-only 的 scopeWired 恒 true」已作废:
+  // 原判据「global-only 的 scopeWired 恒 true」已作废
   // 新类型里 `global-only` 根本没有 wired 这一维(它不参与「过滤没过滤」这个问题),
   // 取而代之的是**自证**:必须有登记过的理由码 + 「按区的东西去哪看」。
   it("🔴 `global-only` 必须自证:理由码在封闭集合里 + insteadSee 指向真实路由或 self", () => {
@@ -121,7 +119,7 @@ describe("scope-capability-guard —— 登记面必须盖满真实路由", () =
 
 describe("capabilityForPath", () => {
   it("精确命中菜单叶", () => {
-    // 🔴 `scopeWired` **不写死字面量**:它会随施工序第 5 步逐个单元翻成 true,
+    // 🔴 `scopeWired` **不写死字面量**:它会逐个单元翻成 true,
     // 写死就得每接一页改一次测试(而那种改动很容易顺手把断言改松)。这里断「查出来的 == 登记的」。
     for (const key of ["/etl-jobs", "/exec-envs", "/genbi", "/monitor"] as const) {
       expect(capabilityForPath(key), key).toEqual(MENU_ROUTE_SCOPE[key]);
@@ -149,7 +147,6 @@ describe("capabilityForPath", () => {
     expect(capabilityForPath("/nonexistent-page")).toMatchObject({
       scope: "global-and-target",
       wired: false,
-      ticket: "SC-16",
     });
   });
 

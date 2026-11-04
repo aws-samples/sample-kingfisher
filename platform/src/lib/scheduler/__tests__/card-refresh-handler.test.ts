@@ -1,4 +1,4 @@
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // 🔴 卡片定时刷新的执行体:三道重验在**刷新之前**,任一不过 ⇒ 失败且一次都不刷;
 //    通过 ⇒ 以服务身份 + 作者 sub 调唯一作者 refreshCardOnce(与「立即刷新」同一个函数)。
 // 另含接线判据:路由 / 删卡顺序 / 页面入口 / 调度中心。

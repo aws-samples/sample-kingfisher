@@ -1,4 +1,4 @@
-// @kf-batch 37-wf-sync-backfill —— 序 37 装配层判据:补数中心 × **工作流里的数据同步节点**,整条链一起跑。
+// 装配层判据:补数中心 × **工作流里的数据同步节点**,整条链一起跑。
 //   建计划路由(真)→ forcedBackfillConcurrency(真)→ createPlan / expandInstances(真)→ tick(真)→ executeInstance(真)
 //   → 工作流 sync 分支 → sync-task 入口判定(真)→ 启动核心 startGlueSyncRun(真)→ 后台轮询(真)→ run 台账(真)
 //   → reconcile 解锁级联下游 SQL 节点(真,Data API 假客户端)→ 计划收口(真)。
@@ -291,7 +291,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("序 37 工作流 sync 节点可补数 —— 白名单与强制并发(单一作者)", () => {
+describe("工作流 sync 节点可补数 —— 白名单与强制并发(单一作者)", () => {
   it("node-registry:sync 节点进补数白名单", () => {
     expect(nodeSupportsBackfill("sync")).toBe(true);
     expect(nodeSupportsBackfill("python")).toBe(false);
@@ -306,7 +306,7 @@ describe("序 37 工作流 sync 节点可补数 —— 白名单与强制并发(
   });
 });
 
-describe("序 37 工作流 sync 节点 —— 建计划(/api/backfill/plan)", () => {
+describe("工作流 sync 节点 —— 建计划(api/backfill/plan)", () => {
   it("预览:2 天 × 2 节点 = 4 个实例,sync 节点在内;客户端传并发 5 被强制成 1;级联下 sql 依赖同日期的 sync", async () => {
     const r = await plan(body({ dryRun: true }));
     expect(r.status).toBe(200);
@@ -326,7 +326,7 @@ describe("序 37 工作流 sync 节点 —— 建计划(/api/backfill/plan)", ()
   });
 });
 
-describe("序 37 工作流 sync 节点 —— 执行 + 级联 + 回收(整条链一起跑)", () => {
+describe("工作流 sync 节点 —— 执行 + 级联 + 回收(整条链一起跑)", () => {
   it("两天逐天:sync 实例跑关联任务(StartJobRun 带 --ds)⇒ 成功后同日期 sql 节点才跑;run 落在同步任务名下;不扇出、不推水位", async () => {
     const p = await createPlan();
     expect(p.concurrency).toBe(1);

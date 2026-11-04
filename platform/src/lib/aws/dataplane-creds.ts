@@ -1,9 +1,8 @@
-// @kf-batch 50-WP31-seq5-dataplane-role
-// WP-31 序 5(L5「能力即授权」)—— 数据面凭证 = 代入**该区那一个执行环境**的平台数据面角色。
+// (L5「能力即授权」)—— 数据面凭证 = 代入**该区那一个执行环境**的平台数据面角色。
 //
 // ── 为什么 ───────────────────────────────────────────────────────────────────────
-// 序 1–4 让「落点写错」在代码层当场暴露(类型必填 / 入口 400 / 越区断言)。但代码层的断言**可以被绕过**
-// (散建客户端、非 SDK 通道、断言本身的 bug)。L5 把第二道闸放进 IAM:平台 TaskRole 最终(序 5 第三刀)
+// 让「落点写错」在代码层当场暴露(类型必填 / 入口 400 / 越区断言)。但代码层的断言**可以被绕过**
+// (散建客户端、非 SDK 通道、断言本身的 bug)。L5 把第二道闸放进 IAM:平台 TaskRole 最终
 // **对任何区都不持有数据面权限**,只能经工厂代入「该 target 的平台数据面角色」—— 角色 = 资源只限本 target ∧
 // `aws:RequestedRegion = 该区`。落点错 ⇒ 拿到的是别的 target 的凭证 ⇒ 碰不到本 target 以外的东西。
 //
@@ -11,7 +10,7 @@
 //   taskrole  —— 现状(第一刀部署时的缺省):数据面客户端照旧用任务角色。
 //   observe   —— 先用数据面角色发;**被 IAM 拒**就记一条 `place.creds.denied`(服务 / 区 / target / AWS 原话,
 //                原话里带 action 与资源 ARN)再用任务角色重发 ⇒ 功能不受影响,一轮全量硬门拿到**角色策略缺口的完整清单**
-//                (与序 2「先观测再拦截」同一路数:用事实而不是 grep 量出改造面)。
+//                (与「先观测再拦截」同一路数:用事实而不是 grep 量出改造面)。
 //   enforce   —— 只用数据面角色(第三刀;同时收回 TaskRole 的数据面直授)。
 //   只认这三个字面值;拼错一律 taskrole(与 `BGP_PLACE_GUARD` 同语义:拼错不许变成「半开」的第四态)。
 //
@@ -165,13 +164,13 @@ export function isIdentitySensitive(input: unknown): boolean {
 }
 
 /**
- * 🔴 B-49(序 36 第二十五轮真环境):请求里带了要**交给服务**的 IAM 角色 ARN(PassRole:DMS endpoint 的
+ * 🔴 请求里带了要**交给服务**的 IAM 角色 ARN(PassRole:DMS endpoint 的
  *   SecretsManagerAccessRoleArn / EMR executionRoleArn / Flink ServiceExecutionRole …)⇒ 服务按**调用者**核 iam:PassRole。
  *   有的服务被拒时**不回 AccessDenied**:DMS CreateEndpoint 回 `InvalidParameterValueException: SecretsManagerSecretId is invalid`
  *   ⇒ observe 认不出是权限、不回落 ⇒ 实时任务起不来(observe 号称「功能不变」被打破)。
  *   ⇒ 带角色 ARN 的请求一律按身份敏感:observe 直接用任务角色并记 identity-sensitive(清单 = 第二刀给数据面角色补 PassRole 的输入)。
  */
-// 序 72 B-139:角色 ARN 形态单一作者(lib/execution-role/resolve.ts);此处原有一份前缀版正则,已收口
+// 角色 ARN 形态单一作者(lib/execution-role/resolve.ts);此处原有一份前缀版正则,已收口
 function passesRole(v: unknown, depth = 0): boolean {
   if (typeof v === "string") return isRoleArn(v);
   if (depth > 6 || v === null || typeof v !== "object") return false;
@@ -228,7 +227,7 @@ interface Sendable {
 }
 
 function operationOf(command: unknown): string {
-  // 🔴 B-47:Next 产物里类名被压成单字母(真环境 operation 全是 "C" / "s")⇒ 先读 SDK 命令自带的操作模式
+  // 🔴 Next 产物里类名被压成单字母(真环境 operation 全是 "C" / "s")⇒ 先读 SDK 命令自带的操作模式
   //   `schema = [9, 命名空间, 操作名, …]`(不受压缩影响),读不到才退回类名
   const sc = (command as { schema?: unknown })?.schema;
   if (Array.isArray(sc) && sc[0] === 9 && typeof sc[2] === "string" && sc[2]) return sc[2];

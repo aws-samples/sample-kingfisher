@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads
 /**
  * 🔴🔴 **读取级执行范围台账**(页内每一次取数,不是每一页)。
  *
@@ -17,8 +16,6 @@
  * 🔴 判据只看 **URL 实参**,不看整个调用文本:本仓 `targetId` 被复用成表单字段名
  * (`SlaPanel` 里它指 SLA 绑的任务 id),拿整段调用文本去匹配会把那种页面判成「已带范围」= 假绿。
  */
-import type { ScopeTicket } from "./capability";
-
 /** 一处「不带执行范围的读取」为什么可以不带。**封闭枚举** —— 编不出理由 = 它就是欠账。 */
 export type UnscopedReadReason =
   /** 全平台只有一份对应物(一个 OpenMetadata / 一个 AgentCore 的技能清单 / 通知渠道出口),按区拆没有对应物。 */
@@ -29,7 +26,7 @@ export type UnscopedReadReason =
   | "by-id-server-derives"
   /** 这次读取的**用途本身就是跨范围**(「其他范围里还有 N 条」提示;项目发现页要看全平台可申请的项目)。 */
   | "cross-scope-by-design"
-  /** 🔴 欠账。必须带工单号,并在 WORK-PACKAGES 的台账里查得到。 */
+  /** 🔴 欠账。必须带工单号,并在 台账里查得到。 */
   | "not-wired-yet";
 
 interface UnscopedReadBase {
@@ -43,9 +40,7 @@ interface UnscopedReadBase {
   note: string;
 }
 
-export type UnscopedRead =
-  | (UnscopedReadBase & { reason: Exclude<UnscopedReadReason, "not-wired-yet">; ticket?: never })
-  | (UnscopedReadBase & { reason: "not-wired-yet"; ticket: ScopeTicket });
+export type UnscopedRead = UnscopedReadBase & { reason: UnscopedReadReason };
 
 /**
  * 🔴 全表。**修好一处就删一条**,新长出一处就必须在这里交代。
@@ -71,7 +66,7 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
     note: "按 planId 取补数计划详情:纯 DDB 取行,不打区域性端点(计划行上已有绑定章,列表侧已按范围过滤)",
   },
   {
-    // @kf-batch 50-SEQ47b-backfill-observability —— 补数实例抽屉「查看运行日志」复用监控页同一个弹窗
+    // 补数实例抽屉「查看运行日志」复用监控页同一个弹窗
     page: "/backfill", file: "components/monitor/RunLogModal.tsx", api: "/api/monitor/tasks",
     reason: "by-id-server-derives",
     note: "按 (taskId, runId) 取补数实例底层那条 run 的日志:服务端按 run 行上的章解落点,解析不到回 409 说清原因(与监控页同一条路、同一个作者)",
@@ -80,7 +75,7 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   {
     page: "/bi", file: "components/bi/AnalysisWorkbench.tsx", api: "/api/bi/reports",
     reason: "cross-scope-by-design",
-    note: "画布里「导入已有报表」的候选清单:把**别区**的报表放进当前看板是合法用法(一张仪表盘可以并排放不同区的图,SPEC §8.3)⇒ 刻意不按范围筛,而是在每个候选后面标出它取哪个区的数;看板**列表**侧另有一个默认关的按区过滤开关(SC-28 定案:增加过滤能力、默认不过滤)",
+    note: "画布里「导入已有报表」的候选清单:把**别区**的报表放进当前看板是合法用法(一张仪表盘可以并排放不同区的图,SPEC §8.3)⇒ 刻意不按范围筛,而是在每个候选后面标出它取哪个区的数;看板**列表**侧另有一个默认关的按区过滤开关(定案:增加过滤能力、默认不过滤)",
   },
   // ── Copilot 计划中心 ────────────────────────────────────────────────
   {
@@ -102,7 +97,7 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   {
     page: "/datasources", file: "app/datasources/page.tsx", api: "/api/datasources",
     reason: "by-id-server-derives",
-    note: "按 datasourceId 浏览库表:凭证客户端按 **secret ARN 里的 region** 建(ARN 自带 region,是单一真值源);AWS 原生源(DDB / S3 / MSK / Kinesis)的 region 从行上的连接袋取;JDBC 是直连 host:port。SC-31 修的就是这里原来那个模块级主控区 Secrets Manager 客户端",
+    note: "按 datasourceId 浏览库表:凭证客户端按 **secret ARN 里的 region** 建(ARN 自带 region,是单一真值源);AWS 原生源(DDB / S3 / MSK / Kinesis)的 region 从行上的连接袋取;JDBC 是直连 host:port。此前修的就是这里原来那个模块级主控区 Secrets Manager 客户端",
   },
   // ── 离线作业 ────────────────────────────────────────────────────────
   {
@@ -121,16 +116,14 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
     note: "按 (type, id) 取某个对象的配置版本历史:版本随对象走,纯 DDB 取行",
   },
   {
-    // @kf-batch 50-SEQ47a-promote-ux
     page: "/etl-jobs", file: "components/common/EnvPromotionStatus.tsx", api: "/api/promote/lineage",
     reason: "by-id-row-lookup",
     note: "按 (type, id) 取同一个对象在 dev / staging / prod 的三份与待批准审批:环境维在行上、按 lineageId 取行,纯 DDB,不打任何区域端点;同一组件也挂在编排 / EMR / 同步详情",
   },
   {
-    // @kf-batch 50-WP5-rungroup
     page: "/etl-jobs", file: "components/monitor/RunGroupPanel.tsx", api: "/api/run-groups",
     reason: "cross-scope-by-design",
-    note: "「联动运行」这个对象**本身就是跨执行范围的**(一次点击在 N 个区各跑一次 = 一个组);按当前范围过滤会把它**截掉一半** —— 那正是 WP-19 GC-9 修掉的「列表按范围截肢」同一个坑(计数器说 97 张而列表只有 3 张)。读法是按 runGroupId 取一行 + 按 taskId Query 子 run(纯 DDB);要打区域性端点的只有「取消」,而那条路径按**每条 run 自己的 targetId** 建客户端(lib/monitor/run-cancel.ts,判据 E-163 钉死)",
+    note: "「联动运行」这个对象**本身就是跨执行范围的**(一次点击在 N 个区各跑一次 = 一个组);按当前范围过滤会把它**截掉一半** —— 那正是 GC-9 修掉的「列表按范围截肢」同一个坑(计数器说 97 张而列表只有 3 张)。读法是按 runGroupId 取一行 + 按 taskId Query 子 run(纯 DDB);要打区域性端点的只有「取消」,而那条路径按**每条 run 自己的 targetId** 建客户端(lib/monitor/run-cancel.ts,判据钉死)",
   },
   {
     page: "/etl-jobs", file: "components/engines/EmrJobPanel.tsx", api: "/api/engines",
@@ -146,7 +139,7 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   {
     page: "/finops", file: "components/finops/TaskCostTab.tsx", api: "/api/finops/tasks",
     reason: "by-id-row-lookup",
-    note: "按 taskId 取该任务的成本明细:run 级成本行上已有 targetId,列表侧已按范围过滤;明细每行回带 effectiveTargetId,前端按排行那一行的执行环境等值筛(WP-6)",
+    note: "按 taskId 取该任务的成本明细:run 级成本行上已有 targetId,列表侧已按范围过滤;明细每行回带 effectiveTargetId,前端按排行那一行的执行环境等值筛",
   },
   // ── 智能问数 ────────────────────────────────────────────────────────
   {
@@ -154,7 +147,6 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
     reason: "by-id-row-lookup",
     note: "按 taskId 轮询异步问数结果:纯 DDB 取行(落点已在提问时随 body.targetId 定下并盖在行上)",
   },
-  // @kf-batch 54-genbi-session-cards
   {
     page: "/genbi", file: "app/genbi/page.tsx", api: "/api/genbi/cards",
     reason: "by-id-server-derives",
@@ -166,7 +158,7 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
       "openCard 刻意用 `getTargetRaw` 而不是 `requireReadyTarget` —— 「能不能看」≠「能不能承接」。" +
       "**卡片列表**(集合)那一处是带 `?scope=` 的,在 components/genbi/SessionCards.tsx 里,不在本表。",
   },
-  // @kf-batch 50-WP28-platform-action-node(WP-29 问数)
+  // (问数)
   {
     page: "/genbi", file: "components/genbi/SessionCards.tsx", api: "/api/genbi/cards",
     reason: "by-id-row-lookup",
@@ -210,10 +202,10 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   },
   // ── 任务监控 ────────────────────────────────────────────────────────
   {
-    // @kf-batch 50-SEQ47b-backfill-observability —— 「运行日志」弹窗抽成唯一作者 components/monitor/RunLogModal.tsx(监控页与补数页同用),读取随之搬家
+    // 「运行日志」弹窗抽成唯一作者 components/monitor/RunLogModal.tsx(监控页与补数页同用),读取随之搬家
     page: "/monitor", file: "components/monitor/RunLogModal.tsx", api: "/api/monitor/tasks",
     reason: "by-id-server-derives",
-    note: "按 taskId 取运行日志:服务端已按 run 行上的 targetId 解出落点(S3 日志桶 + CloudWatch 都按那个区建),解析不到**回 409 并说清原因**而不是回落主控区取一份空日志 —— SC-34 修的就是这一点",
+    note: "按 taskId 取运行日志:服务端已按 run 行上的 targetId 解出落点(S3 日志桶 + CloudWatch 都按那个区建),解析不到**回 409 并说清原因**而不是回落主控区取一份空日志 —— 此前修的就是这一点",
   },
   {
     page: "/monitor", file: "components/common/DiagnosisButton.tsx", api: "/api/diagnostics",
@@ -261,12 +253,12 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   {
     page: "/settings", file: "app/settings/page.tsx", api: "/api/admin/pending-cleanups",
     reason: "cross-scope-by-design",
-    note: "序 58 B-130 后台清理任务清单:人要看的是**全平台所有执行环境**里还没清掉 / 需人工的平台安全组,按区拆开反而漏看;服务端按注册表逐区取作业表,每条带 region",
+    note: "后台清理任务清单:人要看的是**全平台所有执行环境**里还没清掉 / 需人工的平台安全组,按区拆开反而漏看;服务端按注册表逐区取作业表,每条带 region",
   },
   {
     page: "/settings", file: "app/settings/page.tsx", api: "/api/admin/datasource-network-objects",
     reason: "cross-scope-by-design",
-    note: "序 61 B-133 数据源网络对象清单:人要看的是**全平台所有执行环境**里平台自建的安全组各归谁 / 在不在用 / 是不是真孤儿,按区拆开正是误删事故的温床;服务端按注册表逐区 Describe,每条带 region / targetId",
+    note: "数据源网络对象清单:人要看的是**全平台所有执行环境**里平台自建的安全组各归谁 / 在不在用 / 是不是真孤儿,按区拆开正是误删事故的温床;服务端按注册表逐区 Describe,每条带 region / targetId",
   },
   {
     page: "/settings", file: "app/settings/page.tsx", api: "/api/system/wiring",
@@ -275,8 +267,8 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
   },
   {
     page: "/settings", file: "components/settings/AiModelCard.tsx", api: "/api/admin/model-config",
-    reason: "not-wired-yet", ticket: "SC-25",
-    note: "🔴 **只剩「按区分别设默认模型」这一半**:模型设置的作用域模型(`settingScope`)一期只有 `global`,per-region 覆盖(`settingScope=<targetId>#global`)是 **51 WP-8 / P51.3** 的设计决定 —— 50 这一刀不越权替它拍板。读侧已做实:模型**目录**按区取(`us.` 跨区推理配置在非美国区调不通),界面上标出清单属于哪个区、并说清保存的是全平台默认",
+    reason: "not-wired-yet",
+    note: "🔴 **只剩「按区分别设默认模型」这一半**:模型设置的作用域模型(`settingScope`)一期只有 `global`,per-region 覆盖(`settingScope=<targetId>#global`)是模型配置模块的设计决定 —— 本刀不越权替它拍板。读侧已做实:模型**目录**按区取(`us.` 跨区推理配置在非美国区调不通),界面上标出清单属于哪个区、并说清保存的是全平台默认",
   },
   {
     page: "/skills", file: "app/skills/page.tsx", api: "/api/genbi/skills",

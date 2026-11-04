@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-matrix2
 // 看板「处置」派发表的门禁(INTERACTION §3.1b)。
 //
 // 🔴 这一组测试防的是**一类**很难被别的门禁抓到的错:混排之后多了 code-table / model-table 两种行,

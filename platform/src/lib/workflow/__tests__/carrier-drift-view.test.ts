@@ -1,5 +1,4 @@
-// @kf-batch 50-B09-carrier-drift
-// B-09 **呈现面**(B2)的判据。机制在库里而界面上看不见 = 写了等于没写(本仓的元 bug),
+// **呈现面**(B2)的判据。机制在库里而界面上看不见 = 写了等于没写(本仓的元 bug),
 // 所以这一组既钉判别函数的**行为**,也钉界面**真的接到了它**。
 //
 // 🔴 这一组最值钱的是「只查了一半」那条:一行绑两个区、接口只回了一个区的结果时,
@@ -22,7 +21,7 @@ const armedRow = (targets: string[], drift?: Record<string, { state: string; rea
   ...(drift ? { carrierDrift: drift } : {}),
 });
 
-describe("B-09 B2 ① 判别函数:五态各自成立(行为判据)", () => {
+describe("B2 ① 判别函数:五态各自成立(行为判据)", () => {
   it("🔴 没有载体 ⇒ n/a(「落后」这个问题不成立,不是「最新」也不是「未检查」)", () => {
     expect(carrierDriftView({}).kind).toBe("n/a");
     expect(carrierDriftView({ deployments: {} }).kind).toBe("n/a");
@@ -89,7 +88,7 @@ describe("B-09 B2 ① 判别函数:五态各自成立(行为判据)", () => {
   });
 });
 
-describe("B-09 B2 ② 接线:界面真的接到了那个唯一作者", () => {
+describe("B2 ② 接线:界面真的接到了那个唯一作者", () => {
   const panel = strip(read("components/monitor/SchedulePanel.tsx"));
 
   it("🔴 在**调用位置**用了 carrierDriftView(不是只 import)", () => {
@@ -130,7 +129,7 @@ describe("B-09 B2 ② 接线:界面真的接到了那个唯一作者", () => {
   });
 });
 
-describe("B-09 B2 ③ 一键重发:复用产品已有的发布通道", () => {
+describe("B2 ③ 一键重发:复用产品已有的发布通道", () => {
   const panel = strip(read("components/monitor/SchedulePanel.tsx"));
 
   it("🔴 两类各打**既有**接口,不自己写一遍下发", () => {
@@ -139,7 +138,7 @@ describe("B-09 B2 ③ 一键重发:复用产品已有的发布通道", () => {
     const body = panel.slice(i, i + 1400);
     expect(body, "工作流没走既有的 publish 接口").toMatch(/\/api\/workflow\/\$\{r\.itemId\}\/publish/);
     expect(body, "同步任务没走既有的 schedule/enable 接口").toContain('"/api/schedule/enable"');
-    // 🔴 B-09 的病根就是「生成有两个作者」——界面自己拼产物就是把它埋回去
+    // 🔴该缺陷的病根就是「生成有两个作者」——界面自己拼产物就是把它埋回去
     for (const bad of ["buildCarrierArtifact", "buildWorkflowTasksYaml", "generateAirflowDag"]) {
       expect(body.includes(bad), `🔴 界面自己拼载体产物(${bad})⇒ 又出现第二个作者`).toBe(false);
     }
@@ -158,7 +157,7 @@ describe("B-09 B2 ③ 一键重发:复用产品已有的发布通道", () => {
   });
 });
 
-describe("B-09 B2 ④ 我这一刀自己拉大的竞态窗口,同刀封上", () => {
+describe("B2 ④ 我这一刀自己拉大的竞态窗口,同刀封上", () => {
   const panel = strip(read("components/monitor/SchedulePanel.tsx"));
 
   it("🔴🔴 fetchData 必须有陈旧响应守卫(withDrift 让响应从毫秒变成秒级)", () => {

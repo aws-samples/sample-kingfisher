@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 B-67:保存同步任务(PUT)时,**作业已存在**的任务要让 Glue 脚本跟上新定义。
+// 保存同步任务(PUT)时,**作业已存在**的任务要让 Glue 脚本跟上新定义。
 //
 // 【缺陷原形(2026-10-12 真环境)】脚本只在平台启动(手动 / 补数)时重生成;调度载体 `_exec_sync` 直接 start_job_run 旧作业。
 //   于是用户改了 WHERE / 分区 / 合并键 / 逐表确认之后,**定时运行一直跑旧脚本**,直到有人手动跑一次 —— 保存回 200,没有任何提示。
@@ -93,7 +93,7 @@ function fakeClient(svc: string) {
       const n = cmd.constructor.name;
       if (svc === "s3" && n === "PutObjectCommand") { if (h.s3PutFails) { const e = new Error("S3 down"); e.name = "ServiceUnavailable"; throw e; } return {}; }
       if (svc === "s3" && n === "GetObjectCommand") return { Body: { transformToString: async () => JSON.stringify({ properties: {} }) } };
-      // 序 38 B-68:作业存在性由 GetJob 判(作业已存在 ⇒ 回定义);CreateJob 不该再被调到 —— 若调到,按 Glue 真实行为回幂等不匹配
+      // 作业存在性由 GetJob 判(作业已存在 ⇒ 回定义);CreateJob 不该再被调到 —— 若调到,按 Glue 真实行为回幂等不匹配
       if (svc === "glue" && n === "GetJobCommand") return { Job: { Name: input.JobName, GlueVersion: "5.0" } };
       if (svc === "glue" && n === "CreateJobCommand") { const e = new Error("Job already submitted with different configuration"); e.name = "IdempotentParameterMismatchException"; throw e; }
       if (svc === "glue" && n === "UpdateJobCommand") { if (h.glueUpdateFails) { const e = new Error("Role arn:aws:iam::123456789012:role/bgp-glue-role is not passable"); e.name = "InvalidInputException"; throw e; } return {}; }
@@ -133,14 +133,14 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("🔴 B-67 保存同步任务 ⇒ 作业已存在时脚本跟上定义", () => {
+describe("🔴 保存同步任务 ⇒ 作业已存在时脚本跟上定义", () => {
   it("改 WHERE ⇒ 200;脚本重新写进脚本桶(Body 含新 WHERE)、作业 UpdateJob;落库发生在脚本写入**之后**", async () => {
     const r = await put({ whereClause: "status = 'active'" });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(s3Puts()).toHaveLength(1);
     expect(s3Puts()[0].input.Key).toBe(`glue-scripts/${TASK_ID}.py`);
     expect(String(s3Puts()[0].input.Body)).toContain("status = 'active'");
-    // 作业定义(序 38 B-68):GetJob 判存在 ⇒ 直接 UpdateJob,**不再先试 CreateJob**(定义有变时那一步会被 Glue 幂等不匹配拒掉);
+    // 作业定义:GetJob 判存在 ⇒ 直接 UpdateJob,**不再先试 CreateJob**(定义有变时那一步会被 Glue 幂等不匹配拒掉);
     //   S3 Tables 命名空间的 GetCatalog / CreateCatalog 也在同一条链上,不在此断
     expect(glueCalls().filter((c) => c.endsWith("JobCommand"))).toEqual(["GetJobCommand", "UpdateJobCommand"]);
     const iPut = h.calls.findIndex((c) => c.svc === "s3" && c.cmd === "PutObjectCommand");
@@ -165,7 +165,7 @@ describe("🔴 B-67 保存同步任务 ⇒ 作业已存在时脚本跟上定义"
     expect(taskSets()).toHaveLength(0);
     expect(h.task.whereClause).toBeUndefined();
   });
-  it("序 38 B-68:UpdateJob 失败 ⇒ 502 说清「保存未生效」且带 Glue 原话,任务字段**不落库**(原来这个失败被吞成 200)", async () => {
+  it("UpdateJob 失败 ⇒ 502 说清「保存未生效」且带 Glue 原话,任务字段**不落库**(原来这个失败被吞成 200)", async () => {
     h.glueUpdateFails = true;
     const r = await put({ glueConfig: { glueVersion: "5.1", numberOfWorkers: 4 } });
     expect(r.status, JSON.stringify(r.body)).toBe(502);
@@ -175,7 +175,7 @@ describe("🔴 B-67 保存同步任务 ⇒ 作业已存在时脚本跟上定义"
     expect(taskSets()).toHaveLength(0);
     expect(h.task.glueConfig).toBeUndefined();
   });
-  it("序 38 B-68:改 Glue 版本 / Worker 数 ⇒ UpdateJob 的 JobUpdate 真带新值(GlueVersion / NumberOfWorkers),不是沿用旧定义", async () => {
+  it("改 Glue 版本 / Worker 数 ⇒ UpdateJob 的 JobUpdate 真带新值(GlueVersion / NumberOfWorkers),不是沿用旧定义", async () => {
     const r = await put({ glueConfig: { glueVersion: "5.1", numberOfWorkers: 4, workerType: "G.2X" } });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     const upd = h.calls.find((c) => c.svc === "glue" && c.cmd === "UpdateJobCommand");
@@ -183,7 +183,7 @@ describe("🔴 B-67 保存同步任务 ⇒ 作业已存在时脚本跟上定义"
     expect(upd!.input.JobUpdate).toMatchObject({ GlueVersion: "5.1", NumberOfWorkers: 4, WorkerType: "G.2X" });
     expect(h.calls.filter((c) => c.svc === "glue" && c.cmd === "CreateJobCommand")).toHaveLength(0);
   });
-  it("序 38 B-69:写 S3 Tables 的任务把 Glue 版本改成 5.0 ⇒ 400 说清原因,零 S3 / Glue 调用、不落库", async () => {
+  it("写 S3 Tables 的任务把 Glue 版本改成 5.0 ⇒ 400 说清原因,零 S3 / Glue 调用、不落库", async () => {
     const r = await put({ glueConfig: { glueVersion: "5.0" } });
     expect(r.status, JSON.stringify(r.body)).toBe(400);
     expect(String(r.body?.error?.message ?? JSON.stringify(r.body))).toContain("5.1");

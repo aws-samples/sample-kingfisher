@@ -1,4 +1,4 @@
-// 模块 26 — 业务口径/术语/规则「一键预置」的 global 单一事实源(所有项目/用户开箱即用)。
+// 业务口径/术语/规则「一键预置」的 global 单一事实源(所有项目/用户开箱即用)。
 //
 // Why: 「业务口径与规则」页(app/knowledge)此前无任何数据,空库对新用户毫无引导价值,且
 // GenBI Agent 的 lookup_business_context 技能 / 代码生成 grounding 查不到任何口径。

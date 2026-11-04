@@ -1,4 +1,4 @@
-// 模块 42 — 数据源注册表(表驱动,照抄 lib/engines/registry.ts)。
+// 数据源注册表(表驱动,照抄 lib/engines/registry.ts)。
 // 加数据源 = 这张表加一行 + 独立 provider 文件纯增量;老代码零改动。
 
 import type { DataSourceProvider } from "./spi";
@@ -17,10 +17,10 @@ const PROVIDERS: Record<DataSourceType, DataSourceProvider> = {
   postgresql: postgresProvider,
   oracle: oracleProvider,
   sqlserver: sqlserverProvider,
-  kinesis: kinesisProvider, // 流范式(P42.7)
-  msk: mskProvider, // 流范式第二个:MSK / Kafka(P42.6)
-  dynamodb: dynamodbProvider, // NoSQL 范式首个(P42.5)
-  s3: s3Provider, // 对象存储范式首个(P42.4)
+  kinesis: kinesisProvider, // 流范式
+  msk: mskProvider, // 流范式第二个:MSK / Kafka
+  dynamodb: dynamodbProvider, // NoSQL 范式首个
+  s3: s3Provider, // 对象存储范式首个
 };
 
 export function isDataSourceType(v: unknown): v is DataSourceType {

@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 🔴🔴 **装配层判据(2026-09-13 立)** —— 只 mock **真外部**(DDB / S3 / 注册表 / 模型侧),
 // `cards-service` ↔ `cards-store` ↔ `cards-body-store` **之间一律不 mock**。
 //
@@ -48,7 +47,7 @@ function conflict() {
   return e;
 }
 
-// @kf-batch 50-WP28-platform-action-node —— 刷新会写 run 台账(手动那次)⇒ 记下来给判据看
+// 刷新会写 run 台账(手动那次)⇒ 记下来给判据看
 const runRows = vi.hoisted(() => [] as Array<Record<string, any>>);
 vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { GENBI_CARDS: "bgp-genbi-cards", TASK_RUNS: "bgp-task-runs" },
@@ -311,7 +310,7 @@ describe("🔴🔴 装配层:service ↔ store ↔ body-store 之间不 mock", (
   });
 });
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 describe("🔴🔴 装配层:卡片刷新(refresh ↔ store ↔ body-store ↔ runSelect 之间不 mock)", () => {
   const USER = { sub: SUB, username: "u1", groups: [], isPlatformAdmin: false, isManager: false, isDeveloper: false, demo: false } as any;
   const manual = { triggeredBy: "manual" as const, actor: { kind: "user" as const, identity: USER } };

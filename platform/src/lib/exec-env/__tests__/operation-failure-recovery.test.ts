@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // 🔴 唯一失败写入方 `recordOperationFailure` 的行为门禁(SPEC §3.5b;外部审核 §19.8)。
 //
 // 【本文件的四条承重】

@@ -1,14 +1,13 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
 // `bgp-task-runs` 唯一写通道的门禁 + 变异靶子(52 SPEC §1 / 50 SPEC §1.2 / §6 S10)。
 //
-// 🔴 **本文件刻意全部写成「可执行断言」**。上一批(P52.1-D4)有一条分页门禁**第一版是假门禁**:
+// 🔴 **本文件刻意全部写成「可执行断言」**。上一批有一条分页门禁**第一版是假门禁**:
 // 它只扫标识符名字,于是把 `ExclusiveStartKey = undefined` 这个变异照样判绿。
 // ⇒ 这里凡是能跑的都跑:内存 DDB 打桩 + 真的调生成器 + 真的调 AST 量具,
 // 只有「Python 源码」这一处没法执行(它在 MWAA 里跑),那一处才退回文本断言。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-// @kf-batch 50-W3f-T0-T3(零依赖模块,静态 import 不受下面的 DDB mock 影响)
+// (零依赖模块,静态 import 不受下面的 DDB mock 影响)
 import { runGroupIdFor, RUN_GROUP_ATTR } from "@/lib/monitor/run-group";
 
 // ── 内存 DDB:只实现本通道用到的语义(Put 整行替换 / Update 条件写 + if_not_exists / Query 翻页)──
@@ -52,7 +51,6 @@ vi.mock("@/lib/aws/dynamodb", () => ({
       if (cond.includes("attribute_exists(taskId)") && !row) {
         throw new ConditionalCheckFailedException("row missing");
       }
-      // @kf-batch 50-WP18b-fanout-seam
       // 🔴 真的**求值**条件表达式,别只认几个特例:「不许改写已取消的 run」那道守卫写的是
       //   `(attribute_not_exists(#k0) OR #k0 <> :gstopped)` —— 老 mock 的 `\w+` 匹配不到 `#k0`,
       //   于是守卫**被 mock 静默忽略**,针对它写的判据会变成空断言(mock 抹平接缝的典型形态)。
@@ -263,7 +261,7 @@ describe("resolveRunStamp:归属取资源行,两个缺省各有出处", () => {
     expect(resolveRunStamp(null).projectId).toBe("proj-default");
   });
 
-  it("targetId 优先级:显式传参 > 资源行 > home(P50.3 扇出靠第一档)", () => {
+  it("targetId 优先级:显式传参 > 资源行 > home(扇出靠第一档)", () => {
     expect(resolveRunStamp({ targetId: "tgt_a" }, "tgt_b").targetId).toBe("tgt_b");
     expect(resolveRunStamp({ targetId: "tgt_a" }).targetId).toBe("tgt_a");
     expect(resolveRunStamp({}).targetId).toBe("tgt_home");
@@ -310,7 +308,6 @@ describe("🔴 盖章覆盖门禁:裸写入点只允许出现在写通道自己�
   });
 });
 
-// @kf-batch 50-W3f-T0-T3
 describe("🔴 T2:runGroupId 只经一等参数进入写通道(50 SPEC §1.3a S6 ②)", () => {
   it("多区扇出:两条 run 同一个 runGroupId;单区:行上**没有**该属性(不是 null / 空串)", async () => {
     const rg = runGroupIdFor(["tgt_home", "tgt_usw2_a"]) as string;
@@ -329,7 +326,6 @@ describe("🔴 T2:runGroupId 只经一等参数进入写通道(50 SPEC §1.3a S6
     expect(store["t1#r1"]).toBeUndefined();
   });
 
-  // @kf-batch 50-WP5-rungroup
   it("🔴 定时触发的确定性键 `rgs_<24hex>` 必须能写进台账(O2;漏了它 = 定时运行整批没有历史)", async () => {
     const rgs = "rgs_0123456789abcdef01234567";
     await putRunRecord({ taskId: "t1", runId: "r1", taskType: "etl-glue", stamp: STAMP, runGroupId: rgs });
@@ -346,7 +342,6 @@ describe("🔴 T2:runGroupId 只经一等参数进入写通道(50 SPEC §1.3a S6
   });
 });
 
-// @kf-batch 50-WP18b-fanout-seam
 describe("🔴🔴 用户取消的终态不许被任何自动化写回改写", () => {
   it("已 stopped 的 run:写 failed / succeeded 都被拒(返回 false 且行**一个字节没变**)", async () => {
     await putRunRecord({ taskId: "j1", runId: "r1", taskType: "etl-redshift", stamp: STAMP });
@@ -385,7 +380,7 @@ describe("🔴🔴 用户取消的终态不许被任何自动化写回改写", (
   });
 });
 
-// @kf-batch 50-WP18b-fanout-seam —— 语义映射:被取消 ≠ 失败(三处写点同一张表)
+// 语义映射:被取消 ≠ 失败(三处写点同一张表)
 describe("🔴 ABORTED / STOPPED 是「被取消」,不是「失败」", () => {
   const fs = require("node:fs") as typeof import("node:fs");
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");

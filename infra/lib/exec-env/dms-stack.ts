@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3a-component-stacks
 // 执行环境 **dms 组件**栈(50 SPEC §1.1 的 `dms` 资源袋:`dmsSubnetGroup`)。
 //
 // 【本栈为什么这么薄 —— 不是没做完,是 DMS 的形态如此】
@@ -18,7 +17,7 @@ import { Construct } from "constructs";
 import { resourceName } from "../shared/naming";
 import { ExecEnvStack, type ExecEnvStackProps } from "./exec-env-stack";
 import { boundStatement, bucketArnPair, perTargetExecRole, serviceTrust } from "./exec-roles";
-// @kf-batch 50-WP16-zero-egress —— 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
+// 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
 import { execEnvPrivateSubnets } from "./private-subnets";
 
 export interface ExecEnvDmsStackProps extends ExecEnvStackProps {
@@ -35,11 +34,11 @@ export class ExecEnvDmsStack extends ExecEnvStack {
     const p = cdk.Aws.PARTITION;
     const { region, account } = ctx;
 
-    // ── @kf-batch 50-W5-seg1-WP3:per-target DMS 统一角色(SPEC v3.21 §6.1 段二)──────────────────
+    // ──:per-target DMS 统一角色(SPEC v3.21 §6.1 段二)──────────────────
     // 照抄 home `realtime-stack.ts` 的 `bgp-dms-kinesis-role`:信任 dms + **区域化** dms.<region> + redshift(COPY 时
     // assume 本角色读 S3 暂存);动作集相同,资源面改指本 target 的数据湖桶 / 本 region secret。
     // 🔴 **消费方接线不在本包**:DMS 实时同步尚未 target 化(`dms-service.ts` 仍读 home 的 `DMS_ROLE_ARN`),
-    //    归 WP-7 / WP-10b;这里先把角色与探活备好,免得届时又回头改栈(再改一次 = usw2 再重新部署一次)。
+    //    ;这里先把角色与探活备好,免得届时又回头改栈(再改一次 = usw2 再重新部署一次)。
     const dmsRole = perTargetExecRole(this, "DmsKinesisRole", {
       ctx,
       kind: "dmsKinesisRole",
@@ -90,7 +89,7 @@ export class ExecEnvDmsStack extends ExecEnvStack {
     });
 
     new cdk.CfnOutput(this, "dmsSubnetGroup", { value: subnetGroupId });
-    // 🔴 WP-3:组件**可选**键(平台 `COMPONENT_OPTIONAL_RESOURCES.dms`,读到才进袋;不追溯存量必填)
+    // 🔴 组件**可选**键(平台 `COMPONENT_OPTIONAL_RESOURCES.dms`,读到才进袋;不追溯存量必填)
     new cdk.CfnOutput(this, "dmsKinesisRoleArn", { value: dmsRole.roleArn });
   }
 }

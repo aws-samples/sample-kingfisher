@@ -1,4 +1,4 @@
-// 序 38 B-71 —— 外部表桶登记的装配判据(只 mock 真外部:DDB、s3tables 客户端、落点解析)。
+// 外部表桶登记的装配判据(只 mock 真外部:DDB、s3tables 客户端、落点解析)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@aws-sdk/client-s3tables";
 
@@ -60,7 +60,7 @@ const s3t = {
 
 beforeEach(() => { h.rows.clear(); h.calls.length = 0; h.bucketExists = true; process.env.AWS_ACCOUNT_ID = "123456789012"; });
 
-describe("B-71 表桶名", () => {
+describe("表桶名", () => {
   it("合法 / 非法", () => {
     expect(assertTableBucketName("bigdata-test-sg-tables")).toBe("bigdata-test-sg-tables");
     expect(assertTableBucketName("  abc  ")).toBe("abc");
@@ -73,7 +73,7 @@ describe("B-71 表桶名", () => {
   });
 });
 
-describe("B-71 登记 / 列 / 撤销", () => {
+describe("登记 / 列 / 撤销", () => {
   it("登记:核该区真有(GetTableBucket 按该区 ARN)→ 落 bgp-settings 一行;列得到;撤销后列不到", async () => {
     const row = await registerExternalTableBucket({ targetId: "tgt_home", bucket: "bigdata-test-sg-tables", label: " 客户自有 ", addedBy: "admin", s3tablesClient: s3t, now: new Date("2026-10-13T03:00:00Z") });
     expect(row).toEqual({ targetId: "tgt_home", bucket: "bigdata-test-sg-tables", region: "ap-southeast-1", label: "客户自有", addedBy: "admin", addedAt: "2026-10-13T03:00:00.000Z" });

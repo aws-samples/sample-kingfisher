@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { requireProject } from "@/lib/projects/guard";
 import { getResults, resolveAthenaPlace } from "@/lib/athena/client";
@@ -21,7 +21,6 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   if (chk instanceof NextResponse) return chk;
   const nextToken = req.nextUrl.searchParams.get("nextToken") || undefined;
   try {
-    // @kf-batch 50-WP4ter-coverage
     const place = await resolveAthenaPlace(requestedTargetId(req.nextUrl.searchParams.get("targetId"), "取 Athena 结果"));
     const results = await getResults(params.id, 1000, nextToken, place.region);
     recordAudit(req, "athena.result.read", {

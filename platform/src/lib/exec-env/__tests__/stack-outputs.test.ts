@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // stack-outputs(CFN Outputs 取数层)单测 —— **顶层 import + 顶层 vi.mock**(唯一已证可靠的组合;
 // 动态 import + 包名 mock 实测拦不住、会真打 AWS,见 stack-outputs.ts 文件头)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -79,9 +78,9 @@ describe("readExecEnvStackOutputs", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// P50.3a:可选组件栈的**组件驱动**读取
+// 可选组件栈的**组件驱动**读取
 // ══════════════════════════════════════════════════════════════════════════════
-describe("可选组件栈(P50.3a:读到才算装了)", () => {
+describe("可选组件栈(读到才算装了)", () => {
   /** 按栈名分发:`present` 里的栈返回 outputs,其余抛真 CFN 的 "does not exist" 文案。 */
   function stacks(present: Record<string, Record<string, string>>) {
     cfnSend.mockImplementation(async (cmd: { input: { StackName: string } }) => {
@@ -102,7 +101,7 @@ describe("可选组件栈(P50.3a:读到才算装了)", () => {
     await readExecEnvStackOutputs("us-west-2", "tgt_usw2_a");
     const asked = cfnSend.mock.calls.map((c) => (c[0] as { input: { StackName: string } }).input.StackName).sort();
     expect(asked).toEqual(
-      // @kf-batch 50-WP13-mwaa-region:mwaa 已实现 ⇒ 它的栈也要探一次(补装刚装的 mwaa 才发现得了)
+      // mwaa 已实现 ⇒ 它的栈也要探一次(补装刚装的 mwaa 才发现得了)
       [BASE, CORE, "BgpExecEnv-tgt-usw2-a-redshift", "BgpExecEnv-tgt-usw2-a-dms", "BgpExecEnv-tgt-usw2-a-flink", "BgpExecEnv-tgt-usw2-a-residency-api", "BgpExecEnv-tgt-usw2-a-mwaa", "BgpExecEnv-tgt-usw2-a-airflow-serverless"].sort()
     );
   });
@@ -144,7 +143,7 @@ describe("可选组件栈(P50.3a:读到才算装了)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// P50.3a 跨侧接缝:redshift 组件栈吐 secret **名字**,平台侧按名换真 **ARN**
+// 跨侧接缝:redshift 组件栈吐 secret **名字**,平台侧按名换真 **ARN**
 // (栈里拼不出 ARN —— 托管 secret 的 ARN 尾部是服务生成的随机后缀,且 CfnNamespace 无该 GetAtt)
 // ══════════════════════════════════════════════════════════════════════════════
 describe("🔴 redshiftSecretName → redshiftSecretArn(fail-closed,绝不拿名字冒充 ARN)", () => {

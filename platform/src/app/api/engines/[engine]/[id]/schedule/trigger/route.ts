@@ -1,8 +1,7 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP15-airflow-serverless(施工序 6)
-// POST /api/engines/[engine]/[id]/schedule/trigger —— EMR 引擎作业的〔触发一次〕(S-7);与 etl-jobs 同一份分路 lib/scheduler/trigger.ts。
+// POST /api/engines/[engine]/[id]/schedule/trigger —— EMR 引擎作业的〔触发一次〕;与 etl-jobs 同一份分路 lib/scheduler/trigger.ts。
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— targets 子集的唯一解析作者
+// targets 子集的唯一解析作者
 import { requestedSubset } from "@/lib/place/resolve";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";

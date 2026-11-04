@@ -4,10 +4,8 @@
 #
 #   MODEL=$(bash scripts/resolve-home-model.sh <profile> <home-region>) || exit 1
 #
-# @kf-batch 50-PROD-A-launch-hardening(h)
 # 🔴 为什么:出厂默认(platform/ai-model.json)是 `us.anthropic.…` —— **美国**跨区推理配置,
 #   只能从美国的区调用。客户把主控区选在欧洲 / 亚太 ⇒ 平台 9 个 AI 能力全部哑火(部署却是绿的)。
-# @kf-batch 51-v2-multi-vendor(模块 51 v2.0,51 SPEC §7.7)
 # 🔴 候选链:ai-model.json 的 `candidateModelIds`(有序;老 json 没有该字段 ⇒ [defaultModelId])。一个候选在本账号 /
 #   本区不可用(账号级未开放 / 未订阅 / 该区没有)就试下一个 —— 2026-10-14 临时账号实测 GLM 5.3 整个账号被拒
 #   (「not available for this account」)而 Kimi K3 能用;链上哪个先通就用哪个,**不许带着不能用的模型上线**。

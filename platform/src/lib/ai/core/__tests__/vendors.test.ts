@@ -1,4 +1,3 @@
-// @kf-batch 51-v2-multi-vendor
 // 厂商档案单测(51 SPEC §7.1;DESIGN §12 D3′ / D10)。钉的是**事实**:哪些 id 进选择面、剥前缀后归哪一系、
 // 字段支持矩阵与 2026-10-14 真环境勘定一致(DESIGN §12.2),以及地理前缀正则由系列键生成(加一家不漏一家)。
 import { describe, it, expect } from "vitest";
@@ -80,7 +79,7 @@ describe("字段支持矩阵 = 2026-10-14 真环境勘定(DESIGN §12.2)", () =>
     expect(v.maxTokensFactor).toBe(2);
     expect(v.toolUse).toBe("probe");
   });
-  // @kf-batch 51-v3-probe-budget(序 46 / B-106,2026-10-20 真测):Kimi K3 tiny / tool-use 探测 8 次采样 3.0–39.4s ⇒ 10s 预算 5 次超时
+  // (2026-10-20 真测):Kimi K3 tiny / tool-use 探测 8 次采样 3.0–39.4s ⇒ 10s 预算 5 次超时
   it("探测预算 probeTimeoutMs:每个系列都有且 ≥ 10s;Kimi K3 ≥ 40s(量出来的首字延迟上限)且 < 60s(ALB 墙,两探并行墙钟 ≈ max)", () => {
     for (const f of FAMILIES) {
       expect(typeof VENDORS[f].probeTimeoutMs, f).toBe("number");

@@ -2,7 +2,7 @@
 // Redshift Data API (ExecuteStatement -> poll DescribeStatement -> GetStatementResult),
 // matching the platform's existing /api/redshift/* pattern.
 
-// @kf-batch 50-WP2-directquery —— 裸客户端 / 落点 / 轮询收编进 `lib/redshift/direct-query.ts`。
+// 裸客户端 / 落点 / 轮询收编进 `lib/redshift/direct-query.ts`。
 // 🔴🔴 **用户 2026-09-09 拍板「连问数都可以切区」** ⇒ 不再 `assertHomeOnly`:
 //    问数的 SQL 打到**当前执行范围那个区的数仓**;AgentCore(模型侧)仍只在主控区,不受影响。
 import { directQueryRaw, resolveDirectQueryPlace } from "@/lib/redshift/direct-query";
@@ -20,7 +20,7 @@ export interface SqlRunResult {
   rows: (string | null)[][];
   rowCount: number;
   error?: string;
-  /** @kf-batch 50-B26-lake-place —— 这条 SQL 真发出去的落点(执行层回报;落点没解析出来就没有) */
+  /** 这条 SQL 真发出去的落点(执行层回报;落点没解析出来就没有) */
   ranIn?: RanInMeta;
 }
 
@@ -37,8 +37,8 @@ export async function runSelect(
   modelSql: string,
   workgroup: string,
   database: string,
-  // @kf-batch 52-P52.5a-supply — 加 `project` 位(静态归类:**project-context**)。
-  // @kf-batch 50-WP31-place-first-class —— 🔴 落点必填(原来可省 = 主控区;主控区也要点名 HOME_TARGET_ID)
+  // 加 `project` 位(静态归类:**project-context**)。
+  // 🔴 落点必填(原来可省 = 主控区;主控区也要点名 HOME_TARGET_ID)
   opts: { targetId: string; project: string | null }
 ): Promise<SqlRunResult> {
   const guard = sanitizeSelect(modelSql, GENBI.maxRows);
@@ -48,7 +48,6 @@ export async function runSelect(
 
   let ranIn: RanInMeta | undefined;
   try {
-    // @kf-batch 50-WP2-directquery
     // 🔴 落点取**该 target 的**四样;`workgroup`/`database` 入参仍优先(调用方显式给的赢),与收编前一致。
     // 🔴 静态归类仍是 **project-context**(问数在项目上下文里取数)⇒ 非 home 的凭证由绑定解析按 project 发。
     const place = await resolveDirectQueryPlace({ targetId: opts.targetId, projectId: opts.project });

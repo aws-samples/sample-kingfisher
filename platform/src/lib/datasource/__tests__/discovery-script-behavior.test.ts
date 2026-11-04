@@ -1,4 +1,4 @@
-// 序 38 B-70 —— 数据源表发现脚本的**行为**判据:平台生成的 PySpark 脚本原样丢进离线替身(discovery-harness.py,
+// 数据源表发现脚本的**行为**判据:平台生成的 PySpark 脚本原样丢进离线替身(discovery-harness.py,
 //   假 awsglue / pyspark / boto3)真跑,断**结果 JSON**(表 / 列顺序 / 可空 / 缺省 schema 去前缀 / 结果落点 / 用了哪份 secret),
 //   以及库名护栏真拒。它是 infra/prod-only-layers.json 里 `codegen:platform/src/lib/datasource/glue-reach.ts` 那一层的替身。
 import { describe, it, expect } from "vitest";
@@ -30,7 +30,7 @@ function run(dbType: string, rows: Row[], over: Record<string, unknown> = {}) {
 }
 const row = (p: Partial<Row>): Row => ({ tbl_schema: "", tbl_name: "t", col_name: "c", col_type: "int", col_nullable: "NO", col_key: "", col_comment: "", col_pos: 1, ...p });
 
-describe("B-70 发现脚本(替身真跑)", () => {
+describe("发现脚本(替身真跑)", () => {
   it("MySQL:两张表、列按 ordinal 排序、可空 YES/NO → 布尔、主键 / 备注透传;结果写到 --result_uri 指的桶 / 键;secret 与 JDBC 三样来自平台生成期", () => {
     const r = run("mysql", [
       row({ tbl_schema: "gamedb", tbl_name: "players", col_name: "name", col_type: "varchar(32)", col_nullable: "YES", col_pos: 2, col_comment: "昵称" }),

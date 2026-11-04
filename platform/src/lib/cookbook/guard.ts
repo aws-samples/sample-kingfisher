@@ -1,7 +1,7 @@
-// 模块 45 — 方言校验层(生成后安全网)。消费【与 retrieve 同源的 DialectRule】,
+// 方言校验层(生成后安全网)。消费【与 retrieve 同源的 DialectRule】,
 // 在落库/执行前检测并机械纠正 LLM 偶发的方言违规(即便提示词+配方已引导,LLM 仍可能偶发违反)。
 //
-// 【P45.5b 重构(2026-07-24)】纯逻辑(mask→匹配→区间 fix→fixpoint)已抽到 guard-core.ts 的
+// 【重构(2026-07-24)】纯逻辑(mask→匹配→区间 fix→fixpoint)已抽到 guard-core.ts 的
 // runGuardWithRules(rules,engine,code),inprocess 与 AgentCore 容器共用同一纯核(零手抄漂移)。
 // 本文件只做"取规则(经 registry,即系统内嵌 seed)+ 委托纯核",对外 API(guard/guardCode/detectableRuleCount)
 // 逐字不变——4 个消费者(GenBI inprocess/Copilot/离线ETL/实时Flink)零改动。

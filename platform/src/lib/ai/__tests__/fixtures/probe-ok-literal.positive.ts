@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // 类型级门禁对照(正向):只有 ok:true 的探测结果才能进 putGlobalModel —— 本文件必须 0 诊断。
 import { putGlobalModel } from "@/lib/settings/model-store";
 import type { ProbeOk } from "@/lib/ai/capabilities";

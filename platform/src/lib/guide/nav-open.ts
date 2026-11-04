@@ -1,7 +1,6 @@
-// @kf-batch 53-guide-tour-reach
 // 导览锚点的**可达性**规则(纯逻辑,单一作者)。
 //
-// 🔴 为什么需要这一层(WP-21 部署前勘定源码抓到的真缺口):
+// 🔴 为什么需要这一层(部署前勘定源码抓到的真缺口):
 //   左侧菜单是 antd 的 inline Menu,分类(SubMenu)**收起时子项压根不在 DOM 里**
 //   (`@rc-component/menu` 的 InlineSubMenuList:`forceRender: forceSubMenuRender`,默认 false;
 //    首次展开后 `removeOnLeave: false` 会把它留在 DOM 但 `display:none` ⇒ rect 0×0)。

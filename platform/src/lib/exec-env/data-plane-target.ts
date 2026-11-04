@@ -1,8 +1,7 @@
-// @kf-batch 50-P50.3-dataplane
 // 数据面执行体的 **target 绑定解析** —— 唯一作者(50 SPEC §3.1 / §3.4 / §3.8 的 `assertCapability`)。
 //
 // ── 这个文件解决的是什么 ────────────────────────────────────────────────────
-// P50.3 的核心价值是那句「**作业真在第二区域跑**」。要让它成立,一个执行体必须同时拿到**四样**东西:
+// 核心价值是那句「**作业真在第二区域跑**」。要让它成立,一个执行体必须同时拿到**四样**东西
 //   ① 客户端的 **region**    ② **workgroup**    ③ **database**    ④ **凭证 ARN**
 // 现网这四样各自散在不同地方(region 取 `process.env.AWS_REGION`、workgroup 走三级兜底、
 // 凭证走 `getRedshiftSecretArn()`),而且**只有 home 那一套**。
@@ -23,7 +22,7 @@
 // (它自己按 `PER_PROJECT_CRED` flag 决定要不要转 §3.9 工厂)。
 // 🔴 **刻意不让 home 也走 §3.9 工厂**:`tgt_home` 现在处于 `provisioning`(deadline 2026-10-04),
 // 一旦让 home 的执行路径依赖那个工厂,窗口过期后 home 的离线作业会全部 fail-closed ——
-// 那是把一个"过渡态的收敛压力"变成"存量业务被打挂"。home 的凭证口径改动属 P52.5b。
+// 那是把一个"过渡态的收敛压力"变成"存量业务被打挂"。home 的凭证口径改动。
 //
 // ── 🔴 非 home 为什么可以不依赖 `PER_PROJECT_CRED` flag ─────────────────────
 // `getPrivilegedCred(purpose:"project-context")` 在 `legacy-seeded` / 未过期 `provisioning` 下会
@@ -32,17 +31,17 @@
 // 而那个 flag 管的是**存量 18 个调用点**要不要切身份(见 `admin-secret.ts`),两件事不同。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
+// 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
 import { notePlaceDecision } from "@/lib/place/context";
 import { getTargetRaw, requireReadyTarget, type ExecutionTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-W5-seg1-WP10a —— 项目白名单判据的单一作者(SPEC §3.12 v3.22)
+// 项目白名单判据的单一作者(SPEC §3.12 v3.22)
 import { accessAllows, accessDeniedReason } from "@/lib/exec-env/residency";
 import { HOME_TARGET_ID, isHome, isValidTargetId, targetOfStamp } from "@/lib/exec-env/target-id";
-// @kf-batch 50-B109-exec-target-dims —— 维度清单与调度组件值域都只 import 单一作者,不手抄字面
+// 维度清单与调度组件值域都只 import 单一作者,不手抄字面
 import type { ExecTargetCapabilityDim } from "@/lib/exec-env/exec-targets-dims";
 import { SCHEDULER_PREFERENCE_COMPONENT } from "@/lib/exec-env/scheduler-preference";
 import { TargetBindingRejected, regionOfTarget } from "@/lib/exec-env/target-region";
-// @kf-batch 50-WP31-place-first-class —— 「能看」判据的单一作者
+// 「能看」判据的单一作者
 import { viewabilityVerdict } from "@/lib/place/resolve";
 import { resolveDatabase, resolveWorkgroup } from "@/lib/redshift/warehouse-location";
 import {
@@ -62,14 +61,13 @@ export interface RedshiftBinding {
    * 凭证 ARN。
    * 🔴 **非 home 恒为非空**(解析不到就抛);**home 可能为 `undefined`** ——
    * 那是现网既有语义(无密钥的本地/裸环境回落调用方 IAM 身份),本批**刻意不改**:
-   * 改它属于"顺手改了现网行为",不在 P50.3 的下推范围里。
+   * 改它属于"顺手改了现网行为",不在 下推范围里。
    */
   secretArn?: string;
   /** `true` = 用的是该 target 的共享 admin(过渡态),`false` = per-project 凭证 */
   degradedToLegacyAdmin: boolean;
   /** `true` = home(等价路径),便于调用方保留既有三元写法 */
   home: boolean;
-  // @kf-batch 50-P50.3-mrquery
   /**
    * 该目标的法域(`home` / 其它)。多 region 直查据它判「结果能不能合并」——
    * 🔴 跨法域自动合并 = 把区内明细搬到中央落地 = 数据出境(INTERACTION §4bis.3)。
@@ -78,7 +76,6 @@ export interface RedshiftBinding {
   jurisdiction: string;
 }
 
-// @kf-batch 50-P50.3-mirror
 // 🔴 `TargetBindingRejected` 与 `regionOfTarget` **搬到** `target-region.ts`(轻量层)并在此
 // re-export —— 理由见那个文件的文件头:周期 reconciler(instrumentation)一侧只能依赖不碰
 // node 内置的模块,否则 **edge bundle 编译期**就炸(动态 import 也救不了)。
@@ -90,7 +87,7 @@ export { TargetBindingRejected, regionOfTarget, __resetRegionCache } from "@/lib
  *
  * 🔴 判据用 **`components`(观测态)**,**不用 `capabilities`** —— SPEC §1.1 明写
  * 「`capabilities` 可用于**展示能力**,**不能代替权限状态机**」,而且它的词表至今未定稿。
- * P50.3a 起 `components` 是纯观测态(部署真装了什么),正是"这个 target 能不能跑 Redshift"的事实源。
+ * 起 `components` 是纯观测态(部署真装了什么),正是"这个 target 能不能跑 Redshift"的事实源。
  *
  * 🔴 **缺组件是拒,不是降级到 home**(SPEC §3.4 说的"降级"是 **UI 置灰 / 直查返回能力不可用**,
  * 不是偷偷换个 target 跑)。回落 home 等于"用户选了欧洲区、数据在美国算完了"。
@@ -110,7 +107,7 @@ export function assertTargetComponent(t: ExecutionTarget, component: string): vo
 /**
  * 解析一个执行体在某 target 上跑 Redshift 所需的四样东西。
  *
- * @param targetId  **必填**(WP-31 序 3:原来缺省 = 主控区,漏传静默落主控区);`tgt_home` ⇒ 走**逐字节等价**的 home 路径
+ * @param targetId  **必填**(原来缺省 = 主控区,漏传静默落主控区);`tgt_home` ⇒ 走**逐字节等价**的 home 路径
  * @param projectId 该执行体归属的项目(取**资源行**,不取请求头 —— 与 `resolveRunStamp` 同一条判据)
  * @param workgroupOverride / databaseOverride 执行体自带的配置(如 `job.redshiftConfig`)
  */
@@ -135,7 +132,7 @@ export async function resolveRedshiftBinding(args: {
       workgroup: resolveWorkgroup(args.workgroupOverride),
       database: resolveDatabase(args.databaseOverride),
       secretArn: await getRedshiftSecretArn(args.projectId ? { project: args.projectId } : undefined),
-      degradedToLegacyAdmin: true, // home 目前就是共享 admin(per-project 化属 P52.5b)
+      degradedToLegacyAdmin: true, // home 目前就是共享 admin(per-project 化)
       home: true,
       jurisdiction: "home",
     };
@@ -198,7 +195,6 @@ function assertNoWarehouseConflict(
   );
 }
 
-// @kf-batch 50-P50.3-multibind
 /**
  * 执行体绑定的 target 集合 —— **唯一归一口**(50 SPEC §1.3a-S1:`targets?: string[]`,缺省 `["tgt_home"]`)。
  *
@@ -212,9 +208,8 @@ function assertNoWarehouseConflict(
  * 🔴 **去重 + 过滤空值**:重复的 target 会让下发跑两遍、矩阵出两列;
  * 空串会让 `lockAttrFor` 产出 home 的属性名(静默串行)。
  */
-// @kf-batch 50-WP31-place-first-class
 /**
- * 执行记录(run)上的执行区章(WP-31 序 3)。原来六处各写一遍 `(run as { targetId?: string }).targetId`,
+ * 执行记录(run)上的执行区章。原来六处各写一遍 `(run as { targetId?: string }).targetId`,
  * 再交给「缺省 = 主控区」的解析器 ⇒ 落点决定藏在解析器的默认值里。规则唯一作者 = `targetOfStamp`;
  * 这里只把「章非法」翻成可修的绑定拒绝(路由按 409 报)。
  */
@@ -271,7 +266,6 @@ export async function assertBindableTargets(
   return dedup.length ? dedup : [HOME_TARGET_ID];
 }
 
-// @kf-batch 50-P50.3-mrquery
 /**
  * 给一条**已提交的语句**取它所在 region 的客户端。
  *
@@ -288,13 +282,12 @@ export async function assertBindableTargets(
  */
 export async function redshiftClientForTarget(targetId: string) {
   notePlaceDecision({ targetId, via: "redshiftClientForTarget" });
-  // 🔴 空串 / any 漏进来不许变成主控区(regionOfTarget 自己对空值仍回主控区 —— 那是序 3 下一批)
+  // 🔴 空串 / any 漏进来不许变成主控区(regionOfTarget 自己对空值仍回主控区 —— 那是下一批)
   if (!isValidTargetId(targetId)) throw new TargetBindingRejected("invalid-target", `非法 targetId:${JSON.stringify(targetId)}`);
   const { redshiftDataClientFor } = await import("@/lib/exec-env/target-clients");
   return redshiftDataClientFor(await regionOfTarget(targetId));
 }
 
-// @kf-batch 50-P50.3-fanout
 /**
  * **按引擎**的绑定校验 —— 写入路径的唯一入口(创建/编辑作业都走它)。
  *
@@ -338,7 +331,6 @@ export async function resolveGlueBinding(args: { targetId: string }): Promise<Ta
 }
 
 /**
- * @kf-batch 50-W5-seg1-WP3
  * 解析某个执行目标的 **EMR Serverless 提交落点** = Spark 落点 + 执行角色(SPEC v3.21 §6.1 段二)。
  *
  * 为什么不把角色直接塞进 `resolveGlueBinding` 的返回:Glue 作业不需要 EMR 角色,而「用不上的字段」最后总会被人
@@ -359,7 +351,7 @@ export async function resolveEmrBinding(
   }
 }
 
-// @kf-batch 50-WP31-place-first-class —— 序 3 收尾:原 `resolveFlinkBinding` 已删除。它的主控区分支走 env 常量
+// 收尾:原 `resolveFlinkBinding` 已删除。它的主控区分支走 env 常量
 //   (`resolveGlueBinding` + `resolveTargetFlink` 的 home 分支),与启动侧不是同一口径;现在 Flink 落点只有一个作者
 //   `lib/realtime/flink-place.ts#resolveFlinkPlace`(主控区也读描述符 + 必须装 flink 组件),新建与启动共用它。
 
@@ -388,7 +380,7 @@ export async function assertBindableTargetsForEngine(
     //    在 `ensureApplication` 里再校一次(那里能给出"缺哪一项"的准确话)。
     const ok = await assertBindableTargets(list, "core", opts);
     for (const t of ok) await resolveGlueBinding({ targetId: t });
-    // 🔴 WP-3:EMR 还要该 target 的执行角色(SPEC §6.1 段二)。在**绑定那一刻**就核,免得「绑得上、跑不了」
+    // 🔴 EMR 还要该 target 的执行角色(SPEC §6.1 段二)。在**绑定那一刻**就核,免得「绑得上、跑不了」
     //    (那是最难查的形态:界面绿、run 在 StartJobRun 那步 AccessDenied)。
     if (engine === "emr-serverless") for (const t of ok) await resolveEmrBinding({ targetId: t });
     return ok;
@@ -406,10 +398,9 @@ export async function assertBindableTargetsForEngine(
  * @returns 归一后的 targetId(缺省/空 ⇒ `tgt_home`)
  */
 /**
- * @kf-batch 50-W5-seg1-WP10a
  * 绑定校验的上下文:项目白名单判定(SPEC §3.12 v3.22 通用 `access`)。
  *
- * @kf-batch 50-WP11b-shared-writer —— 🔴🔴 **必填判别式,没有默认值**(SPEC §3.9d.8 / 台账 B-17):
+ * 🔴🔴 **必填判别式,没有默认值**(SPEC §3.9d.8 / 台账):
  *  · `per-project`:项目的业务数据往哪个区落 ⇒ 过 `accessAllows`(白名单的唯一作者,一个字不改);
  *    `projectId: null` = 调用方**显式声明**「这里没有项目上下文」⇒ allowlist 下照旧拒(fail-closed)。
  *  · `platform-global`:建模产物(码表 / 维度·事实表定义)**没有项目维** ⇒ 白名单这条轴对它是 dead-closed
@@ -438,7 +429,7 @@ export async function assertBindableTarget(targetId: unknown, component: string,
   if (isHome(targetId)) return targetId;
   if (!t) throw new TargetBindingRejected("invalid-target", `执行目标 ${targetId} 不存在`);
   assertTargetComponent(t, component);
-  // 🔴 @kf-batch 50-W5-seg1-WP10a:原「跨法域一期不放开 ⇒ 拒绑」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
+  // 🔴 原「跨法域一期不放开 ⇒ 拒绑」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
   //    跨法域 target 与同法域走同一条路;它唯一多出来的前置(装 residency-api + per-target 角色)已在
   //    `requireReadyTarget` 的准入内核里(`residencyPrerequisite`),这里不再重复判。
   return targetId;
@@ -452,7 +443,6 @@ export async function assertBindableTarget(targetId: unknown, component: string,
  * 🔴 但**呈现不是授权**:真正的拒还在 `resolveRedshiftBinding`(界面拿到的清单可能已经陈旧)。
  */
 /**
- * @kf-batch 50-WP4-o1-scope
  * **顶栏「执行范围」下拉的唯一列表来源**(合同 SPEC v3.36 §2.6.5a)。
  *
  * 🔴 用户 2026-09-09 拍板:「可切换区域下拉列表只能显示现在**已经安装好的**,不存在/没安装的不能出现在
@@ -492,7 +482,7 @@ export async function listScopeTargets(
   const now = Date.now();
   return all
     .filter((t) => typeof t?.targetId === "string" && t.targetId.length > 0)
-    // @kf-batch 50-WP31-place-first-class —— 「能看」的三条判据收成单一作者 `viewabilityVerdict`(读接口点名
+    // 「能看」的三条判据收成单一作者 `viewabilityVerdict`(读接口点名
     //   `requestedRegisteredPlace` 用同一份 ⇒ 下拉里有的点进去一定解析得开,下拉里没有的点名也拒):
     //   描述符不合格的不列(那不是「装好了」,而是数据坏了)· 墓碑不列(targetId 不可复用)·
     //   🔴 「已安装好」= 初始化跑完过(`ready` 置位 / observed 到过 ready),没装好的不列(用户点名的那一条)。
@@ -514,13 +504,12 @@ export async function listScopeTargets(
 }
 
 /**
- * @kf-batch 50-B109-exec-target-dims
  * 维度 → 「这个目标装了它要的组件吗」的**唯一作者**(与写入路径同口径,呈现 = 授权):
  *  · redshift:`assertTargetComponent(t, "redshift")` 同一字面;
  *  · airflow:新建编排 `requireMwaaForTargets` 认的两种调度组件 = `SCHEDULER_PREFERENCE_COMPONENT` 值域
  *    (airflow-serverless / mwaa);**主控区恒通过** —— 写路径对 home 不查组件(走部署期 env),列表也不许比写路径更严;
  *  · core:每个已就位目标都有(`listActiveTargets` 已逐个过准入)。
- * 🔴 B-109:编排页要 "airflow" 清单而路由只实现了 redshift ⇒ 400 被吞成空列表、「全选当前活跃区(0)」灰了一个月。
+ * 🔴 编排页要 "airflow" 清单而路由只实现了 redshift ⇒ 400 被吞成空列表、「全选当前活跃区(0)」灰了一个月。
  */
 const DIM_HAS_COMPONENT: Record<ExecTargetCapabilityDim, (components: readonly string[], home: boolean) => boolean> = {
   redshift: (components) => components.includes("redshift"),
@@ -539,7 +528,7 @@ export async function listComponentCapableTargets(
     .filter((t) => hasComponent(Array.isArray(t.components) ? t.components.map(String) : [], isHome(t.targetId)))
     // 🔴 与 `assertBindableTarget` **同一条判据**(呈现 = 授权):项目白名单不放行的 target 不列出来 ——
     //    列出来再拒 = "按钮亮着却 403",本仓已经为这种撕裂立过规矩(判据必须单一作者 `accessAllows`)。
-    // @kf-batch 50-W5-seg1-WP10a:原「跨法域本期不接受绑定 ⇒ 不列」**已删**(不设法务门);跨法域 target 照常列出、带法域标签。
+    // 原「跨法域本期不接受绑定 ⇒ 不列」**已删**(不设法务门);跨法域 target 照常列出、带法域标签。
     .filter((t) => scopeAllows(t, opts))
     .map((t) => ({
       targetId: t.targetId,

@@ -1,4 +1,3 @@
-// @kf-batch 50-WP5-rungroup
 // 「运行分组台账写不进去」→ HTTP 的**唯一映射处**(与 `lib/exec-env/target-http.ts` 同一手法)。
 //
 // 🔴 为什么必须单一作者:同族的分类缺陷 2026-09-13 一天修了三次(落点冲突报 500、抢不到运行锁报 500、
@@ -28,8 +27,8 @@ const USER_ID = "default-user";
  * 三条 `/api/run-groups/[id]/**` 路由共用的前置:**读组 → 找到它的定义行 → 走既有 RBAC 守卫**。
  *
  * 🔴 权限判据不许自己发明:组本身没有成员表,它的权限**完全等于它那个定义的权限**
- * ⇒ 一律回落到 `guardResourceAccess(定义行)`(P52.1 把 by-id 路由统一成「按资源归属项目判」,这里沿用同一条)。
- * 🔴 定义行去哪张表读也不自己写 switch:用模块 14 的 `getResourceMeta(definitionKind)`(单一作者)。
+ * ⇒ 一律回落到 `guardResourceAccess(定义行)`(把 by-id 路由统一成「按资源归属项目判」,这里沿用同一条)。
+ * 🔴 定义行去哪张表读也不自己写 switch:用 `getResourceMeta(definitionKind)`(单一作者)。
  */
 export async function loadRunGroupForRequest(
   req: NextRequest,

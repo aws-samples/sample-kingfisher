@@ -4,7 +4,7 @@
 // 【core 契约】(照 @genbi/core、@paramadvisor/core)core 内部所有文件引用类型都走 "./types"
 // (相对路径,不用 @/ alias),保证 core 能独立编译成 CJS 给容器 agent import 时无 alias 解析问题。
 //
-// 【模块47 L3】只放 core(rules 目录/renderRulesForPrompt 渲染)真正需要的 4 个类型:
+// 只放 core(rules 目录/renderRulesForPrompt 渲染)真正需要的 4 个类型
 //   RuleDef(规则定义) + ComputeKind/RemediationType/RuleStatus/Target(RuleDef 字段引用)。
 // 其余顾问契约(ConnectivityRequest/Recommendation/EnvironmentFacts/Prefill/Ruling…)仍留
 // network-advisor/types.ts(不牵连进 core);后者反向 re-export 本文件这些类型,对外 API 逐字不变。

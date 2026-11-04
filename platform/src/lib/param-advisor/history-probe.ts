@@ -3,7 +3,7 @@
 // 优雅降级:IAM 拒/资源不存在时不崩,degraded=true + missing 记原因,推荐退回纯启发式。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { GlueClient, GetJobCommand, GetJobRunsCommand } from "@aws-sdk/client-glue";
 import { KinesisAnalyticsV2Client, DescribeApplicationCommand } from "@aws-sdk/client-kinesis-analytics-v2";

@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 新字段在建任务 / 改任务两个入口的校验(路由层行为判据)。
+// 新字段在建任务 / 改任务两个入口的校验(路由层行为判据)。
 //   mock 形态照抄 overwrite-guard-route.test.ts(只 mock 真外部);断「拒绝时没有落库」与「存量保存不多读数据源」。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -32,7 +32,7 @@ vi.mock("@/lib/projects/guard", () => ({
   envFilter: vi.fn(() => ({ clause: "1=1", values: {} })),
 }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
-// @kf-batch 50-WP31-place-first-class —— B-35:入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
+// 入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
 vi.mock("@/lib/exec-env/registry", async (orig) => {
   const real: any = await orig();
   const mk = (targetId: string, region: string) => ({ targetId, region, accountId: "000000000000", partition: "aws", status: "active", ready: true, components: ["core"], resources: {} });
@@ -78,7 +78,7 @@ const base = { name: "t", datasourceId: "D1", targetType: "redshift", channel: "
 
 beforeEach(() => { h.ddb.length = 0; h.sql.length = 0; h.existing = {}; h.ds = { userId: "default-user", datasourceId: "D1", type: "mysql", database: "gamedata", projectId: "p1" }; vi.resetModules(); });
 
-describe("序 37:建任务入口校验新字段", () => {
+describe("建任务入口校验新字段", () => {
   it("过滤条件带未知变量 ⇒ 400,不落库", async () => {
     const r = await req("@/app/api/sync/route", { ...base, whereClause: "d = '${today}'" });
     expect(r.status).toBe(400);
@@ -86,7 +86,7 @@ describe("序 37:建任务入口校验新字段", () => {
     expect(h.ddb).not.toContain("PutCommand");
   });
   it("非 JDBC 源填过滤条件 ⇒ 400,不落库", async () => {
-    // B-123 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
+    // 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
     h.ds = { ...h.ds, type: "dynamodb", connection: { tableName: "orders", region: "us-east-1" } };
     const r = await req("@/app/api/sync/route", { ...base, whereClause: "x > 1" });
     expect(r.status).toBe(400);
@@ -105,7 +105,7 @@ describe("序 37:建任务入口校验新字段", () => {
     expect(r.status).toBe(400);
     expect(h.ddb).not.toContain("PutCommand");
   });
-  it("序 56:普通表(月表实例)的目标名与模板的固定目标名撞车 ⇒ 400 点名样例表,不落库;带样例表的合法任务 ⇒ 201 且样例原样存", async () => {
+  it("普通表(月表实例)的目标名与模板的固定目标名撞车 ⇒ 400 点名样例表,不落库;带样例表的合法任务 ⇒ 201 且样例原样存", async () => {
     const tpl = "orders_${bizmonth}";
     const clash = await req("@/app/api/sync/route", { ...base, sourceTables: ["orders_202609", tpl], targetTableNames: { [tpl]: "ods_orders", orders_202609: "ods_orders" } });
     expect(clash.status).toBe(400);
@@ -120,7 +120,7 @@ describe("序 37:建任务入口校验新字段", () => {
   });
 });
 
-describe("序 37:改任务入口校验新字段", () => {
+describe("改任务入口校验新字段", () => {
   it("改成按分区覆盖却没给分区列 ⇒ 400,不写", async () => {
     h.task = { ...base, userId: "default-user", taskId: "T1", projectId: "p1" };
     const r = await req("@/app/api/sync/[id]/route", { writeMode: "overwrite", overwriteScope: "partitions" }, "PUT", { id: "T1" });
@@ -137,7 +137,7 @@ describe("序 37:改任务入口校验新字段", () => {
   });
   it("改出一个带变量的过滤条件 ⇒ 读数据源判范式;DynamoDB 源 ⇒ 400", async () => {
     h.task = { ...base, userId: "default-user", taskId: "T1", projectId: "p1" };
-    // B-123 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
+    // 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
     h.ds = { ...h.ds, type: "dynamodb", connection: { tableName: "orders", region: "us-east-1" } };
     const r = await req("@/app/api/sync/[id]/route", { whereClause: "d = '${ds}'" }, "PUT", { id: "T1" });
     expect(r.status).toBe(400);
@@ -145,7 +145,7 @@ describe("序 37:改任务入口校验新字段", () => {
   });
   it("存量 DynamoDB 任务带着从前不生效的过滤条件,做一次无关编辑 ⇒ 照常保存(不读数据源)", async () => {
     h.task = { ...base, userId: "default-user", taskId: "T1", projectId: "p1", whereClause: "x > 1" };
-    // B-123 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
+    // 起「有没有活可干」按范式判:非 JDBC 源的定位在连接袋里(DynamoDB = tableName),夹具要像真的数据源行一样带上
     h.ds = { ...h.ds, type: "dynamodb", connection: { tableName: "orders", region: "us-east-1" } };
     const r = await req("@/app/api/sync/[id]/route", { name: "renamed", whereClause: "x > 1" }, "PUT", { id: "T1" });
     expect(r.status).toBe(200);

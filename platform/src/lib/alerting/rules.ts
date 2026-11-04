@@ -1,4 +1,4 @@
-// 模块 34 — 告警规则 CRUD(bgp-alert-rules)。单逻辑分区 pk="alertrule",ruleId(ULID)排序键。
+// 告警规则 CRUD(bgp-alert-rules)。单逻辑分区 pk="alertrule",ruleId(ULID)排序键。
 // 低频低量配置数据:Query(pk) 列全部 + 内存按 projectId 过滤(同 bgp-metrics/bgp-diagnostics 约定)。
 // 更新走乐观锁(version):并发改同一规则,一个成功一个 409(WS5 约定)。
 
@@ -142,7 +142,7 @@ export async function updateRule(
     if (!n) throw new Error("规则名称不能为空");
     sets.push("#nm = :nm"); values[":nm"] = n; names["#nm"] = "name";
   }
-  // 序 43 B-92:scope / condition 都是 DynamoDB 保留字(和上面的 name 一样),裸写进 UpdateExpression 会被 DDB 400
+  // scope / condition 都是 DynamoDB 保留字(和上面的 name 一样),裸写进 UpdateExpression 会被 DDB 400
   //   「Attribute name is a reserved keyword; reserved keyword: scope」⇒ 页面「编辑告警规则」保存必失败(行内启用 / 静默开关只发
   //   enabled / silenced 所以一直好着)。一律走 ExpressionAttributeNames 别名。
   if (patch.scope !== undefined) { sets.push("#sc = :sc"); values[":sc"] = normalizeScope(patch.scope); names["#sc"] = "scope"; }

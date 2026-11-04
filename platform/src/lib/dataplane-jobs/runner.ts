@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 推进一条作业的**唯一逻辑**(WORK-PACKAGES WP-9 ④-2:内部端点一步 = 抢 lease → 执行 / 轮询一步 → 写回,墙钟 45s)。
+// 推进一条作业的**唯一逻辑**(④-2:内部端点一步 = 抢 lease → 执行 / 轮询一步 → 写回,墙钟 45s)。
 //
 // 两个入口共用这一份:
 //   · 内部端点 `/api/internal/dataplane-jobs/step`(泵回环调用,`respectSchedule=true`);
@@ -19,9 +18,7 @@ import type { JobHandler, StepResult } from "@/lib/dataplane-jobs/handler";
 import { redactSql } from "@/lib/exec-env/admin-ddl-executor";
 import { supplyJobHandler } from "@/lib/exec-env/project-cred-supply";
 import { canaryJobHandler } from "@/lib/exec-env/permission-canary";
-// @kf-batch 50-project-delete-orphans
 import { reclaimJobHandler } from "@/lib/exec-env/project-cred-reclaim";
-// 序 58 B-130
 import { sgCleanupJobHandler } from "@/lib/datasource/sg-cleanup-job";
 
 /** 种类 → handler(穷尽表:新增种类不登记 handler 编译不过)。 */

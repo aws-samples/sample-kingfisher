@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— 业务日期变量**全平台一张表**:TS `paramSet`(lib/etl/run-params.ts)与 Python `bgp_sync_run_vars`
+// 业务日期变量**全平台一张表**:TS `paramSet`(lib/etl/run-params.ts)与 Python `bgp_sync_run_vars`
 // (lib/sync/run-vars-py.ts,经 lib/etl/run-params-py.ts 转出给调度运行时 / 经典 DAG)逐日同值;两种参数形态
 // (Glue Arguments / EMR entryPointArguments)TS 与 Python 也逐项同值。用真 python3 跑生成进产物的那段代码,不另写一份。
 import { describe, it, expect } from "vitest";
@@ -13,7 +13,7 @@ function py(code: string, argv: string[] = []): string {
   return execFileSync("python3", ["-c", `import re, sys, json\n${RUN_PARAMS_PY}\n${code}`, ...argv], { encoding: "utf8" });
 }
 
-describe("序 37:业务日期变量单一作者 —— TS paramSet / Python bgp_sync_run_vars 逐日同值", () => {
+describe("业务日期变量单一作者 —— TS paramSet / Python bgp_sync_run_vars 逐日同值", () => {
   it("每个日期的 15 个变量逐项相等,且**键的顺序**相同(顺序即界面展示顺序)", () => {
     const out = py(`
 res = {}

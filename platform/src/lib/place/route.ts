@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1 —— 路由包装器 `withPlace`(L7):决策 → 解析 → 在显式上下文里跑 handler。
+// 路由包装器 `withPlace`(L7):决策 → 解析 → 在显式上下文里跑 handler。
 //
 //     export const GET = withPlace(async (req, place) => apiOk(await listTables(place)));
 //

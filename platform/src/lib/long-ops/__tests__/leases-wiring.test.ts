@@ -1,4 +1,4 @@
-// 模块 55 — 闸门 ⑬(55 DESIGN §2.8 对象租约)接线判据(「写了」≠「接上了」):
+// 闸门 ⑬(55 DESIGN §2.8 对象租约)接线判据(「写了」≠「接上了」):
 //   a) LONG_OP_RESOURCES 源码字面每种 kind 恰一条,键集 === LONG_OP_KINDS;声明里只经 resourceKey / tableResource 生成键,族字面 ⊆ LONG_OP_RESOURCE_FAMILIES;
 //   b) 声明了租约族的实体(codetable / dimension / project / flink / workflow / datasource),其改 / 删路由(闭合清单)每个**直接改写**的方法都有
 //      resourceBusyResponse([resourceKey("<族>", …)]) **调用点**且在写动作之前;改走长操作的方法(删项目 / 删 Flink 作业 / 删编排)则 submitLongOp 自己的 kind,
@@ -76,7 +76,7 @@ const FAMILY_MUTATION_ROUTES: Record<string, MutationRoute[]> = {
       file: "app/api/datasources/[id]/route.ts", guarded: ["PUT", "DELETE"],
       mutation: /new (?:UpdateCommand|DeleteCommand)\(/, serviceCalls: /\bensureExternalTable\(/,
     },
-    // 序 57 / B-129:建源 provision 段改走长操作(租约 datasource:create:<项目>:<名字>);网络 / Glue 连接的服务层入口在 app/api 再无第二个调用点
+    // 建源 provision 段改走长操作(租约 datasource:create:<项目>:<名字>);网络 / Glue 连接的服务层入口在 app/api 再无第二个调用点
     {
       file: "app/api/datasources/route.ts", guarded: [],
       longOps: { POST: { kind: "datasource-create", sample: DS_CREATE_SAMPLE } },
@@ -84,7 +84,7 @@ const FAMILY_MUTATION_ROUTES: Record<string, MutationRoute[]> = {
       serviceCalls: /\b(?:detectNetwork|userSpecifiedNetwork|createGlueConnection|ensureGlueRole)\(/,
     },
   ],
-  // 第三批 / B-136:引擎作业「运行」的提交段改走长操作(租约 engine-job:<jobId>,由 run 路由的 submitLongOp 占);改 / 删作业路由加守卫
+  // 第三批:引擎作业「运行」的提交段改走长操作(租约 engine-job:<jobId>,由 run 路由的 submitLongOp 占);改 / 删作业路由加守卫
   "engine-job": [{
     file: "app/api/engines/[engine]/[id]/route.ts", guarded: ["PUT", "DELETE"],
     mutation: /\b(?:offlineEmrFanout|destroyResource)\(|new (?:UpdateCommand|DeleteCommand)\(/, serviceCalls: /\.destroyResource\(/,
@@ -93,7 +93,7 @@ const FAMILY_MUTATION_ROUTES: Record<string, MutationRoute[]> = {
 /** 没有「改 / 删路由」的族:table(目标表只被长操作本身独占)· approval(审批单只经执行长操作改状态)· governance(schema-sync 单例,只做两次同步互斥)。 */
 const FAMILIES_WITHOUT_MUTATION_ROUTES = ["table", "approval", "governance"] as const;
 
-describe("模块 55 闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
+describe("闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
   const kindsSrc = read("lib/long-ops/kinds.ts");
   const block = /export const LONG_OP_RESOURCES:[\s\S]*?=> string\[\] \} = \{([\s\S]*?)\n\};/.exec(kindsSrc);
   it("源码字面每种 kind 恰一条,键集 === LONG_OP_KINDS", () => {
@@ -147,11 +147,11 @@ describe("模块 55 闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
     expect(LONG_OP_RESOURCES["project-delete"]({ projectId: "proj-1" })).toEqual([resourceKey("project", "proj-1")]);
     expect(LONG_OP_RESOURCES["datasource-s3-external"]({ datasourceId: "ds-1", projectId: "proj-1" })).toEqual(["datasource:ds-1"]);
     expect(LONG_OP_RESOURCES["governance-schema-sync"]({})).toEqual(["governance:schema-sync"]);
-    // 序 57 / B-129:建源占「项目 + 名字」(对象还没有 id;同名再点一次 ⇒ 409,不同名 / 不同项目互不阻塞;与 S3 外表的 datasource:<id> 不同键)
+    // 建源占「项目 + 名字」(对象还没有 id;同名再点一次 ⇒ 409,不同名 / 不同项目互不阻塞;与 S3 外表的 datasource:<id> 不同键)
     expect(LONG_OP_RESOURCES["datasource-create"](DS_CREATE_SAMPLE)).toEqual(["datasource:create:proj-1:n1"]);
     expect(LONG_OP_RESOURCES["datasource-create"]({ ...DS_CREATE_SAMPLE, name: " n1 " })).toEqual(["datasource:create:proj-1:n1"]);
     expect(LONG_OP_RESOURCES["datasource-create"]({ ...DS_CREATE_SAMPLE, projectId: "proj-2" })).toEqual(["datasource:create:proj-2:n1"]);
-    // B-136:运行提交段独占这条引擎作业(与改 / 删路由的守卫同键)
+    // 运行提交段独占这条引擎作业(与改 / 删路由的守卫同键)
     expect(LONG_OP_RESOURCES["engine-run"]({ engine: "emr-serverless", jobId: "job-1", projectId: "proj-1", runTargets: ["tgt_home", "tgt_usw2_a"], runGroupId: "rg1" })).toEqual(["engine-job:job-1"]);
   });
   it("样例键:落地 ↔ 删码表同键;解绑按 entity 选族;改表 dryRun 不占、execute 占表;审批执行占审批单 + 表", () => {
@@ -165,7 +165,7 @@ describe("模块 55 闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
   });
 });
 
-describe("模块 55 闸门 ⑬ b:声明了租约族的实体,改 / 删路由必须有守卫调用点(或改走长操作),且没有绕过守卫的第二条路", () => {
+describe("闸门 ⑬ b:声明了租约族的实体,改 / 删路由必须有守卫调用点(或改走长操作),且没有绕过守卫的第二条路", () => {
   const apiFiles = walk(join(SRC, "app/api")).map((f) => [relative(SRC, f), noImports(readFileSync(f, "utf8"))] as const);
   it("族清单闭合:每个 LONG_OP_RESOURCE_FAMILIES 要么登记了改删路由,要么明确列为无改删路由;两边不重叠", () => {
     const withRoutes = Object.keys(FAMILY_MUTATION_ROUTES);
@@ -202,7 +202,7 @@ describe("模块 55 闸门 ⑬ b:声明了租约族的实体,改 / 删路由必�
   }
 });
 
-describe("模块 55 闸门 ⑬ c / d:单一作者与接线", () => {
+describe("闸门 ⑬ c / d:单一作者与接线", () => {
   it("longOpErrorResponse 只在 http-error.ts 定义,driver 只 re-export;guard.ts 不 import driver / registry", () => {
     expect(/export function longOpErrorResponse\(/.test(read("lib/long-ops/http-error.ts"))).toBe(true);
     const driver = read("lib/long-ops/driver.ts");

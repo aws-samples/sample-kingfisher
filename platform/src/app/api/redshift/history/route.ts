@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
 // SQL 编辑器的执行历史(52 SPEC §2 缺口B 第 11 面:`redshift/history` —— 全平台共享 SQL 历史)。
 //
 // 🔴 **改动前的真实状态**(2026-09-03 逐行实测,比 SPEC 的描述更糟;台账 52 DESIGN §11.2 第 2 项):
@@ -25,19 +24,18 @@ import { apiOk } from "@/lib/api-response";
 import { NextResponse } from "next/server";
 import { ulid } from "ulid";
 import { requireProject, projectFilter } from "@/lib/projects/guard";
-// @kf-batch 50-WP4quater-reads(工单 SC-35)—— 执行历史按执行范围过滤。
+// 执行历史按执行范围过滤。
 // 行上**本来就有** `targetId`(POST 时从 body 盖的章),此前只是读侧没人用它 ⇒ 单区视角也会看到
 // 别的区跑过的语句。🔴 过滤必须放在**翻页循环之内累计**:DDB 是先 Limit 取页、再套 FilterExpression,
 // 过滤完直接返回会把「最近 100 条」变成「最近 100 条里恰好属于这个区的那几条」= 静默截断
 // (与本文件头那条 Limit×Filter 纪律同一个坑,只是维度换成了区)。
 import { readScope, scopeFilter } from "@/lib/exec-env/scope";
 import { LEGACY_PARTITION } from "@/lib/auth/identity";
-// @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 的 SQL 原文留区
+// 跨法域 target 的 SQL 原文留区
 import { apiError } from "@/lib/api-response";
 import { getTargetRaw } from "@/lib/exec-env/registry";
 import { isHome } from "@/lib/exec-env/target-id";
-// @kf-batch 50-WP31-place-first-class
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
+// 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
 import { requestedRegisteredPlace } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { isCrossJurisdiction, jurisdictionOf } from "@/lib/exec-env/residency";
@@ -100,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { sql, status, duration, rowCount, error } = body ?? {};
-  // @kf-batch 50-WP31-place-first-class —— 🔴 每条历史必须点名在哪个区跑的(缺 / 非法 ⇒ 400)。原来缺就**不盖章**
+  // 🔴 每条历史必须点名在哪个区跑的(缺 / 非法 ⇒ 400)。原来缺就**不盖章**
   //    ⇒ 读侧归主控区;非法值还会原样写进权威字段。
   let tid: string;
   try {
@@ -113,8 +111,7 @@ export async function POST(req: NextRequest) {
   const historyId = ulid();
   const createdAt = new Date().toISOString();
 
-  // @kf-batch 50-W5-seg2-WP10a
-  // 🔴 **跨法域 target 的 SQL 原文留区**(SPEC v3.23 §3.2 / E-189):中央 `bgp-sql-history` 行**不存 sql**,只存指针
+  // 🔴 **跨法域 target 的 SQL 原文留区**(SPEC v3.23 §3.2):中央 `bgp-sql-history` 行**不存 sql**,只存指针
   //    `{residency:"region", sqlAvailable:"on-demand", region, jurisdiction, sqlRef}`;原文写进该 target 的区域结果表
   //    (`bgp-region-results-<slug>`,pk=<projectId>#<targetId>,sk=sql-history#<ts>#<historyId>)。
   //    区域表写不成 ⇒ **503、中央也不写**(不许「中央有行、原文丢了」这种半截状态)。home / 同法域行**逐字节不变**。
@@ -151,7 +148,6 @@ export async function POST(req: NextRequest) {
     duration,
     rowCount,
     error,
-    // @kf-batch 50-P50.3-mrquery
     // 🔴 **多 region 直查:每个区各写一条历史**,否则一条 SQL 打了 3 个区、历史里只有一条,
     // 用户回头看不出"哪个区成了哪个区没成"。纯追加属性、存量行没有它就当 home(读侧同口径)。
     targetId: tid,

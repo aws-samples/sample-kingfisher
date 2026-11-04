@@ -1,9 +1,9 @@
-// B-135(2026-10-29 两个测试账号安装链 showcase 主控区同红、…4916 对照实验坐实)—— 实时「造数」示例事件的**唯一作者**。
+// (2026-10-29 两个测试账号安装链 showcase 主控区同红、…4916 对照实验坐实)—— 实时「造数」示例事件的**唯一作者**。
 //
 // 缺陷原形:造数把 ~3 分钟跨度的事件时间按**随机顺序**写进流,而示例 SQL 的 watermark 只容忍 5 秒乱序
 // (`WATERMARK FOR ts AS ts - INTERVAL '5' SECOND`)⇒ 第一批记录一到,watermark 就跳到 max(ts) − 5s,
 // 其后到达的、比它更早的记录全被窗口算子按**迟到**丢弃 ⇒ 聚合产出成了抽签:同一字节 300 条随机序 ⇒ 9 行且整窗缺失
-// (主控区两账号 0 行),同字段按时间升序 300 条 ⇒ 44 秒内 20 行、每窗 5 区齐全。页面却承诺「窗口关闭后约 30-60s 出聚合结果」。
+// (主控区两账号 0 行),同字段按时间升条 ⇒ 44 秒内 20 行、每窗 5 区齐全。页面却承诺「窗口关闭后约 30-60s 出聚合结果」。
 //
 // 根治 = 示例事件**按事件时间升序**写入:单分片内 Kinesis 保序 ⇒ watermark 随流单调推进 ⇒ 除最后一个窗口外每个窗口都确定性关闭并产出;
 // 多分片时每个分片各自升序、Flink 取各分片 watermark 的最小值,结论不变。时间格式仍是 Flink JSON 默认的 SQL 时间戳 'yyyy-MM-dd HH:mm:ss.SSS'(UTC 墙钟,无时区)。
@@ -38,7 +38,7 @@ export function flinkSqlTimestamp(epochMs: number): string {
 }
 
 /**
- * 生成 count 条示例订单事件,**按事件时间升序**(B-135 的全部修法就在这一句 sort;判据钉它:随机序输入 ⇒ 输出单调不减)。
+ * 生成 count 条示例订单事件,**按事件时间升序**(该缺陷的全部修法就在这一句 sort;判据钉它:随机序输入 ⇒ 输出单调不减)。
  * 事件时间 ∈ [now − spanMs, now],字段 region / amount / ts 与示例 SQL 的 orders_src 同形。
  */
 export function buildSampleOrderEvents(input: BuildSampleEventsInput): SampleOrderEvent[] {

@@ -1,13 +1,13 @@
 "use client";
 
-// 序 72 B-139(模块 56)—— 「执行角色」选择器(离线计算 Glue / EMR、数据同步 Glue 通道、实时计算 Flink 四处共用)。
+// 「执行角色」选择器(离线计算 Glue / EMR、数据同步 Glue 通道、实时计算 Flink 四处共用)。
 //
 // 改动前四处都是自由文本「执行角色 ARN」,文案承诺「可填自定义角色」而平台任务角色根本传不出去(客户现网 2026-11-03 绑不上)。
 // 现在与 AWS 控制台「IAM role」下拉同口径:下拉三组(平台默认 · 角色顾问生成 · 自建)+「刷新」(IAM 里新建角色后不用退出页面)
 // + 「手动输入 ARN」兜底(存量 / 旧客户端口径不变:值仍是 `executionRoleArn` 字符串,空 = 平台默认)+「检查权限」(保存前先量)。
 // 角色顾问面板保留在其下:一键创建成功 ⇒ 选中它并刷新候选(新角色立刻出现在「角色顾问生成」组)。
 //
-// 🔴 Form.Item 注入的 `id` 必须透传到 Select / Input(B-94 教训:漏传 ⇒ 字段 id 消失,无头判据与无障碍都找不到它)。
+// 🔴 Form.Item 注入的 `id` 必须透传到 Select / Input(教训:漏传 ⇒ 字段 id 消失,无头判据与无障碍都找不到它)。
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Button, Input, Select, Space, Tag, Tooltip, Typography, message } from "antd";

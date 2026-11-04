@@ -1,4 +1,4 @@
-// 模块 40 — 预算评估:算本月已耗 → 与预算限额比 → 越 80%/100% 档经 34 通道推送。
+// 预算评估:算本月已耗 → 与预算限额比 → 越 80%/100% 档经 34 通道推送。
 // 幂等:notifiedMarks 记录 "<month>#<threshold>",每月每档只推一次。
 
 import { dispatch } from "@/lib/alerting/notify";
@@ -20,7 +20,7 @@ async function spentOf(b: Budget, month: string): Promise<number> {
     const svc = b.scope.service;
     return rows.filter((r) => r.service === svc).reduce((a, r) => a + r.amountUsd, 0);
   }
-  // @kf-batch 50-WP4quater-reads(工单 SC-24)—— region 作用域:只算**那个区**的花费。
+  // region 作用域:只算**那个区**的花费。
   // 🔴 落 REGION 分组之前采的存量行没有 region ⇒ **不算进任何区的预算**。
   //    把它们算进来会让某个区的预算凭空多出一大笔(那是账号级合计),预算当场误报越档;
   //    漏掉它们则是「这个区的预算暂时少算了 —— 重采后就准了」,两害相权取后者,

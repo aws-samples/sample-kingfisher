@@ -1,4 +1,4 @@
-// 模块 55 — 客户端传输层判据:只认 protocol long-op/1 的 202(GenBI / warming 的 202 原样放行);轮询到终态整形成与同步分支同形的
+// 客户端传输层判据:只认 protocol long-op/1 的 202(GenBI / warming 的 202 原样放行);轮询到终态整形成与同步分支同形的
 // Response(succeeded resultStatus / failed errorBody 还原原状态码 / timeout 504);非 JSON 5xx 瞬态继续;服务端 404 / 403 JSON 原样交回;
 // 事件三相位;前端预算耗尽 504。零 DOM 依赖(事件经注入的 emit)。
 import { describe, it, expect } from "vitest";
@@ -22,13 +22,13 @@ function fetchSeq(responses: Array<() => Response | Promise<Response>>) {
   return { fetchImpl, calls };
 }
 
-describe("模块 55 follow:peekLongOpAccepted 只认协议记号", () => {
+describe("follow:peekLongOpAccepted 只认协议记号", () => {
   it("202 + protocol long-op/1 + taskId ⇒ 载荷;原 Response body 不被消耗", async () => {
     const res = json({ success: true, data: { taskId: "01TASK", kind: "modeling-land", label: "码表落地到执行区", status: "running", async: true, protocol: LONG_OP_PROTOCOL } }, 202);
     expect(await peekLongOpAccepted(res)).toEqual(accepted);
     expect((await res.json()).data.taskId).toBe("01TASK");
   });
-  it("GenBI 的 202 `{taskId,status:\"pending\",async:true}`、B-95 的 202 `{status:\"warming\"}`、非 202、非 JSON ⇒ null(原样放行)", async () => {
+  it("GenBI 的 202 `{taskId,status:\"pending\",async:true}`、该缺陷的 202 `{status:\"warming\"}`、非 202、非 JSON ⇒ null(原样放行)", async () => {
     expect(await peekLongOpAccepted(json({ success: true, data: { taskId: "g1", status: "pending", async: true } }, 202))).toBeNull();
     expect(await peekLongOpAccepted(json({ success: true, data: { deleted: false, status: "warming", retryAfterMs: 5000 } }, 202))).toBeNull();
     expect(await peekLongOpAccepted(json({ success: true, data: { ...accepted } }, 200))).toBeNull();
@@ -37,7 +37,7 @@ describe("模块 55 follow:peekLongOpAccepted 只认协议记号", () => {
   });
 });
 
-describe("模块 55 follow:终态整形(与同步分支同形)", () => {
+describe("follow:终态整形(与同步分支同形)", () => {
   it("succeeded ⇒ resultStatus ?? 200 + `{success:true,data,_meta?}` + 头 x-bgp-long-op", async () => {
     const res = terminalToResponse({ taskId: "01TASK", kind: "catalog-create-table", label: "x", status: "succeeded", result: { kind: "redshift" }, resultStatus: 201, elapsedMs: 5 }, { modelId: "m" });
     expect(res.status).toBe(201);
@@ -45,7 +45,7 @@ describe("模块 55 follow:终态整形(与同步分支同形)", () => {
     expect(res.headers.get("content-type")).toMatch(/application\/json/);
     expect(await res.json()).toEqual({ success: true, data: { kind: "redshift" }, _meta: { modelId: "m" } });
   });
-  it("resultRaw(序 50 第二批,编排四条)⇒ result 就是整个响应体,原样 JSON、不包 {success,data} 信封;resultStatus 缺省 200;头 x-bgp-long-op 照带", async () => {
+  it("resultRaw(编排四条)⇒ result 就是整个响应体,原样 JSON、不包 {success,data} 信封;resultStatus 缺省 200;头 x-bgp-long-op 照带", async () => {
     const raw = { success: true, dagId: "bgp_wf1", scheduler: "serverless", perTarget: [{ targetId: "tgt_home", ok: true }] };
     const res = terminalToResponse({ taskId: "01TASK", kind: "workflow-publish", label: "发布工作流", status: "succeeded", result: raw, resultRaw: true, elapsedMs: 5 });
     expect(res.status).toBe(200);
@@ -70,7 +70,7 @@ describe("模块 55 follow:终态整形(与同步分支同形)", () => {
   });
 });
 
-describe("模块 55 follow:followLongOp 轮询", () => {
+describe("follow:followLongOp 轮询", () => {
   it("running → running → succeeded:轮询 GET /api/long-ops/<taskId> 带同一套头;事件 started / progress×2 / settled(succeeded);交回 200 同形", async () => {
     const { fetchImpl, calls } = fetchSeq([
       () => json({ success: true, data: { taskId: "01TASK", kind: "modeling-land", label: "l", status: "running", elapsedMs: 2000 } }),

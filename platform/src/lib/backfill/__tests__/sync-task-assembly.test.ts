@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-backfill —— 序 37 ⑦ 装配层判据:补数中心 × 同步任务,整条链**一起**跑。
+// 装配层判据:补数中心 × 同步任务,整条链**一起**跑。
 //   建计划路由(真)→ createPlan(真)→ tick(真)→ executeInstance(真)→ sync-task 入口判定(真)
 //   → 启动核心 startGlueSyncRun(真)→ 后台轮询(真)→ run 台账唯一写通道(真)→ tick 的 reconcile(真)。
 // 🔴 只 mock 真外部:DDB(内存表,按条件写语义实现)、按区 SDK 客户端工厂、落点解析(描述符注册表)、项目守卫、审计、
@@ -21,7 +21,7 @@ const H = vi.hoisted(() => ({
   jobState: "SUCCEEDED",
   runningGlue: 0,
   maxRunningGlue: 0,
-  concurrentLeft: 0,   // 序 37 B-64:接下来多少次 StartJobRun 回「上一次 run 收尾中」(ConcurrentRunsExceededException)
+  concurrentLeft: 0,   // 接下来多少次 StartJobRun 回「上一次 run 收尾中」(ConcurrentRunsExceededException)
 }));
 
 const KEYS: Record<string, string[]> = {
@@ -231,7 +231,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("序 37 ⑦ 能不能补(唯一作者 syncTaskBackfillRejection)", () => {
+describe("能不能补(唯一作者 syncTaskBackfillRejection)", () => {
   it("glue + 全量 + 用到日期变量 ⇒ 能补;源表名模板也算用到", () => {
     expect(syncTaskBackfillRejection(baseTask)).toBeNull();
     expect(syncTaskBackfillRejection({ ...baseTask, whereClause: "", sourceTables: ["cf_point_${bizmonth}"] })).toBeNull();
@@ -245,7 +245,7 @@ describe("序 37 ⑦ 能不能补(唯一作者 syncTaskBackfillRejection)", () =
   });
 });
 
-describe("序 37 ⑦ 建计划(/api/backfill/plan)", () => {
+describe("建计划(api/backfill/plan)", () => {
   it("预览:3 天 = 3 个实例,都在任务的章上;客户端传并发 5 也被强制成 1", async () => {
     const r = await plan(body({ dryRun: true }));
     expect(r.status).toBe(200);
@@ -284,7 +284,7 @@ describe("序 37 ⑦ 建计划(/api/backfill/plan)", () => {
   });
 });
 
-describe("序 37 ⑦ 执行 + 回收(整条链一起跑)", () => {
+describe("执行 + 回收(整条链一起跑)", () => {
   async function createPlan(): Promise<string> {
     const r = await plan(body({ dryRun: false }));
     expect(r.status).toBe(201);
@@ -366,7 +366,7 @@ describe("序 37 ⑦ 执行 + 回收(整条链一起跑)", () => {
     expect(failed[0].lastError).toContain("禁止跨区取数");
   });
 
-  // 序 37 B-64:启动核心的重试要等(假时钟),tick 不能直接 await —— 起了之后用 drain 推时钟直到它返回
+  // 启动核心的重试要等(假时钟),tick 不能直接 await —— 起了之后用 drain 推时钟直到它返回
   async function tickDrained(planId: string): Promise<any> {
     let out: any = null;
     void tick("proj-a", planId).then((x) => { out = x; });
@@ -375,7 +375,7 @@ describe("序 37 ⑦ 执行 + 回收(整条链一起跑)", () => {
   }
   const insts = () => [...H.tables["bgp-backfill-instances"].values()].sort((a, b) => String(a.sk).localeCompare(String(b.sk)));
 
-  it("🔴 B-64 Glue「上一次 run 收尾中」:实例还回 pending(attempts 保留、runToken 清掉、lastError 说明),下一拍再领,最终三天全成功", async () => {
+  it("🔴 Glue「上一次 run 收尾中」:实例还回 pending(attempts 保留、runToken 清掉、lastError 说明),下一拍再领,最终三天全成功", async () => {
     // 启动核心每拍最多试 2 次 ⇒ 前 3 次都撞:第一拍两次都撞 → 还回 pending;第二拍第 1 次撞、第 2 次成功
     H.concurrentLeft = 3;
     const planId = await createPlan();
@@ -400,7 +400,7 @@ describe("序 37 ⑦ 执行 + 回收(整条链一起跑)", () => {
     expect(insts()[0].attempts).toBe(2);
   });
 
-  it("B-64 一直收尾中 ⇒ attempts 到上限后如实判 failed(lastError 说明原因),不无限等", async () => {
+  it("一直收尾中 ⇒ attempts 到上限后如实判 failed(lastError 说明原因),不无限等", async () => {
     H.concurrentLeft = 9999;
     const planId = await createPlan();
     let t: any = null;

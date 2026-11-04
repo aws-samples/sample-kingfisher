@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 4(L6)—— MWAA Serverless 运行时**真跑**(python3)读执行落点:区 / 工作组 / 库 / 凭证全部来自 spec.place(PlaceWire),
+// MWAA Serverless 运行时**真跑**(python3)读执行落点:区 / 工作组 / 库 / 凭证全部来自 spec.place(PlaceWire),
 // 缺 place / 章与落点的 targetId 不一致 / redshift 作业缺数仓腿 ⇒ 拒,且一个 AWS 客户端都不建。
 // 只替换真外部:boto3(记下客户端建在哪个区、发了什么)。运行时源取**代码包里那一份全文**(BGP_RUNTIME_PY)。
 import { describe, it, expect } from "vitest";
@@ -8,7 +7,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BGP_RUNTIME_PY } from "../runtime-py";
-// @kf-batch 37-emr-run-date —— 业务日期参数两种形态的 TS 侧单一作者(与运行时 Python 逐项比对)
+// 业务日期参数两种形态的 TS 侧单一作者(与运行时 Python 逐项比对)
 import { runParamArguments, runParamArgv } from "@/lib/etl/run-params";
 
 const FAKE_BOTO3 = `CLIENTS = []
@@ -81,11 +80,10 @@ describe("🔴 MWAA Serverless 运行时:执行落点只来自 spec.place(PlaceW
     const r = run({ ...base, engine: "glue", place: { v: 1, targetId: "tgt_usw2_a", region: "us-west-2" }, glueJobName: "g" }, "_run_glue");
     expect(r.error).toBeNull();
     expect(r.clients).toEqual(["glue@us-west-2"]);
-    // @kf-batch 37-emr-run-date
     expect(r.calls).toEqual([{ JobName: "g", Arguments: runParamArguments("2026-10-11") }]);
   });
 
-  // @kf-batch 37-emr-run-date —— B-56 的调度那一半:serverless 运行时给 EMR 作业追加业务日期参数
+  // 该缺陷的调度那一半:serverless 运行时给 EMR 作业追加业务日期参数
   it("🔴 emr:entryPointArguments = spec 里的用户入参 + 全套业务日期参数(追加在后,与 provider.submit 同一张表);spec 本身不烙日期", () => {
     const spec = {
       ...base, engine: "emr", taskType: "emr-serverless", place: { v: 1, targetId: "tgt_usw2_a", region: "us-west-2" },

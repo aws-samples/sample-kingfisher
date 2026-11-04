@@ -1,4 +1,4 @@
-// 模块 44 — 把平台的只读发现工具适配成 Strands tool()(供规划大脑 planner 用)。
+// 把平台的只读发现工具适配成 Strands tool()(供规划大脑 planner 用)。
 //
 // 现有 CopilotTool 用 JSON Schema + handler(args, caller);Strands tool() 用 Zod + callback(input)。
 // 本文件是【单向适配桥】:把 CopilotTool 包装成 Strands InvokableTool——

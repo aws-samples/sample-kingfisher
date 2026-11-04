@@ -1,4 +1,4 @@
-// 模块 37 — 报表 widget 单资源路由:GET / PUT(乐观锁)/ DELETE。
+// 报表 widget 单资源路由:GET / PUT(乐观锁)/ DELETE。
 // 按资源自身 projectId 鉴权(guardResourceAccess),防越权改别项目的报表。
 export const dynamic = "force-dynamic";
 

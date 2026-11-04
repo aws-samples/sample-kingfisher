@@ -33,14 +33,14 @@ const server = http.createServer((req, res) => {
           projectId: typeof input.projectId === "string" ? input.projectId : undefined,
           engine: input.engine === "athena" ? "athena" : "redshift",
           database: input.database || "dev",
-          // @kf-batch 50-WP2-one-agentcore-one-om —— 取数落点(平台解析好的;缺省 = 主控区)
+          // 取数落点(平台解析好的;缺省 = 主控区)
           place: input.place && typeof input.place === "object" ? input.place : undefined,
-          // @kf-batch 50-WP31-place-first-class —— 序 4(L6):容器唯一读的落点(PlaceWire v1);agent.js 用 readPlaceWire 校验,缺 / 不合法即拒
+          // 容器唯一读的落点(PlaceWire v1);agent.js 用 readPlaceWire 校验,缺 / 不合法即拒
           placeWire: input.placeWire,
           published: Array.isArray(input.published) ? input.published : [],
           history: Array.isArray(input.history) ? input.history : [],
           memory: typeof input.memory === "string" ? input.memory : "",
-          // @kf-batch 50-W5-seg2-WP8 — 模块 51:平台按运行时配置透传的模型(顶层 payload.modelId,兼容 input.modelId)。
+          // 平台按运行时配置透传的模型(顶层 payload.modelId,兼容 input.modelId)。
           modelId: typeof payload.modelId === "string" ? payload.modelId : (typeof input.modelId === "string" ? input.modelId : undefined),
         });
         return send(res, 200, { output: out });

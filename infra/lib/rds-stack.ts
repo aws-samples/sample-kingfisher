@@ -6,7 +6,7 @@ import { Construct } from "constructs";
 
 interface RdsStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
-  dataKey: kms.IKey; // 模块 27 (WS1) — 数据域 CMK
+  dataKey: kms.IKey; // 数据域 CMK
 }
 
 export class RdsStack extends cdk.Stack {
@@ -53,17 +53,17 @@ export class RdsStack extends cdk.Stack {
       }),
       allocatedStorage: 20,
       maxAllocatedStorage: 50,
-      // 模块 27 (WS2 — 高可用): Multi-AZ 同步备库,主库 AZ 故障自动切换(去单点)。
+      // (WS2 — 高可用): Multi-AZ 同步备库,主库 AZ 故障自动切换(去单点)。
       multiAz: true,
       publiclyAccessible: false,
-      // 模块 27 (WS1 — 加密): 存储用数据域 CMK 静态加密(解密由 RDS 服务经 grant 完成)。
+      // (WS1 — 加密): 存储用数据域 CMK 静态加密(解密由 RDS 服务经 grant 完成)。
       storageEncrypted: true,
       storageEncryptionKey: props.dataKey,
-      // 模块 27 (WS3 — 容灾): 30 天自动备份 + RETAIN + 删除保护,防误删/可时间点恢复。
+      // (WS3 — 容灾): 30 天自动备份 + RETAIN + 删除保护,防误删/可时间点恢复。
       backupRetention: cdk.Duration.days(30),
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       deletionProtection: true,
-      // 模块 31 (R1) + Zero-ETL 前置: 挂上面声明的自定义参数组(binlog_format=ROW + binlog_row_image=FULL)。
+      // + Zero-ETL 前置: 挂上面声明的自定义参数组(binlog_format=ROW + binlog_row_image=FULL)。
       // 全新实例创建即带正确 binlog 配置,DMS CDC / Zero-ETL 开箱即用,无需带外改参数组+reboot。
       // ⚠️ 对【已存在且带数据】的实例改参数组需评估重启窗口;从零部署无此问题。
       parameterGroup: paramGroup,

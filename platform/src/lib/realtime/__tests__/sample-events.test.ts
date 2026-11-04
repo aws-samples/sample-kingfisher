@@ -1,4 +1,4 @@
-// B-135 —— 实时「造数」示例事件按事件时间升序(唯一作者 lib/realtime/sample-events.ts)。
+// 实时「造数」示例事件按事件时间升序(唯一作者 lib/realtime/sample-events.ts)。
 // 判据钉事实:随机序输入 ⇒ 输出 ts 单调不减;落在 [now − span, now];字段 / 时间格式与示例 SQL 同形;Kinesis 记录顺序 = 事件顺序。
 // 变异(去掉 sort)⇒ 第一条必红(确定性随机序列保证输入乱序)。
 import { describe, it, expect } from "vitest";
@@ -16,7 +16,7 @@ function lcg(seed: number): () => number {
 const NOW = Date.UTC(2026, 9, 29, 9, 14, 39, 123);
 const SPAN = 3 * 60_000;
 
-describe("buildSampleOrderEvents —— B-135 事件时间升序", () => {
+describe("buildSampleOrderEvents —— 事件时间升序", () => {
   it("随机序输入 ⇒ 输出 ts 单调不减(乱序写入会让 5 秒 watermark 容忍之外的记录全被按迟到丢弃)", () => {
     const events = buildSampleOrderEvents({ count: 300, spanMs: SPAN, now: NOW, random: lcg(7) });
     expect(events).toHaveLength(300);

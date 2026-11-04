@@ -1,4 +1,4 @@
-// 模块 13 — 真实身份解析 (v1.4.0)
+// 真实身份解析 (v1.4.0)
 //
 // Replaces the hardcoded `default-user` identity. Reuses verify-token.ts' `verifyRequest`
 // (aws-jwt-verify: validates RS256 signature, issuer, audience, expiry) to read the real
@@ -69,7 +69,6 @@ export async function resolveIdentity(req: NextRequest): Promise<Identity | null
 }
 
 /**
- * @kf-batch 50-PROD-A-launch-hardening
  * 「必须是**已校验**的登录身份」守卫:拿不到 ⇒ 401。用户维度的数据(问数卡片 / 历史 / 任务)一律按它的
  * `sub` 分区,不再用 `get-user.getUserId` —— 那个函数**不验签**地解 JWT,而且缺 token 时回 "default-user"。
  */

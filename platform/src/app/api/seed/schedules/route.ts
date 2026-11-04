@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-CAPSEED-seed-dispatch(登记 CAP-SEED 交付)
+// (登记 CAP-SEED 交付)
 // GET  /api/seed/schedules?scope=   当前项目的定时造数任务(按执行范围过滤;读路由口径)
 // POST /api/seed/schedules          建一个定时造数任务(**未启用**;启用走 POST /api/schedule/enable taskType=seed)
 //

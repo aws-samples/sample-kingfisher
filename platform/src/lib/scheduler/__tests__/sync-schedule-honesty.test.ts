@@ -1,4 +1,4 @@
-// @kf-batch 50-WP26-sync-schedule-carrier(前身 50-sync-schedule-honesty)
+// (前身 50-sync-schedule-honesty)
 // 🔴🔴 **同步任务的「启用调度」从「空壳 + 诚实」变成「真有载体」** —— 这组判据跟着往前走一格。
 //
 // 【它原来钉什么】2026-09-19 无头验收抓到:在调度配置页给 `Showcase-home-GameSync-7tables` 配
@@ -8,11 +8,11 @@
 //   ⇒ 当时先修**诚实**:接口回 `carrier: "none"` + 人话,页面报警不报喜、绿标改橙色「定时未交付」。
 //   那一版判据的最后一条刻意写成「**载体真交付时这条会红**」—— 它现在红了,所以这组判据整体改写。
 //
-// 【现在钉什么(WP-26 交付之后)】用户 2026-09-20:「我们后面所有的调度都走 mwaa serverless,
+// 【现在钉什么(交付之后)】用户 2026-09-20:「我们后面所有的调度都走 mwaa serverless,
 //   而且日志要拿得到,在任务监控里面要能看到日志。」
 //   ① 载体真的是**单节点 sync 工作流 + MWAA Serverless**(不是又长出一条平行机制);
 //   ② **先办载体、再改记录**:发布失败不许把 `enabled` 写进库(否则又是一个空壳);
-//      停用时**撤不下来就不许动记录**(WP-18d 铁律:孤儿 workflow 会继续按 cron 跑);
+//      停用时**撤不下来就不许动记录**(铁律:孤儿 workflow 会继续按 cron 跑);
 //   ③ 台账归属:run 记录记在**这个同步任务**头上(`taskType="sync"`),且**不回写 `bgp-workflows`**
 //      —— 那张表里没有它的行,盲写会 upsert 出幽灵工作流(与 schedule/enable 已修过的那条同类);
 //   ④ 界面的绿标只给**真有产物**的那一行(看 `deployments` 里的 workflowArn,**不看** `scheduleEnabled`
@@ -61,7 +61,7 @@ const TASK = {
   glueJobName: "bgp-sync-ABCDEF",
 };
 
-describe("同步任务的定时调度:载体真交付(WP-26)", () => {
+describe("同步任务的定时调度:载体真交付", () => {
   const route = code("app/api/schedule/enable/route.ts");
   const panel = code("components/monitor/SchedulePanel.tsx");
   const carrier = read("lib/sync/schedule-carrier.ts");
@@ -122,7 +122,7 @@ describe("同步任务的定时调度:载体真交付(WP-26)", () => {
   });
 
   it("③b 🔴🔴 **接缝**:归属字段必须真的进 YAML 的 env(两端都写了判据,中间那一层没有 ⇒ 真环境出事)", () => {
-    // 【为什么单独一条】WP-26 第一版把 `ledger_*` 加进了 `DagSpec`、也让运行期 python 去读,
+    // 【为什么单独一条】第一版把 `ledger_*` 加进了 `DagSpec`、也让运行期 python 去读,
     //   唯独漏了中间这一层:`runEnvOf` 是一张**白名单**,没列的字段压根到不了运行期。
     //   真环境当场坐实:同步任务的定时调度**真跑起来了**(`triggeredBy=schedule`,一条 succeeded),但
     //     ① run 台账写成 `taskType: "workflow"` ⇒ 监控页按工作流查名字、查不到 ⇒ 收弹等 1810s 说没有;
@@ -143,11 +143,10 @@ describe("同步任务的定时调度:载体真交付(WP-26)", () => {
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // @kf-batch 50-WP26-ledger-into-place
   // 🔴🔴 **③c:归属的「值」必须真的从 ledger 派生出来 —— 光有字段等于没有。**
   //
   // 【为什么 ③b 没能挡住它】③b 钉的是「`runEnvOf` 白名单里有这三个字段」= **形态**;
-  //   而承重的事实是「**那三个字段的值来自 `CarrierLedger`**」。2026-09-20 第三轮硬门真环境坐实:
+  //   而承重的事实是「**那三个字段的值来自 `CarrierLedger`**」。2026-09-20 第三轮硬门真环境坐实
   //     · 载体真发出去了(`deployments[*].workflowArn` 在、`WorkflowStatus=READY`);
   //     · `get-workflow` 的定义里三个 `ledger_*` 字段**全都在**(所以 ③b 是绿的);
   //     · 但值是 `ledger_task_type: "workflow"` / `writes_workflow_row: true` —— **缺省值**;

@@ -1,4 +1,4 @@
-// 模块 33-A（根治·裂缝A）— EMR 平台环境事实的【单一事实源 + 运行时兜底】。
+// （根治·裂缝A）— EMR 平台环境事实的【单一事实源 + 运行时兜底】。
 //
 // 【为什么存在】平台把 EMR 可用的私有子网早已算好、由 CDK 注入成环境变量 EMR_DEFAULT_SUBNET_IDS
 // (infra platform-stack.ts:853 = VPC 的 PRIVATE_WITH_EGRESS 子网,带 NAT 出网),但此前 platform/src
@@ -16,11 +16,11 @@
 //    必须守住,故 SSOT 逻辑放这个独立文件,不进 network.ts。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { EC2Client, DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
 import type { EmrNetwork } from "./emr/network";
-// G6(模块 50):SG id 缓存改按 targetId 键 —— 见 defaultSgId 上方注释。
+// G6:SG id 缓存改按 targetId 键 —— 见 defaultSgId 上方注释。
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 import { locationCacheKey, ProcessCache } from "@/lib/exec-env/cred-cache";
 
@@ -38,7 +38,7 @@ function defaultSubnetIds(): string[] {
 
 // 默认 SG id 进程内缓存(SG id 在其生命周期内不变;查失败不缓存,下次重试)。
 //
-// ── 🔴 G6(模块 50)改造:单值 → 按 targetId 键 ─────────────────────────────────
+// ── 🔴 G6改造:单值 → 按 targetId 键 ─────────────────────────────────
 // 原状是进程级单值:多 target 时**第一个 target 查出的 SG id 被所有 target 复用**,
 // 而 SG 属于具体 VPC/region ⇒ 跨区拿到一个本区不存在的 SG id,EMR 提交会以一个
 // 离根因很远的报错失败(甚至更糟:恰好撞上同名 SG,静默连错网络)。
@@ -56,7 +56,7 @@ async function defaultSgId(targetId: string = HOME_TARGET_ID): Promise<string> {
   if (!isHome(targetId)) {
     throw new Error(
       `platform-env 的默认网络只覆盖 home;target ${targetId} 的子网/SG 应取自其描述符的 resources 袋` +
-        `(50 SPEC §1.1;per-target 下发随 P50.3)`
+        `(50 SPEC §1.1;per-target 下发)`
     );
   }
   const key = locationCacheKey(targetId);

@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
-// 🔴 **改动前零守卫**(52 SPEC §2 缺口B B-2;台账 §11.2 第 9 项):任一登录用户凭 taskId/workflowId
+// 🔴 **改动前零守卫**(52 SPEC §2 缺口B;台账 §11.2 第 9 项):任一登录用户凭 taskId/workflowId
 //    就能读**任意项目**的运行日志。日志里有 SQL、表名、行数、报错栈 —— 泄露面不比数据本身小。
 // 🔴 两道:顶层 `requireProject(viewer)`(挡住非成员拿 id 当探测器)+ 按**资源归属项目**再判一次。
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
-// @kf-batch 50-WP17-serverless-workflow —— 日志组名必须来自**该工作流落点**的环境(不是主控区)
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
+// 日志组名必须来自**该工作流落点**的环境(不是主控区)
 import { schedulerEndpointFor, isServerlessEndpoint } from "@/lib/scheduler/mwaa-endpoint";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
@@ -15,16 +14,16 @@ import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { requireProject, guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP4quater-reads(工单 SC-34)—— 🔴 日志必须去**这条 run 实际执行的那个区**取。
+// 🔴 日志必须去**这条 run 实际执行的那个区**取。
 // 原来这里是一个模块级 home S3 客户端 + home CloudWatch 客户端:非主控区跑的运行点开日志,
 // 取到的是**主控区那个桶里不存在的对象**,catch 掉之后界面显示「暂无日志」——
 // 而「暂无日志」与「作业没有输出」长得一模一样,排障时会往完全错误的方向走。
 // 修法与 api/etl-jobs/[id]/logs 同一条纪律:按 run 行上的章解析落点,**解析不到就如实报错,不回落 home**。
 import { resolveGlueBinding, stampedTargetOf } from "@/lib/exec-env/data-plane-target";
 import { s3ClientFor, logsClientFor } from "@/lib/exec-env/target-clients";
-// @kf-batch 50-WP28-platform-action-node —— 平台动作的调度对象(治理定时任务 / 卡片定时刷新)
+// 平台动作的调度对象(治理定时任务 / 卡片定时刷新)
 import { getActionSchedule, actionCarrierDagId } from "@/lib/scheduler/action-schedules";
-// @kf-batch 50-CAPSEED-seed-dispatch —— 手动造数的 run(Glue 日志在该区)
+// 手动造数的 run(Glue 日志在该区)
 import { isSeedRunTaskId } from "@/lib/seed/seed-job";
 
 const USER_ID = "default-user";
@@ -42,7 +41,6 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     // 🔴 权威那一道:按同步任务自己的归属项目判(不是调用方的 active project)。
     const tctx = await guardResourceAccess(req, task as { projectId?: string }, "viewer");
     if (tctx instanceof NextResponse) return tctx;
-    // @kf-batch 50-WP23-monitor-logs-dispatch
     // 🔴 尊重 `runId`:原来**恒取最新一条** run ⇒ 在运行历史里点第 3 条的日志,看到的是最新那条的
     //    (或者最新那条没有 logS3Key ⇒ 直接「暂无日志」)。点哪条就取哪条,取不到就说清楚。
     let run: Record<string, unknown> | undefined;
@@ -109,8 +107,8 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       // 🔴 工作流日志同理按区取。目标态是**每区一套 MWAA Serverless、调度只在本区执行**
       // (用户 2026-09-10 第三次强调),那时日志组就在本区;现网只有主控区一个环境,
       // 所以 `resolveGlueBinding` 对 home 解出来的就是主控区 —— 逐字节等价于改动前的行为。
-      // 逐区环境建好后**这里不用再改**(工单 SC-3 / WP-14 只需让 run 行盖上真章)。
-      // @kf-batch 50-WP17-serverless-workflow —— 🔴 这三行原来有**两个**洞:
+      // 逐区环境建好后**这里不用再改**(只需让 run 行盖上真章)。
+      // 🔴 这三行原来有**两个**洞
       //   ① 落点取 `(wf as {targetId}).targetId`,而路由写工作流用的是 `targets[]`(B 类绑定字段名)
       //      ⇒ 绑在别区的工作流这里解出 undefined ⇒ 回落主控区 region;
       //   ② 日志组名写的是 `homeMwaaEndpoint().envName` ⇒ **恒是主控区那个环境名**,
@@ -156,7 +154,6 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     return NextResponse.json({ logs: [{ message: "暂无日志" }] });
   }
 
-  // @kf-batch 50-WP28-platform-action-node
   // 🔴 平台动作的调度对象:日志在**该区**的 MWAA Serverless 日志组里(节点 print 了命令号 / 结果摘要);
   //    run 行上的 error 就是消费端写回的真因 —— 一并给出,不让用户只看到「暂无日志」。
   const sched = await getActionSchedule(params.id);
@@ -188,7 +185,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     return NextResponse.json({ logs: msgs.length ? msgs : [{ message: "暂无日志" }] });
   }
 
-  // @kf-batch 50-CAPSEED-seed-dispatch —— 手动造数(台账对象 `seed_<targetId>`,每区一个,不在任何任务表里)
+  // 手动造数(台账对象 `seed_<targetId>`,每区一个,不在任何任务表里)
   //   🔴 守卫按 **run 行自己的归属项目**判(这个对象没有资源行;run 行就是唯一的归属事实)。
   if (isSeedRunTaskId(params.id)) {
     let run: Record<string, unknown> | undefined;
@@ -208,7 +205,6 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     return NextResponse.json({ logs: await readSeedRunLogs(run) });
   }
 
-  // @kf-batch 50-WP23-monitor-logs-dispatch
   // 🔴🔴 用户 2026-09-15 报的真缺陷:「跑完的任务都没有日志,点日志显示暂无日志」。
   //    根因是这个端点**只认识同步任务与工作流**:监控页的运行历史早就把 ETL / 引擎(Glue·EMR·Redshift)
   //    的 run 一起列出来了,而它们的 taskId 在上面两张表里都查不到 ⇒ 直接落到这句

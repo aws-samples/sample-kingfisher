@@ -1,8 +1,7 @@
-// @kf-batch 50-B28-flink-delete-settling
-// 🔴🔴 B-28(2026-10-01 新账号硬门 `scq` A3-撤 真撞):停止后紧接着删除 ⇒ 应用正 STOPPING ⇒ 原实现只等 RUNNING_LIKE(不含 STOPPING)
+// 🔴🔴 (2026-10-01 新账号硬门 `scq` A3-撤 真撞):停止后紧接着删除 ⇒ 应用正 STOPPING ⇒ 原实现只等 RUNNING_LIKE(不含 STOPPING)
 //   ⇒ 直接 DeleteApplication ⇒ ResourceInUse ⇒ 页面 502「请重试」,作业留着(验收残留就是这么攒出来的)。
 // 只 mock 真外部:MSAF / 日志客户端工厂(target-clients)+ DynamoDB(忠实执行 SET / 条件删除的假表)。
-// @kf-batch 50-B28b-flink-delete-async —— 🔴 B-28 第二次:判据改钉**用户结果**(点一次删除 ⇒ 行最终消失),
+// 🔴 第二次:判据改钉**用户结果**(点一次删除 ⇒ 行最终消失),
 //   第一次只钉了「回 409」,于是第九轮硬门同一条再红(用户:「别总是在同一个地方踩坑」)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
@@ -80,7 +79,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
   return { ...real, kdaClientFor: async () => kda, logsClientFor: async () => noop, s3ClientFor: async () => noop, cloudWatchClientFor: async () => noop, secretsClientFor: async () => noop };
 });
 
-// @kf-batch 50-WP31-place-first-class —— 主控区的 Flink 落点也读描述符了(序 3 收尾)⇒ 注册表是真外部(DDB 边界),在这里给主控区一份描述符
+// 主控区的 Flink 落点也读描述符了(收尾)⇒ 注册表是真外部(DDB 边界),在这里给主控区一份描述符
 vi.mock("@/lib/exec-env/registry", async (orig) => {
   const real: any = await orig();
   const ACCT = "000000000000";
@@ -107,20 +106,20 @@ import {
   __flinkDeletionsSettled,
 } from "../flink-service";
 
-// 序 50 第二批:等 MSAF 过渡态改经唯一原语 awaitTerminal ⇒ 请求路径里的调用必须在长操作上下文(submitLongOp)或登记过的后台等待者里;
+// 等 MSAF 过渡态改经唯一原语 awaitTerminal ⇒ 请求路径里的调用必须在长操作上下文(submitLongOp)或登记过的后台等待者里;
 //   判据直接调服务函数时用 runInLongOp 包一层(与执行体 flink-delete 同一种上下文),反向钉「裸调即抛」。
 const inOp = <T,>(fn: () => Promise<T>) => runInLongOp({ taskId: "t-flink-judge", opKind: "flink-delete" }, fn);
 
 describe("🔴 删除 Flink 应用:等过渡态稳下来,等不到就明确说(不撞 ResourceInUse)", () => {
   beforeEach(() => { h.statuses = []; h.sent = []; h.afterStop = null; h.rows.clear(); });
 
-  it("🔴 模块 55 闸门 ②:请求路径裸调(无长操作上下文)⇒ 抛 LongOpContextMissing,一次 MSAF 命令都不发", async () => {
+  it("🔴 闸门 ②:请求路径裸调(无长操作上下文)⇒ 抛 LongOpContextMissing,一次 MSAF 命令都不发", async () => {
     h.statuses = ["STOPPING", "STOPPING", "STOPPING", "READY"];
     await expect(deleteFlinkApp("01JOBJOBJOBJOBJOBJOBJOBJOB", "tgt_home", { pollMs: 1, budgetMs: 2000 })).rejects.toBeInstanceOf(LongOpContextMissing);
     expect(h.sent).not.toContain("DeleteApplicationCommand");
   });
 
-  it("🔴 B-28 原状:STOPPING → STOPPING → READY ⇒ 等到 READY 再删(原实现在第一个 STOPPING 就删,撞 ResourceInUse)", async () => {
+  it("🔴 原状:STOPPING → STOPPING → READY ⇒ 等到 READY 再删(原实现在第一个 STOPPING 就删,撞 ResourceInUse)", async () => {
     h.statuses = ["STOPPING", "STOPPING", "STOPPING", "READY"];
     await inOp(() => deleteFlinkApp("01JOBJOBJOBJOBJOBJOBJOBJOB", "tgt_home", { pollMs: 1, budgetMs: 2000 }));
     expect(h.sent).toContain("DeleteApplicationCommand");
@@ -147,13 +146,13 @@ describe("🔴 删除 Flink 应用:等过渡态稳下来,等不到就明确说(�
     expect(h.sent).not.toContain("DeleteApplicationCommand");
   });
 
-  it("过渡态清单至少含 STOPPING / FORCE_STOPPING / DELETING(B-28 就是漏了 STOPPING)", () => {
+  it("过渡态清单至少含 STOPPING / FORCE_STOPPING / DELETING(就是漏了 STOPPING)", () => {
     for (const s of ["STOPPING", "FORCE_STOPPING", "DELETING"]) expect(FLINK_SETTLING_STATUSES as readonly string[]).toContain(s);
   });
 
 });
 
-describe("🔴🔴 B-28b 用户结果:点一次删除 ⇒ 作业最终从列表消失(不管引擎要停多久)", () => {
+describe("🔴🔴 用户结果:点一次删除 ⇒ 作业最终从列表消失(不管引擎要停多久)", () => {
   const J = "01JOBJOBJOBJOBJOBJOBJOBJOB";
   beforeEach(() => {
     h.statuses = []; h.sent = []; h.afterStop = null; h.rows.clear();
@@ -232,7 +231,7 @@ describe("🔴🔴 B-28b 用户结果:点一次删除 ⇒ 作业最终从列表�
   });
 
   it("接线:停止执行体写 stopping(不写 stopped);删除执行体只经 requestFlinkDeletion,已受理回 202;两条路由只 submitLongOp 自己的 kind", () => {
-    // 序 50 第二批:启 / 停 / 删三条路由的主体搬进 lib/realtime/long-ops.ts;后台销毁入口 ensureFlinkDeletion 包进登记过的后台等待者
+    // 启 / 停 / 删三条路由的主体搬进 lib/realtime/long-ops.ts;后台销毁入口 ensureFlinkDeletion 包进登记过的后台等待者
     const SRC = resolve(__dirname, "../../..");
     const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
     const exec = strip(readFileSync(join(SRC, "lib/realtime/long-ops.ts"), "utf8"));

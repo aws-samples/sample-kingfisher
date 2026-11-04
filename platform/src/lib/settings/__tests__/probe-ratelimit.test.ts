@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // probe 限频单测(51 SPEC §3.4a 卡点④;ACCEPTANCE M12)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

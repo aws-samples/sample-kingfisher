@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // 供给层门禁(50 SPEC §3.9b「进 `isolated` 的前置」)。
 //
 // 三条承重:
@@ -8,7 +7,7 @@
 //     "补上这几个就能切",并进 `present` 更糟(直接放行一个其实没凭证的项目)。
 //  ③ **在用项目清单必须翻页**:漏掉的项目正是"没凭证却被放行进 isolated"的那一类。
 //
-// @kf-batch 50-WP9a-durable-jobs —— 同步入口 `provisionProjectCredential` 已删(唯一调用方改 202 + 作业);
+// 同步入口 `provisionProjectCredential` 已删(唯一调用方改 202 + 作业);
 //   ① 与「幂等与失败」两组改为驱动**作业 handler**(`supplyJobHandler`)逐步走 —— 同一份 `SUPPLY_STEPS`,
 //   外加作业化之后才有的那条承重:**续跑不重做已完成的步骤**(尤其 provision-login:重做 = 口令再轮换一次)。
 //   runner + store + 真执行器的装配见 lib/dataplane-jobs/__tests__/dataplane-jobs-assembly.test.ts。

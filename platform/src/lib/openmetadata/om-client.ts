@@ -4,7 +4,7 @@
 // failures never throw to the caller (metadata push must not break the sync run).
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 const OM_URL = () => (process.env.OPENMETADATA_URL || "").replace(/\/$/, "");
 
@@ -13,7 +13,7 @@ let tokenExpiry = 0;
 let cachedBot: string | null = null;
 let botExpiry = 0;
 
-// OM 中心件的两件密钥(bot token / 管理员口令)共用这一个读取口(一个客户端构造点,见 WP-31 棘轮 L3/L4)。
+// OM 中心件的两件密钥(bot token / 管理员口令)共用这一个读取口(一个客户端构造点,棘轮 L3/L4)。
 async function readOmSecret(secretId: string): Promise<string> {
   const { SecretsManagerClient, GetSecretValueCommand } = await import("@aws-sdk/client-secrets-manager");
   const sm = sdkClient("central:openmetadata", SecretsManagerClient, { region: homeRegion() });
@@ -114,7 +114,7 @@ export async function omRequest(method: string, path: string, body?: any): Promi
 /**
  * 与 `omRequest` 同一条认证 / 重试路径,但**如实回状态**(不把失败压成 null)。
  *
- * 🔴 @kf-batch 50-B42-om-reconcile:`omRequest` 对任何失败都回 null ⇒ 「列不出来」与「确实是空的」
+ * 🔴 `omRequest` 对任何失败都回 null ⇒ 「列不出来」与「确实是空的」
  *   分不清。凡是要**据此删除**的调用方(目录对账)必须用本函数:读不清楚就一张都不删(fail-closed)。
  *   `status`:HTTP 状态;0 = 网络 / 解析失败;-1 = OM 没配置或拿不到 token。
  */

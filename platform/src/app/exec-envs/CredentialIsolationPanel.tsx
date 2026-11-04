@@ -1,8 +1,7 @@
 "use client";
-// @kf-batch 50-WP9a-durable-jobs
-// 执行环境详情页的「凭证隔离」一栏 + 〔延期供给截止〕入口(WORK-PACKAGES WP-9 施工序 2;50 SPEC §3.9b 延期专用操作)。
+// 执行环境详情页的「凭证隔离」一栏 + 〔延期供给截止〕入口(50 SPEC §3.9b 延期专用操作)。
 //
-// 🔴 为什么单独一个组件:TargetDetail.tsx 是并行包(WP-30)的高频改动面;本栏只在那里插一行,改动面最小。
+// 🔴 为什么单独一个组件:TargetDetail.tsx 是并行包的高频改动面;本栏只在那里插一行,改动面最小。
 // 🔴 只读三件事(状态 / 世代 / 截止)+ 一个写入口(延期)。延期必须写理由、天数 1–30,服务端再校验一遍
 //    (前态 = provisioning、epoch 一致、新截止晚于旧截止、≤ 30 天、审计 fail-closed)—— 这里的限制只是少让人撞墙。
 import React, { useState } from "react";

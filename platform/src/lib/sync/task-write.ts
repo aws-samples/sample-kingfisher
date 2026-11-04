@@ -1,8 +1,7 @@
-// @kf-batch 50-B08-sync-task-write-guard
 /**
  * 同步任务行(`bgp-sync-tasks`)的**唯一状态写通道**。
  *
- * 【为什么必须收成一个作者(2026-09-20 B-08)】
+ * 【为什么必须收成一个作者】
  * DynamoDB 的 `UpdateItem` 默认是 **upsert**:行不存在时它**建**一个只有 Key + 本次 SET 那几个字段
  * 的残行。于是任何「读出 task → 过一会儿写回状态」的路径,在这中间行被删掉之后,都会
  * **把那条已删的任务凭空造回来** —— 页面上出现一条没有名字、没有源、删不掉的任务。
@@ -42,9 +41,9 @@ export type SyncTaskUpdate = Omit<
    * 额外前置条件(与 `attribute_exists(taskId)` 取 **AND**;只许引用调用方自己在
    * ExpressionAttributeNames / Values 里给出的 `#名` / `:值`)。
    *
-   * @kf-batch 41-B121-dms-start-single-flight —— 「同一任务只许一条启动编排在飞」这类**状态机守卫**
+   * 「同一任务只许一条启动编排在飞」这类**状态机守卫**
    *   也必须经本通道(否则又回到绕开唯一作者裸发 UpdateCommand 的老路)。写之前**读出来再判**不行:
-   *   读与写之间就是并发窗口,B-121 的两条编排正是在那条缝里一起起跑的。
+   *   读与写之间就是并发窗口,该缺陷的两条编排正是在那条缝里一起起跑的。
    */
   onlyIf?: string;
 };

@@ -1,7 +1,7 @@
-// 序 49 ⑨ B-110 —— 页面拿到非 JSON 的 /api 响应 ⇒ 可读错误而不是「Unexpected token <」(整形逻辑判据 + 调用点判据)。
+// 页面拿到非 JSON 的 /api 响应 ⇒ 可读错误而不是「Unexpected token <」(整形逻辑判据 + 调用点判据)。
 //
 // 【缺陷原形(第四十三轮 c …9435 18:07Z)】平台边缘访问频率规则把 `/api/*` 拦成 HTML 403;CloudFront / ALB 502 / 504 也是 HTML。
-//   页面调用点 `await res.json()` 抛异常,用户零提示。B-107 只给七条 AI 路由包过。
+//   页面调用点 `await res.json()` 抛异常,用户零提示。只给七条 AI 路由包过。
 // 【根治】全局 fetch 拦截器(AuthProvider)对所有 /api/* 响应 normalizeApiResponse:≥ 400 且不是 JSON ⇒ 标准错误信封;
 //   2xx / JSON / 正文其实是 JSON 的一律原样。aiFetchJson 文案从同一作者 import。
 import { describe, it, expect } from "vitest";
@@ -14,7 +14,7 @@ const html = (status: number, body = "<!DOCTYPE html><html><body><h1>403 ERROR</
 const json = (status: number, body: unknown, contentType = "application/json") =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": contentType } });
 
-describe("🔴 B-110 normalizeApiResponse:≥ 400 且不是 JSON ⇒ 同状态码的错误信封", () => {
+describe("🔴 normalizeApiResponse:≥ 400 且不是 JSON ⇒ 同状态码的错误信封", () => {
   it("缺陷原形:边缘访问规则 HTML 403 ⇒ `{ success:false, error.message 可读, status:403, nonJson:true }`,状态码不变、content-type 变 JSON", async () => {
     const out = await normalizeApiResponse(html(403));
     expect(out.status).toBe(403);
@@ -75,7 +75,7 @@ describe("🔴 B-110 normalizeApiResponse:≥ 400 且不是 JSON ⇒ 同状态�
   });
 });
 
-describe("🔴 B-110 调用点判据:全局 fetch 拦截器与 aiFetchJson 都经同一作者", () => {
+describe("🔴 调用点判据:全局 fetch 拦截器与 aiFetchJson 都经同一作者", () => {
   const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), "src", rel), "utf8");
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 

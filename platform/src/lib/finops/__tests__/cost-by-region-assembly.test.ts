@@ -1,13 +1,12 @@
-// @kf-batch 50-WP6-cost-by-region
 // 🔴🔴 **装配层**:CE 采集器 ↔ v2 存储 ↔ 区卡片 / 对账 ↔ 异常检测 ↔ 签名 ↔ 读路由 —— 兄弟模块之间**一个都不 mock**
 // (mock-hygiene-guard 的纪律;lib/finops 原在欠账名单里,本文件补上后从名单删除)。
 //
 // 只 mock **真外部**:DynamoDB(一张按 pk/sk 存、Query 会翻页的假表)/ Cost Explorer(会翻页的假账单)/
 // 执行环境注册表 / 项目守卫 / 告警投递与知识库写入(断言它们收到了什么)。
 //
-// 判据对应 WORK-PACKAGES §WP-6 ⑦:
-//   E-170 区卡片金额 == CE 按 region 直查 · E-171 scope=usw2 列表 == 该 target 的成本行 ·
-//   E-172 未分摊 = 区账单 − Σ归因 · E-173 v1 旧行存在时总额不变 · E-174 两区同任务各自基线(只报一区)。
+// 判据对应 §⑦:
+//   区卡片金额 == CE 按 region 直查 scope=usw2 列表 == 该 target 的成本行 ·
+//   未分摊 = 区账单 − Σ归因 v1 旧行存在时总额不变 两区同任务各自基线(只报一区)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -66,7 +65,7 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
           const rows = [...h.ddb.entries()].filter(([k]) => k.startsWith(`${t}|`));
           return page(rows, cmd.input.ExclusiveStartKey);
         }
-        if (n === "DeleteCommand") throw new Error("🔴 WP-6:成本链路不许删任何行");
+        if (n === "DeleteCommand") throw new Error("🔴 成本链路不许删任何行");
         throw new Error(`假 DDB 未支持 ${n}`);
       }),
     },
@@ -178,7 +177,7 @@ beforeEach(() => {
   ];
 });
 
-describe("采集 → v2 分区(施工序 2)", () => {
+describe("采集 → v2 分区", () => {
   it("🔴 v2 首次采集自动回填:窗口回到上月 1 日(且 ≥30 天),之后回到常规 3 天", async () => {
     const first = await collectDailyCosts();
     expect(first.backfillReason).toBe("v2-first-run");
@@ -207,12 +206,12 @@ describe("采集 → v2 分区(施工序 2)", () => {
   });
 });
 
-describe("大盘区卡片(O3a,E-170 / E-173)", () => {
+describe("大盘区卡片(O3a)", () => {
   beforeEach(async () => {
     await collectDailyCosts();
   });
 
-  it("🔴 E-170:区卡片本月累计 == CE 按 region 求和;全局服务单独一张,不进任何区", async () => {
+  it("🔴 区卡片本月累计 == CE 按 region 求和;全局服务单独一张,不进任何区", async () => {
     const d = await json(overviewGET(req("/api/finops/overview")));
     const card = (r: string) => d.byRegion.find((c: any) => c.region === r);
     expect(card("us-west-2").monthToDateUsd).toBeCloseTo(6.25, 6);
@@ -240,7 +239,7 @@ describe("大盘区卡片(O3a,E-170 / E-173)", () => {
     expect(d.regionlessMonthToDateUsd).toBe(0);
   });
 
-  it("🔴 E-173:旧分区 `cost#<month>` 里的旧格式行存在时,总额不变(读侧只读 v2)", async () => {
+  it("🔴 旧分区 `cost#<month>` 里的旧格式行存在时,总额不变(读侧只读 v2)", async () => {
     const before = await json(overviewGET(req("/api/finops/overview")));
     for (const [sk, extra] of [[`${today}#AWS Glue`, {}], [`${today}#AWS Glue#us-west-2`, { region: "us-west-2" }]] as const) {
       h.ddb.set(`${FINOPS_TABLES.COST_DAILY}|cost#${thisMonth}|${sk}`, {
@@ -259,7 +258,7 @@ describe("大盘区卡片(O3a,E-170 / E-173)", () => {
   });
 });
 
-describe("任务成本按区(O3b,E-171 / E-172)", () => {
+describe("任务成本按区(O3b)", () => {
   beforeEach(async () => {
     await collectDailyCosts();
     const t = new Date().toISOString();
@@ -268,12 +267,12 @@ describe("任务成本按区(O3b,E-171 / E-172)", () => {
     putRun("t2", "r3", "tgt_usw2_a", 0.5, t);
   });
 
-  it("E-171:scope=tgt_usw2_a 的列表 == targetId=tgt_usw2_a 的成本行集合", async () => {
+  it("scope=tgt_usw2_a 的列表 == targetId=tgt_usw2_a 的成本行集合", async () => {
     const d = await json(tasksGET(req("/api/finops/tasks?scope=tgt_usw2_a")));
     expect(d.items.map((i: any) => `${i.taskId}@${i.targetId}`).sort()).toEqual(["t1@tgt_usw2_a", "t2@tgt_usw2_a"]);
   });
 
-  it("🔴 E-172:未分摊 = 区账单(CE)− Σ该区归因(DDB)", async () => {
+  it("🔴 未分摊 = 区账单(CE)− Σ该区归因(DDB)", async () => {
     const d = await json(tasksGET(req("/api/finops/tasks?scope=tgt_usw2_a")));
     expect(d.reconcile.byRegion).toHaveLength(1);
     const r = d.reconcile.byRegion[0];
@@ -286,7 +285,7 @@ describe("任务成本按区(O3b,E-171 / E-172)", () => {
   });
 });
 
-describe("异常检测按 (task, target)(施工序 4,E-174)", () => {
+describe("异常检测按 (task, target)", () => {
   /**
    * 造数:同一任务 T 在两个区各跑 8 次 —— 主控区每次 $1,us-west-2 每次 $10(两区本来就不一样贵)。
    * 主控区最后一次涨到 $5(真突增);us-west-2 最后一次 $10(完全正常)。

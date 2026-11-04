@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
-// @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 治理记录按区。
+// 🔴 治理记录按区。
 // 目录 fqn 不含区(`redshift.<db>.<schema>.<table>`)⇒ 两个区的同名表**共用同一个 DDB 分区**:
 // 一个区打的标签盖掉另一个区的、一个区跑绿另一个跑红的质量结果互相覆盖。
 // 用户 2026-09-10 的原话是「同名表跨区会互相顶,按区出分会**串味**」。
@@ -17,12 +17,11 @@ import {
   isMaskStrategy,
 } from "@/lib/governance/classification";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP31-place-first-class
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
+// 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
 import { requestedRegisteredPlace } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 
-// 模块 18: data classification control-plane.
+// data classification control-plane.
 //   GET   ?fqn=<table FQN>  → that table's column classifications; no fqn → all (catalog/overview)
 //   PUT   {fqn, column?, level, category?, maskStrategy?}  → upsert (platform admin only)
 //   DELETE ?fqn=&column=    → remove (platform admin only)
@@ -50,7 +49,7 @@ export async function PUT(req: NextRequest) {
   try {
     // 🔴 写侧必须用**同一个键**:写裸 fqn 而读按区键 ⇒ 永远读不到自己刚写的那条,
     //    而界面上表现为「设了级别但不生效」——这类错最难查。
-    // @kf-batch 50-WP31-place-first-class —— 🔴 写入的落点必须**点名**(缺 / 非法 ⇒ 400)。原来没给就读 `?scope=`、再没有就主控区
+    // 🔴 写入的落点必须**点名**(缺 / 非法 ⇒ 400)。原来没给就读 `?scope=`、再没有就主控区
     //   ⇒ 页面保存分级两样都不带 ⇒ us-west-2 视角设的级别写进主控区那张表(「设了级别但不生效」)。
     const wKey = scopedFqn(body.fqn, (await requestedRegisteredPlace(body.targetId, "设置数据分级")).targetId);
     const saved = await upsertClassification({

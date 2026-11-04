@@ -1,9 +1,9 @@
-// 模块 40 — FinOps 数据类型(全模块单一事实源)。
+// FinOps 数据类型(全模块单一事实源)。
 
 // ── L1 服务日成本 ──────────────────────────────────────────────
 
 export interface CostDailyRow {
-  pk: string; // "costv2#<yyyy-MM>"(@kf-batch 50-WP6-cost-by-region;旧分区 "cost#<yyyy-MM>" 已不在读路径上)
+  pk: string; // "costv2#<yyyy-MM>"(旧分区 "cost#<yyyy-MM>" 已不在读路径上)
   sk: string; // "<yyyy-MM-dd>#<service>#<region>"
   date: string; // yyyy-MM-dd
   service: string; // CE SERVICE 维度原文
@@ -13,7 +13,7 @@ export interface CostDailyRow {
   /**
    * CE 的 **REGION** 维度原文(如 `us-east-1`;全局服务如 Tax / Support / Route 53 回 `global` / `NoRegion`)。
    *
-   * @kf-batch 50-WP6-cost-by-region —— 🔴 **必填**(原为可选):v2 分区里每一行都按区采,
+   * 🔴 **必填**(原为可选):v2 分区里每一行都按区采,
    * 「没有 region 的行」只存在于旧分区,而旧分区已不在任何读路径上。留成可选 = 给「静默合法默认值」
    * 留了个口子(读侧各写一遍 `r.region || ""` 去猜它是什么)。全局服务用 CE 自己的字面量,不留空。
    */
@@ -28,7 +28,7 @@ export function isRegionlessCost(region: string): boolean {
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— 大盘第一层的 **region 卡片**(O3a,INTERACTION §3.2)。
+ * 大盘第一层的 **region 卡片**(O3a,INTERACTION §3.2)。
  * 🔴 按 **AWS region** 分组,**不是** target 归因:CE 的维度里没有「执行环境」,同区两套环境的钱分不开。
  */
 export interface RegionCostCard {
@@ -51,7 +51,7 @@ export interface OverviewSummary {
   watermark: string | null; // CE 采集水位(null=从未采集)
   stale: boolean;
   /**
-   * @kf-batch 50-WP6-cost-by-region —— 区卡片(按本月累计降序)。只含**有区归属**的钱;
+   * 区卡片(按本月累计降序)。只含**有区归属**的钱;
    * 单区 / 分组视角下只含视角内的区。
    */
   byRegion: RegionCostCard[];
@@ -86,7 +86,7 @@ export interface CostRunRow {
   finishedAt: string;
   runStatus: string; // succeeded/failed —— 失败的 run 也烧钱,照记
   triggeredBy?: string; // backfill 的 run 不进异常基线(43-B 硬约束同款)
-  // @kf-batch 50-W3f-T0-T3(50 ROADMAP §2octies.17 T1 / SPEC §1.3a S6)
+  // (50 ROADMAP §2octies.17 T1 / SPEC §1.3a S6)
   // 🔴 成本行**继承 run 行的归属章**:成本按 target 归因(O3b)的前提。写侧(sweep)必填;
   //    存量无章行由 `stamp-backfill.ts` 从 run 行回填 —— 绝不由读侧猜 home。
   projectId: string;
@@ -97,7 +97,7 @@ export interface CostRunRow {
 export interface TaskCostSummary {
   taskId: string;
   /**
-   * @kf-batch 50-WP6-cost-by-region —— 这一行是**哪个执行环境**的运行汇总(O3b)。
+   * 这一行是**哪个执行环境**的运行汇总(O3b)。
    * 🔴 排行按 (taskId, targetId) 分组:同一个任务扇出到两个区,是两行而不是一行 ——
    *    合成一行就看不出「贵的是哪个区」,也和「执行范围」那一列对不上。
    * 取值走 `scalarTargetOf(row, "cost")`(与范围过滤同一条规则;存量无章行归主控区)。
@@ -112,7 +112,7 @@ export interface TaskCostSummary {
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— 任务成本 Tab 的 KPI「已归因 / 未分摊」按 **region** 对账(O3b,E-172)。
+ * 任务成本 Tab 的 KPI「已归因 / 未分摊」按 **region** 对账(O3b)。
  * 未分摊 = region 账单 − Σ该 region 的已归因 run 成本。
  * 🔴 对账粒度只能是 region(CE 只给到 region):同区若有多套执行环境,它们的 run **都**算进这个区的已归因,
  *    哪怕当前视角只选了其中一套 —— 否则另一套的花费会被算成「未分摊」。
@@ -140,8 +140,8 @@ export interface CostReconcile {
 // ── 异常检测 ──────────────────────────────────────────────────
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— 🔴 异常必须带**它属于哪里**,做成判别联合(A4:非法状态写不出来):
- *   · 任务级 ⇒ `targetId` 必填:基线按 (task, target) 各算各的,两区同任务不互相污染(E-174);
+ * 🔴 异常必须带**它属于哪里**,做成判别联合(A4:非法状态写不出来):
+ *   · 任务级 ⇒ `targetId` 必填:基线按 (task, target) 各算各的,两区同任务不互相污染;
  *   · 服务级 ⇒ `region` 必填:账单按 (service, region) 各算各的,同理。
  * 原来是一个可选 `engine` 加一个 `key`,两区同任务的 run 被并进同一条基线 ——
  * 一个区的高成本被另一个区的低成本稀释(漏报),或者一个区的正常值被当成另一个区的突增(误报)。
@@ -167,7 +167,7 @@ export type CostAnomaly =
 
 /**
  * 预算作用域。
- * @kf-batch 50-WP4quater-reads(工单 SC-24)—— 新增 `region` 变体:用户 2026-09-10 点名
+ * 新增 `region` 变体:用户 2026-09-10 点名
  * 「『成本大盘』与『预算护栏』仍是全平台合计」。有了它才能**给某个区单独设预算**
  * (「us-west-2 每月不超过 $200」),而不是只能给整个账号设一个总额。
  * 🔴 做成判别联合的新变体而不是给现有变体加个可选 region 字段:后者会让
@@ -186,7 +186,7 @@ export interface Budget {
   name: string;
   scope: BudgetScope;
   monthlyLimitUsd: number;
-  channelIds: string[]; // 复用模块34通道
+  channelIds: string[]; // 复用通道
   enabled: boolean;
   // 最近评估快照(detect 时刷新)
   lastEval?: { month: string; spentUsd: number; pct: number; at: string };
@@ -208,7 +208,7 @@ export interface Advice {
   estMonthlySavingUsd?: number;
   resource?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-24)—— 这条建议是**哪个区**的资源。
+   * 这条建议是**哪个区**的资源。
    * 🔴 不带区的成本建议在多区下没法执行:用户看到「删掉这个空转实例」却不知道去哪个区删。
    */
   region?: string;

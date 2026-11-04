@@ -1,4 +1,4 @@
-// 模块 55 — 等待上下文与唯一轮询原语的判据:无上下文即抛(闸门 ④ 的运行时半边)、op 帧 / 后台帧都放行、未登记 owner 拒、
+// 等待上下文与唯一轮询原语的判据:无上下文即抛(闸门 ④ 的运行时半边)、op 帧 / 后台帧都放行、未登记 owner 拒、
 // 预算到抛 LongOpWaitBudgetExceeded(文案含次数 / 秒数 / 最后状态)、abort、退避口径、ALS 跨 await / Promise.all 保持。
 import { describe, it, expect } from "vitest";
 import { BACKGROUND_WAITERS, LongOpContextMissing, currentWaitContext, runAsBackgroundWaiter, runInLongOp } from "../context";
@@ -6,7 +6,7 @@ import { LongOpAborted, LongOpWaitBudgetExceeded, awaitTerminal } from "../await
 
 const noSleep = async () => {};
 
-describe("模块 55 context", () => {
+describe("context", () => {
   it("请求路径(无帧)⇒ currentWaitContext undefined;runInLongOp 内是 op 帧且跨 await / Promise.all 保持;退出后恢复", async () => {
     expect(currentWaitContext()).toBeUndefined();
     await runInLongOp({ taskId: "t1", opKind: "modeling-land" }, async () => {
@@ -28,7 +28,7 @@ describe("模块 55 context", () => {
   });
 });
 
-describe("模块 55 awaitTerminal", () => {
+describe("awaitTerminal", () => {
   it("🔴 无等待上下文 ⇒ 第一步就抛 LongOpContextMissing(probe 一次都不调)", async () => {
     let probes = 0;
     await expect(awaitTerminal({ what: "观测语句", maxPolls: 3, sleep: noSleep, probe: async () => { probes++; return { done: true, value: 1 }; } })).rejects.toBeInstanceOf(LongOpContextMissing);

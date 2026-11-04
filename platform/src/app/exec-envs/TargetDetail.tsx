@@ -1,35 +1,33 @@
 "use client";
 
-// @kf-batch 50-P50.2c-control-api
 // 执行环境详情(50 INTERACTION §1.2 进度 / §1.3 探活·启用 / §1.5 组件区)。
 //
 // 诚实边界(与后端批次对齐,别做"看起来能点其实必炸"的按钮):
 //   · probe / enable —— 切片 e 并行交付;接口 404 时给出明确降级提示,不白屏;
-//   · 补充部署(add-components);删除:路 A 弃置 / 路 B 下线销毁(drain→影响预览→审批→销毁,DecommissionPanel);
+//   · 补充部署(add-components);删除:弃置 下线销毁(drain→影响预览→审批→销毁,DecommissionPanel);
 //   · home 环境**不显示**删除入口(INTERACTION §1.4 机制D;后端另有硬拒)。
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Descriptions, Divider, Drawer, Input, List, Modal, Radio, Select, Space, Tag, Tooltip, Typography, message } from "antd";
 import { CheckCircleTwoTone, CloseCircleTwoTone, ExperimentOutlined, MedicineBoxOutlined, PoweroffOutlined, RocketOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { ApiError, COMPONENT_META, STATUS_META, addComponents, apiFetch, deployTarget, enableTarget, getPreviewVerdict, getRecoveryStatus, previewComponents, probeTarget, recoverTarget, setTargetAccess, setTargetIntent, setTargetSchedulerPreference, type ExecEnvTarget, type ImpactVerdictView, type ProbeResult, type RecoveryStatus } from "./api";
-// @kf-batch 50-WP15-airflow-serverless(施工序 6):调度器偏好(两者都装时)
+// 调度器偏好(两者都装时)
 import { SCHEDULER_PREFERENCES, SCHEDULER_PREFERENCE_LABEL, isWritableSchedulerPreference } from "@/lib/exec-env/scheduler-preference";
 import BuildProgress from "./BuildProgress";
-import CredentialIsolationPanel from "./CredentialIsolationPanel"; // @kf-batch 50-WP9a-durable-jobs
-// @kf-batch 50-WP30-decommission
+import CredentialIsolationPanel from "./CredentialIsolationPanel";
 import DecommissionPanel from "./DecommissionPanel";
 import { missingRequiredComponents, requiredComponentsFor } from "@/lib/exec-env/implemented-components";
-// @kf-batch 50-WP15-airflow-serverless(K-5 网络规模)
+// (K-5 网络规模)
 
 /**
  * 可(重)触发部署的状态 —— **UI 便利判定,真权威在 broker**(infra/lambda/exec-env-broker/validate.mjs
  * 的 DEPLOYABLE_STATUS,语义一致:draining/decommissioning/deleted 是删除流程的地盘,一律不给按钮)。
  * 两侧若漂移,后果只是按钮点了拿到 broker 的明确 409/400 报错 —— 不是安全面。
- * 🔴 P50.2e3 补:此前 deploy 只在向导里,register 成功但触发失败的环境在页面上**无路可重试**
+ * 🔴 补:此前 deploy 只在向导里,register 成功但触发失败的环境在页面上**无路可重试**
  * (向导报错文案却承诺「可在详情页重试」)—— 用户实测撞到(broker KMS 缺权那次)。
  */
 const DEPLOYABLE_STATUS = new Set(["registered", "initializing", "testing", "active", "degraded", "failed", "upgrading"]);
-// @kf-batch 50-WP30-discard —— 「从没装出来」的提示性口径(服务端 discard.ts 现查 CFN 才是最终判定)
+// 「从没装出来」的提示性口径(服务端 discard.ts 现查 CFN 才是最终判定)
 const DISCARDABLE_STATUS = new Set(["registered", "initializing", "failed"]);
 
 const { Text } = Typography;
@@ -44,14 +42,13 @@ export default function TargetDetail({
   onClose: () => void;
   /** probe/enable 改了状态后回调(父组件刷新列表)。 */
   onChanged: () => void;
-  /** @kf-batch 50-WP13-mwaa-region 深链要高亮的组件(调度页「去执行环境补装 MWAA」落点;INTERACTION v2.18 §2.2a) */
+  /** 深链要高亮的组件(调度页「去执行环境补装 MWAA」落点;INTERACTION v2.18 §2.2a) */
   highlightComponent?: string;
 }) {
   const t = useT();
   const [probing, setProbing] = useState(false);
   const [enabling, setEnabling] = useState(false);
   const [intentBusy, setIntentBusy] = useState(false);
-  // @kf-batch 50-WP30-discard
   const [discardOpen, setDiscardOpen] = useState(false);
   const [discardText, setDiscardText] = useState("");
   const [discardBusy, setDiscardBusy] = useState(false);
@@ -74,7 +71,7 @@ export default function TargetDetail({
       setDiscardBusy(false);
     }
   };
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6):调度器偏好只影响之后的发布(INTERACTION §2.2b)
+  // 调度器偏好只影响之后的发布(INTERACTION §2.2b)
   const [spBusy, setSpBusy] = useState(false);
   const doSetSchedulerPreference = async (v: "serverless" | "mwaa") => {
     if (!target) return;
@@ -89,11 +86,11 @@ export default function TargetDetail({
       setSpBusy(false);
     }
   };
-  // @kf-batch 50-WP16-zero-egress:网络行的两个观测量(都来自描述符资源袋 SPEC §3.16-E)
+  // 网络行的两个观测量(都来自描述符资源袋 SPEC §3.16-E)
   const netRes = (target as { resources?: Record<string, unknown> } | null | undefined)?.resources ?? {};
   const endpointCount = String(netRes.endpointIds ?? "").split(",").filter((x) => x.trim().length > 0).length;
   const crossRegionOk = Boolean(netRes.crossRegionDdbEndpointId) && Boolean(netRes.homeLinkHostedZoneId);
-  // @kf-batch 50-W5-seg2-WP10a —— 「已同意告知」卡(INTERACTION v2.17 §4bis;E-198):跨法域 target 才有;只读回查
+  // 「已同意告知」卡(INTERACTION v2.17 §4bis):跨法域 target 才有;只读回查
   type AckView = { source: "register" | "ack"; by: string; sub?: string; at: string; version: string; textHash: string };
   const crossJurisdiction = (target?.jurisdiction ?? "home") !== "home";
   const [acks, setAcks] = useState<AckView[]>([]);
@@ -104,7 +101,7 @@ export default function TargetDetail({
       .then((d) => { setAcks(d.acks || []); setAcksErr(null); })
       .catch((e) => setAcksErr(String((e as Error)?.message ?? e)));
   }, [target?.targetId, crossJurisdiction, target?.updatedAt]);
-  // @kf-batch 50-W5-seg1-WP10a —— 「授权项目」卡(INTERACTION v2.17 §1.7;SPEC §1.1 access,通用)
+  // 「授权项目」卡(INTERACTION v2.17 §1.7;SPEC §1.1 access,通用)
   const [accessMode, setAccessMode] = useState<"all-projects" | "allowlist">(target?.access?.mode ?? "all-projects");
   const [accessProjects, setAccessProjects] = useState<string[]>(target?.access?.mode === "allowlist" ? target.access.projects : []);
   const [accessBusy, setAccessBusy] = useState(false);
@@ -146,7 +143,7 @@ export default function TargetDetail({
   const [adding, setAdding] = useState<string | null>(null);
   const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
   /**
-   * 🔴 P50.3b-2b:在途/失败会话的恢复状态(判据全在服务端,页面只渲染它回的东西)。
+   * 🔴 2b:在途/失败会话的恢复状态(判据全在服务端,页面只渲染它回的东西)。
    * 三态:`null` 未拉过 / `"error"` **拉失败** / 对象 = 服务端结论。
    * 🔴 `"error"` 必须 **fail-closed**:审核 §19.8 要求"必须展示 + 禁止静默重试",若拉不到就把横幅一撤、
    *    部署按钮放开,恰好在最需要它的时候静默失效(真安全仍有 broker 兜,但呈现层不该自己开口子)。
@@ -156,7 +153,7 @@ export default function TargetDetail({
 
   const isHome = !!target && (target.isHome === true || target.targetId === "tgt_home");
   const installed = useMemo(() => new Set(target?.components ?? []), [target]);
-  // @kf-batch 50-PROD-B-seq33 ②:完整组件集与缺口(唯一作者 requiredComponentsFor;home 也按它判,但不在这里补)
+  // ②:完整组件集与缺口(唯一作者 requiredComponentsFor;home 也按它判,但不在这里补)
   const requiredSet = useMemo(
     () => requiredComponentsFor({ isHome, jurisdiction: target?.jurisdiction }),
     [isHome, target]
@@ -167,7 +164,7 @@ export default function TargetDetail({
   );
   // 探活结果:优先本次 probe 的返回,否则用注册表里落的 probe 字段(切片 e 写入)。
   const probe = probeResult?.probe ?? target?.probe;
-  // @kf-batch 50-init-region-enablement —— 完成序真因(init 段 I-4:9 行「描述符缺 resources.*」只是衍生症状)
+  // 完成序真因(init 段 I-4:9 行「描述符缺 resources.*」只是衍生症状)
   const finalizeError = probeResult?.finalizeError;
   const regionNotEnabled = target?.controlPlaneRegionEnabled === false || probeResult?.regionEnabled === false;
 
@@ -231,14 +228,14 @@ export default function TargetDetail({
   };
 
   /**
-   * @kf-batch 50-W5-seg1-WP3 —— 「重新部署」= **升级**,与「触发部署」(首装)走不同的路:
+   * 「重新部署」= **升级**,与「触发部署」(首装)走不同的路
    *   · 首装(`registered`):直接 deploy(初装 change set 全是 Add,本就无需审批);
    *   · 已启用:先**预演同集**(SPEC §2.1 v3.21 升级预演),让人看见这次源包对既有栈会改什么 + 基线是否漂移,
    *     再在同一个 P0-E 弹窗里〔批准并部署〕(带 `approvedPlanHash`)。没有这一步,源漂移后「重新部署」在 build 侧闸必挂,
    *     而管理员只看到一个很远的「构建失败」。
    */
   const UPGRADE_KEY = "__upgrade__";
-  /** @kf-batch 50-PROD-B-seq33 ②:〔补齐缺失组件〕在预演/部署公共体里的 key(与 UPGRADE_KEY 同一用法) */
+  /** ②:〔补齐缺失组件〕在预演/部署公共体里的 key(与 UPGRADE_KEY 同一用法) */
   const FILL_MISSING_KEY = "__fill_missing__";
   const doDeploy = async () => {
     if (target.status !== "registered") {
@@ -263,7 +260,7 @@ export default function TargetDetail({
    * 🔴 传给服务端的是**全集**(现装 ∪ 这一个),不是增量 —— add-components 的合同是全集语义,
    *    服务端按"只增不减"校验(减组件要走删除流程)。
    */
-  // @kf-batch 50-PROD-B-seq33 ②:唯一的补装动作 = 补齐到要求集(SSOT requiredComponentsFor)
+  // ②:唯一的补装动作 = 补齐到要求集(SSOT requiredComponentsFor)
   const doFillMissing = async () => {
     await runPreview(FILL_MISSING_KEY, Array.from(new Set([...(target.components ?? []), ...missingRequired])));
   };
@@ -348,7 +345,7 @@ export default function TargetDetail({
   };
 
   /**
-   * 🔴 P50.3b-4:排空 / 回服务。**必须二次确认** —— 排空会让该 region 停止承接新工作(同步生效)。
+   * 🔴 4:排空 / 回服务。**必须二次确认** —— 排空会让该 region 停止承接新工作(同步生效)。
    * 🔴 文案如实:排空**不**销毁任何资源、在途作业会跑完;回服务需下一次全绿探活才真正回到「运行中」。
    */
   const doSetIntent = (intent: "serve" | "drain") => {
@@ -388,7 +385,7 @@ export default function TargetDetail({
   };
 
   /**
-   * 🔴 P50.3b-2b:恢复失败会话(SPEC §3.5b)。**必须二次确认** —— 它会清掉在途部署会话与部署锁,
+   * 🔴 2b:恢复失败会话(SPEC §3.5b)。**必须二次确认** —— 它会清掉在途部署会话与部署锁,
    * 前提是服务端已核验 build 终止 + 目标 region 基础设施稳定(审核 §19.8 禁止静默自动恢复)。
    */
   const doRecover = () => {
@@ -483,7 +480,7 @@ export default function TargetDetail({
           {(target.updatedAt ?? "").slice(0, 19).replace("T", " ") || "—"}
         </Descriptions.Item>
         {/* 🔴 可服务性:数据面此刻会不会收它 + **为什么不收**(逐字是数据面的拒因,同一判定内核)。 */}
-        {/* @kf-batch 50-WP9a-durable-jobs —— 凭证隔离状态 + 〔延期供给截止〕(50 SPEC §3.9b) */}
+        {/* 凭证隔离状态 + 〔延期供给截止〕(50 SPEC §3.9b) */}
         <Descriptions.Item label={t("凭证隔离")} span={2}>
           <CredentialIsolationPanel target={target} onChanged={onChanged} />
         </Descriptions.Item>
@@ -527,7 +524,7 @@ export default function TargetDetail({
         </Descriptions.Item>
       </Descriptions>
 
-      {/* @kf-batch 50-W5-seg2-WP10a —— 「已同意告知」卡(INTERACTION v2.17 §4bis;E-198):注册时 admin 的同意 + 之后每个用户
+      {/* 「已同意告知」卡(INTERACTION v2.17 §4bis):注册时 admin 的同意 + 之后每个用户
           首次数据操作时的同意,只读可回查(表只追加、不可改删)。home 法域 target 没有这张卡(没有需要同意的东西)。 */}
       {crossJurisdiction && (
         <>
@@ -558,7 +555,7 @@ export default function TargetDetail({
         </>
       )}
 
-      {/* @kf-batch 50-W5-seg1-WP10a —— 「授权项目」卡(INTERACTION v2.17 §1.7):任何 target 都有,不对跨法域特殊化;
+      {/* 「授权项目」卡(INTERACTION v2.17 §1.7):任何 target 都有,不对跨法域特殊化;
           缺省全部项目;判据与数据面同一个 accessAllows(呈现 = 授权)。全集语义,POST .../access,审计 exec-env.access.set。 */}
       <Divider titlePlacement="start" plain>
         {t("授权项目")}
@@ -593,7 +590,7 @@ export default function TargetDetail({
         </Space>
       </Space>
 
-      {/* 🔴 P50.3b-2b:在途/失败会话的阻断横幅 —— 审核 §19.8 要求 UI **必须**呈现
+      {/* 🔴 2b:在途/失败会话的阻断横幅 —— 审核 §19.8 要求 UI **必须**呈现
           start-uncertain / needs-failure-reconcile,并**禁止静默重试新 operation**(故下方部署按钮同时禁用)。 */}
       {rec?.needed ? (
         <Alert
@@ -668,7 +665,7 @@ export default function TargetDetail({
       <Divider titlePlacement="start" plain>
         {t("部署进度")}
       </Divider>
-      {/* @kf-batch 50-WP16-zero-egress:取代 K-5 的「网络规模」行(INTERACTION v2.21)。
+      {/* 取代 K-5 的「网络规模」行(INTERACTION v2.21)。
           只显示**观测到的事实**,不给「n / n」这种需要期望值的分数 —— 期望清单的唯一作者在
           infra 的 endpoints.ts,platform 跨不过构建边界;拿它对账的是 synth 门禁与 net0 判据,
           不是这个界面(界面编一个分母出来就是第二个作者)。 */}
@@ -760,7 +757,7 @@ export default function TargetDetail({
         ) : null}
       </Space>
 
-      {/* ── 🔴 P50.3b-4:排空 / 回服务(SPEC §1.1 双轴)────────────────────────────
+      {/* ── 🔴 4:排空 / 回服务(SPEC §1.1 双轴)────────────────────────────
           运维在维护、腾挪、准备退役前需要"停接新活但让在途跑完"。没有这个入口,运维只能去改状态字段
           或干脆不排空(后者更危险)。🔴 home **不给**这个按钮 —— 排空控制面自己的执行环境 = 平台自断双腿
           (与「home 不显示删除入口」同一口径,后端另有 403 硬拒)。 */}
@@ -822,7 +819,7 @@ export default function TargetDetail({
       <Divider titlePlacement="start" plain>
         {t("组件")}
       </Divider>
-      {/* @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):这里只列**要求集**(+ 存量已装的停供组件),
+      {/* ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):这里只列**要求集**(+ 存量已装的停供组件),
           没有逐个「+ 补充部署」;缺了就整体〔补齐缺失组件〕(只为修存量,新注册的环境天生完整)。 */}
       {missingRequired.length > 0 && (
         <Alert
@@ -859,7 +856,7 @@ export default function TargetDetail({
           <List.Item
             style={{
               padding: "4px 0",
-              // @kf-batch 50-WP13-mwaa-region —— 深链高亮:从调度页跳来要补的那一行(背景 + 左侧色条)
+              // 深链高亮:从调度页跳来要补的那一行(背景 + 左侧色条)
               ...(highlightComponent === c.key && !installed.has(c.key)
                 ? { background: "rgba(250,173,20,0.12)", borderLeft: "3px solid #faad14", paddingLeft: 8 }
                 : {}),
@@ -887,7 +884,7 @@ export default function TargetDetail({
 
       {!isHome && (
         <>
-          {/* @kf-batch 50-WP15-airflow-serverless —— 两者都装 ⇒ 「调度器偏好」单选(Serverless 默认 / MWAA);只影响之后的发布 */}
+          {/* 两者都装 ⇒ 「调度器偏好」单选(Serverless 默认 / MWAA);只影响之后的发布 */}
       {installed.has("mwaa") && installed.has("airflow-serverless") ? (
         <div style={{ margin: "8px 0 12px" }} data-testid="scheduler-preference-row">
           <Space wrap>
@@ -898,10 +895,10 @@ export default function TargetDetail({
               value={target.schedulerPreference ?? "serverless"}
               disabled={spBusy || deployBlocked}
               onChange={(e) => doSetSchedulerPreference(e.target.value as "serverless" | "mwaa")}
-              /* @kf-batch 50-WP20b-retire-mwaa-preference
+              /*
                  🔴 已停供的取值**禁用而不是隐藏**:隐藏会让存量双装目标上「现在是 MWAA」这件事凭空消失
                  (选中项都渲染不出来);禁用 + 「已停止提供」才能既说清现状、又说清为什么点不动。
-                 与向导里经典 MWAA 那一行同一个做法(WP-20)。 */
+                 与向导里经典 MWAA 那一行同一个做法。*/
               options={SCHEDULER_PREFERENCES.map((p) => ({
                 value: p,
                 label: isWritableSchedulerPreference(p)
@@ -917,7 +914,7 @@ export default function TargetDetail({
       <Divider titlePlacement="start" plain>
             {t("危险区")}
           </Divider>
-          {/* @kf-batch 50-WP30-discard —— 路 A「弃置」:从没装出来的环境(目标区没有它的资源)一键退役、释放该区名额。
+          {/* 「弃置」:从没装出来的环境(目标区没有它的资源)一键退役、释放该区名额。
               🔴 前端只做**提示性**分流(status ∈ registered/initializing/failed 且从没 ready);最终判定在服务端
               (`lib/exec-env/discard.ts` 现查 CFN),不满足会 409 并把原因原样显示。 */}
           {DISCARDABLE_STATUS.has(target.status) && target.ready !== true ? (
@@ -938,7 +935,7 @@ export default function TargetDetail({
               }
             />
           ) : (
-            // @kf-batch 50-WP30-decommission —— 路 B「下线销毁」:停止承接 → 影响预览 → 输 region 名 → 审批 → 销毁 → 已删除 / 卡住重试
+            // 「下线销毁」:停止承接 → 影响预览 → 输 region 名 → 审批 → 销毁 → 已删除 / 卡住重试
             <DecommissionPanel target={target} onChanged={onChanged} />
           )}
           <Modal

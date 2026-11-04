@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2b-deploy-isolation
 // 执行环境**部署机制**栈(控制面侧、home 单份;50 DESIGN §12.0 / §12.3 / §12.5)。
 //
 // 【它买到的是什么 —— 用 §12.0 拍板的措辞,不夸大】
@@ -27,7 +26,7 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import { Construct } from "constructs";
 import * as path from "path";
-// @kf-batch 50-WP15-airflow-serverless —— broker 的组件全集从这里注入(唯一真源 context.ts;validate.mjs 不再手抄)
+// broker 的组件全集从这里注入(唯一真源 context.ts;validate.mjs 不再手抄)
 import { EXEC_ENV_COMPONENTS, EXEC_ENV_REQUIRED_BASE_COMPONENTS } from "./context";
 
 /** CodeBuild 项目名 / broker 函数名:控制面单份、无 target 维(已登记在 naming.json 的 notCovered)。 */
@@ -108,8 +107,8 @@ export class ExecEnvDeployStack extends cdk.Stack {
     // 🔴 诚实登记:`cdk bootstrap` 与 `cdk deploy` 经 bootstrap 角色链落地,
     //    这条链在默认 bootstrap 下是 admin-equivalent。是否用
     //    `--cloudformation-execution-policies` 把 `cfn-exec-role` 从 Admin 收窄
-    //    = **开工前决策**(§12.0),P50.2 沿用默认、靠上面三件套兜底;
-    //    收窄所需的"实际 API 调用集"由 P50.2 真部署时开 CloudTrail 采集(SPEC §6.2)。
+    //    = **开工前决策**(§12.0),沿用默认、靠上面三件套兜底;
+    //    收窄所需的"实际 API 调用集"由真部署时开 CloudTrail 采集(SPEC §6.2)。
     const buildRole = new iam.Role(this, "ExecEnvBuildRole", {
       assumedBy: new iam.ServicePrincipal("codebuild.amazonaws.com"),
       // 🔴 IAM Role description 只收 Latin-1(中文 400,真部署才暴露;synth 不校验)⇒ 英文,中文注释留这行
@@ -147,7 +146,7 @@ export class ExecEnvDeployStack extends cdk.Stack {
         resources: ["*"],
       })
     );
-    // @kf-batch 50-WP4sexies-home-region —— 🔴 孤儿表桶清理(buildspec 1b)用的四个动作**一直没授权**。
+    // 🔴 孤儿表桶清理(buildspec 1b)用的四个动作**一直没授权**。
     // `s3tables` 是**独立服务前缀**,不被上面的 `s3:*` 覆盖;而 buildspec 那几行写的是
     // `... 2>/dev/null || echo None` ⇒ **AccessDenied 被吞成「没有孤儿桶」** ⇒ 那个「防首次失败
     // 毒化所有重试」的清理其实从未生效(bug #6 会原样复发)。synth-gate §11d 抓出来的。
@@ -165,7 +164,7 @@ export class ExecEnvDeployStack extends cdk.Stack {
       })
     );
     // AZ preflight(buildspec 第 1 步 + 🆕 第二层 1d)
-    // @kf-batch 50-WP4sexies-home-region —— 🔴 第二层 preflight(端点服务 × AZ 交集)新增三个只读调用。
+    // 🔴 第二层 preflight(端点服务 × AZ 交集)新增三个只读调用。
     // 血的教训(2026-09-11,当天第二次犯同一类错):我加了 `aws ec2 describe-vpc-endpoint-services`
     // 却**没在同一笔提交里授权** ⇒ build 以 `exit status 254`(CLI 服务错)中止,而报错离
     // 「preflight 逻辑」很远,看起来像交集算错。同 memory manifest-gate-coverage-is-the-criterion:
@@ -179,14 +178,14 @@ export class ExecEnvDeployStack extends cdk.Stack {
           "ec2:DescribeVpcEndpointServices",
           // 存量守卫:沿用现有 VPC 的 AZ ⇒ 要读它的子网(换 AZ 会替换子网,N0 判据禁止)
           "ec2:DescribeSubnets",
-          // @kf-batch 50-WP23-xregion-peering:存量守卫第二条 —— 现网 VPC 的 **CidrBlock** 不许被换
+          // 存量守卫第二条 —— 现网 VPC 的 **CidrBlock** 不许被换
           //   (换网段 ⇒ 所有子网 CidrBlock 变化 ⇒ 子网被替换,N0-10 禁止)⇒ buildspec 要 describe-vpcs
           "ec2:DescribeVpcs",
         ],
         resources: ["*"],
       })
     );
-    // @kf-batch 50-WP30-decommission —— 🔴 下线销毁(buildspec 3.9 → scripts/exec-env-destroy.sh)要的**托管服务**动作。
+    // 🔴 下线销毁(buildspec 3.9 → scripts/exec-env-destroy.sh)要的**托管服务**动作。
     //   删栈本身走上面的 `cloudformation:*`(CFN 用 bootstrap 的执行角色删资源);这里只给「托管服务先走」那一步:
     //   它们由平台运行期创建或带 RETAIN,占着子网 / 安全组 ⇒ 不先删,base 栈删 VPC 必卡(N-5 的血教训)。
     //   🔴 与 §11d 同一条纪律:脚本里每个 aws 调用都必须在这里有授权(synth-gate 把脚本也扫进去了)。
@@ -291,7 +290,7 @@ export class ExecEnvDeployStack extends cdk.Stack {
         resources: [project.projectArn], // 🔴 资源限定到这一个项目
       })
     );
-    // 陈锁接管(P50.2g)要核查持锁者的 build 是否已终止 —— 只读、同样限定到这一个项目。
+    // 陈锁接管要核查持锁者的 build 是否已终止 —— 只读、同样限定到这一个项目。
     brokerRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "ReadOwnProjectBuildsForStaleLock",
@@ -357,10 +356,10 @@ export class ExecEnvDeployStack extends cdk.Stack {
         //    与 CodeBuild 项目级同一个值、同一份 asset ⇒ "这次部署用的哪份源"两侧一致。
         //    broker **不**把它作为 override 传给 build(那会遮蔽项目定义里的那份,见 index.mjs 注释)。
         EXEC_ENV_SOURCE_REF: sourceBundle.s3ObjectKey,
-        // @kf-batch 50-WP15-airflow-serverless:组件全集 = context.ts 枚举(validate.mjs 加载期解析;缺即抛)。
+        // 组件全集 = context.ts 枚举(validate.mjs 加载期解析;缺即抛)。
         //   加组件只改 context.ts 一处 ⇒ 栈组 / broker 同步;synth-gate §7c 钉模板值 == 枚举。
         EXEC_ENV_COMPONENT_ENUM: EXEC_ENV_COMPONENTS.join(","),
-        // @kf-batch 50-PROD-B-seq33 ②:完整组件集(不提供精简形态);broker 判「下发集 ⊇ 它」
+        // ②:完整组件集(不提供精简形态);broker 判「下发集 ⊇ 它」
         EXEC_ENV_REQUIRED_COMPONENTS: EXEC_ENV_REQUIRED_BASE_COMPONENTS.join(","),
       },
     });

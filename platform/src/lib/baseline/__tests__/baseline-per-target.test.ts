@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-15)
 /**
  * 钉住「基线按执行区分开」。
  *
@@ -28,7 +27,7 @@ function runs(targetId: string | undefined, n: number, sec: number, startDay = 1
   }));
 }
 
-describe("基线按执行区分开(SC-15)", () => {
+describe("基线按执行区分开", () => {
   const now = Date.UTC(2026, 8, 10, 0, 0, 0);
   // 🔴 两个区**故意差一个数量级**:主控区 10s × 10 次,usw2 300s × 10 次。
   const row = deriveBaseline({

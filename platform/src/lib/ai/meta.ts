@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — `_meta` 回显契约(51 SPEC §3.3a):响应体统一元数据块 `{ modelId, modelSource, correlationId }`。
+// `_meta` 回显契约(51 SPEC §3.3a):响应体统一元数据块 `{ modelId, modelSource, correlationId }`。
 //
 // 为什么是响应体不是响应头:长任务走异步 + 轮询(绕 CloudFront 60s),头拿不到终态;
 // 为什么必带 correlationId:并发验收下没有它无法把响应与日志对上(基建已有 x-correlation-id)。
@@ -23,10 +22,9 @@ export interface AiInvocationMeta {
 }
 
 /**
- * @kf-batch 50-B26-lake-place
  * 🔴🔴 这一次 SQL **实际**在哪执行 —— 由**执行层**回报(Redshift Data API / Athena 真发出请求的那个客户端),
  * 不是请求侧「我在哪个视角提问」的声称。
- * 为什么要它(B-25/B-26,2026-10-01 无头实测):在 us-west-2 视角选「数据湖」问数,10 条 Athena 查询**全部**
+ * 为什么要它(2026-10-01 无头实测):在 us-west-2 视角选「数据湖」问数,10 条 Athena 查询**全部**
  * 打在主控区工作组、us-west-2 工作组 0 条,而页面横幅照样写「当前在 us-west-2 提问」—— 请求侧声称与执行事实
  * 不一致时,没有回显就**谁都看不见**(答案长得一样)。
  */
@@ -51,7 +49,7 @@ export function mergeRanIn(into: RanInMeta[], more: readonly (RanInMeta | null |
 
 export interface AiMeta {
   /**
-   * @kf-batch 50-B26-lake-place —— 本次 SQL 实际执行的落点(执行层回报;见 `RanInMeta`)。
+   * 本次 SQL 实际执行的落点(执行层回报;见 `RanInMeta`)。
    * 🔴 空数组 = 这次**没有**执行 SQL(或执行层没回报)—— 页面必须如实说「未回报」,不许拿视角顶上。
    */
   ranIn?: RanInMeta[];
@@ -69,9 +67,8 @@ export interface AiMeta {
   degraded?: boolean;
   invocations?: AiInvocationMeta[];
   /**
-   * @kf-batch 50-WP2-directquery
    * 本次**实际用的执行后端**(问数:`agentcore` | `inprocess`)。
-   * 🔴 为什么必须回显:WP-2 之后「在哪个区提问」会决定走哪个后端(AgentCore 只装在主控区),
+   * 🔴 为什么必须回显:此后「在哪个区提问」会决定走哪个后端(AgentCore 只装在主控区),
    * 而两个后端的能力**不完全一样**(记忆 / Gateway 技能)。不回显 = 用户与验收都只能靠猜,
    * 而「猜」在这件事上必然出错:两条路的答案长得一样。`_meta` 本来就是「这次实际用了什么」的地方。
    */

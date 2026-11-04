@@ -1,4 +1,4 @@
-// 参数辅助顾问 Agent —— 模块47 L2:接入 ②runtime 件(agent-runner),只声明"我的差异"。
+// 参数辅助顾问 Agent ——:接入 ②runtime 件(agent-runner),只声明"我的差异"。
 //
 // 【收敛前】本文件曾是 213 行:手写 for(iter) ConverseCommand 循环(与 netadvisor 逐字 73% 相同)
 // + CATALOG_TEXT(6401 字手抄自 catalog.ts)+ systemPrompt 手抄。

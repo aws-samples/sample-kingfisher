@@ -1,4 +1,4 @@
-// 模块 43-B — 动态基线学习器。从 bgp-task-runs 历史学出每任务的时长/准点/成功率基线。
+// 动态基线学习器。从 bgp-task-runs 历史学出每任务的时长/准点/成功率基线。
 //
 // 🔴 硬约束(用户反复强调):**学习必须排除 triggeredBy='backfill'** —— 否则补数大批量重算会
 // 拉高 p90 失真。此外用 MAD 去异常兜底偶发慢跑。纯读 bgp-task-runs,零写回台账,不干扰在线。
@@ -7,9 +7,9 @@ import { ScanCommand, QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { percentile, stdev, ewma, removeOutliersMAD, median } from "./stats";
 import type { BaselineRow, DurationStats, TargetBaseline } from "./types";
-// 模块47 P4.0:在线隔离标常量(单一定义,copilot/plan/types.ts 零依赖,import 安全无循环)。
+// P4.0:在线隔离标常量(单一定义,copilot/plan/types.ts 零依赖,import 安全无循环)。
 import { COPILOT_TRIGGERED_BY } from "@/lib/copilot/plan/types";
-// @kf-batch 50-WP4quater-reads(工单 SC-15)—— 「这条 run 归哪个区」只有一个作者(含缺章回落主控区)
+// 「这条 run 归哪个区」只有一个作者(含缺章回落主控区)
 import { scalarTargetOf } from "@/lib/exec-env/scope";
 
 const ALGO_VERSION = "mad-ewma-v1";
@@ -19,7 +19,7 @@ const baselinePk = (projectId: string) => `baseline#${projectId}`;
 
 interface RunLite {
   taskId: string;
-  // @kf-batch 50-WP4quater-reads(工单 SC-15)—— 这次 run 跑在哪个区(run-records 的章)。
+  // 这次 run 跑在哪个区(run-records 的章)。
   // 缺失 ⇒ 由 `scalarTargetOf` 统一回落主控区(落章之前作业只在主控区跑过,是历史事实)。
   targetId?: string;
   taskType?: string;
@@ -59,7 +59,7 @@ export function deriveBaseline(args: {
   const cutoff = new Date(now - windowDays * 86400_000).toISOString();
 
   // 窗口内 + 排除 backfill 与 copilot 触发(硬约束:在线隔离)。
-  // 模块47 L4/P4.0:补 copilot 排除。补数(backfill)与 Copilot 代执行(copilot)都是"非常规触发",
+  // P4.0:补 copilot 排除。补数(backfill)与 Copilot 代执行(copilot)都是"非常规触发",
   // 会污染任务运行基线(SLA/时长预测),须排除。COPILOT_TRIGGERED_BY 常量避免裸写字符串散落。
   const inWindow = args.runs.filter((r) =>
     (r.startedAt || r.finishedAt || "") >= cutoff &&
@@ -83,7 +83,7 @@ export function deriveBaseline(args: {
 
   const successRate = { value: terminal.length ? Math.round((succeeded.length / terminal.length) * 100) : 100, samples: terminal.length };
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-15)—— **按区各算一份**。
+  // **按区各算一份**。
   // 🔴 复用**同一个** `statsOf`,不在这里把上面那段算法抄第二遍:抄一遍就等于「合计口径」与
   // 「按区口径」各有一个作者,将来只改一处就会让两个数字对不上(而对不上时没人知道哪个是对的)。
   const byTarget: Record<string, TargetBaseline> = {};
@@ -111,7 +111,6 @@ export function deriveBaseline(args: {
 }
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-15)
  * 一组(已过窗口 / 已去 backfill 与 copilot 的)run → 一份基线统计。
  * `deriveBaseline` 的合计口径与每个区的口径**都调它**,所以两者永远是同一套算法。
  */

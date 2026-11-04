@@ -1,12 +1,11 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.5a-supply
 // POST /api/admin/exec-envs/[targetId]/provision-credentials —— per-project 凭证供给的**生产调用方**。
 //
 // 🔴 **为什么必须有这个端点**:memory `unwired-code-is-unverified` 记着一条硬教训 ——
 // 「没生产调用方 = 从未验证过的代码」,而且退化 fixture 的单测常把它骗过去
 // (实证:`assertProjectId` 拒掉了**每一个**真实 projectId,1600 单测全绿,一接线就炸)。
 //
-// @kf-batch 50-WP9a-durable-jobs —— 🔴🔴 **改成 202 + 作业 id**(WORK-PACKAGES WP-9 施工序 2)。
+// 🔴🔴 **改成 202 + 作业 id**。
 //   原实现在一个请求里同步跑完 N 个项目 × ~10 条语句,跨区直接撞 ALB 504,断在中间也没有任何记录。
 //   现在:每个 (target, project) 入队一条供给作业(确定性 jobId ⇒ 双击 / 重放不多一条),立刻回 202;
 //   作业由推进泵逐步推进(断进程可续跑、已完成的步骤不重做),进度看 `GET .../jobs` 或 `GET .../jobs/[jobId]`。

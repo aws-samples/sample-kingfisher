@@ -25,6 +25,10 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Changed
 
+- Product source no longer carries internal tracking identifiers (defect, schedule, module, work-package, phase, batch and acceptance ids) in comments, test titles, annotations or operator-facing text.
+  A repository guard (`internal-identifier-guard`) keeps it that way across all code, tests and offline judges.
+- The execution-scope banner on pages that are not yet scope-filtered no longer shows an internal ticket number; it states what is missing. The `ticket` field and its type were removed from the scope declarations.
+- Scheduler runtime template comments changed, so `BGP_RUNTIME_VERSION` changes: workflows republished after upgrading use the new runtime package, already published ones keep working on the old one. No action required.
 - Major upgrade of the web framework and UI runtime; route handlers follow the new asynchronous request API. Pages and the container layout are unchanged.
 - Release naming: tags are `vX.Y.Z`, matching `VERSION` and this file; hotfixes bump the patch number; `main` is the trunk and CI runs on it.
 - A newer Glue runtime is available as the default for new sync jobs, with a compatibility layer for older source databases; existing jobs keep their recorded runtime.

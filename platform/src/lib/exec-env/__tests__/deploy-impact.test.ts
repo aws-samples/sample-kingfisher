@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-3-p0e-baseline
 // 🔴 P0-E 影响分类的**穷举门禁**(SPEC §3.5c ②)。这是"唯一能毁数据的洞"的判据 ——
 //    它判错一次的后果是 REPLACE 掉 Redshift namespace / MWAA env / S3 桶,即**不可逆丢数据**。
 //

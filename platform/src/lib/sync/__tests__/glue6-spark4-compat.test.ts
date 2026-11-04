@@ -1,4 +1,4 @@
-// 序 53 —— Glue 6.0(Spark 4)下平台生成的同步脚本的兼容段:
+// Glue 6.0(Spark 4)下平台生成的同步脚本的兼容段
 //   · MySQL 源 + Glue ≥ 6.0 ⇒ 脚本带「FloatType 规整回 double」段(Spark 4.0 把 MySQL FLOAT 读成 FloatType,5.1 是 DoubleType,没有 legacy 开关);
 //   · 记录没存版本(存量任务)/ 5.1 / 非 MySQL 源 ⇒ 这段不进脚本(存量脚本逐字节不变,golden-script.test 另钉);
 //   · 6.0 脚本在离线替身(glue-harness.py)上原样跑通 —— 兼容段的 import / cast 在运行时都解析得到。
@@ -26,7 +26,7 @@ function runScript(script: string, cfg: Record<string, unknown>) {
   return JSON.parse(execFileSync("python3", [HARNESS, cp], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })) as { error: string | null; rs: Record<string, { rows: Record<string, unknown>[] }> };
 }
 
-describe("序 53 Glue 6.0 / Spark 4 兼容段", () => {
+describe("Glue 6.0 / Spark 4 兼容段", () => {
   it("MySQL 源 + glueVersion 6.0 ⇒ 脚本带 FloatType → double 规整段,且紧跟在 Byte/Short → int 规整之后", () => {
     const s = generateGlueScript({ ...base, glueConfig: { glueVersion: "6.0" } }, mysqlDs, GOLDEN_BINDINGS);
     expect(s).toContain(COMPAT_LINE);

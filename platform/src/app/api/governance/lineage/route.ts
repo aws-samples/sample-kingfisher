@@ -4,7 +4,6 @@ import { omRequest, isOmConfigured } from "@/lib/openmetadata/om-client";
 import { omServiceBase } from "@/lib/openmetadata/om-service";
 import { getLineage } from "@/lib/governance/lineage-service";
 import { apiOk, apiError } from "@/lib/api-response";
-// @kf-batch 50-WP4quater-reads(工单 SC-8)
 import { scopedFqn, governanceTargetFrom } from "@/lib/governance/scoped-fqn";
 import { requireAuth } from "@/lib/auth/verify-token";
 
@@ -22,7 +21,7 @@ import { requireAuth } from "@/lib/auth/verify-token";
 // tell an RDS instance apart from an S3 bucket / Redshift cluster / Kinesis stream.
 function svcType(fqn?: string): string {
   const parts = (fqn || "").split(".");
-  // @kf-batch 50-o4REG-sync-om-per-target —— per-target service(`bgp-redshift-tgt-…` 等)按基名出图标(单一作者 omServiceBase)
+  // per-target service(`bgp-redshift-tgt-…` 等)按基名出图标(单一作者 omServiceBase)
   const svc = omServiceBase(parts[0]);
   switch (svc) {
     case "bgp-redshift": return "redshift";
@@ -116,7 +115,7 @@ export async function GET(req: NextRequest) {
       if (om) return apiOk(om);
     }
     // Fallback: legacy DynamoDB lineage (OM unconfigured or unreachable).
-    // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 DDB 血缘表的键是 (targetFqn, sourceFqn),
+    // 🔴 DDB 血缘表的键是 (targetFqn, sourceFqn),
     // 两者都不含区 ⇒ 两个区的同名表被画成**同一个节点**。这里按区取键;
     // OM 那条主路径不需要(OM 的区维在 fqn 自带的 service 名里 —— 用户 2026-09-10 拍板
     // 「一个 OpenMetadata,哪个区 = service 维度」)。

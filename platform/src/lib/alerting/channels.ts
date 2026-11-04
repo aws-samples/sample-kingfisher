@@ -1,4 +1,4 @@
-// 模块 34 — 通知通道 CRUD(bgp-alert-channels)。单逻辑分区 pk="alertchannel",channelId(ULID)。
+// 通知通道 CRUD(bgp-alert-channels)。单逻辑分区 pk="alertchannel",channelId(ULID)。
 // 通道跨规则复用(一个钉钉群机器人可被多条规则引用),故独立成表而非内嵌进规则。
 // webhook secret / 收件人是用户运行期输入,随表 CMK 静态加密存储,严禁写进代码。
 

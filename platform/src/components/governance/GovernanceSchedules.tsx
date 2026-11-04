@@ -1,13 +1,13 @@
 "use client";
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 治理)
+// (治理)
 // 治理页「定时治理任务」:建 / 启停 / 删 —— 质量检查 · 敏感扫描 · 目录同步 按 cron 在**当前执行范围**里跑。
 //
 // 🔴 三条与产品既有纪律对齐的约束:
 //   ① **在哪个区跑 = 建它时顶栏选的那个执行范围**,弹框上复述(护栏 2);「全部 / 对比」视角不给建(先选一个区);
 //      每区自治调度(用户拍板),载体发到**该区**的 MWAA Serverless,绝不回落主控区。
 //   ② 「自动调度」绿标只给**真有载体**的行(看 deployments 里的 workflowArn,不看 scheduleEnabled);
-//      enabled 而没有产物 ⇒ 橙色「待发布载体」(WP-26 那个教训:页面不许替没有载体的东西报喜)。
+//      enabled 而没有产物 ⇒ 橙色「待发布载体」(那个教训:页面不许替没有载体的东西报喜)。
 //   ③ 目录同步勾上「数仓目录」⇒ 当场明示**会唤醒该区数仓并计费**(30 分钟的平台镜像定时器仍只刷 Glue)。
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Button, Card, Checkbox, Input, Modal, Popconfirm, Select, Space, Switch, Table, Tag, Tooltip, Typography, message } from "antd";

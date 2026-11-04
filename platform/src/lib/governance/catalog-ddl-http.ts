@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录建表 / 改表四条路由共用的「错误 ⇒ HTTP」映射(单一作者;与 target-http / decommission-http 同款)。
+// 数据目录建表 / 改表四条路由共用的「错误 ⇒ HTTP」映射(单一作者;与 target-http / decommission-http 同款)。
 import { apiError } from "@/lib/api-response";
 import { CatalogDdlInvalid } from "./catalog-ddl";
 import { AlterRejected, AlterDecisionRequired, AlterNothingToDo } from "@/lib/modeling/alter-service";

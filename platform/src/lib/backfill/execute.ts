@@ -1,4 +1,4 @@
-// 模块 43-C — 补数实例执行器。把一个(日期,节点)实例分派到正确的执行路径,
+// 补数实例执行器。把一个(日期,节点)实例分派到正确的执行路径,
 // **一律以 triggeredBy="backfill" 写 bgp-task-runs**(在线隔离硬约束)。
 //
 // 复用策略(遵守设计"只调用引擎已导出方法,不改 provider/路由"):
@@ -6,46 +6,45 @@
 //  · task/engine-job→ getProvider(taskType).submit(job, {runDate,...}) (EMR Serverless,自轮询)
 //  · task/sync-task → startGlueSyncRun({triggeredBy:"backfill", runDate, ...})(同步任务 glue 通道,与手动运行同一启动核心,自轮询)
 //  · workflow/sql   → 直接跑该节点 SQL(Redshift Data API + 自建 run 记录 + 自轮询)
-//  · workflow/sync  → 节点关联的同步任务走 task/sync-task 同一入口(@kf-batch 37-wf-sync-backfill)
+//  · workflow/sync  → 节点关联的同步任务走 task/sync-task 同一入口
 //  · workflow/其它  → 明确失败(honest,不静默跳过):python 等节点补数本期不支持
 //
 // 返回 { runTaskId, runId, statementId?, glueJobName?, glueJobRunId? } —— runner 据此在
 // reconcile 时读 bgp-task-runs 终态回收实例状态。执行为「即发即轮询」:submit 后台自己跑到终态
-// 回写 run 记录,runner 只需读 run 记录判定,与模块33/16 现有补数完全同构。
+// 回写 run 记录,runner 只需读 run 记录判定,与现有补数完全同构。
 
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { BatchExecuteStatementCommand, DescribeStatementCommand } from "@aws-sdk/client-redshift-data";
-// B-66:SQL 语句切分的唯一作者(与工作流发布 buildDagSpec / 离线 Redshift 作业同源)
+// SQL 语句切分的唯一作者(与工作流发布 buildDagSpec / 离线 Redshift 作业同源)
 import { splitSql } from "@/lib/etl/dag-generator";
 import { redshiftClientForHomeOnly } from "@/lib/exec-env/target-clients";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { putRunRecord, updateRunRecord, resolveRunStamp, type RunOwner } from "@/lib/monitor/run-records";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { runEtlJob } from "@/lib/etl/job-service";
-// @kf-batch 50-P50.3-mrquery
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { getRedshiftSecretArn } from "@/lib/redshift/admin-secret";
 import { renderTemplate, paramSet, todayDs } from "@/lib/etl/run-params";
 import { isEngineType, getProvider } from "@/lib/engines/registry";
 import { nodeSupportsBackfill } from "@/lib/workflow/node-registry";
-// @kf-batch 50-P50.3-multibind —— `lockAttrFor` 是锁属性名的**唯一作者**(SPEC §3.6)。
+// `lockAttrFor` 是锁属性名的**唯一作者**(SPEC §3.6)。
 import { acquireRunLock, releaseRunLock, renewRunLockIfDue, keepRunLockForReconcile, lockAttrFor, RunLockBusy } from "@/lib/etl/run-lock";
 import type { EtlJob } from "@/types/etl-job";
 import type { BackfillInstanceRow, BackfillPlanRow } from "./types";
 import { runSyncTaskBackfillInstance } from "./sync-task";
-// 序 73 模块 57(R6)—— 离线作业节点:作业行的读取与三道判定(存在 / 本项目 / 绑定含该区)与发布期同一作者;补数标记字段的唯一作者
+// 离线作业节点:作业行的读取与三道判定(存在 / 本项目 / 绑定含该区)与发布期同一作者;补数标记字段的唯一作者
 import { loadJobNodeRow } from "@/lib/workflow/job-node-spec";
 import { backfillRunExtra } from "./run-extra";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101):工作流 SQL 节点补数把受影响行数写进 run 行 `metrics.rowsAffected`(唯一作者)
+// 工作流 SQL 节点补数把受影响行数写进 run 行 `metrics.rowsAffected`(唯一作者)
 import { affectedRowsMetrics } from "@/lib/redshift/affected-rows";
 
 const USER_ID = "default-user";
-// @kf-batch 50-WP2-directquery —— 合同 home-only:**编排表没有区域维**(实测 bgp-workflows 无 target 字段)
-// ⇒ workflow SQL 节点的补数只能在主控区跑;给它加维 = WP-14。锁属性那边已经按 `wf.targetId` 算,
-// 那是**为 WP-14 预留的参数位**,不代表这条执行路径已经能跨区。
+// 合同 home-only:**编排表没有区域维**(实测 bgp-workflows 无 target 字段)
+// ⇒ workflow SQL 节点的补数只能在主控区跑;给它加维 =。锁属性那边已经按 `wf.targetId` 算,
+// 那是**为预留的参数位**,不代表这条执行路径已经能跨区。
 const rsData = redshiftClientForHomeOnly("workflow-no-target-dim");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -63,7 +62,6 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
     if (kind === "etl-job") {
       const { Item } = await docClient.send(new GetCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: targetId } }));
       if (!Item) throw new Error("ETL 作业不存在");
-      // @kf-batch 50-P50.3-mrquery
       // 🔴 **实例自带 targetId**(补数实例的维度已升为 日期 × 节点 × target,见 `plan.ts`)⇒
       // 直接按它执行。原实现不传 targetId ⇒ `runRedshiftSqlJob` 取 `bindingTargets(job)[0]`
       // (通常是 home)⇒ 多区绑定的作业**只补第一个区、另一个区仍是空的**(静默只补一半,
@@ -78,7 +76,7 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
       if (!Item) throw new Error("引擎作业不存在");
       const engineType = String((Item as any).engine || "emr-serverless");
       if (!isEngineType(engineType)) throw new Error(`未知引擎类型 ${engineType}`);
-      // @kf-batch 50-B51-backfill-pump —— 🔴 B-51a:与上面 etl-job 同一条纪律,**按实例自带的 targetId 提交**。
+      // 🔴 与上面 etl-job 同一条纪律,**按实例自带的 targetId 提交**。
       // 原来不传 ⇒ provider 缺省 `tgt_home` ⇒ 绑两区的 EMR 作业两区实例**都在主控区跑**(主控区跑两遍、
       // 非主控区一天也没补),而页面显示成功。存量实例没有 targetId ⇒ 回落绑定的第一个(与改动前一致)。
       const instTarget = inst.targetId || bindingTargets(Item as { targets?: unknown; targetId?: unknown })[0];
@@ -86,7 +84,7 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
       return { runTaskId: targetId, runId: res.runId };
     }
     if (kind === "sync-task") {
-      // @kf-batch 37-sync-backfill —— 序 37 ⑦:与手动运行同一个启动核心(triggeredBy=backfill、--ds=实例日期、带补数计划号);
+      // 与手动运行同一个启动核心(triggeredBy=backfill、--ds=实例日期、带补数计划号);
       // 入口判定与「能不能补」在 sync-task.ts(任务可能在建计划之后被改过,执行时再判一次)。
       return runSyncTaskBackfillInstance(targetId, inst, runDate);
     }
@@ -104,14 +102,13 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
   if (nodeSupportsBackfill(node.type) && node.type === "sql") {
     const sql = node.data?.sql;
     if (!sql || !String(sql).trim()) throw new Error("SQL 节点脚本为空");
-    // @kf-batch 52-P52.2-W2a-run-stamp
     // ⚠️ 本函数里的局部变量 `targetId` 是**补数目标的 id**(工作流/作业 id),
-    // 与模块 50 的执行目标 `targetId`(`tgt_*`)**同名不同物**。盖章要的是后者,
+    // 与执行目标 `targetId`(`tgt_*`)**同名不同物**。盖章要的是后者,
     // 它在工作流行 `wf.targetId` 上 ⇒ 把整行传下去,别传这个局部变量。
     return runWorkflowSqlNode(wf as RunOwner & { workflowId: string }, inst, String(sql), runDate);
   }
   if (nodeSupportsBackfill(node.type) && node.type === "sync") {
-    // @kf-batch 37-wf-sync-backfill —— 序 37:工作流里的数据同步节点 = 用实例日期跑一次它关联的同步任务。
+    // 工作流里的数据同步节点 = 用实例日期跑一次它关联的同步任务。
     // 字段名 `data.syncTaskId` 与节点执行器(workflow/dag-generator.ts、runtime-lib.ts、scheduler/serverless/runtime-py.ts
     // 的 `data.get("syncTaskId")`)及 node-registry 的 validate 同源 —— 调度跑的和补数跑的是同一个任务。
     const syncTaskId = String(node.data?.syncTaskId || "").trim();
@@ -125,7 +122,7 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
   }
 
   if (nodeSupportsBackfill(node.type) && node.type === "job") {
-    // 序 73 模块 57(R6):离线作业节点补数 = 用实例日期跑一次它引用的作业 —— ETL ⇒ runEtlJob、EMR ⇒ provider.submit,
+    // 离线作业节点补数 = 用实例日期跑一次它引用的作业 —— ETL ⇒ runEtlJob、EMR ⇒ provider.submit,
     //   与「立即运行」同一个启动核心(同一个按区 Glue 作业名 / 同一个 application / 同一把作业锁);run 行落在**作业**名下
     //   (triggeredBy=backfill,带 backfillPlanId / backfillNode,与 SQL 节点同形),返回 runTaskId = 作业 id ⇒ runner 按 (runTaskId, runId) 回收终态。
     // 🔴 实例的区 = 工作流的章;作业必须绑在这个区 —— 与发布期同一判定(loadJobNodeRow:不存在 / 不属本项目 / 不绑该区 ⇒ 如实失败,不替它挑区)。
@@ -154,7 +151,7 @@ async function runWorkflowSqlNode(
 ): Promise<ExecResult> {
   const workflowId = wf.workflowId;
   const rendered = renderTemplate(sql, paramSet(runDate || todayDs()));
-  // B-66:语句切分改走唯一作者 splitSql(与工作流发布 / 离线作业同一把刀;规则逐字相同,行为不变)
+  // 语句切分改走唯一作者 splitSql(与工作流发布 / 离线作业同一把刀;规则逐字相同,行为不变)
   const statements = splitSql(rendered);
   if (statements.length === 0) throw new Error("SQL 为空");
   const workgroup = homeWorkgroup();
@@ -163,7 +160,7 @@ async function runWorkflowSqlNode(
   // 根治·裂缝C:补数中心对 workflow SQL 节点补数走本独立路径(不过 job-service),同样直接 DROP+CTAS →
   // 同一 workflow 同一 node 的多个业务日期并发会撞同表 OID。加【节点级运行锁】:锁存 WORKFLOWS 行的
   // runLock_<nodeId> 属性,同节点不同日期串行、不同节点仍并行。补数场景排队等前序终态(waitMs 大)。
-  // @kf-batch 50-P50.3-multibind —— 改走**唯一作者** `lockAttrFor`(SPEC §3.6 的 4 家之④)。
+  // 改走**唯一作者** `lockAttrFor`(SPEC §3.6 的 4 家之④)。
   // 🔴 workflow 的 nodeId 必用**原始 node.id**(370cd0c 教训);home 时产出与存量逐字节同名。
   const lockAttr = lockAttrFor({
     targetId: (wf as { targetId?: string }).targetId,
@@ -172,14 +169,13 @@ async function runWorkflowSqlNode(
   const lock = await acquireRunLock(TABLES.WORKFLOWS, { userId: USER_ID, workflowId }, 45 * 60 * 1000, lockAttr);
   if (!lock) throw new RunLockBusy(`节点 ${inst.nodeId} 正在运行中,已跳过本次并发提交(避免并发重建同一结果表)。`);
   try {
-    // @kf-batch 52-P52.5a-supply — 静态归类:**project-context**(补数跑的是某项目工作流的节点;
+    // 静态归类:**project-context**(补数跑的是某项目工作流的节点;
     // 归属取工作流行 `wf.projectId`,与该 workflow 的其它路径同一权威)。
     const SecretArn = await getRedshiftSecretArn({
       project: (wf as { projectId?: string }).projectId,
     });
     const { Id } = await rsData.send(new BatchExecuteStatementCommand({ Sqls: statements, WorkgroupName: workgroup, Database: database, ...(SecretArn ? { SecretArn } : {}) }));
     const runId = ulid();
-    // @kf-batch 52-P52.2-W2a-run-stamp
     await putRunRecord({
       taskId: workflowId,
       runId,
@@ -219,7 +215,6 @@ async function pollRedshiftRun(
         const desc = await rsData.send(new DescribeStatementCommand({ Id: statementId }));
         if (desc.Status && ["FINISHED", "FAILED", "ABORTED"].includes(desc.Status)) {
           const status = desc.Status === "FINISHED" ? "succeeded" : "failed";
-          // @kf-batch 52-P52.2-W2a-run-stamp
           await updateRunRecord({
             taskId,
             runId,
@@ -228,7 +223,7 @@ async function pollRedshiftRun(
               finishedAt: new Date().toISOString(),
               duration: desc.Duration ? Math.round(Number(desc.Duration) / 1e9) : 0,
               error: desc.Error || null,
-              // 序 47b:成功时记受影响行数(补数页据它标「成功(0 行)」;失败 / 取消不写,免得把 0 当成事实)
+              // 成功时记受影响行数(补数页据它标「成功(0 行)」;失败 / 取消不写,免得把 0 当成事实)
               ...(status === "succeeded" ? affectedRowsMetrics(desc) : {}),
             },
             stamp: resolveRunStamp(wf),

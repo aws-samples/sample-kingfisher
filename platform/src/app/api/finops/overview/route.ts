@@ -7,10 +7,10 @@ import { getCeWatermark, collectDailyCosts } from "@/lib/finops/collector";
 import { sweepTaskCosts } from "@/lib/finops/sweep";
 import { STALE_AFTER_MS } from "@/lib/finops/constants";
 import type { OverviewSummary, CostDailyRow } from "@/lib/finops/types";
-// @kf-batch 50-WP6-cost-by-region —— 区卡片(O3a)与「无区域归属」判定的唯一作者
+// 区卡片(O3a)与「无区域归属」判定的唯一作者
 import { isRegionlessCost } from "@/lib/finops/types";
 import { regionCards } from "@/lib/finops/region-cost";
-// @kf-batch 50-WP4quater-reads(工单 SC-24)—— 🔴 大盘按执行范围。用户 2026-09-10:
+// 🔴 大盘按执行范围。用户 2026-09-10:
 // 「『成本大盘』与『预算护栏』仍是全平台合计 —— 账单来自 Cost Explorer 的服务维度采集,
 //  按区拆分需要多采一个 REGION 分组并重采存量」。采集侧已加 REGION 分组,这里按区筛。
 //
@@ -19,8 +19,8 @@ import { regionCards } from "@/lib/finops/region-cost";
 //     它们真的不属于某个区。单独报,不硬塞。
 //  ② 单区视角的「合计」= 那个区的钱,**不含**上面那类;界面上必须把这件事说出来,
 //     否则用户会拿它去核对账单总额然后发现对不上。
-// @kf-batch 50-WP6-cost-by-region —— 读侧只读 v2 分区(`listCostDaily` 的 pk 前缀),旧分区里
-// 「落 REGION 分组之前的账号级合计」**结构上读不到** ⇒ SC-24 那套「存量行 / 立即重采」分支已无对象,删掉
+// 读侧只读 v2 分区(`listCostDaily` 的 pk 前缀),旧分区里
+// 「落 REGION 分组之前的账号级合计」**结构上读不到** ⇒ 那套「存量行 / 立即重采」分支已无对象,删掉
 // (留着就是一段永远不触发、却在界面上许诺「重采」的死代码)。
 import { requireScope } from "@/lib/exec-env/scope";
 import { regionsInViewOf } from "@/lib/finops/cost-region";
@@ -34,7 +34,7 @@ function monthOf(d: Date): string {
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
-  // @kf-batch 50-WP6-cost-by-region —— 非法参数 400、看不见的 target 404(原来非法参数静默当成「不筛」)
+  // 非法参数 400、看不见的 target 404(原来非法参数静默当成「不筛」)
   const scope = await requireScope(req, ctx.projectId);
   if (scope instanceof NextResponse) return scope;
 
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
       dailyTrend,
       watermark,
       stale,
-      // @kf-batch 50-WP6-cost-by-region —— 第一层 region 卡片(按 AWS region 分组,非 target 归因)
+      // 第一层 region 卡片(按 AWS region 分组,非 target 归因)
       ...(() => {
         const { cards, regionlessMonthToDateUsd } = regionCards(allRows, now.toISOString().slice(0, 10), regionsInScope);
         return { byRegion: cards, regionlessMonthToDateUsd };

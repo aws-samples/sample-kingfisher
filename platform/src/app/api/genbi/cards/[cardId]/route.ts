@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 54-genbi-session-cards
 // GET    /api/genbi/cards/[cardId]  取正文(打开;54 DESIGN v1.3 §5.3)
 // DELETE /api/genbi/cards/[cardId]  删卡(两段式,§5.4 / §7.3)
 //
@@ -11,7 +10,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { recordAudit } from "@/lib/audit";
 import { CardNotFound, deleteCard, openCard } from "@/lib/genbi/cards-service";
 import { cardsError } from "@/lib/genbi/cards-http";
-// @kf-batch 50-WP28-platform-action-node —— 删卡前先撤这张卡的定时刷新(撤不下来 ⇒ 卡片不删)
+// 删卡前先撤这张卡的定时刷新(撤不下来 ⇒ 卡片不删)
 import { removeCardSchedule } from "@/lib/genbi/cards-schedule";
 import { getCardPointer } from "@/lib/genbi/cards-store";
 

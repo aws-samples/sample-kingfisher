@@ -1,4 +1,4 @@
-// 模块 45(P45.5)— Athena / Trino SQL 工程配方 + 方言规则。平台用 Athena 查 S3 Tables(托管 Iceberg)。
+// Athena / Trino SQL 工程配方 + 方言规则。平台用 Athena 查 S3 Tables(托管 Iceberg)。
 //
 // ⚠️ 验证纪律(红线):本文件规则的 antiPattern/fix 逻辑靠单测保证;方言【事实】依据平台【已在生产
 // 使用、验证过】的 GenBI 提示词(lib/genbi/prompt.ts 的 Trino 方言指导:三段式限定名、双引号别名等)。
@@ -37,7 +37,7 @@ export const ATHENA_DIALECT_RULES: DialectRule[] = [
     severity: "warn",
   },
   {
-    // @kf-batch 50-B26-lake-place —— 🔴🔴 B-26(2026-10-01 无头实测):us-west-2 视角问数 ⇒ 10 条 Athena 查询**全部**
+    // 🔴🔴 (2026-10-01 无头实测):us-west-2 视角问数 ⇒ 10 条 Athena 查询**全部**
     //   打在主控区工作组、目录引用写的是主控区表桶,答案是主控区的数据(页面照样说「在 us-west-2」)。
     //   根因之一就是提示词 / 示例里写死了主控区目录名,模型照抄。⇒ 生成前把「三样必须同区」教给所有 AI 路径。
     // 纯引导文案(无 antiPattern):目录名在双引号标识符里且主控区本就合法,正则判不出「是不是别的区的」。

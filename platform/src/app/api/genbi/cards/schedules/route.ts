@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // GET /api/genbi/cards/schedules?scope=  **我的**卡片定时刷新(调度中心 / 我的卡片抽屉用)。
 // 🔴 按执行范围过滤(读路由口径);只列本人的(卡片是个人资产);带 `?withDrift=1` 才查载体是否落后。
 import { NextRequest, NextResponse } from "next/server";

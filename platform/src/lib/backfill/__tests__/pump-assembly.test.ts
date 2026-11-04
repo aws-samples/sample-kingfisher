@@ -1,5 +1,4 @@
-// @kf-batch 50-B51-backfill-pump
-// 🔴 B-51c 装配层:泵 + 「哪些计划要推」的读法**一起**跑(只 mock 真外部:DDB / fetch)。
+// 🔴 装配层:泵 + 「哪些计划要推」的读法**一起**跑(只 mock 真外部:DDB / fetch)。
 // 判据钉的是用户能感知的事实:**页面没开,未收口的计划也会被推进**;已收口的不碰;不是选主副本 / 停泵 / 缺密钥都真的不跑。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -55,7 +54,7 @@ beforeEach(() => {
   delete process.env.BGP_BACKFILL_PUMP_PAUSED;
 });
 
-describe("🔴 B-51c 补数后台推进泵", () => {
+describe("🔴 补数后台推进泵", () => {
   it("未收口(planned / running / paused)的计划逐个回环推进,按创建先后;已收口的不碰;翻页翻到底", async () => {
     const s = await runBackfillPumpTick(deps());
     expect(s).toMatchObject({ ran: true, open: 3, posted: 3, failed: 0 });

@@ -1,22 +1,21 @@
 "use client";
-// @kf-batch 50-WP4-o1-scope
-// 按路由能力渲染四种壳 + 两种错误壳(合同 SPEC v3.36 §2.6.7;判据 E-152 / E-153 / E-154)。
+// 按路由能力渲染四种壳 + 两种错误壳(合同 SPEC v3.36 §2.6.7;判据)。
 //
 // 🔴 四种壳(正常路径):
-//   ① `global-only`            ⇒ 说明条 + 内容,**选择器不重置**(E-153)
-//   ② `target-only` 且 global 且可见 target ≥2 ⇒ 「请选择执行范围」,**内容一个字都不渲染**(E-152①)
-//   ③ `wired:false`            ⇒ 内容 + **常驻**提示条,🔴 且提示条要说出**工单号与差什么**(WP-4ter ②)
+//   ① `global-only`            ⇒ 说明条 + 内容,**选择器不重置**
+//   ② `target-only` 且 global 且可见 target ≥2 ⇒ 「请选择执行范围」,**内容一个字都不渲染**
+//   ③ `wired:false`            ⇒ 内容 + **常驻**提示条,🔴 且提示条要说出**差什么**
 //   ④ 其余                      ⇒ 正常内容
 // 🔴 两种错误壳:URL 里的 scope **文法非法** / **指向不可用的执行环境** ⇒ 报错 + 一个**显式**
-//   〔切到「全部」〕按钮。绝不自动改写 URL —— 前端吃掉 4xx 再偷偷切 global 是最隐蔽的回落(E-154)。
+//   〔切到「全部」〕按钮。绝不自动改写 URL —— 前端吃掉 4xx 再偷偷切 global 是最隐蔽的回落。
 
 import React from "react";
 import { usePathname } from "next/navigation";
 import { Alert, Button, Empty, Space } from "antd";
 import { GlobalOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 横幅不再是两句放之四海皆准的断言:全局页渲染**登记过的理由**,
-// 未接入页渲染**工单号 + 差什么 + 现在看到的是全部区域**。
+// 横幅不再是两句放之四海皆准的断言:全局页渲染**登记过的理由**,
+// 未接入页渲染**差什么 + 现在看到的是全部区域**。
 import { capabilityForPath, GLOBAL_REASONS, isGlobalOnly, isNotWired, partialOf } from "@/lib/scope/capability";
 import { routeLabelOf } from "@/components/layout/routes";
 import { useScope } from "./ScopeProvider";
@@ -126,7 +125,7 @@ export default function ScopeGate({ children }: { children: React.ReactNode }) {
   if (cap.scope === "target-only") {
     const eff = effectiveScope(cap);
     if (eff.kind === "global") {
-      // 🔴 内容一个字都不渲染:E-152 断的是「DOM 里没有任何 home 数据行」
+      // 🔴 内容一个字都不渲染:断的是「DOM 里没有任何 home 数据行」
       return (
         <Empty
           data-testid="scope-need-target"
@@ -144,7 +143,7 @@ export default function ScopeGate({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // ── ③ 未接入:内容 + **常驻**提示条(说出工单号与差什么)─────────────────────────
+  // ── ③ 未接入:内容 + **常驻**提示条(说出差什么)─────────────────────────
   // 🔴 用户 2026-09-10 逐字点名这句横幅「有问题」。问题不在于它出现,而在于它**什么都没说**:
   // 九个页面同一句话,用户既不知道差什么、也不知道谁在管、更不知道该去哪看按区数据。
   if (isNotWired(cap)) {
@@ -158,8 +157,7 @@ export default function ScopeGate({ children }: { children: React.ReactNode }) {
           style={{ marginBottom: 12 }}
           message={
             <span>
-              <b data-testid="scope-not-wired-ticket">{cap.ticket}</b>
-              {t(" · 本页的数据还没有按执行范围过滤,你现在看到的是")}
+              {t("本页的数据还没有按执行范围过滤,你现在看到的是")}
               <b>{t("全部区域")}</b>
               {t("的数据。")}
             </span>
@@ -171,7 +169,7 @@ export default function ScopeGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // ── ④ 已接入但**部分**:常驻一条说明条,点名哪几块不分区(WP-4ter ②)────────────
+  // ── ④ 已接入但**部分**:常驻一条说明条,点名哪几块不分区────────────
   // 🔴 为什么不做成「不显示」:用户切到某个区,看到页面上还有几块是全平台数字 —— 不说清楚,
   // 他要么以为那几块也是这个区的(被误导),要么以为整页都没过滤(不信任已经做好的部分)。
   const partial = partialOf(cap);
@@ -187,7 +185,6 @@ export default function ScopeGate({ children }: { children: React.ReactNode }) {
           message={
             <span data-testid="scope-partial-note">
               {t(partial.note)}
-              {partial.ticket ? <b style={{ marginLeft: 6 }}>{partial.ticket}</b> : null}
             </span>
           }
         />

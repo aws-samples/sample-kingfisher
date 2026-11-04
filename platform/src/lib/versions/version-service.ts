@@ -1,4 +1,4 @@
-// 模块 14 — 资源版本管理与回滚 (v1.5.0)
+// 资源版本管理与回滚 (v1.5.0)
 //
 // Generic per-resource config versioning for the "configuration" resource types
 // (workflow / etl-job / sync / redshift-task). Each save snapshots the resource's business
@@ -26,7 +26,7 @@ const RESOURCES: Record<ResourceType, ResourceMeta> = {
   "etl-job": { table: TABLES.ETL_JOBS, sk: "jobId", label: "作业" },
   sync: { table: TABLES.SYNC_TASKS, sk: "taskId", label: "同步任务" },
   "redshift-task": { table: TABLES.REDSHIFT_TASKS, sk: "taskId", label: "Redshift 任务" },
-  // 模块 33-A 补齐:离线多引擎(EMR Serverless 等)作业——与 etl-job 同为"离线计算"页作业,
+  // 补齐:离线多引擎(EMR Serverless 等)作业——与 etl-job 同为"离线计算"页作业,
   // 接入同一套版本/晋升/回滚。表 bgp-engine-jobs(pk=userId, sk=jobId),结构兼容通用服务。
   "engine-job": { table: TABLES.ENGINE_JOBS, sk: "jobId", label: "引擎作业" },
 };
@@ -53,11 +53,10 @@ const META_FIELDS = new Set([
   "createdBySub",
   "createdAt",
   "updatedAt",
-  // @kf-batch 50-P50.3-fanout
   // 🔴 `deployments` 是**下发台账(运行态)**,不是可版本化的配置。放进快照会有两个后果:
   //   ① 回滚会把**旧的台账**整包写回资源行 ⇒ 台账说「这个版本已发到 us-west-2」,而实际没有
   //      —— 版本一致性矩阵最不能犯的错就是这种「假绿」;
-  //   ② 晋升(模块 15 用同一个 `getResourceConfig`)会把台账复制给目标环境的新资源,
+  //   ② 晋升(用同一个 `getResourceConfig`)会把台账复制给目标环境的新资源,
   //      于是一个从没下发过的资源开局就带着一串 ok 记录。
   // 台账的真值源只有资源行本身,由 `recordDeployment`/`removeDeployment` 单口写。
   "deployments",
@@ -90,10 +89,9 @@ export function getResourceConfig(type: ResourceType, item: Record<string, any>)
 
 const pad = (n: number) => String(n).padStart(6, "0");
 
-// @kf-batch 50-P50.3-multibind
 // 🔴 导出它:版本一致性矩阵要拿"当前定义版本"与**下发台账里的版本**比,才能判"版本不齐"。
 // 刻意**不在资源行上再存一份** `defVersion` —— 那会有两个真值源,而快照表本来就是权威。
-// @kf-batch 50-WP5-rungroup —— 🔴 A4:形参从 `string` 收紧成 `ResourceType`。
+// 🔴 A4:形参从 `string` 收紧成 `ResourceType`。
 // 它是「下发产物里那个定义版本号」的唯一来源(dag-fanout / schedule-fanout / 一致性矩阵三处),
 // 传错一个不在 RESOURCES 里的 kind 不会报错、只会**恒回 0** ⇒ 台账说「版本 0」而产物是新的(假绿)。
 // 现有三个调用点传的都是合法字面量 ⇒ 零改动。

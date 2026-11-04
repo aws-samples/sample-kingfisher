@@ -36,7 +36,7 @@ export class AuthStack extends cdk.Stack {
       userPoolName: "bgp-user-pool",
       selfSignUpEnabled: false,
       signInAliases: { username: true, email: true },
-      // 模块 27 (WS4b-1): 强化密码策略(min12 + 大小写 + 数字 + 符号)。仅对【新设】密码生效,
+      // (WS4b-1): 强化密码策略(min12 + 大小写 + 数字 + 符号)。仅对【新设】密码生效,
       // 不影响现有用户登录(故零功能风险)。MFA + 禁 USER_PASSWORD_AUTH 属 WS4b-2(会断无头
       // 登录,需先改造测试登录流),此处不动 authFlows。
       passwordPolicy: {

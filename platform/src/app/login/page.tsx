@@ -6,7 +6,7 @@ import { UserOutlined, LockOutlined } from "@ant-design/icons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/useT";
-import { useBuildInfo, BuildLabel } from "@/components/common/BuildInfo"; // 序 39 第二刀:页脚一行「哪一版」
+import { useBuildInfo, BuildLabel } from "@/components/common/BuildInfo"; // 页脚一行「哪一版」
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -46,7 +46,7 @@ export default function LoginPage() {
         <Typography.Text type="secondary" style={{ display: "block", textAlign: "center" }}>
           {t("未配置 Cognito 时可直接访问各页面")}
         </Typography.Text>
-        {/* 序 39 第二刀 —— 登录前就能只读核版(运维 / 升级对账第一眼):发版 tag,或未发版构建的产品提交 */}
+        {/* 登录前就能只读核版(运维 / 升级对账第一眼):发版 tag,或未发版构建的产品提交 */}
         <div style={{ textAlign: "center", marginTop: 8, fontSize: 12 }}>
           <BuildLabel info={buildInfo} />
         </div>

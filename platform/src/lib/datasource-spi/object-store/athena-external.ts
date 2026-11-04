@@ -1,4 +1,4 @@
-// 模块 42 P42.4 — S3 源的分析通道:Athena 外部表直查。
+// S3 源的分析通道:Athena 外部表直查。
 //
 // 【为什么独立】现有 Athena 能力(lib/genbi/athena.ts)全指向 AWS 托管的联邦目录
 // s3tablescatalog(Iceberg / S3 Tables),没有「对任意用户 S3 桶建外部表直查」的路径。
@@ -8,7 +8,7 @@
 //
 // 【落点】外部表建在默认 catalog(AwsDataCatalog / Glue Data Catalog)下一个专用 database
 // (bgp_s3_ext),与托管 s3tablescatalog 物理隔离,不污染 S3 Tables 命名空间。
-// 🔴 序 52 / B-124(2026-10-25):建在**哪个区**的目录由调用方传进来的 AthenaPlace 决定(落点必填,类型上没有缺省)——
+// 🔴 建在**哪个区**的目录由调用方传进来的 AthenaPlace 决定(落点必填,类型上没有缺省)——
 //   原来三条 DDL 都 startQuery(sql, { database }) 不带落点、getExecution(id) 不带区 ⇒ 第二区的 S3 源建出来的表一律落主控区目录
 //   (主控区 Athena 跨区读桶),而执行体明明已记了这条源所在区。home 的 place 与原行为逐字节等价(同一工作组 / 同一客户端)。
 //
@@ -16,7 +16,7 @@
 // 直接 startQuery 执行;sql-guard 只拦"用户查询"路径(runSelectAthena)。
 
 import { startQuery, getExecution, type AthenaPlace } from "@/lib/athena/client";
-// 模块 55 第二批:等 Athena 终态的唯一原语(本文件只能在长操作 datasource-s3-external 的执行上下文里被调)
+// 等 Athena 终态的唯一原语(本文件只能在长操作 datasource-s3-external 的执行上下文里被调)
 import { awaitTerminal, LongOpWaitBudgetExceeded } from "@/lib/long-ops/await-terminal";
 import type { SourceColumn } from "../types";
 
@@ -105,7 +105,7 @@ async function runDdl(sql: string, label: string, place: AthenaPlace): Promise<v
 
 // 建外部表(幂等):先建专用 database,再 DROP+CREATE 表(重建以吸收 schema 变化)。
 //  返回 fully-qualified 表名(db.table)与真落点,供随后 SELECT。columns 为空则拒绝(无法建表)。
-//  🔴 place 必填(B-124):外部表建在这个落点的 Athena 工作组 / Glue 目录里 —— 调用方按数据源行上的章解析(datasourceOwnerTarget →
+//  🔴 place 必填:外部表建在这个落点的 Athena 工作组 / Glue 目录里 —— 调用方按数据源行上的章解析(datasourceOwnerTarget →
 //     resolveAthenaPlace),这里不解析、不猜,也不会因为「没给」就落到主控区。
 export async function ensureExternalTable(
   spec: ExternalTableSpec,

@@ -1,4 +1,4 @@
-// 模块 31 (R5) — 实时数据集成 CDC 编排服务层。
+// 实时数据集成 CDC 编排服务层。
 //
 // 把 R3/R4 用 CLI 手工打通的 DMS(MySQL→Redshift,full-load+CDC)编排固化为幂等代码,
 // 内含 7 个实测踩坑的解法(见 docs/design/31-realtime-cdc/DESIGN.md §9b)。
@@ -11,7 +11,7 @@
 //  - 控制面只编排;实时基建的常驻计费由调用方按需 enable/destroy(成本红线)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   DatabaseMigrationServiceClient,
@@ -31,7 +31,7 @@ import {
 } from "@aws-sdk/client-database-migration-service";
 import { EC2Client, DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
 import { logger } from "@/lib/observability/logger";
-// @kf-batch 56-B128-channel-reconcile —— 复制任务状态按**任务 ARN 里的区**取客户端(见 dmsClientOfTaskArn)
+// 复制任务状态按**任务 ARN 里的区**取客户端(见 dmsClientOfTaskArn)
 import { dmsClientFor } from "@/lib/exec-env/target-clients";
 import { regionOfArn } from "@/lib/aws/arn";
 
@@ -98,15 +98,14 @@ export interface ReplicationInstanceProbe {
   /** DMS 回的实例状态;实例不存在且没能发起创建时为 `missing`。 */
   status: string;
   arn?: string;
-  /** 本次探测发起了懒创建(调用方据此告诉用户「首次使用需约 10–15 分钟」,B-137)。 */
+  /** 本次探测发起了懒创建(调用方据此告诉用户「首次使用需约 10–15 分钟」)。 */
   requestedCreate: boolean;
 }
 
-// @kf-batch 41-B121-dms-start-single-flight
 /**
  * **只看一眼、不等**:实例不存在就发起懒创建并立刻把当前状态带回;实例在建 / 在改就如实回 creating / modifying。
  *
- * 【为什么要把「看」和「等」拆开(B-121,2026-10-24 全新账号页面驱动段 wp24 抓到)】
+ * 【为什么要把「看」和「等」拆开(2026-10-24 全新账号页面驱动段 wp24 抓到)】
  *   启动路由原来在返 202 之前就 `await getReplicationInstanceArn()` —— 全新账号第一次点「启动」,实例要
  *   现场创建 3–8 分钟,这一等就把一次 HTTP 请求等过了 60s 边缘超时 ⇒ 页面拿到 504(「不知道成没成」),
  *   而服务端那条请求**还在跑**;用户再点一次就再多一条;实例就位后它们一起起跑、互撞
@@ -147,10 +146,9 @@ export async function probeReplicationInstance(): Promise<ReplicationInstancePro
   return { status: cur?.status || "missing", arn: cur?.arn, requestedCreate };
 }
 
-// @kf-batch 69-B137-dms-instance-wait
 /**
  * 复制实例冷建的等待预算(🔴 只给后台编排用;HTTP 请求路径不等)。
- * 【B-137,2026-11-01 …4916 第五十轮硬门 wp24 真撞】原口径 48 × 10s = 8 分钟,而 AWS 真建这台实例用了 **13.3 分钟**
+ * 【2026-11-01 …4916 第五十轮硬门 wp24 真撞】原口径 48 × 10s = 8 分钟,而 AWS 真建这台实例用了 **13.3 分钟**
  *   (CloudTrail CreateReplicationInstance 15:20:57 → available 15:34:16);编排 15:29:01 放弃(`realtime.start.failed`
  *   「未就绪(当前状态 creating,可稍后重试)」),CreateReplicationTask 从未发出,用户必须再点一次「启动」——
  *   违反「用户按一次最终达成」。AWS 文档对 DMS 实例创建只说「几分钟到十几分钟」⇒ 预算放到 30 分钟(90 × 20s),
@@ -169,8 +167,8 @@ export async function getReplicationInstanceArn(): Promise<string> {
   let cur: { arn: string; status: string } | null = probe.arn ? { arn: probe.arn, status: probe.status } : null;
 
   // 轮询到 available(首次冷建 10–15 分钟;调用方是长驻编排,可等)。
-  // 上限 30 分钟(REPLICATION_INSTANCE_WAIT,B-137);超时抛错,由调用方决定重试(下次进来实例可能已 available,直接复用)。
-  // 🔴 只许**后台编排**调本函数;HTTP 请求路径用 probeReplicationInstance()(B-121)。
+  // 上限 30 分钟(REPLICATION_INSTANCE_WAIT);超时抛错,由调用方决定重试(下次进来实例可能已 available,直接复用)。
+  // 🔴 只许**后台编排**调本函数;HTTP 请求路径用 probeReplicationInstance()。
   for (let i = 0; i < REPLICATION_INSTANCE_WAIT.maxAttempts && cur && cur.status !== "available"; i++) {
     if (REPLICATION_INSTANCE_BROKEN_STATUSES.includes(cur.status)) {
       throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 状态异常:${cur.status}`);
@@ -384,7 +382,6 @@ export async function ensureReplicationTask(
 }
 
 // 查复制任务当前状态(轻量)。
-// @kf-batch 50-WP24-sync-teardown
 /** DMS 通道的**下线**结果(如实报:有没有找到、有没有真停下来、有没有真删掉)。 */
 export interface DmsTeardownResult {
   found: boolean;
@@ -400,7 +397,7 @@ export interface DmsTeardownResult {
  *   **全仓零命中** —— 也就是说 DMS 通道(全量 / 增量 / 实时 CDC)**从来没被平台真正停过**:
  *   页面点「停止」只把 DDB 的 `status` 改成 `stopped`,而复制任务**继续把源库数据搬到目标区**、
  *   复制实例继续计费;删任务更狠 —— DDB 行一删,连它的 identifier 都没人记得了。
- *   在多法域下这就是**停不下来的跨境数据流动**(模块 50 的核心承诺被这一处击穿)。
+ *   在多法域下这就是**停不下来的跨境数据流动**(核心承诺被这一处击穿)。
  * 🔴 客户端与命名都用**创建时那一套**(本文件顶部的 home 客户端 + `names()`):
  *   下线必须打在创建它的地方 —— 「换一个更正确的解析器」会去停一个根本不存在的任务。
  */
@@ -557,7 +554,6 @@ export interface RealtimeStatus {
 /** 复制任务的**轻量**状态(只 Describe 任务本体,不拉逐表统计)—— 列表读时对账用:每行每次刷新一次,不该拖逐表统计。 */
 export type ReplicationTaskState = Pick<RealtimeStatus, "status" | "fullLoadProgress" | "lastFailure" | "stopReason">;
 
-// @kf-batch 56-B128-channel-reconcile
 // 🔴 客户端按**复制任务 ARN 里的区**取,不再用模块级的主控区客户端:DMS 通道今天按合同只在主控区
 //   (start-realtime 对非 home 章 409 CHANNEL_NOT_PUSHED_DOWN)⇒ ARN 的区 == 主控区,行为不变;但「去哪个区问」的真值
 //   本来就写在 ARN 里 —— 等 DMS 逐区下推那天这里不需要再改。ARN 读不出区 ⇒ 如实回 null(详情页 unknown),不猜主控区。

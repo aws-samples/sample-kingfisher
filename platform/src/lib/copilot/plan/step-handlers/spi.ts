@@ -1,4 +1,4 @@
-// 模块 44 — StepHandler SPI(步骤处理器接口)。把补数 execute.ts 写死的分支泛化为可注册的处理器:
+// StepHandler SPI(步骤处理器接口)。把补数 execute.ts 写死的分支泛化为可注册的处理器
 // 新增步骤类型 = 注册一个 handler,不改推进器(executor)。这是"高度抽象 + 全球自安装可插拔"的核心。
 //
 // 一个 handler 对应一种 StepType,提供 4 段能力(按安全级别分层):

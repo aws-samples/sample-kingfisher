@@ -6,23 +6,23 @@ import { PlusOutlined, ReloadOutlined, PlayCircleOutlined, PauseCircleOutlined, 
 import type { SyncTask } from "@/types/sync-task";
 import { useRouter } from "next/navigation";
 import SyncTaskModal from "./SyncTaskModal";
-// @kf-batch 37-sync-backfill —— 序 37 ⑥:指定业务日期运行(不用它 = 直接「启动」= 改动前的行为)
+// 指定业务日期运行(不用它 = 直接「启动」= 改动前的行为)
 import RunWithDateModal from "@/components/sync/RunWithDateModal";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围接入(工单 SC-2;50 SPEC §2.6 / INTERACTION §9)。
+// 执行范围接入(50 SPEC §2.6 / INTERACTION §9)。
 // 🔴 列表请求带 `?scope=`;`global` 时 `toScopeParam` 回 null ⇒ URL 与改动前逐字节相同(回滚点)。
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
 import { toScopeParam } from "@/lib/scope/scope";
 import { isHome } from "@/lib/exec-env/target-id";
-// @kf-batch 42-ux-feedback —— 自动刷新的事实在纯模块(page 文件不许多出 export,否则 next build 失败)
+// 自动刷新的事实在纯模块(page 文件不许多出 export,否则 next build 失败)
 import { SYNC_AUTO_REFRESH_MS, anySyncInFlight } from "@/lib/sync/auto-refresh";
-// 序 41 B-117 —— 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
+// 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
 import { deleteJson } from "@/lib/http/delete-json";
 import { syncTaskCanStop, syncToggleAction, SYNC_STATUS_META } from "@/lib/sync/row-action";
 import { Empty, Alert } from "antd";
 
-// 序 41 B-118 —— 状态文案与「启动 / 停止」判别搬到唯一作者 `lib/sync/row-action.ts`(列表与详情共用;provisioning「启动中」可停)
+// 状态文案与「启动 / 停止」判别搬到唯一作者 `lib/sync/row-action.ts`(列表与详情共用;provisioning「启动中」可停)
 
 const channelLabel: Record<string, string> = { "zero-etl": "Zero-ETL", glue: "Glue ETL", dms: "DMS" };
 
@@ -37,11 +37,11 @@ export default function SyncPage() {
   // PLT-02: guard expensive row actions (start/stop/delete) against double-submit.
   const [busyId, setBusyId] = useState<string>("");
   const [runDateTask, setRunDateTask] = useState<SyncTask | null>(null);
-  // @kf-batch 42-ux-feedback(用户 2026-10-15:「数据同步页面增加定时刷新,否则要手动刷新才能看见任务运行的最终状态」)
+  // (用户 2026-10-15:「数据同步页面增加定时刷新,否则要手动刷新才能看见任务运行的最终状态」)
   //   有任务在跑(running / starting / stopping)时每 SYNC_AUTO_REFRESH_MS 自动重拉一次列表;全部到终态就停,不白打接口。
   //   开关默认开,用户可关(关了就回到手动刷新);状态只存本页内存,不进 URL。
   const [autoRefresh, setAutoRefresh] = useState(true);
-  // @kf-batch 50-WP4ter-coverage —— 当前执行范围(顶栏选的那个;URL 是权威)
+  // 当前执行范围(顶栏选的那个;URL 是权威)
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `scope=${encodeURIComponent(scopeParam)}` : "";
@@ -59,7 +59,7 @@ export default function SyncPage() {
       if (cur.syncMode) params.set("syncMode", cur.syncMode);
       if (cur.targetType) params.set("targetType", cur.targetType);
       if (cur.status) params.set("status", cur.status);
-      // @kf-batch 50-WP4ter-coverage —— 执行范围与既有筛选并列进同一个 query
+      // 执行范围与既有筛选并列进同一个 query
       if (scopeQs) params.set("scope", scopeParam!);
       const qs = params.toString();
       const res = await fetch(`/api/sync${qs ? `?${qs}` : ""}`);
@@ -68,10 +68,10 @@ export default function SyncPage() {
     } finally { setLoading(false); }
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)
+  // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)
   useEffect(() => { fetchData(); }, [scopeQs]);
 
-  // @kf-batch 42-ux-feedback —— 自动刷新:只在开关开 + 有任务处于非终态时轮询;终态齐了自然停
+  // 自动刷新:只在开关开 + 有任务处于非终态时轮询;终态齐了自然停
   const anyInFlight = anySyncInFlight(data);
   useEffect(() => {
     if (!autoRefresh || !anyInFlight) return;
@@ -87,7 +87,7 @@ export default function SyncPage() {
       message.success(t("已删除"));
       fetchData();
     } catch (e) {
-      // 序 41 B-117:服务端拒绝(409 通道还在撤 / 502 撤不下来)⇒ 原话呈现、行不动;此前这里无条件提示「已删除」
+      // 服务端拒绝(409 通道还在撤 / 502 撤不下来)⇒ 原话呈现、行不动;此前这里无条件提示「已删除」
       message.error((e as Error).message || t("删除失败"));
     } finally { setBusyId(""); }
   };
@@ -96,7 +96,7 @@ export default function SyncPage() {
     if (busyId) return; // prevent double-submit
     setBusyId(id);
     // DMS 通道(全量/增量/实时)统一走 DMS 启动入口 start-realtime;Glue / Zero-ETL 走 /start。
-    // 序 41 B-118:唯一作者判「停 / 启」(provisioning 也可停,不再把「启动中」再发一次 start-realtime)
+    // 唯一作者判「停 / 启」(provisioning 也可停,不再把「启动中」再发一次 start-realtime)
     const path = syncToggleAction(status, channel);
     const isDmsStart = path === "start-realtime";
     try {
@@ -173,7 +173,7 @@ export default function SyncPage() {
           <Button onClick={() => { const f = { name: "", channel: "", syncMode: "", targetType: "", status: "" }; setFilters(f); fetchData(f); }}>{t("重置")}</Button>
         </Space>
       </Card>
-      {/* @kf-batch 50-WP4ter-coverage —— 护栏 2:非主控区视角下,先把「新建会落在哪」说清楚,
+      {/* 护栏 2:非主控区视角下,先把「新建会落在哪」说清楚,
           不静默、也不把入口藏起来(功能守恒:不许用删入口冒充 fail-closed)。 */}
       {nonHomeView && (
         <Alert
@@ -202,7 +202,7 @@ export default function SyncPage() {
                 <ScopeEmptyHint
                   resources={["sync"]}
                   noun={t("同步任务")}
-                  // @kf-batch 50-WP7-sync-pushdown(施工序 6)—— 执行已逐区下推,这里是可建可跑的正常空态:
+                  // 执行已逐区下推,这里是可建可跑的正常空态
                   // 任务跟随数据源的执行环境(源在哪个区,就在那个区跑);跨区取数是设计禁止(409),不是没做完。
                   note={t("同步任务跟随数据源的执行环境:在当前区新建数据源后即可建任务、就地执行(源与任务必须同区,跨区取数为设计禁止)")}
                 />
@@ -211,7 +211,7 @@ export default function SyncPage() {
           ),
         }}
       />
-      {/* @kf-batch 50-WP4ter-coverage —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
+      {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
       <OtherScopesHint resources={["sync"]} />
       <SyncTaskModal open={modalOpen} editing={editing} onClose={() => setModalOpen(false)} onSuccess={() => { setModalOpen(false); fetchData(); }} />
       <RunWithDateModal task={runDateTask} open={!!runDateTask} onClose={() => setRunDateTask(null)} onStarted={() => fetchData()} />

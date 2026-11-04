@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // 🔴 恢复**判定**门禁(SPEC §3.5b ③④):`assessRecovery` + `describeStackDisposition` + 结构性安全窗算术。
 //
 // 【本文件的三条承重】
@@ -43,7 +42,7 @@ vi.mock("@aws-sdk/client-cloudformation", () => {
 // readExactBuildPhase 走 mock(不打真 CodeBuild);describeStackDisposition/窗口算术保持**真实实现**。
 vi.mock("@/lib/exec-env/deploy-control", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/exec-env/deploy-control")>();
-  // @kf-batch 50-WP15-airflow-serverless:verifyNoBuildForOperation 也走 mock(不打真 CodeBuild);缺省「找不到证据」= 旧行为
+  // verifyNoBuildForOperation 也走 mock(不打真 CodeBuild);缺省「找不到证据」= 旧行为
   return { ...actual, readExactBuildPhase: readPhaseMock, verifyNoBuildForOperation: absenceMock };
 });
 
@@ -223,7 +222,7 @@ describe("🔴 assessRecovery:无 buildId 的结构性安全窗(startUncertain /
     expect(readPhaseMock).not.toHaveBeenCalled();
   });
 
-  // @kf-batch 50-WP15-airflow-serverless —— 真环境:broker open 后 post-image 不匹配即停、根本没起 build,却要等 2h15m 结构窗。
+  // 真环境:broker open 后 post-image 不匹配即停、根本没起 build,却要等 2h15m 结构窗。
   //    第二证据 = CodeBuild 项目列表里没有该 operation 的 build(会话 ≥ 5min 后可信)⇒ 不必等窗。
   it("🔴 窗内但会话 ≥ 5min 且 CodeBuild 列表里没有该 operation 的 build ⇒ ready(不必等 2h15m)", async () => {
     absenceMock.mockResolvedValue({ absent: true, verifiedAt: START_MS + 6 * 60_000 });

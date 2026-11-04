@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3b-3-p0e-baseline
 // POST/GET /api/admin/exec-envs/[targetId]/preview —— P0-E 的**先看后批再做**第一阶段(SPEC §3.5c ①③)。
 //
 // 【它买到什么】把"这次补组件到底会改什么"从**猜**变成**看**:走同一条部署通道(窄权 broker → CodeBuild),
@@ -58,12 +57,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
     const target = await getTargetRaw(params.targetId);
     if (!target) return apiError(`执行目标不存在:${params.targetId}`, 404, { code: "NOT_FOUND" });
 
-    // @kf-batch 50-W5-seg1-WP10a —— 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
+    // 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
     //    跨法域 target 与同法域走同一条通道;它唯一的技术前置(装 residency-api + per-target 角色)由准入内核
     //    `residencyPrerequisite` 判,不在部署入口设门 —— 不装 residency-api 的跨法域 target 能部署、能探活,但 active 后**不承接**工作。
 
     const installed = Array.isArray(target.components) ? (target.components as string[]) : [];
-    // 🔴 WP-3(SPEC §2.1 v3.21):同集 = **升级预演**(`added=[]`)—— 已启用 target 的「重新部署」先走这里看计划
+    // 🔴 (SPEC §2.1 v3.21):同集 = **升级预演**(`added=[]`)—— 已启用 target 的「重新部署」先走这里看计划
     //    (源包一变即 drift-unauthorized 需审批;没有这条,重新部署在 p0e-gate 必挂)。
     const plan = planComponentAddition(
       installed,

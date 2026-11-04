@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 打开会话卡片时**重建短期记忆**的单测(54 DESIGN v1.2 §3.3)。
 // 两条后端各测一遍:selfmanaged(`bgp-genbi-turns`)与 agentcore(托管会话事件)。
 import { describe, it, expect, vi, beforeEach } from "vitest";

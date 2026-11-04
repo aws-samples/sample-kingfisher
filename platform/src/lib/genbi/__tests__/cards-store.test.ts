@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片「中央指针 + 配额」的单测。🔴 mock **真的实现** ConditionExpression 语义(照 run-lock.test.ts 的先例)——
 // 只断「命令形状对不对」的测试挡不住「先 Count 再 Put」那种退化:形状看着一样,并发下写出 101。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -199,7 +198,6 @@ describe("54 会话卡片 · 中央指针 + 配额(单一作者)", () => {
     });
 
     // ══════════════════════════════════════════════════════════════════════
-    // @kf-batch 50-GC3a-contention-budget
     // 🔴🔴 2026-09-21 第五轮全量硬门 **GC-3a 实测红**:8 路并发造满 100 张时冒出一个 **503**
     //   (配额本身精确到 100/100、第 101 次 409 —— 正确性是对的,坏的是「平台没把瞬态争抢吸收干净」)。
     //   根因两处,而**第二处才是要命的**:预算是拍出来的 `6` 次(总退避 ~1.2s);
@@ -418,7 +416,7 @@ describe("54 会话卡片 · 中央指针 + 配额(单一作者)", () => {
     expect(await readQuota(USER)).toBe(0);
   });
 
-  it("列表包含 deleting 的卡(残留可见,WP-11a 口径)且按 updatedAt 倒序", async () => {
+  it("列表包含 deleting 的卡(残留可见,口径)且按 updatedAt 倒序", async () => {
     const a = await saveCardPointer(USER, base("c1"));
     await new Promise((r) => setTimeout(r, 2));
     const b = await saveCardPointer(USER, base("c2"));

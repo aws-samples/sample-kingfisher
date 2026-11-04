@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— isValidDs 不许放过「格式对但不存在」的日子(2026-02-30 曾被 Date.parse 顺延成 3 月 2 日)。
+// isValidDs 不许放过「格式对但不存在」的日子(2026-02-30 曾被 Date.parse 顺延成 3 月 2 日)。
 // isValidDs 是全平台业务日期的唯一校验(离线作业 / 引擎作业运行、补数区间、同步运行参数都用它)。
 import { describe, it, expect } from "vitest";
 import { isValidDs, dateRange } from "@/lib/etl/run-params";

@@ -1,4 +1,4 @@
-// 模块 55 / 序 50 第二批 —— 编排(工作流)四种长操作的执行体:发布 / 下线 / 手动触发 / 删除。
+// 编排(工作流)四种长操作的执行体:发布 / 下线 / 手动触发 / 删除。
 //
 // 原路由(app/api/workflow/[id]/{publish,unpublish,trigger} · app/api/workflow/[id] DELETE)的「主体」原样搬入:
 // 读工作流行 / 项目鉴权 / 触发前的子集校验 · 跨法域同意 · 运行组开立 **留在路由**;这里只做「调 publish-dag / 调度器(内部等
@@ -54,7 +54,7 @@ const workflowPublish: LongOpExecutor<"workflow-publish"> = async (params, ctx) 
     // 生成+下发 DAG 走【共享权威实现】(与 schedule/enable 同一份);含 flag 分派 + 能力门 + runtime-lib 固定库下发 + assertSpecValid fail-loud。
     let dagId: string;
     let scheduler: "mwaa" | "serverless";
-    // @kf-batch 50-WP18-workflow-fanout —— 逐区发布结果必须**透出去**:界面/验收要看得见「哪个区发成了、哪个没」
+    // 逐区发布结果必须**透出去**:界面/验收要看得见「哪个区发成了、哪个没」
     let perTarget: Array<{ targetId: string; ok: boolean; scheduler?: string; artifact?: string; error?: string; code?: string }> = [];
     try {
       ({ dagId, scheduler, perTarget } = await publishWorkflowDag(workflow));
@@ -120,7 +120,7 @@ const workflowUnpublish: LongOpExecutor<"workflow-unpublish"> = async (params, c
     // 那个区没装调度组件 ⇒ 409 + 直达补装(判定收在单一作者里)
     const mapped = await httpErrorFromMappers(e, [SCHEDULER_MAPPER]);
     if (mapped) throw mapped;
-    // 撤不下来就**不许**把记录改成 draft(T-14)
+    // 撤不下来就**不许**把记录改成 draft
     throw rawError(502, { error: `下线失败: ${(e as Error)?.message ?? e}`, code: "DAG_CLEANUP_FAILED" }, e);
   }
 };
@@ -161,13 +161,13 @@ const workflowDelete: LongOpExecutor<"workflow-delete"> = async (params, ctx) =>
 };
 
 // ── 手动触发(原 app/api/workflow/[id]/trigger POST 的扇出主体) ──
-// @kf-batch 50-WP18-workflow-fanout —— 缺省在**全部绑定区**各跑一次(子集 / 跨法域同意 / 运行组开立已在路由做完)
+// 缺省在**全部绑定区**各跑一次(子集 / 跨法域同意 / 运行组开立已在路由做完)
 const workflowTrigger: LongOpExecutor<"workflow-trigger"> = async (params, ctx) => {
   const { workflowId, targets: runTargets, runGroupId } = params;
   const item = await readWorkflow(workflowId);
   const fanRuns: Array<Record<string, unknown>> = [];
   const fanFailures: Array<{ targetId: string; error: string; code?: string }> = [];
-  // @kf-batch 50-WP18b-fanout-seam —— 原始拒因对象留着(状态码分派要 instanceof / code)
+  // 原始拒因对象留着(状态码分派要 instanceof / code)
   const fanCauses: unknown[] = [];
   for (const targetId of runTargets) {
     try {
@@ -221,7 +221,7 @@ async function triggerOneTarget(
 ): Promise<Record<string, unknown>> {
   // 🔴 原样抛:包成裸 Error 之后上面那层就判不出 `MwaaNotInstalled`,用户拿不到 409 + 「去执行环境补装调度」的直达链接
   const ep = await schedulerEndpointFor(targetId);
-  // @kf-batch 50-WP17-serverless-workflow —— serverless 的手动触发 = StartWorkflowRun。
+  // serverless 的手动触发 = StartWorkflowRun。
   // 🔴 这里**刻意不预写台账行**:serverless 的台账键是 `<服务侧 per-run dag_id>#<targetId>`,而 `StartWorkflowRun` 只回它自己的 `RunId`。
   if (isServerlessEndpoint(ep)) {
     const dagId = String(item.airflowDagId);
@@ -280,7 +280,7 @@ async function triggerOneTarget(
     await cli(`dags unpause ${dagId}`);
     const res = await cli(`dags trigger ${dagId} -r ${runId}`);
     const result = await res.text();
-    // @kf-batch 52-P52.2-W2a-run-stamp — 归属取工作流行;扇出时**每条 run 盖自己那个区的章**
+    // 归属取工作流行;扇出时**每条 run 盖自己那个区的章**
     await putRunRecord({
       taskId: workflowId, runId, taskType: "workflow", startedAt: now, triggeredBy: "manual",
       stamp: resolveRunStamp(item, targetId),

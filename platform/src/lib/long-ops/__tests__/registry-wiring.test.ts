@@ -1,4 +1,4 @@
-// 模块 55 — 接线判据(「写了」≠「接上了」;55 DESIGN §2.7 ① ④ ⑧ ⑨ ⑩ ⑪):
+// 接线判据(「写了」≠「接上了」;55 DESIGN §2.7 ① ④ ⑧ ⑨ ⑩ ⑪):
 //   ① kind 闭合清单 ↔ 各域执行体文件(清单从 registry.ts 的 import + 展开字面推出,第一批 3 个域、第二批 9 个)的对象字面键集 ↔ 标签 ↔ 参数类型一一对应;
 //   ④ 每条已接入路由 submitLongOp 自己的 kind、longOpResponse / longOpErrorResponse、主体不再留在路由(第一批 17 条 + 第二批 14 条);
 //   ⑧ 全局 fetch 拦截器接了 followLongOp;壳层挂了 LongOpIndicator;英文词典含每个标签;
@@ -30,7 +30,7 @@ function executorDomains(): Array<{ name: string; file: string }> {
   const imported = [...reg.matchAll(/^import \{ (\w+_LONG_OP_EXECUTORS) \} from "@\/(lib\/[\w/-]+)";/gm)].map((m) => ({ name: m[1], file: `${m[2]}.ts` }));
   const spread = [...reg.matchAll(/^\s*\.\.\.(\w+),/gm)].map((m) => m[1]);
   expect(spread.sort(), "registry.ts 展开的域 === import 的域").toEqual(imported.map((x) => x.name).sort());
-  expect(imported.length, "第一批 3 个域 + 第二批 6 个域 + 第三批 1 个域(engines,B-136)").toBe(10);
+  expect(imported.length, "第一批 3 个域 + 第二批 6 个域 + 第三批 1 个域(engines)").toBe(10);
   return imported;
 }
 
@@ -67,14 +67,14 @@ const ROUTES: Array<[file: string, kind: (typeof LONG_OP_KINDS)[number], bodyCal
   ["app/api/datasources/[id]/s3-external/route.ts", "datasource-s3-external", /ensureExternalTable\(|\.introspect\(/],
   ["app/api/modeling/model-metrics/[id]/compute/route.ts", "modeling-metric-compute", /computeModelMetric\(/],
   ["app/api/metrics/[id]/compute/route.ts", "metric-compute", /computeMetric\(/],
-  // ── 第三批首条(序 57 / B-129):建源 provision 段;密钥仍在路由里建(口令不落任务行),其余四步进执行体 ──
+  // ── 第三批首条:建源 provision 段;密钥仍在路由里建(口令不落任务行),其余四步进执行体 ──
   //   (非 JDBC 范式的 `provider.testConnection(` 是真探测、合法留在路由,只盯裸调用的 JDBC 配置核对)
   ["app/api/datasources/route.ts", "datasource-create", /ensureGlueRole\(|detectNetwork\(|userSpecifiedNetwork\(|createGlueConnection\(|(?<!\.)\btestConnection\(|readSourceSchema\(/],
-  // 第三批第二条 / B-136:提交段(逐区 submit / 运行组逐 target 记账 / 扇出循环)全在执行体,路由里一个都不许留
+  // 第三批第二条:提交段(逐区 submit / 运行组逐 target 记账 / 扇出循环)全在执行体,路由里一个都不许留
   ["app/api/engines/[engine]/[id]/run/route.ts", "engine-run", /\.submit\(|forEachTargetPlace\(|noteFanoutResult\(|recordAudit\(/],
 ];
 
-describe("模块 55 接线 ①:kind 闭合清单 ↔ 执行体 ↔ 标签 ↔ 参数类型", () => {
+describe("接线 ①:kind 闭合清单 ↔ 执行体 ↔ 标签 ↔ 参数类型", () => {
   it("registry.ts 接入的各域执行体文件的对象字面键集之并 === LONG_OP_KINDS(无重叠、无遗漏);九个域文件齐", () => {
     const domains = executorDomains();
     expect(domains.map((x) => x.file).sort()).toEqual([
@@ -107,14 +107,14 @@ describe("模块 55 接线 ①:kind 闭合清单 ↔ 执行体 ↔ 标签 ↔ �
     expect(stripComments(kinds)).not.toMatch(/token/i);
   });
 
-  it("🔴 copilot-ask 的参数类型没有 token 字段;执行体从承载请求的 Authorization 取(B-107 铁律沿用)", () => {
+  it("🔴 copilot-ask 的参数类型没有 token 字段;执行体从承载请求的 Authorization 取(铁律沿用)", () => {
     const iface = /"copilot-ask": \{([^}]*)\}/.exec(read("lib/long-ops/kinds.ts"))!;
     expect(iface[1]).not.toMatch(/token/i);
     expect(read("lib/ai/long-op-executors.ts")).toMatch(/headers\.get\("authorization"\)/);
   });
 });
 
-describe("模块 55 接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 kind", () => {
+describe("接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 kind", () => {
   it("每条路由 submitLongOp 自己的 kind(只此一种)、longOpResponse(req, result)、longOpErrorResponse(、主体不再留在路由里", () => {
     for (const [file, kind, bodyCall] of ROUTES) {
       const src = stripComments(read(file)).replace(/^import .*$/gm, "");
@@ -145,13 +145,13 @@ describe("模块 55 接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 ki
       "lib/workflow/long-ops.ts": ["publishWorkflowDag(", "await ensureDagUnpaused(", "unpublishWorkflowDag(", "startWorkflowRun(", "putRunRecord(", "fanoutRunBody(", '"workflow.publish"', '"workflow.unpublish"', '"workflow.trigger"', '"workflow.delete"', "rawBody: true", 'code: "DAG_CLEANUP_FAILED"', '"SCHEDULER_ARTIFACT_MISSING"'],
       "lib/datasource/long-ops.ts": [
         "ensureExternalTable(", ".introspect(", '"datasource.s3-external"', "sampleQuery",
-        // 序 57 / B-129:建源主体(核角色 / 网络 / Glue 连接 / 落库 / 两段收口)+ 失败清理 + 原口径文案
+        // 建源主体(核角色 / 网络 / Glue 连接 / 落库 / 两段收口)+ 失败清理 + 原口径文案
         "ensureGlueRole(", "detectNetwork(", "userSpecifiedNetwork(", "createGlueConnection(", "settleAfterConfigCheck(", "pushDataSourceToOpenMetadata(",
         '"datasource.create"', "resultStatus: 201", "cleanupProvisioned(", "`创建数据源失败: ${", "Glue 作业角色未就位", 'code: "UPSTREAM_ERROR"',
       ],
       "lib/metrics/long-ops.ts": ["computeMetric(", '"metric.compute"', '"capability" in out'],
       "lib/modeling/long-ops.ts": ["computeModelMetric(", '"model-metric.compute"'],
-      // 第三批 / B-136:路由循环体逐字搬入 —— 逐区顺序 submit、逐 target 记账、失败三分类、三种原口径状态码、审计动作名、响应摊平
+      // 第三批:路由循环体逐字搬入 —— 逐区顺序 submit、逐 target 记账、失败三分类、三种原口径状态码、审计动作名、响应摊平
       "lib/engines/long-ops.ts": [
         "forEachTargetPlace(", ").submit(", "noteFanoutResult(", "sequential: true", 'via: "engine-job.run"',
         "RunLockBusy", "TargetBindingRejected", "ResidencyAckRequired", "AuditUnavailable",
@@ -193,7 +193,7 @@ describe("模块 55 接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 ki
   });
 });
 
-describe("模块 55 接线 ⑧:客户端传输层", () => {
+describe("接线 ⑧:客户端传输层", () => {
   it("AuthProvider 拦截器:对 /api/* 响应先 peekLongOpAccepted 再 followLongOp(orig + 同一 headers),normalizeApiResponse 仍在;壳层挂 LongOpIndicator", () => {
     const auth = stripComments(read("lib/auth/AuthProvider.tsx"));
     expect(auth).toMatch(/import \{ peekLongOpAccepted, followLongOp \} from "@\/lib\/long-ops\/client\/follow"/);
@@ -221,7 +221,7 @@ describe("模块 55 接线 ⑧:客户端传输层", () => {
   });
 });
 
-describe("模块 55 接线 ⑨ ⑪:两侧表名 / 台账", () => {
+describe("接线 ⑨ ⑪:两侧表名 / 台账", () => {
   it("TABLES.LONG_OPS === 'bgp-long-ops' 且 infra database-stack 建同名表(pk taskId + ttl + 加固选项);仓内再无 bgp-ai-tasks / AI_TASKS 字面", () => {
     expect(TABLES.LONG_OPS).toBe("bgp-long-ops");
     expect((TABLES as Record<string, string>).AI_TASKS).toBeUndefined();

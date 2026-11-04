@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 平台动作调度对象(治理定时任务 / 卡片定时刷新)的 **异常 → HTTP** 单一作者 + 呈现辅助。
 // 🔴 不放在 route.ts 里:App Router 的 route 文件只许导出固定名;多处各写一份会让同一种失败在不同入口给出不同状态码。
 import { apiError } from "@/lib/api-response";

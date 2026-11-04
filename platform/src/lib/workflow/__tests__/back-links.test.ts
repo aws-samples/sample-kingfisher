@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN R3 / R8 ③)—— 「双写回链」两个方向在页面上的判据:
+// 「双写回链」两个方向在页面上的判据
 //   ① 地址唯一作者(back-links.ts):运行行 → `/workflow/<id>?run=<runId 编码>`;节点 → `/etl-jobs?jobId=&tab=runs` / `/sync/<taskId>`;
 //      节点详情行(task_id)↔ 定义节点用生成器那一份 buildIdMap(碰撞后缀也对得上);
 //   ② 运行历史「触发」格(RunTriggerCell,三处共用)服务端真渲染:工作流触发行 ⇒ Next <Link> + testid run-trigger-workflow + 「由工作流「X」触发」,

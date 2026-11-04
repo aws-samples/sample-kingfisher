@@ -6,14 +6,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Card, Col, Row, Select, Space, Statistic, Table, Tag, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-11);计数随列表响应回(不走 counts 端点,台账 N-7)
+// 执行范围;计数随列表响应回(不走 counts 端点,台账 N-7)
 import { useScope } from "@/components/scope/ScopeProvider";
 import { ScopeCountsHint } from "@/components/scope/OtherScopesHint";
 import { toScopeParam } from "@/lib/scope/scope";
 
 interface TaskRow {
   taskId: string;
-  /** @kf-batch 50-WP6-cost-by-region —— 排行按 (task, target) 分行;这一行是哪个执行环境 */
+  /** 排行按 (task, target) 分行;这一行是哪个执行环境 */
   targetId: string;
   engine: string;
   runCount: number;
@@ -31,11 +31,11 @@ interface RunRow {
   priceVersion: string;
   triggeredBy?: string;
   usage: Record<string, number | undefined>;
-  /** @kf-batch 50-WP6-cost-by-region —— 服务端按 `scalarTargetOf` 判定的归属执行环境 */
+  /** 服务端按 `scalarTargetOf` 判定的归属执行环境 */
   effectiveTargetId: string;
 }
 
-/** @kf-batch 50-WP6-cost-by-region —— 「已归因 / 未分摊」按 region 对账(服务端 reconcileByRegion 算) */
+/** 「已归因 / 未分摊」按 region 对账(服务端 reconcileByRegion 算) */
 interface RegionReconcile {
   region: string;
   targetIds: string[];
@@ -64,7 +64,7 @@ function RunDetail({ taskId, targetId }: { taskId: string; targetId: string }) {
   const [runs, setRuns] = useState<RunRow[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    // @kf-batch 50-WP6-cost-by-region —— 只看这一行的执行环境(同任务另一个区的 run 在另一行);
+    // 只看这一行的执行环境(同任务另一个区的 run 在另一行);
     // 归属用服务端给的 `effectiveTargetId`(与排行分组同一条规则),前端不自己猜缺章行属于谁
     fetch(`/api/finops/tasks/${encodeURIComponent(taskId)}`)
       .then((r) => r.json())
@@ -97,11 +97,9 @@ export default function TaskCostTab() {
   const [loading, setLoading] = useState(false);
   const [engine, setEngine] = useState<string | undefined>();
   const [days, setDays] = useState(30);
-  // @kf-batch 50-WP4ter-coverage
   const { scope, targets } = useScope();
   const scopeParam = toScopeParam(scope);
   const [countsByTarget, setCountsByTarget] = useState<Record<string, number>>({});
-  // @kf-batch 50-WP6-cost-by-region
   const [reconcile, setReconcile] = useState<CostReconcile | null>(null);
   const targetName = (id: string) => (targets || []).find((x) => x.targetId === id)?.displayName || id;
 
@@ -147,7 +145,7 @@ export default function TaskCostTab() {
         />
         <Button icon={<ReloadOutlined />} onClick={load}>{t("刷新")}</Button>
       </Space>
-      {/* @kf-batch 50-WP6-cost-by-region(O3b,E-172)—— 🔴 KPI 按 region 对账:未分摊 = region 账单 − Σ已归因。
+      {/* (O3b)—— 🔴 KPI 按 region 对账:未分摊 = region 账单 − Σ已归因。
           对账粒度只能是 region(CE 只给到 region),同区其他执行环境的 run 也计入已归因;不按引擎筛。 */}
       {reconcile && reconcile.byRegion.length > 0 && (
         <Card
@@ -211,7 +209,7 @@ export default function TaskCostTab() {
         expandable={{ expandedRowRender: (r) => <RunDetail taskId={r.taskId} targetId={r.targetId} /> }}
         columns={[
           { title: t("任务 ID"), dataIndex: "taskId", ellipsis: true },
-          // @kf-batch 50-WP6-cost-by-region —— 「执行范围」列:这一行的运行发生在哪个执行环境
+          // 「执行范围」列:这一行的运行发生在哪个执行环境
           {
             title: t("执行范围"), dataIndex: "targetId", width: 180,
             render: (v: string) => <Tag data-testid="finops-task-target" data-target={v}>{targetName(v)}</Tag>,
@@ -223,7 +221,7 @@ export default function TaskCostTab() {
           { title: t("最近运行"), dataIndex: "lastRunAt", width: 180, render: (v: string) => (v ? new Date(v).toLocaleString() : "-") },
         ]}
       />
-      {/* @kf-batch 50-WP4ter-coverage —— 护栏 1:同一天窗口径的「别处还有 N 条」 */}
+      {/* 护栏 1:同一天窗口径的「别处还有 N 条」 */}
       <ScopeCountsHint counts={countsByTarget} noun={t("成本运行")} />
     </div>
   );

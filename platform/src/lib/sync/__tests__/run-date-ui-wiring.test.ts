@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-backfill —— 序 37 ⑥⑦ 界面接线判据(写了 ≠ 接上了):查**调用位置**(剥掉 import 行再看),不查 token 出现过。
+// 界面接线判据(写了 ≠ 接上了):查**调用位置**(剥掉 import 行再看),不查 token 出现过。
 // 行为判据在 start-route-baseline.test.ts(路由)与 lib/backfill/__tests__/sync-task-assembly.test.ts(补数整链);
 // 这里只钉三件界面侧的结构事实:
 //   ① 「指定业务日期运行」弹窗真的把日期放进请求体发给 start 路由;列表页、详情页都挂上了它;
@@ -17,7 +17,7 @@ function code(rel: string): string {
     .join("\n");
 }
 
-describe("序 37 ⑥ 指定业务日期运行:界面接线", () => {
+describe("指定业务日期运行:界面接线", () => {
   it("① 弹窗把所选日期作为 runDate 放进请求体,POST 到该任务的 start 路由", () => {
     const m = code("components/sync/RunWithDateModal.tsx");
     expect(m).toContain("fetch(`/api/sync/${task.taskId}/start`, {");
@@ -40,7 +40,7 @@ describe("序 37 ⑥ 指定业务日期运行:界面接线", () => {
   });
 });
 
-describe("序 37 ⑦ 补数页:界面接线", () => {
+describe("补数页:界面接线", () => {
   it("③ 拉目标时显式要同步任务;补不了的选项置灰", () => {
     const p = code("app/backfill/page.tsx");
     expect(p).toContain('tq.set("include", "sync-task");');

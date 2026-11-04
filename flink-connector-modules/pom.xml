@@ -8,7 +8,7 @@
   <version>1.0</version>
   <packaging>pom</packaging>
 
-  <!-- 模块 32-CR — 连接器运行时:统一 version parent(§2.4 约束①)。
+  <!-- 连接器运行时:统一 version parent(§2.4 约束①)。
        设计文档:docs/design/32-realtime-compute/DESIGN-connector-runtime-modular.md。
 
        【为什么是 parent】§2.4 实测:各连接器 fat jar 运行期合并时,同名类若【版本分叉】→ 运行期崩;
@@ -40,7 +40,7 @@
     <flink.version>1.20.0</flink.version>
     <kinesis.connector.version>5.0.0-1.20</kinesis.connector.version>
     <kafka.connector.version>3.4.0-1.20</kafka.connector.version>
-    <!-- 🔴 P42.6b 真跑实测(2026-07-27):2.3.7 是 Java 17 编译(class major 61),MSAF Flink 1.20 运行时是
+    <!-- 🔴 真跑实测(2026-07-27):2.3.7 是 Java 17 编译(class major 61),MSAF Flink 1.20 运行时是
          Java 11(只认到 major 55)→ UnsupportedClassVersionError,SplitEnumerator 启动即崩。
          回退 2.2.0(2.x 最高的 Java 8 编译版本,major 52,MSAF 可加载;入口类 IAMLoginModule/
          IAMClientCallbackHandler 一致)。教训:连接器模块的字节码 Java 版本必须 ≤ MSAF 运行时(Java 11)。 -->

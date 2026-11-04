@@ -1,4 +1,4 @@
-// 模块 55 — 任务表服务层判据(= 序 46 B-107 long-call.test 泛化):状态机三保证、读时对账五决策、新增 resultStatus / errorStatus / errorBody 落库、
+// 任务表服务层判据(= long-call.test 泛化):状态机三保证、读时对账五决策、新增 resultStatus / errorStatus / errorBody 落库、
 // LongOpHttpError.fromResponse 吸收路由映射器的信封。只 mock 真外部 DynamoDB(内存夹具按真表达式求值)。
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
@@ -13,7 +13,7 @@ import {
 const isoAgo = (ms: number) => new Date(Date.now() - ms).toISOString();
 beforeEach(() => resetMemLongOps());
 
-describe("模块 55 store:建 / 读 / 抢占 / 重认领", () => {
+describe("store:建 / 读 / 抢占 / 重认领", () => {
   it("createLongOp 落 pending 行(kind / params / userId / correlationId / ttl 7 天)到 bgp-long-ops", async () => {
     const row = await createLongOp({ kind: "modeling-land", params: { codeTableId: "ct1", targets: ["tgt_usw2_a"], force: false, probeOnly: false }, userId: "u1", correlationId: "c1" });
     expect(sendLog[0].input.TableName).toBe("bgp-long-ops");
@@ -61,7 +61,7 @@ describe("模块 55 store:建 / 读 / 抢占 / 重认领", () => {
   });
 });
 
-describe("模块 55 store:终态字段(resultStatus / errorStatus / errorBody)", () => {
+describe("store:终态字段(resultStatus / errorStatus / errorBody)", () => {
   it("markSucceeded 带 resultStatus 201 落库;200 不落(缺省就是 200);meta.model 落库", async () => {
     const a = await createLongOp({ kind: "catalog-create-table", params: { spec: { kind: "redshift" } as never, env: "dev" }, userId: "u1" });
     const ta = (await claimForRun(a.taskId))!;
@@ -100,7 +100,7 @@ describe("模块 55 store:终态字段(resultStatus / errorStatus / errorBody)",
   });
 });
 
-describe("模块 55 store:读时对账决策与开关", () => {
+describe("store:读时对账决策与开关", () => {
   it("reconcileDecision 五态:终态 terminal / pending claim / 超天花板 timeout(优先于 stale)/ stale reclaim / 新鲜 running", () => {
     const now = Date.now();
     const base = { createdAt: new Date(now - 1000).toISOString() };

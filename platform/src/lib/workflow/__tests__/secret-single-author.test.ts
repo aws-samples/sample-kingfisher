@@ -1,8 +1,7 @@
-// @kf-batch 50-B09-secret-single-author
 // 🔴🔴 **产物里的数仓凭证只许有一个作者 = `resolveRedshiftBinding`。**
 //
-// 【这条判据是 B-09 的前置,不是附带的洁癖】
-// B-09(「改了产物生成器,存量载体不会自动重发」)的解法是**可派生**的:
+// 【这条判据是该缺陷的前置,不是附带的洁癖】
+// (「改了产物生成器,存量载体不会自动重发」)的解法是**可派生**的
 //   拿当前生成器**重新生成**一遍该对象的定义,与 `get-workflow` 回来的 `WorkflowDefinition`
 //   **逐字节比对**,不一致 = 载体落后。(刻意不存 `generatorVersion` —— 版本号自己会漂,
 //    而且又多一份要同步的真值;「重新生成再比」没有第二份真值。)
@@ -34,7 +33,7 @@ const read = (p: string) => readFileSync(resolve(SRC, p), "utf8");
 /** 🔴 负向文本断言前必先剥注释(否则会被「解释为什么不能这么写」的注释命中 ⇒ 假红)。 */
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
 
-describe("产物里的数仓凭证只有一个作者(B-09 前置)", () => {
+describe("产物里的数仓凭证只有一个作者(前置)", () => {
   const pub = strip(read("lib/workflow/publish-dag.ts"));
 
   it("① 判据自己先有判别力:锚点都在(改名了就该红,不许静默空转)", () => {
@@ -58,7 +57,7 @@ describe("产物里的数仓凭证只有一个作者(B-09 前置)", () => {
   it("③ 🔴 负向:发布函数的 `opts` 里不许再有 `redshiftSecretArn`(那就是那个第二作者的入口)", () => {
     expect(
       /opts:\s*\{[^}]*redshiftSecretArn/.test(pub),
-      "🔴 `opts` 又能传凭证进来了 ⇒ home 的凭证回到两个作者,B-09 的比对会误报「载体落后」"
+      "🔴 `opts` 又能传凭证进来了 ⇒ home 的凭证回到两个作者,载体落后比对会误报"
     ).toBe(false);
   });
 
@@ -93,7 +92,7 @@ describe("产物里的数仓凭证只有一个作者(B-09 前置)", () => {
       .filter((l) => !/\/__tests__\//.test(l));
     expect(
       offenders,
-      `🔴 还有调用方把凭证传进发布函数(= 凭证的第二个作者,B-09 的比对会在 home 上误报):\n${offenders.join("\n")}`
+      `🔴 还有调用方把凭证传进发布函数(= 凭证的第二个作者,载体落后比对会在 home 上误报):\n${offenders.join("\n")}`
     ).toEqual([]);
   });
 

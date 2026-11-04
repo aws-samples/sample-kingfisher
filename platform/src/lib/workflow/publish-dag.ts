@@ -1,4 +1,4 @@
-// 模块 33-B（根治 Task#19）— workflow DAG 生成+下发的【单一权威实现】(SSOT)。
+// （根治 Task#19）— workflow DAG 生成+下发的【单一权威实现】(SSOT)。
 //
 // 【为什么存在】publish/route.ts 与 schedule/enable/route.ts 都要"按引擎 flag 生成 workflow DAG 并下发 S3",
 // 但历史上各写了一份:publish 正确(flag 分派 + 能力门 + runtime-lib 下发),schedule/enable 是【陈旧副本】
@@ -6,15 +6,15 @@
 // 的 workflow 从监控页切调度时被 legacy 生成的坏 DAG 覆盖掉 publish 的好 DAG(写同一 S3 key)。
 // 根治=把这段逻辑抽成本函数,两个路由同调,消灭副本(单点修 import 只治标,副本还会再漂移)。
 
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
-// @kf-batch 50-WP4quater-reads(工单 SC-3)—— 🔴🔴 编排的 target 维度接线(WP-14)。
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
+// 🔴🔴 编排的 target 维度接线。
 // 用户 2026-09-10 **第三次**强调:「**这个是误区,我一开始要求的就是按照分区隔离,每一个分区都有
 // MWAA serverless 的调度能力,调度只能在自己的区域执行。只是元数据收集上报到主控区而已。**」
 // 我此前把「一个 AgentCore / 一个 OpenMetadata」那条中心化纪律套到编排上了 —— 那条只管 AgentCore 与 OM。
-// 逐区扇出的机器(`schedulerEndpointFor` + fail-closed 不回落 home)WP-13/WP-15 就建好了,
+// 逐区扇出的机器(`schedulerEndpointFor` + fail-closed 不回落 home)就建好了,
 // 只有编排这条路径一直没接。这一刀接上。
 import { schedulerEndpointFor, isServerlessEndpoint, unpauseWhenLoaded, MwaaNotInstalled } from "@/lib/scheduler/mwaa-endpoint";
-// @kf-batch 50-WP17-serverless-workflow —— 多节点编排也走 serverless(SPEC v3.43 §3.15;形状只有 tasks)
+// 多节点编排也走 serverless(SPEC v3.43 §3.15;形状只有 tasks)
 import { assertServerlessExpressible, buildWorkflowTasksYaml } from "@/lib/scheduler/serverless/workflow-yaml";
 import { publishServerlessWorkflow, offlineServerlessWorkflow } from "@/lib/scheduler/serverless/publish";
 import { findWorkflowArnByName, getWorkflow } from "@/lib/scheduler/serverless/workflow-client";
@@ -30,14 +30,13 @@ import { generateAirflowDagV2, checkEngineCapability } from "@/lib/workflow/dag-
 import { RUNTIME_LIB_FILENAME, RUNTIME_LIB_SOURCE, AIRFLOW_IGNORE_CONTENT } from "@/lib/workflow/runtime-lib";
 import type { Workflow } from "@/types/workflow";
 import type { CarrierLedger } from "@/lib/scheduler/carrier-ledger";
-// @kf-batch 50-WP18b-fanout-seam —— 逐区全失败时怎么合成拒因,只有这一个作者
+// 逐区全失败时怎么合成拒因,只有这一个作者
 import { fanoutRejection } from "@/lib/scheduler/fanout-reject";
-// 序 73 模块 57(57 DESIGN §3.2 / §3.5)—— 离线作业节点的发布期 spec 解析 + 同步 / 作业节点的落点一致性 fail-closed(唯一作者)
+// 离线作业节点的发布期 spec 解析 + 同步 / 作业节点的落点一致性 fail-closed(唯一作者)
 import { assertWorkflowNodesRunOn, resolveWorkflowJobSpecs, withJobSpecs } from "@/lib/workflow/job-node-spec";
 // 作业节点在该区的就位(Glue 作业定义 / EMR 脚本 · jar · application)—— 写操作,只在发布的写阶段调
 import { prepareJobNodesForTarget } from "@/lib/workflow/job-node-prepare";
 
-// @kf-batch 50-WP17-serverless-workflow
 // 🔴 这里原来有个 `WorkflowSchedulerUnsupported`(「多节点编排只支持经典 MWAA」)。**已删**:
 //   那条拒绝的前提是「dag-factory 表达不了多节点」,而 2026-09-11 的真跑证伪了它
 //   (`tasks` + `dependencies` + `trigger_rule` 都支持;只有两个 operator 在白名单外)。
@@ -55,14 +54,13 @@ export function dagEngine(): "legacy" | "runtime-lib" {
 export interface PublishDagResult {
   dagId: string;
   dagContent: string;
-  /** @kf-batch 50-WP17-serverless-workflow —— 这份产物发给了哪种调度器(路由与审计如实呈现) */
+  /** 这份产物发给了哪种调度器(路由与审计如实呈现) */
   scheduler: "mwaa" | "serverless";
   workflowArn?: string;
   workflowVersion?: string;
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 写 `deployments[targetId]`(与作业侧同形)。首次发布时这个 map 还不存在 ⇒ 嵌套路径写会失败,
  * 先 `if_not_exists` 建出 map 再写(两次 UpdateCommand 的写法只在这里出现一次)。
  */
@@ -70,7 +68,6 @@ async function recordWorkflowDeployment(
   workflowId: string,
   targetId: string,
   rec: Record<string, unknown>,
-  // @kf-batch 50-WP26-sync-schedule-carrier
   // 🔴 **发布台账写哪一行**由调用方声明(缺省 = 工作流自己 ⇒ 逐字节同改动前)。
   //   不拆这个参数,给同步任务合成的载体就会往 `bgp-workflows` **upsert 出一条幽灵工作流**
   //   —— 与 `schedule/enable` 里已修过的那条盲 Update 是同一个缺陷(理由见 carrier-ledger.ts)。
@@ -115,7 +112,7 @@ async function recordWorkflowDeployment(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-B09-carrier-drift —— **「已发布的载体是不是最新的」= 一个可派生的事实**
+// **「已发布的载体是不是最新的」= 一个可派生的事实**
 //
 // 做法:拿当前生成器**重新生成**一遍(唯一作者 `buildCarrierArtifact`,零副作用)+ 从服务
 // **只读**取回已发布的定义,两边**逐字节**比。刻意不存 `generatorVersion`:版本号自己会漂
@@ -162,11 +159,11 @@ export async function carrierDefinitionDrift(
 ): Promise<{ state: CarrierDriftState; scheduler: string; dagId: string; reason?: string }> {
   const art = await buildCarrierArtifact(workflow, wfTarget, opts);
   if (!isServerlessEndpoint(art.ep)) {
-    // ⚠️ 如实说明,不假装支持:经典 MWAA 已停供、只保存量(WP-17),它的产物在 S3 上,
+    // ⚠️ 如实说明,不假装支持:经典 MWAA 已停供、只保存量,它的产物在 S3 上,
     //   要另写一条「读 S3 再比」的路。本期不做,而且**不许静默当成 ok**。
     return {
       state: "unsupported", scheduler: art.scheduler, dagId: art.dagId,
-      reason: "经典 MWAA 只保存量(WP-17 已停供),载体落后检测本期只覆盖 MWAA Serverless",
+      reason: "经典 MWAA 只保存量(已停供),载体落后检测本期只覆盖 MWAA Serverless",
     };
   }
   const known = (workflow as unknown as { deployments?: Record<string, { workflowArn?: string } | undefined> })
@@ -197,13 +194,11 @@ export async function carrierDefinitionDrift(
 // 杜绝"坏 DAG 落 S3 → MWAA 静默不加载/覆盖好 DAG"。
 /**
  * 发到**一个** target(原来的 `publishWorkflowDag` 就是这个;扇出版在下面)。
- * @kf-batch 50-WP18-workflow-fanout
  */
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-B09-carrier-drift
-// 🔴🔴 **产物生成的唯一作者**(B-09 的承重件)。
+// 🔴🔴 **产物生成的唯一作者**(该缺陷的承重件)。
 //
-// 【为什么必须抽它】B-09 要判「已发布的载体定义是不是最新的」,做法是**拿当前生成器
+// 【为什么必须抽它】要判「已发布的载体定义是不是最新的」,做法是**拿当前生成器
 //   重新生成一遍再比对**(刻意不存 `generatorVersion`:版本号自己会漂,而且又多一份要同步
 //   的真值;「重新生成再比」没有第二份真值,忘不掉也漂不了)。
 //   ⇒ 如果「发布时怎么生成」与「比对时怎么生成」是**两份代码**,它们迟早分叉,
@@ -228,7 +223,7 @@ export interface CarrierArtifact {
 }
 
 /**
- * 序 73 模块 57 —— 产物生成的**只读前半段**(「这份发布会不会被拒」的全部判定都在这里,一个写都没有)。
+ * 产物生成的**只读前半段**(「这份发布会不会被拒」的全部判定都在这里,一个写都没有)。
  * 🔴 为什么从 `buildCarrierArtifact` 里拆出来:发布的写阶段(`prepareJobNodesForTarget`:建 Glue 作业定义 / 上传 EMR 脚本 · jar / 建 application)
  *    必须排在**生成之前**(EMR 的 applicationId 要先就位才解析得出 spec),而生成里又藏着会拒的判定
  *    (那个区没装调度器 ⇒ 409 / 服务侧表达不了的节点 ⇒ 400 / legacy 引擎 ⇒ 400 / 作业 · 同步节点不绑该区 ⇒ 400 / spec 自校验 ⇒ 400)
@@ -252,16 +247,16 @@ export async function resolveCarrierPlan(
   const dagId = workflow.airflowDagId || `bgp_${workflow.workflowId}`;
   const wfBase: Workflow = { ...workflow, airflowDagId: dagId };
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-3)—— 🔴 DAG 发到**这个工作流自己那个区**的调度器。
+  // 🔴 DAG 发到**这个工作流自己那个区**的调度器。
   // 落点来自行上的章(无章的存量工作流回落主控区 —— 落章之前编排确实只在主控区发布过,是历史事实);
   // 那个区没装调度组件 ⇒ `schedulerEndpointFor` 抛 `MwaaNotInstalled`,由路由转 409 + 直达补装,
   // **绝不回落主控区**(回落 = 用户明令禁止的跨区域调度)。
-  // 🔴 @kf-batch 50-WP17-serverless-workflow:端点解析**排在引擎能力门之前** —— 那道门(`WORKFLOW_DAG_ENGINE`)
+  // 🔴 端点解析**排在引擎能力门之前** —— 那道门(`WORKFLOW_DAG_ENGINE`)
   //   只管经典 MWAA 用哪个生成器;serverless 侧的运行时**恒是新的**(NODE_EXEC_PY)。
   //   顺序反了会出现最难查的一种:现网 flag=legacy ⇒ 一个带 branch 的图发到 serverless 也被判「引擎不支持」。
   const ep = await schedulerEndpointFor(wfTarget);
 
-  // @kf-batch 50-WP4quinquies-pushdown —— 🔴🔴 **落点解析必须排在生成之前**。
+  // 🔴🔴 **落点解析必须排在生成之前**。
   // 真环境段 `scq` A2-1 抓到的形态:DAG 文件写进了 usw2 的桶、也真跑在 usw2 的 Airflow(A2-2 绿),
   // 但**正文**里 `region = "us-east-1"`、`WorkgroupName="bgp-workgroup"`、`SecretArn=...us-east-1...`
   // ⇒ 「调度在 usw2、活儿在主控区干」。原因就是这里:生成在解析之前,生成器无从知道落点。
@@ -272,8 +267,7 @@ export async function resolveCarrierPlan(
     execRegion: ep.region,
     workgroup: rsBinding.workgroup,
     database: rsBinding.database,
-    // @kf-batch 50-B09-secret-single-author
-    // 🔴🔴 **凭证落点只有一个作者 = `resolveRedshiftBinding`**(2026-09-21 B-09 开包勘定)。
+    // 🔴🔴 **凭证落点只有一个作者 = `resolveRedshiftBinding`**(2026-09-21 开包勘定)。
     //   原来这里写的是 `rsBinding.home ? opts.redshiftSecretArn : rsBinding.secretArn` ——
     //   home 走调用方传进来的那一个,理由写的是「home 产物逐字节不变」。
     //   但 `resolveRedshiftBinding` 的 home 分支**本来就算出了** `secretArn`
@@ -288,11 +282,10 @@ export async function resolveCarrierPlan(
     //   ⇒ home 分支 = `getRedshiftSecretArn({ project: workflow.projectId })` ⇒ **逐字节相同**。
     //   ⇒ 那个参数是**纯多余的第二作者**,删掉不改变任何产物。
     //
-    // 🔴 **为什么非删不可**(B-09 的前置):B-09 要判「已发布的定义是不是最新的」,做法是
+    // 🔴 **为什么非删不可**(该缺陷的前置):要判「已发布的定义是不是最新的」,做法是
     //   **拿当前生成器重新生成一遍再逐字节比对**。重新生成时没有「调用方传进来的那个」,
     //   只能走 `rsBinding.secretArn` ⇒ 只要这两个作者还并存,home 上的比对就会**误报「载体落后」**。
     redshiftSecretArn: rsBinding.secretArn,
-    // @kf-batch 50-WP26-ledger-into-place
     // 🔴🔴 **台账归属必须跟着落点一起走进生成器**(2026-09-20 真环境抓到,第三轮硬门 `sync × dispatch` 两区都红)。
     //   `CarrierLedger` 有**两个**消费点,而本函数原来只接了一个:
     //     ① 台账归属 —— 发布记录写到哪张表哪个 key(`recordWorkflowDeployment(..., opts.ledger)`)✅ 早就接上;
@@ -309,7 +302,7 @@ export async function resolveCarrierPlan(
     ledger: opts.ledger,
   };
 
-  // 序 73 模块 57(R5 / B-141 ①)—— 🔴 **发布期落点一致性 fail-closed**,排在任何写 / 任何生成之前:
+  // 🔴 **发布期落点一致性 fail-closed**,排在任何写 / 任何生成之前
   //   同步节点关联的任务 / 作业节点引用的作业必须「存在 · 本项目 · 绑定含这个落点」,否则抛 JobNodeUnbound(路由 400 点名节点与作业),
   //   不再等运行期 Glue EntityNotFound。没有作业 / 同步节点的工作流这里零次读。
   await assertWorkflowNodesRunOn(wfBase, wfTarget);
@@ -347,7 +340,7 @@ export async function buildCarrierArtifact(
 ): Promise<CarrierArtifact> {
   const { dagId, wfBase, ep, place, engine } = plan ?? (await resolveCarrierPlan(workflow, wfTarget, opts));
 
-  // 序 73 模块 57 —— 把作业节点的运行 spec(与单作业载体同一份,单一作者 job-node-spec.ts)挂进 `node.data.jobSpec`:
+  // 把作业节点的运行 spec(与单作业载体同一份,单一作者 job-node-spec.ts)挂进 `node.data.jobSpec`:
   //   下面三条生成路都从 data 透传,运行期 `_exec_job` 只读它;没有作业节点的工作流这里零次读、产物不变。
   //   EMR 作业要先由写阶段(prepareJobNodesForTarget)建好 application 才解析得出 ⇒ 这一步必须排在写之后(只读比对路径没发布过 ⇒ not-prepared)。
   const wfWithDag = withJobSpecs(wfBase, await resolveWorkflowJobSpecs(wfBase, wfTarget, { dagId, execRegion: ep.region }));
@@ -375,18 +368,18 @@ export async function buildCarrierArtifact(
 export async function publishWorkflowDagToTarget(
   workflow: Workflow,
   wfTarget: string,
-  // @kf-batch 50-WP26-sync-schedule-carrier —— `ledger` 缺省 = 工作流自己(零回归)
+  // `ledger` 缺省 = 工作流自己(零回归)
   // 🔴 50-B09:`redshiftSecretArn` **已删** —— 凭证落点的唯一作者是 `resolveRedshiftBinding`(见下)
   opts: { ledger?: CarrierLedger } = {}
 ): Promise<PublishDagResult> {
-  // 序 73 模块 57 —— 顺序铁律:**① 先把会拒的全判完(只读)→ ② 再写 → ③ 再生成**。
+  // 顺序铁律:**① 先把会拒的全判完(只读)→ ② 再写 → ③ 再生成**。
   //   ① `resolveCarrierPlan`:调度端点(没装 ⇒ 409)/ 数仓落点 / 作业 · 同步节点落点一致性(⇒ 400)/ 服务侧表达不了的节点(⇒ 400)/
   //      legacy 引擎能力门(⇒ 400)/ spec 自校验(⇒ 400)—— 任一拒 ⇒ 该区一个字节都没动;
   //   ② `prepareJobNodesForTarget`:作业节点在该区的就位是写操作(Glue 作业定义 / EMR 脚本 · jar · application,与「立即运行」同一组作者);没有作业节点 ⇒ 零写;
   //   ③ `buildCarrierArtifact(plan)`:只读生成(EMR 的 applicationId 这时才就位 ⇒ spec 解析得出)。
   const plan = await resolveCarrierPlan(workflow, wfTarget, opts);
   await prepareJobNodesForTarget(workflow, wfTarget);
-  // @kf-batch 50-B09-carrier-drift —— 🔴 产物**只从唯一作者**拿(它零副作用);
+  // 🔴 产物**只从唯一作者**拿(它零副作用);
   //   本函数只负责「把它发出去」+ 记台账。生成与发布分开之后,比对路径才可能与发布同源。
   const art = await buildCarrierArtifact(workflow, wfTarget, opts, plan);
   const { dagId, ep, cron } = art;
@@ -442,16 +435,13 @@ export async function publishWorkflowDagToTarget(
   return { dagId, dagContent, scheduler: "mwaa" };
 }
 
-// @kf-batch 50-WP4quinquies-pushdown
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 一个工作流在 serverless 侧的 workflowArn(读侧也要,单一作者收在这里)。
  * 台账 `deployments[targetId].workflowArn` 优先;台账没有就按名字问服务本身(名字 = dagId)。
  * 🔴 拿不到就返回 undefined,由调用方给**人话**(绝不静默当成「没有运行记录」—— 那是本仓的量具铁律:
  *    「读不到」不许回落成「没有」)。
  */
 /**
- * @kf-batch 50-WP18-workflow-fanout
  * 🔴🔴 **一次发布 → 全部绑定区各一份产物**(用户 2026-09-15:「我不是让你在美东1 发布执行多个区域吗?」)。
  * 改动前这里是 `bindingTargets(...)[0]` —— 绑了两个区只发第一个,另一个区**根本没有产物**,
  * 于是它的定时永远不会跑、手动触发也找不到 workflow;而界面上两个区都亮着(客户痛点「怕漏 region」)。
@@ -469,11 +459,11 @@ export async function publishWorkflowDag(
   const targets = bindingTargets(workflow as unknown as { targets?: unknown; targetId?: unknown });
   const list = targets.length ? targets : ["tgt_home"];
   const perTarget: Array<{ targetId: string; ok: boolean; scheduler?: string; artifact?: string; error?: string; code?: string }> = [];
-  // @kf-batch 50-WP18b-fanout-seam —— 🔴 原始拒因**必须留着**:聚合时要原样抛回去,
+  // 🔴 原始拒因**必须留着**:聚合时要原样抛回去,
   //   `instanceof MwaaNotInstalled` / `instanceof ServerlessNodeUnsupported` 才判得出来。
   const causes: unknown[] = [];
   let first: PublishDagResult | undefined;
-  // 序 73 模块 57(R5)—— 🔴 **先把全部绑定区的落点一致性核一遍,再动第一个区**:同步节点的任务 / 作业节点的作业不绑其中任何一个区
+  // 🔴 **先把全部绑定区的落点一致性核一遍,再动第一个区**:同步节点的任务 / 作业节点的作业不绑其中任何一个区
   //   ⇒ 整个发布 400(抛 JobNodeUnbound,原样出去由单一作者映射),不许「第 1 个区发成、第 2 个区才发现」留下半份产物。
   for (const t of list) await assertWorkflowNodesRunOn(workflow, t);
   for (const t of list) {
@@ -488,7 +478,6 @@ export async function publishWorkflowDag(
     }
   }
   if (!first) {
-    // @kf-batch 50-WP18b-fanout-seam
     // 一个区都没发成功 ⇒ 走**单一作者**合成(把第一个带语义的拒因原样抛出去,逐区明细挂 `fanoutPerTarget`)。
     // 🔴 这里原来是 `new Error(聚合文本)` + 只拷 `code`:类型信息一丢,路由那两条 instanceof 全落空 ⇒
     //    「图里有 external 节点」「那个区没装调度器」双双被说成 500 平台故障(2026-09-16 段 slsw N-3 实测)。
@@ -511,13 +500,12 @@ export async function serverlessWorkflowArnOf(
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 「发布之后让它真的会被触发」= 解挂那个 DAG。**落点由本函数自己解析**,调用方不许再传端点。
  *
  * 🔴 为什么收成一个作者:`schedule/enable` 那条路原来写的是 `unpauseWhenLoaded(homeMwaaEndpoint(), …)`
  *   —— **恒打主控区**。工作流绑在别的区时:DAG 发到了那个区、cron 也写进去了,而解挂打在 home
  *   (那里根本没有这个 DAG)⇒ 页面显示「调度已开启」,而那个区的 DAG **一直是 paused、永远不触发**。
- *   这是 WP-13 当时留的「target 维度归 WP-14」的尾巴,WP-4quater 接编排时漏了这一处
+ *   这是当时留的「target 维度」的尾巴,接编排时漏了这一处
  *   (publish 路由那条是对的 —— 两个调用方一个对一个错,正是「同一件事有两处实现」的典型下场)。
  * serverless 没有 pause 概念(TriggerMode 决定要不要按 cron 收它)⇒ 如实 no-op。
  */
@@ -525,7 +513,6 @@ export async function ensureDagUnpaused(
   workflow: Pick<Workflow, "workflowId"> & { targets?: unknown; targetId?: unknown },
   dagId: string
 ): Promise<{ unpaused: boolean; scheduler: "mwaa" | "serverless"; perTarget: Array<{ targetId: string; unpaused: boolean; scheduler: string; error?: string }> }> {
-  // @kf-batch 50-WP18-workflow-fanout
   // 🔴 解挂必须**逐个绑定区**做:只解第一个区 ⇒ 第二个区的 DAG 一直是 paused ⇒ **它的 cron 永远不触发**,
   //    而页面上那个区显示「已发布」。这与「只发第一个区」是同一个洞的另一半。
   const list = bindingTargets(workflow);
@@ -556,16 +543,16 @@ export async function ensureDagUnpaused(
 // 还会往台账写行)。存量单区时代这个洞就在,多区域下更坏:孤儿 DAG 长在**别的区**,没人会去看。
 // 🔴 桶必须经**同一个解析器**取(`schedulerEndpointFor`):用主控区的桶去删别区的文件是静默 no-op。
 //
-// @kf-batch 50-WP17-serverless-workflow —— 本函数升级成**「把一个工作流从它的调度器上撤下来」的唯一作者**:
+// 本函数升级成**「把一个工作流从它的调度器上撤下来」的唯一作者**:
 //   · 经典 ⇒ `offlineDag(dagId, wfTarget)`:pause(立刻停触发)+ 删该区 DAG 文件;
 //   · serverless ⇒ `offlineServerlessWorkflow`:Stop 在跑的 run → 等终态 → DeleteWorkflow + 删定义对象。
 // 🔴 两个此前的洞一并补掉:
 //   ① 原来 serverless 分支直接 `return { removed: false }`(那是「serverless 从来没被 publish 过」时代的假设)
-//      —— 现在它会 publish 了,不接就是**删不掉的孤儿 workflow 继续按 cron 跑**(T-14 已付过这个学费);
+//      现在它会 publish 了,不接就是**删不掉的孤儿 workflow 继续按 cron 跑**(已付过这个学费);
 //   ② `unpublish/route.ts` 原来调 `offlineDag(dagId)` **不传 target** ⇒ 恒打主控区:
 //      工作流绑在别的区时,pause 与删文件都作用在 home(静默 no-op),那个区的 DAG 照跑 ——
-//      与 A2-3 同一个病、只是长在另一条路由上(WP-13 当时留的缺省值本意是「存量逐字节不变」,
-//      而 WP-4quater 把工作流变成 per-target 之后,这个缺省就成了洞)。
+//      与 A2-3 同一个病、只是长在另一条路由上(当时留的缺省值本意是「存量逐字节不变」,
+//      而把工作流变成 per-target 之后,这个缺省就成了洞)。
 export interface UnpublishResult {
   removed: boolean;
   scheduler: "mwaa" | "serverless";
@@ -583,11 +570,10 @@ export interface UnpublishResult {
 }
 
 /**
- * @kf-batch 50-WP18d-unpublish-seam
  * 🔴🔴 扇出**必须把「有没有区撤不下来」透出来**。改动前这里逐区 try/catch 之后只回 `head`,
  * 两个调用方(`unpublish` 路由与 DELETE 路由)于是都**看不到**某个区失败 ——
  * 而它们的注释写的正好相反(「撤不下来就不许把记录改成 draft / 不许删记录,否则只剩一个谁也管不着的孤儿」,
- * T-14 与段 `scq` A2-3 的学费)。WP-18 把单区改成扇出时,那条不变量**靠的是异常会往上抛**,
+ * 与段 `scq` A2-3 的学费)。把单区改成扇出时,那条不变量**靠的是异常会往上抛**,
  * 扇出把异常收进 `perTarget` 之后守卫就静默失效了 —— 与「扇出把类型化拒因抹平」是同一族接缝缺陷。
  */
 export interface UnpublishFanoutResult extends UnpublishResult {
@@ -602,7 +588,6 @@ export async function unpublishWorkflowDag(
   workflow: Pick<Workflow, "workflowId" | "airflowDagId"> & { targets?: unknown; targetId?: unknown; deployments?: unknown }
 ): Promise<UnpublishFanoutResult> {
   const dagId = workflow.airflowDagId || `bgp_${workflow.workflowId}`;
-  // @kf-batch 50-WP18-workflow-fanout
   // 🔴🔴 下线必须覆盖**每一个有产物的区**,不只是绑定里的第一个:
   //   · 只下线第一个区 ⇒ 另一个区的 workflow / DAG 文件**留着继续按 cron 跑**(孤儿产物,
   //     跨法域下就是数据出境);这与离线作业侧「解绑即下线」是同一条铁律。

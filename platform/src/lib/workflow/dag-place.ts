@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quinquies-pushdown
 // 编排 DAG 的**执行落点**(单一作者)。
 //
 // 【为什么单独一个文件】工作流有**两个** DAG 生成器(冻结的 legacy 与 v2/runtime-lib),
@@ -27,7 +26,6 @@ export interface WorkflowDagPlace {
   redshiftSecretArn?: string;
   /** 该工作流的落点;用于 fail-closed 判定与错误信息 */
   targetId?: string;
-  // @kf-batch 50-WP26-sync-schedule-carrier
   /**
    * **这个载体的台账归属**(缺省 = 工作流自己 ⇒ 逐字节同改动前)。
    * 同步任务的定时调度复用同一套载体,但运行/发布记录要落到它自己那一行 ——
@@ -59,7 +57,7 @@ export function assertDagPlace(workflowId: string, place: WorkflowDagPlace, hasS
     );
   }
   if (hasSqlNode && !place.redshiftSecretArn) {
-    // 非 home 没有 SecretArn ⇒ DAG 里会省掉该参数、退回 MWAA worker 的联邦身份 = 属主分叉(P52.1-L1)。
+    // 非 home 没有 SecretArn ⇒ DAG 里会省掉该参数、退回 MWAA worker 的联邦身份 = 属主分叉。
     throw new Error(
       `工作流 ${workflowId} 落点是 ${place.targetId} 且含 SQL 节点,必须传该 target 的 redshiftSecretArn ` +
         `(§3.9a:禁 IAM fallback,不许省略 SecretArn)`

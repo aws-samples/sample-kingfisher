@@ -12,10 +12,9 @@ import {
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP31-place-first-class(B-36)
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope } from "@/lib/scope/scope";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 
 const { Text, Paragraph } = Typography;
@@ -59,7 +58,7 @@ export default function RequirementsPage() {
   const { getToken, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const t = useT();
-  // @kf-batch 50-WP31-place-first-class(B-36)—— 生成实现 / 创建作业的落点唯一作者(单区视角 = 该区;「全部 / 对比」= 显式主控区)。
+  // 生成实现 / 创建作业的落点唯一作者(单区视角 = 该区;「全部 / 对比」= 显式主控区)。
   //   原来两样都不带 ⇒ 生成按主控区目录、作业建在主控区,与用户正在看的区无关。
   const { scope } = useScope();
   const reqLanding = landingOfScope(scope);

@@ -1,5 +1,5 @@
 "use client";
-// 模块 55 / 序 50 —— 长操作的全局提示:监听 lib/long-ops/client/events.ts 的 DOM 事件,用 antd message.loading 显示
+// 长操作的全局提示:监听 lib/long-ops/client/events.ts 的 DOM 事件,用 antd message.loading 显示
 // 「正在后台执行:<label>(已 n 秒)」,终态自动消(key = taskId,多个长操作并发各一条)。
 //
 // 为什么是组件而不是在拦截器里直接调 antd:拦截器是非 React 模块,直接用静态 message 会脱离 ConfigProvider(皮肤 / 语言);

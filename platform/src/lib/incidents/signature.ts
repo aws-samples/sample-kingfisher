@@ -1,4 +1,4 @@
-// 模块 43-A — 故障指纹(signature)算法:运维知识库归并的核心。
+// 故障指纹(signature)算法:运维知识库归并的核心。
 //
 // 目标:同类故障稳定归并、不同类不误并。给定 (taskType, errorText) → 一个确定性、已脱敏的
 // signature 字符串。同一根因(仅表名/日期/账号/数字不同)→ 同一 signature;不同根因 → 不同。
@@ -16,7 +16,7 @@
 //
 // 纯函数、无副作用、可单测(见 __tests__/signature.test.ts,黄金语料取自历史真实事故)。
 // 安全:signature 与本文件产出的 symptomTemplate 严禁包含表名/路径/账号/UUID/密钥等敏感 token
-// (继承模块36 E5"只存元数据"铁律)。
+// (继承E5"只存元数据"铁律)。
 
 /** 归一化后的诊断结果:signature(归并键)+ symptomTemplate(已脱敏的现象模板,可入库/导出)。 */
 export interface SignatureResult {

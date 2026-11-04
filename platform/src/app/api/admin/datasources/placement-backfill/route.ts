@@ -1,4 +1,3 @@
-// @kf-batch 50-W3f-T0-T3
 export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";

@@ -1,17 +1,16 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1 —— **数据面 AWS 客户端的唯一工厂**(L3)。
+// **数据面 AWS 客户端的唯一工厂**(L3)。
 //
 // ── 为什么是这里、而不是再造一个 ────────────────────────────────────────────────
 // 按区缓存的客户端早就有了(`exec-env/target-clients.ts` 的 `xxxClientFor(region)` 14 个服务),
 // 但「怎么 new」散在那 14 个函数里各写一遍,另外还有 108 处在业务文件里自己 `new XxxClient(`
-// (其中 46 个是模块级单例 —— B-26 就是一个)。本文件把「构造 + 按区缓存 + 挂越区断言」收成**一处**:
-// `target-clients.ts` 的那些函数改成薄委托(调用方一个字不用改),业务文件里的散建由序 3 按引擎迁过来,
+// (其中 46 个是模块级单例 —— 就是一个)。本文件把「构造 + 按区缓存 + 挂越区断言」收成**一处**:
+// `target-clients.ts` 的那些函数改成薄委托(调用方一个字不用改),业务文件里的散建由按引擎迁过来,
 // 棘轮 `place-ratchets.test.ts` 只减不增。
 //
 // ── 越区断言(SDK v3 官方 middleware,initialize 步)────────────────────────────
 // 每个工厂客户端挂一个 `bgpPlaceGuard`:有显式落点上下文(`runInPlace` / `withPlace`)且
 // **客户端区 ≠ 落点区** ⇒ 拦截模式下抛 `CrossRegionDataPlaneCall`,**一个网络请求都不发**(D5 实测)。
-// 模式由 `BGP_PLACE_GUARD` 决定:缺省 `observe`(只记录,不拦)—— 序 6 才切 `enforce`。
+// 模式由 `BGP_PLACE_GUARD` 决定:缺省 `observe`(只记录,不拦)—— 才切 `enforce`。
 // 观测模式下这里什么都不做:全局观测器(`place/observer.ts`)在 SDK 底层 `send` 上看**所有**客户端
 // (包括还没迁过来的散建客户端),记录只有那一个作者,不在这里重复记。
 
@@ -19,22 +18,22 @@ import { RedshiftDataClient } from "@aws-sdk/client-redshift-data";
 import { currentPlace } from "@/lib/place/context";
 import { CrossRegionDataPlaneCall, type Place } from "@/lib/place/types";
 import type { CentralComponent } from "@/lib/place/central";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 序 5:数据面凭证只在这里注入(代入该区执行环境的平台数据面角色)
+// 数据面凭证只在这里注入(代入该区执行环境的平台数据面角色)
 import { dataPlaneCredsMode, roleCredentialProvider, withObserveFallback, type TempCreds } from "@/lib/aws/dataplane-creds";
 
 /** AWS region 字面形态(`us-east-1` / `ap-southeast-1` / `cn-north-1`);`lib/aws/arn.ts` 读 ARN 的区时复用同一份,不再各写一遍。 */
 export const REGION_RE = /^[a-z]{2}(-[a-z]+)+-\d$/;
 
-// ── 序 57 / B-129 ③:SDK 客户端的网络预算(**唯一作者**;两个工厂入口 regionalClient / sdkClient 与 Redshift Data / DynamoDB / STS 都从这里拿)──
+// ── ③:SDK 客户端的网络预算(**唯一作者**;两个工厂入口 regionalClient / sdkClient 与 Redshift Data / DynamoDB / STS 都从这里拿)──
 //
-// 第四十七轮实测:平台进程里一次 IAM GetRole 在 CreateSecret 之后**空档 64 秒**才到达 IAM(CloudTrail),同窗口 CPU 14%、无限流、无 5xx。
+// 平台进程里一次 IAM GetRole 在 CreateSecret 之后**空档 64 秒**才到达 IAM(CloudTrail),同窗口 CPU 14%、无限流、无 5xx。
 // 64 秒 ≈ TCP 建连 SYN 重传序列 1+2+4+8+16+32(⚪ 推理:AWS SDK v3 缺省 connectionTimeout = 0 = 没有预算,内核重传到第 7 个 SYN 才通);
 // 没有预算就只能干等,而外层 CloudFront 60 秒就 504。这里给**所有**工厂客户端显式预算,让一跳停顿秒级失败,交给 SDK 标准重试
 // (full jitter,有界 maxAttempts)—— 建连阶段失败重试**不会**重复副作用(请求根本没发出去)。
 //   · connectionTimeout 5 s:TCP / TLS 建连,任何服务都不该超过;
 //   · socketTimeout 60 s:已建连但对端持续无字节(连接半死);只给控制面 / 数据面 / 中心件;
 //     🔴 model / central:agentcore **不设**空闲超时 —— 模型推理(Kimi 首字 3–39 s、Converse 整体可到分钟级)与智能体流式响应会在
-//     合法地沉默,空闲超时在那里就是把慢回答误判成故障;它们的墙由模块 55 长操作框架 / 智能体自己的预算管。
+//     合法地沉默,空闲超时在那里就是把慢回答误判成故障;它们的墙由长操作框架 / 智能体自己的预算管。
 //   · 调用方显式给了 requestHandler / maxAttempts(单测、特殊客户端)⇒ 尊重,不覆盖。
 export const SDK_NETWORK_BUDGET = Object.freeze({
   connectionTimeoutMs: 5_000,
@@ -73,17 +72,17 @@ export type DataPlaneService =
   | "kinesis"
   | "dms"
   | "rds"
-  // @kf-batch 41-B115-netadvisor-place —— Redshift provisioned 集群(网络顾问解析目标 VPC / SG):区域服务,按落点 region 建
+  // Redshift provisioned 集群(网络顾问解析目标 VPC / SG):区域服务,按落点 region 建
   | "redshift"
   | "cloudwatch"
   | "ec2"
   | "secrets"
-  // @kf-batch 50-WP30-decommission —— 删除执行环境收口要在**目标区**真查栈 / 经典 MWAA(WP-31 L3:不许在工厂外散建客户端)
+  // 删除执行环境收口要在**目标区**真查栈 / 经典 MWAA(L3:不许在工厂外散建客户端)
   | "cloudformation"
   | "mwaa";
-// 🔴 B-47(序 36 真环境实测):CodeBuild / IAM 曾在这里(候选区组织策略探测)。它们是**主控区控制面**调用,
+// 🔴 CodeBuild / IAM 曾在这里(候选区组织策略探测)。它们是**主控区控制面**调用,
 //   进了数据面集合 ⇒ observe 下每次模拟先用数据面角色发一次被拒、再用任务角色重发 ⇒ IAM 请求量翻倍、限流把候选区
-//   打成「未能核实」(B-46 复发);enforce 下直接不通。控制面一律 `sdkClient("control-plane", …)`,不许回到这里。
+//   打成「未能核实」;enforce 下直接不通。控制面一律 `sdkClient("control-plane", …)`,不许回到这里。
 
 type ClientOf = {
   athena: import("@aws-sdk/client-athena").AthenaClient;
@@ -173,7 +172,7 @@ export function attachPlaceGuard(client: StackLike, clientRegion: string): void 
   );
 }
 
-// ── 序 5:数据面凭证(三态见 dataplane-creds.ts)──────────────────────────────────────────────
+// ──:数据面凭证(三态见 dataplane-creds.ts)──────────────────────────────────────────────
 type StsLike = { send: (c: unknown) => Promise<{ Credentials?: { AccessKeyId?: string; SecretAccessKey?: string; SessionToken?: string; Expiration?: Date } }> };
 let stsClient: StsLike | null = null;
 
@@ -271,7 +270,7 @@ export function dataPlane(place: Place): { [K in DataPlaneService]: () => Promis
   return out as ReturnType<typeof dataPlane>;
 }
 
-// ── 散建客户端的唯一构造入口(WP-31 序 3 收尾:散建迁入工厂)─────────────────────────────
+// ── 散建客户端的唯一构造入口(收尾:散建迁入工厂)─────────────────────────────
 //
 // 业务文件里原来有一百多处自己 `new XxxClient(cfg)`:各自决定区、各自决定挂不挂断言(实际一个都没挂)。
 // 它们不都是「按区缓存的数据面客户端」—— 有平台自己的表 / 身份 / 通知(控制面)、有模型推理、有中心件,
@@ -281,11 +280,11 @@ export function dataPlane(place: Place): { [K in DataPlaneService]: () => Promis
 //     const s3 = sdkClient("data-plane", S3Client, { region });
 //
 //   · 🔴 行为保持:构造参数**原样**交给 SDK(不补 region、不改选项、不缓存 —— 调用方原来是模块单例还是每次新建,照旧);
-//     唯一例外 = 序 57 / B-129 ③ 的网络预算(withNetworkBudget:connectionTimeout / socketTimeout / maxAttempts),调用方没给才补;
+//     唯一例外 = ③ 的网络预算(withNetworkBudget:connectionTimeout / socketTimeout / maxAttempts),调用方没给才补;
 //   · `use` 是**封闭集合**,写明「这个客户端为什么在这个区」(读代码的人一眼分得清「按落点」与「主控区控制面 / 中心件」);
 //   · 只有 `data-plane` 挂越区断言(拦截模式下按调用时的落点核验;观测模式什么都不做)。区不是合法区名(例如用户填错的
 //     数据源区)⇒ 不挂断言、照常构造 —— 与原来 `new` 的行为逐字相同,错误照旧在 send 时由 SDK 报;
-//   · 序 5 按 target 代入角色:凭证注入点就是这一个函数(`buildDataPlane`),而不是一百多处。
+//   · 按 target 代入角色:凭证注入点就是这一个函数(`buildDataPlane`),而不是一百多处。
 
 /** 客户端用途(封闭集合;加一类 = 又多一种「不按落点」的理由,要说清为什么)。 */
 export type ClientUse =
@@ -300,10 +299,10 @@ export type ClientUse =
 
 export function sdkClient<C, A extends unknown[]>(use: ClientUse, Ctor: new (...args: A) => C, ...args: A): C {
   const region = (args[0] as { region?: unknown } | undefined)?.region;
-  // 序 57 / B-129 ③:第一个构造参数并入网络预算(调用方给了就不覆盖);其余参数原样
+  // ③:第一个构造参数并入网络预算(调用方给了就不覆盖);其余参数原样
   const budgeted = [withNetworkBudget(use, (args[0] ?? {}) as Record<string, unknown>), ...args.slice(1)] as unknown as A;
   if (use !== "data-plane" || typeof region !== "string" || !REGION_RE.test(region)) return new Ctor(...budgeted);
-  // 序 5:数据面且区合法 ⇒ 经唯一作者注入凭证(taskrole 模式下与原来 `new` 逐字相同)
+  // 数据面且区合法 ⇒ 经唯一作者注入凭证(taskrole 模式下与原来 `new` 逐字相同)
   return buildDataPlane((cfg) => {
     const c = new Ctor(...([cfg, ...args.slice(1)] as unknown as A));
     attachPlaceGuard(c as unknown as StackLike, region);

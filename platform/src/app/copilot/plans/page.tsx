@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 44 — Copilot 计划中心(独立页,拍板①-A)。左:计划列表;右:选中计划的执行计划表(全展开大图)。
+// Copilot 计划中心(独立页,拍板①-A)。左:计划列表;右:选中计划的执行计划表(全展开大图)。
 // 顶部:一句话诉求输入 → 规划大脑产计划。与 Copilot 抽屉内嵌卡片【复用同一 ExecutionPlanCard 组件】。
 // 安全:产计划=只读发现+落库;确认某步=建草稿+给指引;执行永远由用户去对应页面点(不在本页发生)。
 
@@ -21,7 +21,7 @@ const PLAN_STATUS_COLOR: Record<string, string> = {
 };
 
 export default function CopilotPlansPage() {
-  // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 当前执行范围。
+  // 当前执行范围。
   // 列表按 `?scope=` 过滤(「这个区有哪些计划要落地」);新建时把落点交给服务端。
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
@@ -63,7 +63,7 @@ export default function CopilotPlansPage() {
       const res = await fetch("/api/copilot/plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 🔴 计划面向**当前视角那个区**:
+        // 🔴 计划面向**当前视角那个区**:
         // 它建出来的同步 / 离线 / Flink 草稿都会落在这个区(执行落点走 body,不读 `?scope=`)。
         body: JSON.stringify({ prompt: p, ...(planTargetId ? { targetId: planTargetId } : {}) }),
       });

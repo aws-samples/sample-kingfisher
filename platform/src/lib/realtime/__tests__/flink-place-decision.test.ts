@@ -1,4 +1,3 @@
-// @kf-batch 50-WP31-place-first-class
 // `resolveFlinkPlace`:落点必填 + **主控区也记决策**(D11:决策记账在第一个 await 之前、与分支无关)。
 //
 // 起因(2026-10-03 09:20Z 观测器实测):全局视角列实时作业,一次请求里混着两个区的作业 ⇒ us-west-2 那条记了决策,
@@ -7,7 +6,7 @@
 // 装配层:不 mock 决策账本(context.ts 是真的),只换掉请求存储的来源(Next 之外没有请求存储)。
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-// @kf-batch 50-WP31-place-first-class —— 主控区也读描述符(序 3 收尾):注册表是真外部(DDB 边界),这里给一份主控区描述符。
+// 主控区也读描述符(收尾):注册表是真外部(DDB 边界),这里给一份主控区描述符。
 const h = vi.hoisted(() => ({ targets: new Map<string, Record<string, unknown>>() }));
 vi.mock("@/lib/exec-env/registry", async (orig) => {
   const real: any = await orig();
@@ -48,7 +47,7 @@ describe("resolveFlinkPlace", () => {
     expect(decisionsOfCurrentRequest().decisions).toEqual([{ targetId: "tgt_home", via: "resolveFlinkPlace" }]);
   });
 
-  it("🔴🔴 主控区的值**全部来自描述符**(序 3 收尾:原来走 FLINK 常量)—— 与 env 无关", async () => {
+  it("🔴🔴 主控区的值**全部来自描述符**(收尾:原来走 FLINK 常量)—— 与 env 无关", async () => {
     const p = await resolveFlinkPlace("tgt_home");
     expect(p).toEqual({
       targetId: "tgt_home", region: "us-east-1", account: ACCT,

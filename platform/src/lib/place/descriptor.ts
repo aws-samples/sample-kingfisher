@@ -1,9 +1,8 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 31 第二刀 ② —— 「描述符 → Place」的投影,独立成**零依赖叶子**。
+// 「描述符 → Place」的投影,独立成**零依赖叶子**。
 //
 // 为什么从 resolve.ts 搬出来:请求外的周期循环(reconciler 探活 / 镜像 tick)也要给每个 target 建**显式落点上下文**
 //   (`runInPlace`),否则它们发出的每一次数据面调用在观测清单里都只能记成「未归因 (请求外)」
-//   (第四十三轮 observe 实测:ec2 80 · s3 HEAD 60 · cloudformation 60 · s3tables / glue / redshift-serverless / dms / athena 各 20)。
+//   (ec2 80 · s3 HEAD 60 · cloudformation 60 · s3tables / glue / redshift-serverless / dms / athena 各 20)。
 //   而 `resolve.ts` 经 `data-plane-target` → `privileged-cred` → `project-schema` 碰 node:crypto,
 //   reconciler 所在的 instrumentation 可达面 import 它会让 edge 编译直接炸(instrumentation-bundle-guard)。
 //   ⇒ 投影函数放这里(只 import 类型 + target-id),resolve.ts 从这里 re-export,既有调用方一个字不改。

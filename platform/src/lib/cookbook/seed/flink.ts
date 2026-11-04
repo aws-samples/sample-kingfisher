@@ -1,4 +1,4 @@
-// 模块 45(P45.4)— Flink SQL 工程配方 + 方言规则。平台用 MSAF Flink 1.20 做实时/近实时流计算
+// Flink SQL 工程配方 + 方言规则。平台用 MSAF Flink 1.20 做实时/近实时流计算
 // (见记忆 [[flink-cdc-mysql-s3table]] [[flink-sink-type-s3-vs-s3tables]] [[flink-sql-runner-comment-split-bug]])。
 //
 // 方言规则基于平台【真跑验证过的】样板(lib/realtime/flink-service.ts 的 defaultFlinkSql/mysqlSinkSql/s3TableSinkSql)
@@ -39,7 +39,7 @@ export const FLINK_DIALECT_RULES: DialectRule[] = [
     title: "占位符必须原样保留(勿写死真实值)",
     rule: "源/sink 的敏感值(stream.arn / url / password / 路径)必须用占位符 ${SOURCE_STREAM_ARN}/${REGION}/${OUTPUT_PATH}/${MYSQL_URL} 等," +
       "启动时由平台安全注入(不入库、不硬编码)。别把真实 ARN/连接串/密码写进 SQL。" +
-      // @kf-batch 50-B26-lake-place —— B-26:S3 Tables sink 的表桶原来恒填主控区 ⇒ 别的区的作业把结果写进主控区表桶
+      // S3 Tables sink 的表桶原来恒填主控区 ⇒ 别的区的作业把结果写进主控区表桶
       "🔴 S3 Tables sink 的 'warehouse' 必须保留 ${TABLE_BUCKET_ARN}(库名 ${S3TABLE_DB}):平台按**作业所在区**填该区表桶;" +
       "写死某个 arn:aws:s3tables:... = 不管作业建在哪个区,结果都写进那一个区的表桶。",
     // 纯引导文案(生成前注入):真实值都在单引号字符串里,guard 的 mask 词法保护会遮蔽字符串内容(防误伤),
@@ -88,8 +88,8 @@ export const FLINK_DIALECT_RULES: DialectRule[] = [
     severity: "warn",
   },
   {
-    // 【安全·凭证守卫】MSK/Kafka 源(P42.6b)的连接+认证必须走占位符注入,别把 SASL 明文密码/bootstrap 写进 SQL。
-    // 真实成因(2026-07-27 P42.6b 落地):MSK 源模板用裸占位符 ${KAFKA_AUTH_PROPS}(启动时 resolveMskSource
+    // 【安全·凭证守卫】MSK/Kafka 源的连接+认证必须走占位符注入,别把 SASL 明文密码/bootstrap 写进 SQL。
+    // 真实成因(2026-07-落地):MSK 源模板用裸占位符 ${KAFKA_AUTH_PROPS}(启动时 resolveMskSource
     // 展开 bootstrap+IAM/SCRAM 认证,SCRAM 账密从 Secrets Manager 取,不入库);${KAFKA_TOPIC} 由页面主 topic 注入。
     // 若用户手写 sasl.jaas.config 里塞明文 password="xxx" → 泄密 + 入库,违反密钥红线(与 keep-placeholders 同源)。
     id: "flink.msk-auth-placeholder",
@@ -116,14 +116,14 @@ export const FLINK_DIALECT_RULES: DialectRule[] = [
       "NoClassDefFoundError org/apache/hadoop/conf/Configuration`。这是 Flink 安全令牌模块" +
       "(HadoopFSDelegationTokenProvider)探测系统类路径无 Hadoop 后跳过发 token 的【正常 INFO】," +
       "与 S3 Tables 写入无关(S3 Tables catalog 在用户代码用 user-jar 里的 Hadoop);" +
-      "MSK/Kafka→S3 裸文件也恒打此 INFO,S3 写入走 Flink 自带 S3 plugin(flink-s3-fs),不需裸 hadoop(P42.6b 实证)。" +
+      "MSK/Kafka→S3 裸文件也恒打此 INFO,S3 写入走 Flink 自带 S3 plugin(flink-s3-fs),不需裸 hadoop。" +
       "判断作业真失败要看:作业状态是否 FAILED/RESTARTING、fullRestarts 是否上涨、checkpoint 是否失败(如 412)," +
       "不要把这条 INFO 当故障根因。诊断时应忽略它。",
     severity: "warn",
   },
   {
     // 【纯说明·连通性诊断】MSK/Kafka 源(以及任何 VPC 内数据源:RDS/MSK/自建库)连不上的四层排查法。
-    // 🔴 真实来源(2026-07-28/29 P42.6b 新账号 412 真跑逼出,反复踩坑后定案):往私有 VPC 内 MSK
+    // 🔴 真实来源(2026-07-28 新账号 412 真跑逼出,反复踩坑后定案):往私有 VPC 内 MSK
     //    Serverless(9098/IAM)发/收数,报 `KafkaTimeoutError: Unable to bootstrap from [...:9098]`。
     //    我一度误判为网络问题反复折腾 EC2/Glue/SG,最后 socket 层探测(DNS/TCP/TLS 全通)才隔离出:
     //    网络根本没问题,真因是【客户端库】——kafka-python 的 OAUTHBEARER 对 MSK IAM 握手脆弱连不上,
@@ -185,7 +185,7 @@ export const FLINK_DIALECT_RULES: DialectRule[] = [
   },
   {
     // 【纯说明·部署诊断】MSK/Kafka 源作业启动即 error、lastError=`The specified key does not exist` 的根因。
-    // 🔴 真实根因(2026-07-29 P42.6b 新账号 412 真机逼出,深挖两小时定案):MSK/Kafka 源【强制走模块化拼装】
+    // 🔴 真实根因(2026-07-新账号 412 真机逼出,深挖两小时定案):MSK/Kafka 源【强制走模块化拼装】
     //    (assembleModularUberJar:两个胖包 flink-sql-runner{,-s3t}.jar 均未打 kafka connector,故 kafka 作业
     //    只能从 S3 `flink/modules/` 读 base + kafka + msk-iam-auth(+files/json)模块合并成 uber jar)。
     //    若 `flink/modules/` 为空(部署漏传模块 jar)→ s3GetBuffer 抛 NoSuchKey → CreateApplication 前就失败。
@@ -232,7 +232,7 @@ export const FLINK_DIALECT_RULES: DialectRule[] = [
 
 export const FLINK_RECIPES: Recipe[] = [
   {
-    // 提炼自 2026-07-29 P42.6b 新账号 412 真跑通(Java kafka CLI 发数 sent=6 consumed=6)+ 反复踩坑定案的
+    // 提炼自 2026-07-新账号 412 真跑通(Java kafka CLI 发数 sent=6 consumed=6)+ 反复踩坑定案的
     // 【网络→SG→IAM→客户端库】四层排查法。配套 guard 方言 flink.msk-connectivity-4layers(校验)。
     id: "flink.msk-vpc-connectivity",
     engine: "flink",
@@ -276,7 +276,7 @@ export const FLINK_RECIPES: Recipe[] = [
     engineVersion: "flink-1.20",
   },
   {
-    // 提炼自 2026-07-29 P42.6b 新账号 412 真机(MSK→S3 端到端 11/11 打通前的根因排查)。配套方言 flink.msk-modular-jar-missing。
+    // 提炼自 2026-07-新账号 412 真机(MSK→S3 端到端 11/11 打通前的根因排查)。配套方言 flink.msk-modular-jar-missing。
     id: "flink.msk-startup-error-modular-jar",
     engine: "flink",
     capability: "msk-startup-error",

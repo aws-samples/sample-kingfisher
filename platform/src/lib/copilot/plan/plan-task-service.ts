@@ -1,5 +1,5 @@
-// 模块 44 — Copilot 规划大脑【异步任务】服务层(bgp-copilot-plan-tasks)。
-// 照抄模块38 GenBI 异步化(lib/genbi/tasks.ts)的并发正确性三保证:
+// Copilot 规划大脑【异步任务】服务层(bgp-copilot-plan-tasks)。
+// 照抄GenBI 异步化(lib/genbi/tasks.ts)的并发正确性三保证
 //  1) claimForRun 条件写(pending→running):并发轮询里只有一个执行者能认领,杜绝重复跑 planner。
 //  2) runToken(每次认领新 ULID):终态/心跳写入条件带 runToken,僵尸执行者无法覆盖当前 owner。
 //  3) 终态写入条件 status=running + 300s 天花板 forceTimeout:状态永不回退,绝不永久卡 running。
@@ -31,10 +31,10 @@ export interface PlanTaskParams {
   token: string;
   createdBy: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-17)—— 这次规划面向哪个执行区(顶栏视角)。
+   * 这次规划面向哪个执行区(顶栏视角)。
    * 🔴 必须**落库**:规划是异步任务,执行体靠库里的行重建上下文;只放在内存里的话
    * 执行体拿不到,建出来的 draft 又会全部落回主控区。
-   * 🔴 @kf-batch 50-B39-plan-target:**必填**(原为可选,且 `createPlanTask` 的 Item 里**从没写它** ——
+   * 🔴 **必填**(原为可选,且 `createPlanTask` 的 Item 里**从没写它**
    *   注释说「必须落库」而代码没落 ⇒ 执行体读回的行恒无落点 ⇒ us-west-2 视角的计划查的是主控区目录、
    *   计划记录也被盖成主控区(段 cov COV-B39-PLAN 真环境坐实)。落点由路由**显式决定**后传入,这里不再有缺省。
    */
@@ -49,13 +49,13 @@ export interface PlanTaskRow {
   projectId: string;
   env: string;
   createdBy: string;
-  // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 规划面向的执行区。
-  // 🔴 B-39 之前建的行**没有**这个字段 ⇒ 读侧一律经 `targetOfStamp`(无章 = 主控区,唯一作者),不在别处补缺省。
+  // 规划面向的执行区。
+  // 🔴 此前建的行**没有**这个字段 ⇒ 读侧一律经 `targetOfStamp`(无章 = 主控区,唯一作者),不在别处补缺省。
   targetId?: string;
   // 结果:成功后 planId(前端据此拉计划详情);degraded 标记规划降级。
   planId?: string;
   degraded?: boolean;
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 SPEC §3.3a ⑧:planner 实际用的模型落进任务项(异步无同步信封,靠它回显)。
+  // SPEC §3.3a ⑧:planner 实际用的模型落进任务项(异步无同步信封,靠它回显)。
   usedModelId?: string;
   usedModelSource?: string;
   error?: string;
@@ -85,7 +85,7 @@ export async function createPlanTask(params: PlanTaskParams): Promise<string> {
       projectId: params.projectId,
       env: params.env,
       createdBy: params.createdBy,
-      targetId: params.targetId, // 🔴 B-39:执行体靠这一行重建上下文,漏写 = 回落主控区
+      targetId: params.targetId, // 🔴 执行体靠这一行重建上下文,漏写 = 回落主控区
       createdAt: now.toISOString(),
       ttl: Math.floor(now.getTime() / 1000) + TTL_SECONDS,
     },
@@ -147,7 +147,7 @@ export async function finalize(
   const values: Record<string, unknown> = { ":st": patch.status, ":fin": new Date().toISOString(), ":running": "running", ":tok": runToken };
   if (patch.planId) { sets.push("planId = :pid"); values[":pid"] = patch.planId; }
   if (patch.degraded !== undefined) { sets.push("degraded = :dg"); values[":dg"] = patch.degraded; }
-  // @kf-batch 50-W5-seg2-WP8:实际用的模型(可缺省 —— 老执行体 / 降级路径无值时不写)。
+  // 实际用的模型(可缺省 —— 老执行体 / 降级路径无值时不写)。
   if (patch.usedModelId) { sets.push("usedModelId = :um"); values[":um"] = patch.usedModelId; }
   if (patch.usedModelSource) { sets.push("usedModelSource = :ums"); values[":ums"] = patch.usedModelSource; }
   if (patch.error) { sets.push("#e = :err"); values[":err"] = String(patch.error).slice(0, 500); }

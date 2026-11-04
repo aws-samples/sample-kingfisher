@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // serverless 产物三件的单测:YAML 生成(服务约束)/ 运行时与经典 DAG 的台账·锁字面同源(parity)/ workflow 客户端的重试判据。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -15,14 +14,14 @@ const read = (rel: string) => readFileSync(resolve(SRC, rel), "utf8");
 const spec: ServerlessJobSpec = {
   engine: "redshift", jobId: "01JOB", dagId: "bgp_etl_01JOB__tgt_usw2_a", taskType: "etl-redshift", jobsTable: "bgp-etl-jobs",
   ctrlRegion: "us-east-1", lockAttr: "runLock-tgt_usw2_a", stamp: { projectId: "proj-default", targetId: "tgt_usw2_a" },
-  // @kf-batch 50-WP31-place-first-class —— 序 4(L6):执行落点 = PlaceWire(原 execRegion + workgroup / database / secretArn 合并)
+  // 执行落点 = PlaceWire(原 execRegion + workgroup / database / secretArn 合并)
   place: { v: 1, targetId: "tgt_usw2_a", region: "us-west-2", redshift: { workgroup: "bgp-workgroup-tgt-usw2-a", database: "dev", secretArn: "arn:aws:secretsmanager:us-west-2:123:secret:x" } },
   statements: ["DROP TABLE IF EXISTS t", "CREATE TABLE t AS SELECT 1 AS n"],
 };
 
 describe("YAML 定义(dag-factory;服务约束)", () => {
   it("dag_id 为顶层键;schedule=cron;start_date 在未来;单任务 PythonOperator bgp_runtime.run_job + op_kwargs.spec;不含 callback / trigger_rule", () => {
-    // @kf-batch 50-WP17-serverless-workflow —— 🔴 **键现在一律带引号**(唯一作者 `toYaml`)。
+    // 🔴 **键现在一律带引号**(唯一作者 `toYaml`)。
     //   起因是真环境抓到的一类:YAML 1.1 把 `yes`/`no`/`on`/`off` 读成布尔、纯数字读成整数,
     //   而 task 名与 `setvar` 的变量名都是**用户命名**的键 ⇒ 一个叫 `no` 的节点让依赖指向不存在的 task
     //   (CreateWorkflow 直接 `Workflow validation failed`)。全量加引号 = 无例外的规则;
@@ -63,7 +62,7 @@ describe("🔴 运行时与经典 DAG 同源(台账字段 / 锁属性 / 表名�
       expect(BGP_RUNTIME_PY, f).toContain(f);
       expect(classicEtl, f).toContain(f);
     }
-    // @kf-batch 50-WP15-airflow-serverless(T-12):runId 不再是裸字面量 —— 两侧都必须经**唯一作者** run-key.ts 复合出
+    // runId 不再是裸字面量 —— 两侧都必须经**唯一作者** run-key.ts 复合出
     //   `<raw>#<targetId>` 并同时落 taskTargetKey(否则同一作业绑两区时两行同键、后写盖掉先写;真环境已坐实)。
     expect(BGP_RUNTIME_PY).toContain('"taskTargetKey"');
     expect(BGP_RUNTIME_PY).toContain('_ledger_run_id(spec, ctx)');
@@ -90,7 +89,7 @@ describe("🔴 运行时与经典 DAG 同源(台账字段 / 锁属性 / 表名�
   it("三引擎执行体与经典逐条同口径:Redshift OID 退避重试 4 次 / Glue+EMR 业务日期参数同一张表 / EMR ensure STARTED + sparkSubmit driver", () => {
     expect(BGP_RUNTIME_PY).toContain("could not open relation with OID");
     expect(BGP_RUNTIME_PY).toContain("for attempt in range(4)");
-    // @kf-batch 37-emr-run-date —— 判据改钉事实:业务日期参数不再各手抄 4 个,运行时与两份经典 DAG 都用同一张表
+    // 判据改钉事实:业务日期参数不再各手抄 4 个,运行时与两份经典 DAG 都用同一张表
     //   (bgp_run_param_args / bgp_run_param_argv,取值 = bgp_sync_run_vars);逐日同值由 lib/etl/__tests__/run-params-parity 钉。
     expect(BGP_RUNTIME_PY).toContain("args = bgp_run_param_args(ds)");
     expect(BGP_RUNTIME_PY).toContain("+ bgp_run_param_argv(ds)");
@@ -107,7 +106,7 @@ describe("🔴 运行时与经典 DAG 同源(台账字段 / 锁属性 / 表名�
     // 60 min 上限:软限记 timeout-pending
     expect(BGP_RUNTIME_PY).toContain("SOFT_LIMIT_S = 50 * 60");
     expect(BGP_RUNTIME_PY).toContain('"timeout-pending"');
-    // 不依赖 callback:成败都在任务体内记(T-12 起带真实 startedAt / duration;T-13 起不写 runType —— worker 侧分不出 cron 与手动)
+    // 不依赖 callback:成败都在任务体内记(带真实 startedAt / duration;不写 runType —— worker 侧分不出 cron 与手动)
     expect(BGP_RUNTIME_PY).toContain('_record(spec, run_id, "succeeded", started_at=_iso(started)');
     expect(BGP_RUNTIME_PY).toContain('_record(spec, run_id, "failed", started_at=_iso(started)');
     expect(BGP_RUNTIME_PY).not.toContain('"runType"');
@@ -115,7 +114,7 @@ describe("🔴 运行时与经典 DAG 同源(台账字段 / 锁属性 / 表名�
   });
   it("代码包 key 带内容哈希版本(改运行时 = 新对象;旧 workflow 版本仍指旧对象)", () => {
     expect(BGP_RUNTIME_VERSION).toMatch(/^[0-9a-f]{12}$/);
-    // @kf-batch 50-WP15-airflow-serverless(T-11):key 与包形态归 code-package.test.ts(zip,模块在根)
+    // key 与包形态归 code-package.test.ts(zip,模块在根)
   });
 });
 

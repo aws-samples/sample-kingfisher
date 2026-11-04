@@ -1,6 +1,5 @@
-// @kf-batch 37-B54-ds-user-sg
 // 网络顾问把「数据源」当目标时读它已落库的 networkConfig:用户指定的**全部**安全组都要算上
-// (B-54 起建源落库 securityGroupIds;改网络的 PATCH 早就落这个键),存量行只有 securityGroupId ⇒ 与改动前一致。
+// (建源落库 securityGroupIds;改网络的 PATCH 早就落这个键),存量行只有 securityGroupId ⇒ 与改动前一致。
 // 只 mock 真外部(DDB)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

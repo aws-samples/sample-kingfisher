@@ -1,5 +1,4 @@
-// @kf-batch 50-G1   ← 审核用批次标签(可 grep:`grep -rn "@kf-batch" platform/src infra`)
-// G1(模块 50)—— `targetId` / `targetSlug` / `isHome()` 的**唯一权威**。
+// G1—— `targetId` / `targetSlug` / `isHome()` 的**唯一权威**。
 //
 // 设计合同:docs/design/50-multi-region-execution/SPEC.md §1.1a(格式定稿 + 出口清单)、§1.1(home target)。
 // 本文件属 **G 共享地基批**:只建函数与常量,**不改任何现有行为**(无损、可回滚)。
@@ -215,9 +214,8 @@ export function assertTargetId(v: unknown): string {
   return v;
 }
 
-// @kf-batch 50-WP31-place-first-class
 /**
- * 记录上的执行区章(run 的 `targetId`、数据源的 `ownerTargetId` …)⇒ targetId —— **唯一作者**(WP-31 序 3)。
+ * 记录上的执行区章(run 的 `targetId`、数据源的 `ownerTargetId` …)⇒ targetId —— **唯一作者**。
  * 🔴 无章 = 多区之前写下的存量记录(当年只有主控区一条执行路径)⇒ 主控区:这是**历史事实**,
  *    与数据源存量归属迁移(placement.ts)同一条理由;新记录一律显式盖章,不走这条推理。
  * 🔴 章非法 ⇒ 抛(不许让非法值流到解析层再变成「查不到 = 主控区」)。零 import,前后端共用。
@@ -240,7 +238,7 @@ export function isHome(target: string | { targetId?: string } | null | undefined
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— targetId → **成本签名用的哈希短码**(出口清单第 3 条的唯一实现)。
+ * targetId → **成本签名用的哈希短码**(出口清单第 3 条的唯一实现)。
  *
  * 🔴 为什么不能直接把 targetId 塞进签名:`costSignature` 的 key 段要求 `[A-Z0-9_]`,而 targetId 小写带 `_`,
  *    大写化 + 折叠 `__` 后 `tgt_a_b` 与 `tgt_ab` 这类会撞成同一段 —— 两个区的成本事件被归并进同一个知识库主档。

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-@kf-batch 50-WP7-sync-pushdown
 33-verify-regions-headless.py —— **无头浏览器**(页面驱动)逐区验证**九类**能力。
 
     python3 scripts/33-verify-regions-headless.py --profile temp-account [--targets tgt_usw2_a,tgt_home]
@@ -46,16 +45,16 @@
     | 能力 | manual | dispatch |
     |---|---|---|
     | seed         | `/datasources` 该区示范源在列表里 | ⚠️ 登记:造数只有部署期 Glue 作业 + 本机脚本(22/23-seed-*),产品里没有「在该区下发一次造数」的载体 |
-    | sync         | `/sync` 点「启动」跑到成功 | ⚠️ 登记:载体未交付(WP-26),但页面必须如实说「定时未交付」 |
+    | sync         | `/sync` 点「启动」跑到成功 | ⚠️ 登记:载体未交付,但页面必须如实说「定时未交付」 |
     | etl          | `/etl-jobs` 逐引擎点「立即运行」跑到成功 | 发布调度到该区 + 「触发一次调度」⇒ 运行实例页「触发=自动」那一行 |
     | compute      | EMR Serverless 点「立即运行」跑到成功 | 同上 |
-    | realtime     | 该区的示范流作业**正在运行**;页面上「停止」→「启动」并回到运行中(收口) | 主控区视角一次提交勾多个区 ⇒ **每个区各建一个作业**(WP-18 扇出;夹具不启动、验完即删) |
+    | realtime     | 该区的示范流作业**正在运行**;页面上「停止」→「启动」并回到运行中(收口) | 主控区视角一次提交勾多个区 ⇒ **每个区各建一个作业**(扇出;夹具不启动、验完即删) |
     | orchestration| `/workflow` 在列表里 + 触发一次 | 配 cron 真烧一轮 ⇒ 运行实例页「触发=自动」那一行 |
     | governance   | `/governance` 目录搜得到该区表 + 「运行检查」在该区数仓真跑 | ⚠️ 登记:治理三件(目录同步/质量检查/敏感扫描)只有页面手动触发,**没有调度载体** |
-    | modeling     | `/modeling` 点「码表」「维度建模」Tab 看得到该区示范定义 | 「落地」把定义物化到该区(home ✅ / 非 home = credential-gap WP-11b ⚠️) |
+    | modeling     | `/modeling` 点「码表」「维度建模」Tab 看得到该区示范定义 | 「落地」把定义物化到该区(home ✅ / 非 home = credential-gap ⚠️) |
     | genbi        | 该区的示范会话卡片在「我的卡片」里,且能**打开续聊** | ⚠️ 登记:没有定时问数 / 订阅式报告这样的载体;判别方式 = 调度清单里不出现问数对象 |
 
-  🔴 **realtime 与 genbi 是 2026-09-19 才补进矩阵的(WP-27)**。补之前它们只由「自造夹具、验完删净」
+  🔴 **realtime 与 genbi 是 2026-09-19 才补进矩阵的**。补之前它们只由「自造夹具、验完删净」
     的硬门段覆盖 ⇒ ① 用户切过去看不到跑着的对象;② **矩阵里没有的那一类 = 默认豁免**。
     代价实证:实时计算在第二个区其实是废的(Kinesis 建流 / 造数 / Flink 日志组三处 IAM 都钉死在
     部署区,SimulatePrincipalPolicy 坐实 us-west-2 全 implicitDeny),而全量硬门一直是绿的。
@@ -102,7 +101,7 @@ SOURCE = "scripts/33-verify-regions-headless.py"
 row_state, all_windows, Rep = L.row_state, L.all_windows, L.Rep
 
 
-# ── B-09 载体定义落后:呈现面判据(2d)─────────────────────────────────────────
+# ── 载体定义落后:呈现面判据(2d)─────────────────────────────────────────
 WF_TABLE = "bgp-workflows"
 
 
@@ -181,7 +180,7 @@ def _set_wf_cron(ddb, row: dict, cron: str) -> None:
 async def _drift_badge(pg, base: str, tid: str, name: str) -> dict:
     """开调度配置页、用产品自己的「名称」筛选缩到那一行,逐行读它的徽标。
 
-    🔴 为什么用筛选而不是翻页找:本轮 B-20 的根因就是「判据只读第一页」的反面 ——
+    🔴 为什么用筛选而不是翻页找:本轮该缺陷的根因就是「判据只读第一页」的反面
       示范作业被 10 行验收残留挤到第 2 页,产品每一层都是对的而判据红了。
       用产品自己的筛选定位,既不依赖行数也不依赖排序;而「用户找得到这一行吗」
       是 2c 在管的事(那一条刻意不筛选),两条判据各钉一层,不互相顶替。
@@ -223,8 +222,8 @@ async def _drift_badge_until(pg, base: str, tid: str, name: str, pred, budget_s:
 
 RESIDUE_PREFIXES = ("slsw-cron-", "wf2r-")
 
-#: 🔴🔴 **实时计算页上的「验收残留」前缀**(B-20 根治)。
-#   B-20 的真相:产品每一层都对(AWS 应用 RUNNING · 台账 running · 接口回 11 行含目标行),
+#🔴🔴 **实时计算页上的「验收残留」前缀**(根治)。
+#该缺陷的真相:产品每一层都对(AWS 应用 RUNNING · 台账 running · 接口回 11 行含目标行),
 #   坏在页面主列表用的是 antd **默认 `pageSize=10`**,而**10 行验收残留**把示范作业按
 #   `createdAt` 降序挤到了**第 11 位 = 第 2 页** ⇒ 用户切过去「什么都没看见」。
 #   ⇒ 这是 `all-capabilities-visible-in-every-region` 的**反面**:
@@ -238,7 +237,7 @@ RESIDUE_JOB_PREFIXES = ("DispatchCheck-RT-", "scq-flink-", "dc-fixture-", "kf-pr
 async def table_rows_all_pages(pg, budget_pages: int = 12) -> list[str]:
     """把一张 antd 表**所有页**的行文本读回来(用产品自己的「下一页」翻)。
 
-    🔴 为什么需要它(B-20 的另一半):判据只读第一页 ⇒ 对象被挤到第 2 页就假红。
+    🔴 为什么需要它(该缺陷的另一半):判据只读第一页 ⇒ 对象被挤到第 2 页就假红。
       但**不许**因此把判据放宽成「存在于某处」就算过 —— 那会丢掉「用户看不见」这层语义。
       ⇒ 分两层:本函数给「产品能力真值」(它到底在不在),
         而「第一页看不看得见」由另一条判据(`8e` 残留清零)守住。
@@ -384,7 +383,7 @@ async def drift_badge_criteria(pg, base: str, tid: str, pfx: str, ddb, rep: Rep,
             await _drop_drift_fixture(pg, ddb, tid, row, rep)
 
 
-#: 🔴 B-09 自造夹具的名字前缀:落在 `RESIDUE_PREFIXES` 的 `wf2r-` 口径里 ⇒ 万一本轮被杀在删除之前,
+#🔴 自造夹具的名字前缀:落在 `RESIDUE_PREFIXES` 的 `wf2r-` 口径里 ⇒ 万一本轮被杀在删除之前,
 #   下一轮 `_residue_fixture` 会把它当残留复用,`36-fixture-ledger.py` 也会把它归为 fixture(不会被当成示范对象)。
 SELF_DRIFT_PREFIX = "wf2r-b09drift-"
 
@@ -429,7 +428,7 @@ async def _make_drift_fixture(pg, base: str, ddb, tid: str, rep: Rep) -> dict | 
     """
     await goto_scope(pg, base, SCHED_PATH, tid, settle="", budget_s=25)
     name = f"{SELF_DRIFT_PREFIX}{tid[len('tgt_'):]}-{time.strftime('%m%d%H%M%S', time.gmtime())}"
-    body = {"name": name, "description": "B-09 判据的一次性夹具(用完即删)", "targetId": tid,
+    body = {"name": name, "description": "判据的一次性夹具(用完即删)", "targetId": tid,
             "cronExpression": "0 3 * * *",
             "dagDefinition": {"nodes": [{"id": "n1", "type": "sql", "data": {"sql": "SELECT 1"}}], "edges": []}}
     why = ""
@@ -482,10 +481,10 @@ async def _drop_drift_fixture(pg, ddb, tid: str, row: dict, rep: Rep) -> None:
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# 5h 🔴🔴 **B-19:治理页的取数,陈旧响应一律不许赢**(观察面 = 「数据分级」的字段清单)
+# 5h 🔴🔴 **:治理页的取数,陈旧响应一律不许赢**(观察面 = 「数据分级」的字段清单)
 #
-# 【5e 之外为什么还要这一条】`5e` 判的是**目录搜索**那一条路(B-10 / B-06 的真根)。
-#   B-19 是**另外 12 条路**:血缘 / 影响分析 / 授权 / 分级 / 质量规则 / 质量结果 / 跑检查 /
+# 【5e 之外为什么还要这一条】`5e` 判的是**目录搜索**那一条路(该缺陷的真根)。
+#   是**另外 12 条路**:血缘 / 影响分析 / 授权 / 分级 / 质量规则 / 质量结果 / 跑检查 /
 #   加规则 / 敏感扫描 / 采纳 / 同步 schema —— 当时它们**一条闸都没有**。
 #   结构判据(`catalog-search-race.test.ts` 的棘轮 12 → 0)+ 变异 4/4 钉住的是「**代码里有那个比较**」;
 #   本仓纪律要求「每修一个 bug 必须在无头判据里留一条」,因为只有行为判据能钉
@@ -622,7 +621,7 @@ async def _class_open(pg, fqn: str, wait_settled: bool = True, budget_s: int = 4
 
 
 async def class_race_criterion(pg, base: str, tid: str, rep: Rep, shots: str) -> None:
-    """B-19 的**行为判据**:人为制造确定竞态,断言最终显示的是**后一次**点的那张表。"""
+    """陈旧响应竞态的**行为判据**:人为制造确定竞态,断言最终显示的是**后一次**点的那张表。"""
     if _CLASS_RACE["verified_on"]:
         log(f"[headless] {tid}:陈旧响应竞态(平台级)已在 {_CLASS_RACE['verified_on']} 端到端验过,本区跳过")
         return
@@ -633,7 +632,7 @@ async def class_race_criterion(pg, base: str, tid: str, rep: Rep, shots: str) ->
         #    验收残留表往往只有 1 个占位列,拿它们当夹具必然「两张表字段集一模一样」(本区实测:
         #    未过滤的第一页前 6 行全是 `home_orders_*`、各 1 列 ⇒ 第一版夹具就这么废了)。
         # 🔴 2026-10-11 第二十轮:只看**第一页** ⇒ 前面各段新建的表把 `ad_channels` 挤到后面,第一页只剩 1 张
-        #   ≥2 列的表 ⇒ 夹具造不出(产品是对的)。判别力不许押在「第一页恰好有什么」上(B-19 v1.10 同一教训)
+        #   ≥2 列的表 ⇒ 夹具造不出(产品是对的)。判别力不许押在「第一页恰好有什么」上(v1.10 同一教训)
         #   ⇒ 用产品自己的分页逐页找,直到**同一页**凑出 ≥2 张(竞态的两次点击要在同一页上发生)。
         cand, pages_seen = [], 0
         while True:
@@ -753,12 +752,12 @@ async def class_race_criterion(pg, base: str, tid: str, rep: Rep, shots: str) ->
     except Exception as e:
         ok, ev = False, f"🔴 判据自身出错(不算过关):{str(e).splitlines()[0][:220]}"
     _CLASS_RACE["why"] = ev
-    rep.add(tid, "5h 🔴🔴 治理页取数:**陈旧响应不许赢**(B-19;观察面=数据分级的字段清单,"
+    rep.add(tid, "5h 🔴🔴 治理页取数:**陈旧响应不许赢**(观察面=数据分级的字段清单,"
                  "人为延迟先点的那张表 ⇒ 竞态确定发生)", ok, ev, cap="governance", mode="manual")
 
 
 
-# ── CAP-SEED:在该区下发一次造数(序 35 交付 4d2ae48)─────────────────────────────
+# ── CAP-SEED:在该区下发一次造数(交付 4d2ae48)─────────────────────────────
 #   主控区造数 = DROP + 重建源库 7 张示范表(5–8 分钟);其它区 = 重写该区湖里的 Parquet + 重建 Glue 表。
 #   🔴 造数是**确定性重建**,行数不变 ⇒ 判据不看「行数增长」,看「该区造数作业有一次 SUCCEEDED、开始于触发之后」(真值)
 #      + 运行实例页该区那一行到成功(页面)。
@@ -936,7 +935,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     rep.add(tid, "1 数据源页:该区的示范数据源在列表里", n_src > 0,
             f"页面上 {pfx}-* 出现 {n_src} 次" + ("" if n_src else "(空 = 用户切过来看不到东西)"),
             cap="seed", mode="manual")
-    # 1b 🔴 造数「立即造数」(CAP-SEED 序 35 交付;原「产品无载体」登记 CAP-SEED-DISPATCH-NOCARRIER 关闭)
+    # 1b 🔴 造数「立即造数」(CAP-SEED 交付;原「产品无载体」登记 CAP-SEED-DISPATCH-NOCARRIER 关闭)
     await seed_run_once_cell(pg, base, t, rep, shots, home_region)
 
     # 2 同步
@@ -988,9 +987,9 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     rep.add(tid, "2c 调度配置页:该区的示范任务在清单里(下发载体在)", n_sched > 0,
             f"调度配置页上 {pfx}-* 出现 {n_sched} 次")
 
-    # 2d 🔴🔴 B-09 呈现面:「已发布的载体上那份定义,还是当前生成器产出的吗」
+    # 2d 🔴🔴 呈现面:「已发布的载体上那份定义,还是当前生成器产出的吗」
     #     —— 改了产物生成器,存量载体**不会自动重发**;那不是一个 bug,是一台产 bug 的机器
-    #     (本轮最重的 B-01 就是从它的现场挖出来的)。机制在库里而界面上看不见 = 写了等于没写。
+    #     (本轮最重的就是从它的现场挖出来的)。机制在库里而界面上看不见 = 写了等于没写。
     # 🔴 四层都要钉,缺一层就不成立:
     #   ① 现网是 ok(否则下面「造完是 stale」可能是**恒 stale**,和恒 ok 一样没判别力);
     #   ② 造一个真落后的载体 ⇒ 那一行显示「载体需重新发布」,**且那一行不再有绿标**;
@@ -1017,7 +1016,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     #   主控区的卡片**刻意一个区标都不挂**(产品明示:存量作业全是 home,挂满标反而把要注意的那几个淹没),
     #   所以「home 页面上要出现 tgt_home」是我钉错了形状(真环境实测 home 页 tgt_home 出现 0 次)。
     #
-    # 🔴🔴 第二次订正(2026-09-19 夜,WP-27):这条原来在**整页文本**上做负向断言(「页面上不出现
+    # 🔴🔴 第二次订正(2026-09-19 夜):这条原来在**整页文本**上做负向断言(「页面上不出现
     #   别的区的 targetId」)—— 当场被打红,而**页面是对的**:同一页上有几个**多区绑定**的对象
     #   (`ui-*` 夹具绑了 home + usw2),页面给它挂上**所有绑定区**的标签,那正是「不丢东西」的
     #   护栏在起作用。整页负向断言 = **用邻居的数据把自己判红**(与「字符窗口跨行 ⇒ 用邻居的数据
@@ -1202,7 +1201,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
             cap="governance", mode="manual")
 
     # ══════════════════════════════════════════════════════════════════════
-    # 5e 🔴🔴 **陈旧响应不许赢**(B-10;B-06 的真根就是它)
+    # 5e 🔴🔴 **陈旧响应不许赢**(该缺陷的真根就是它)
     #
     # 【为什么这条判据必须人为制造竞态】竞态的行为判据**天生不稳定**:要它红,必须让
     #   「先发的那次」比「后发的那次」**晚回来**,而返回顺序不由判据控制 ——
@@ -1230,7 +1229,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
 
         # ① 🔴🔴 **判别词必须从这个区自己的目录里推出来,不许写死。**
         #   上一版写死 `SHORT="dws"`,在 usw2 上只匹配到 1 行 ⇒ `only_short` 为空 ⇒
-        #   这条判据**自己报「没有判别力」而红**(第五轮硬门实测)。判别力不能依赖
+        #   这条判据**自己报「没有判别力」而红**。判别力不能依赖
         #   「某个区恰好有好几张同前缀的表」这种运气。
         #   闭合式做法:先取该区未过滤的一页名字,找一个**至少匹配两行**的公共前缀 ——
         #   SHORT = 那个前缀,LONG = 其中某一行的全名 ⇒ `only_short` 必非空(构造保证)。
@@ -1297,13 +1296,13 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     except Exception as e:
         race_ok, race_ev = False, f"🔴 判据自身出错(不算过关):{str(e).splitlines()[0][:160]}"
     rep.add(tid, "5e 🔴🔴 目录搜索:**陈旧响应不许赢**(人为延迟先发那次 ⇒ 竞态确定发生,判别力不靠运气;"
-                 "B-06 的真根就是它)", race_ok, race_ev,
+                 "「某区视角显示别的区的数仓」的真根就是它)", race_ok, race_ev,
             cap="governance", mode="manual")
 
     # ══════════════════════════════════════════════════════════════════════
-    # 5f 🔴🔴 **B-18:目录搜索不许影响别的页签的「可选资产」清单。**
+    # 5f 🔴🔴 **:目录搜索不许影响别的页签的「可选资产」清单。**
     #
-    # 【这条判据是怎么来的】B-16(`5b` 超时)我原先判成「纯判据问题,不许改产品」。
+    # 【这条判据是怎么来的】(`5b` 超时)我原先判成「纯判据问题,不许改产品」。
     #   决定性对照实验(同一浏览器同一次运行,只差「中间搜没搜」)推翻了它:
     #     A 组 全新进页面        ⇒ 质量页签下拉输入探针表 ⇒ **1 条,选得到**
     #     B 组 先在目录里搜别的词 ⇒ 同一串操作           ⇒ **空态,选不到**
@@ -1357,16 +1356,16 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
         f_ev = (f"搅浑用的词={other!r}(搜出 {len(_fn)} 张、确认不含探针表)· "
                 f"随后在**数据质量**页签搜 {probe!r} ⇒ 候选 {_cnt} 条 · 空态节点={_empty} ⇒ "
                 + ("候选清单没被目录搜索污染" if f_ok
-                   else "🔴 **选不到了** —— 资产候选清单被「目录搜索结果」污染(B-18:一份 state 两个语义)"))
+                   else "🔴 **选不到了** —— 资产候选清单被「目录搜索结果」污染(一份 state 两个语义)"))
     except Exception as e:
         f_ok, f_ev = False, f"🔴 判据自身出错(不算过关):{str(e).splitlines()[0][:160]}"
-    rep.add(tid, "5f 🔴🔴 目录搜索**不许**影响别的页签的可选资产清单(B-18:`catalogData` 一份 state 两个语义)",
+    rep.add(tid, "5f 🔴🔴 目录搜索**不许**影响别的页签的可选资产清单(`catalogData` 一份 state 两个语义)",
             f_ok, f_ev, cap="governance", mode="manual")
 
     # ══════════════════════════════════════════════════════════════════════
     # 5g 🔴 **进治理页只取一次目录数据**,且候选清单真的会就绪。
     #
-    # 【为什么非要一条行为判据】B-18 的**第一版修法**是「初始化各调一次」
+    # 【为什么非要一条行为判据】该缺陷的**第一版修法**是「初始化各调一次」
     #   (`searchCatalog("")` + `loadAllAssets()`),当时 11 条结构判据**全绿**,
     #   而带时间戳的真环境测量当场否证:
     #     1.6s REQ keyword=&scope=…   ← 两条请求**参数逐字节相同**
@@ -1414,10 +1413,10 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
                    " ⇒ 🔴 **多发了参数相同的请求**:它们会在服务端串行、互相拖慢,首屏候选清单更晚就绪"))
     except Exception as e:
         g_ok, g_ev = False, f"🔴 判据自身出错(不算过关):{str(e).splitlines()[0][:160]}"
-    rep.add(tid, "5g 🔴 进治理页**只取一次**目录数据,且候选清单会就绪(B-18 第二刀:别拿多一次请求换语义分离)",
+    rep.add(tid, "5g 🔴 进治理页**只取一次**目录数据,且候选清单会就绪(别拿多一次请求换语义分离)",
             g_ok, g_ev, cap="governance", mode="manual")
 
-    # 5h 🔴🔴 B-19:陈旧响应不许赢(见 `class_race_criterion` 的整段理由)。
+    # 5h 🔴🔴 陈旧响应不许赢(见 `class_race_criterion` 的整段理由)。
     #    🔴 刻意放在 5g **之后**:5g 刚重进过一次页面 ⇒ 目录是**未过滤**的一页(5f 搅浑过搜索框),
     #      而这条判据要从未过滤的目录里挑夹具表。
     await class_race_criterion(pg, base, tid, rep, shots)
@@ -1507,13 +1506,13 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     rep.add(tid, "5b 🔴 治理页「运行检查」在**该区数仓**上真跑出结果(空规则的假绿已堵)", qok, qev,
             cap="governance", mode="manual")
 
-    # 5c 治理的「下发执行」:🔴 序 33 ③ 载体已交付(WP-28 平台动作节点 + 定时治理任务)⇒ 登记关闭,
+    # 5c 治理的「下发执行」:🔴 载体已交付(平台动作节点 + 定时治理任务)⇒ 登记关闭,
     #     改成真跑判据 —— 装弹在 dispatch_arm ④(页面建定时任务 → 绿标看产物),收弹在 dispatch_harvest
     #     (/monitor 等「触发=自动 + 该区 + 成功」那一行)。
 
     # 6 建模:🔴 默认停在「数仓分层」Tab,码表/维度建模的表格**根本没渲染** ⇒ 必须点 Tab 再读。
     #   manual  = 该区的示范定义在列表里看得见
-    #   dispatch= 「落地」把定义物化到该区(控制面 → 该区数据面);非 home 现状 = credential-gap(WP-11b)
+    #   dispatch= 「落地」把定义物化到该区(控制面 → 该区数据面);非 home 现状 = credential-gap
     await goto_scope(pg, base, "/modeling", tid, settle="", budget_s=10)
     seen_ct = seen_dim = False
     txt_ct = txt_dim = ""
@@ -1533,7 +1532,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
             cap="modeling", mode="manual")
 
     # 6b 落地(= 建模的下发执行):逐区观测态由 `LandedTags` 渲染成 `<区>: <状态>` 的标签
-    #   🔴 第一版把非 home 写成**硬编码 gap**,那条判据永远不会变绿 —— WP-11b 交付了它也照样 ⚠️,
+    #   🔴 第一版把非 home 写成**硬编码 gap**,那条判据永远不会变绿 —— 交付了它也照样 ⚠️,
     #     等于「登记」变成了「免检」。而且它扫的字样(credential / 凭证)页面上根本不出现:
     #     UI 真正渲染的是「⊘ 缺写入通道」(LAND_TAG)。两处都改成**按页面真文本逐区读**:
     #     已落地(✓)⇒ ok;⊘ 缺写入通道 ⇒ gap(登记);其它(未落 / drift / 失败)⇒ 判红。
@@ -1547,10 +1546,10 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
         rep.add(tid, "6b 建模落地:定义已物化到主控区(行上逐区观测态 = ✓)", landed_ok,
                 f"该区标签文本={st_txt!r}(应以 ✓ 开头)", cap="modeling", mode="dispatch")
     elif landed_ok:
-        rep.add(tid, "6b 🎉 建模落地到非主控区**已成立**(WP-11b 窄权写通道已交付)", True,
+        rep.add(tid, "6b 🎉 建模落地到非主控区**已成立**(窄权写通道已交付)", True,
                 f"该区标签文本={st_txt!r} —— 可以把这一格的登记项关掉了", cap="modeling", mode="dispatch")
     elif cred_gap:
-        rep.add(tid, "6b 建模落地到非主控区(登记:WP-11b 窄权写通道未交付)", False,
+        rep.add(tid, "6b 建模落地到非主控区(登记:窄权写通道未交付)", False,
                 f"该区标签文本={st_txt!r} = ⊘ 缺写入通道 —— 七类能力里唯一还不成立的那类,如实登记",
                 gap=True, cap="modeling", mode="dispatch", reg="CAP-MODELING-DISPATCH-WP11B")
     else:
@@ -1559,7 +1558,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
                 cap="modeling", mode="dispatch")
 
     # ══════════════════════════════════════════════════════════════════════════
-    # 8 实时计算(@kf-batch 50-WP27-9cap-matrix)
+    # 8 实时计算
     # 🔴 与其它能力不同:流式作业的「成功」**不是终态 succeeded,而是持续运行中**。
     #   manual = 人在该区页面上对这一个作业点一次「停止」再点「启动」,并**等它回到运行中**
     #            (收口断言:不是「点了没报错」,而是回到稳态 —— 示范对象跑完还得在跑)。
@@ -1569,7 +1568,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     rt_name = f"{pfx}-RT-OrderAmount1m"
     txt = await goto_scope(pg, base, "/realtime-compute", tid, settle=rt_name, budget_s=40)
     await shot(pg, shots, f"{tid}-realtime")
-    # 🔴🔴 B-20:**不只读第一页**。第一页先读(它同时告诉我「用户一眼看不看得见」),
+    # 🔴🔴 **不只读第一页**。第一页先读(它同时告诉我「用户一眼看不看得见」),
     #   第一页没有就用产品自己的分页翻下去 —— 「产品能力在不在」与「用户一眼看不看得见」
     #   是**两件事**,分两条判据钉(可见性由 `8e` 残留清零守住,不许靠放宽 `8` 蒙过去)。
     rt_rows = await row_texts(pg, rt_name)
@@ -1586,7 +1585,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
             f"首行={' '.join((rt_rows[0] if rt_rows else '').split())[:110]!r}",
             cap="realtime", mode="manual")
 
-    # 8e 🔴🔴 **建了必撤**(B-20 的根治那一半):实时计算页上不许留验收残留。
+    # 8e 🔴🔴 **建了必撤**(该缺陷的根治那一半):实时计算页上不许留验收残留。
     #   残留本身不影响产品对不对,但它**把示范对象挤出第一页** ⇒ 用户切过来「什么都没看见」。
     #   🔴 闭合式按**前缀**查(不是「本轮建的删掉就算」):那 3 个 `DispatchCheck-RT-*` 正是
     #     以前某几轮**删失败**留下的,而当时清理失败只写 log、没有判据 ⇒ 静默累积。
@@ -1660,7 +1659,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
                 ok, ev, cap="realtime", mode="manual")
 
     # ══════════════════════════════════════════════════════════════════════════
-    # 9 智能问数(@kf-batch 50-WP27-9cap-matrix)
+    # 9 智能问数
     #   manual = 在该区页面上真问一次 → 有答案 → 「保存对话」存成卡片 → 在「我的卡片」里
     #            **打开续聊**(三步都在页面上;只核「有历史」等于没验用户看得见的那一面)。
     #   dispatch = 产品**没有载体**(没有定时问数 / 订阅式报告)⇒ 如实登记,判据带判别力(见 9c)。
@@ -1719,7 +1718,7 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
     rep.add(tid, "9b 🔴 智能问数的单独执行:该区的示范会话卡片在「我的卡片」里,且能打开续聊",
             card_ok, card_ev, cap="genbi", mode="manual")
 
-    # 9c 问数的「下发执行」:🔴 序 33 ③ 载体已交付(问数卡片定时刷新)⇒ 登记关闭,改成真跑判据 ——
+    # 9c 问数的「下发执行」:🔴 载体已交付(问数卡片定时刷新)⇒ 登记关闭,改成真跑判据
     #     装弹在 dispatch_arm ⑤(给 9b 那张示范卡配定时 → 绿标),收弹在 dispatch_harvest
     #     (监控页名字是「问数卡片 <cardId 末 6 位>」,标题只留在该区 ⇒ 按这个名字过滤,不能按 pfx)。
 
@@ -1737,13 +1736,12 @@ async def verify_target(pg, base: str, t: dict, rep: Rep, shots: str, run_sync: 
 
 
 # ── 实时计算的「下发执行」(一次提交 → 每个区各建一个)────────────────────────
-# @kf-batch 50-WP27-9cap-matrix
 # 🔴 为什么实时计算的 dispatch **不能**照抄别的能力:流式作业没有「到点跑一次」的语义 ——
 #   它是长期运行的。所以「不由人在该区逐个点、而由平台把活派到该区」这件事,在实时这一类上
-#   已交付的载体就是 **WP-18 的一次提交多区扇出**:人在**主控区视角**勾上多个执行区,平台在
+#   已交付的载体就是 **一次提交多区扇出**:人在**主控区视角**勾上多个执行区,平台在
 #   **每个区各建一个作业**(MSAF application 是区域资源,一区一个)。判据就钉这个事实。
 #
-# 🔴 判别力:产品一旦退回「只建一个」或「都建在主控区」,这条当场红(WP-18 之前正是那样)。
+# 🔴 判别力:产品一旦退回「只建一个」或「都建在主控区」,这条当场红(此前正是那样)。
 # 🔴 为什么这一相用**夹具**而不是示范对象:示范对象已经在各区跑着(那是 manual 那一格的事实);
 #   而「一次提交扇出」必须**真的提交一次**才能验。夹具刻意**不启动** ⇒ 不建任何 MSAF 应用、
 #   零 AWS 成本、验完当场从页面上删掉,不留残留(示范对象照旧长期保留,用户眼里不空)。
@@ -1813,8 +1811,8 @@ async def verify_realtime_dispatch(pg, base: str, targets: list[dict], rep: Rep,
             created_names[tid] = want_name
 
     # 清夹具:从**页面上**删(顺带把删除这条路也走一遍);示范对象不动
-    # 🔴🔴 **删净这件事必须有判据**(B-20 的直接根因):这里原来失败只写 `log`
-    #   ⇒ 判据压根看不见清理失败 ⇒ 失败就静默累积。B-20 那 3 个 `DispatchCheck-RT-*` 残留
+    # 🔴🔴 **删净这件事必须有判据**(该缺陷的直接根因):这里原来失败只写 `log`
+    #   ⇒ 判据压根看不见清理失败 ⇒ 失败就静默累积。那 3 个 `DispatchCheck-RT-*` 残留
     #   就是这么来的,而它们把示范作业挤到了第 2 页 ⇒ 用户切过去「什么都没看见」。
     #   ⇒ 收口断言 = **最终状态**(列表里真没了),不是「我点过删除」。
     teardown_fail: list[str] = []
@@ -1850,7 +1848,7 @@ async def verify_realtime_dispatch(pg, base: str, targets: list[dict], rep: Rep,
                 not teardown_fail,
                 (f"{len(created_names)} 个夹具全部删净" if not teardown_fail else
                  f"🔴 {len(teardown_fail)} 个没删净:" + " / ".join(teardown_fail)
-                 + " ⇒ 残留会把示范对象挤出第一页(B-20)"))
+                 + " ⇒ 残留会把示范对象挤出第一页"))
 
 
 # ── 下发执行(dispatch)────────────────────────────────────────────────────────
@@ -1977,7 +1975,7 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
             await pg.wait_for_timeout(5000)
         rows_ = await row_texts(pg, sync_name)
         line = " ".join((rows_[0] if rows_ else "").split())
-        # @kf-batch 50-WP26-sync-schedule-carrier —— 🔴 **载体已交付,这一格从「如实登记」改回真跑**。
+        # 🔴 **载体已交付,这一格从「如实登记」改回真跑**。
         #   旧判据钉的是**诚实**(页面必须说「定时未交付」),并刻意写成「载体一交付就变红,逼着改回真跑」
         #   —— 它在 2026-09-20 真的红了,所以现在按设计改判。
         #   新判据两段:
@@ -1998,13 +1996,13 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
     await shot(pg, shots, f"{tid}-dispatch-arm-sync")
     rep.add(tid, "3 🔴 同步的**下发执行**:载体真挂上了(绿标看的是**产物** deployments.workflowArn,"
                  "不是 scheduleEnabled 这个愿望字段;旧的「定时未交付」文案必须已消失)",
-            ok_arm, f"{ev} —— WP-26:按任务绑定的每个执行范围各发一份**单节点 sync 工作流**到该区的 "
+            ok_arm, f"{ev} —— 按任务绑定的每个执行范围各发一份**单节点 sync 工作流**到该区的 "
                     f"MWAA Serverless;真跑那一半由下面的「收弹」判据等定时烧出来",
             cap="sync", mode="dispatch")
     if ok_arm:
         armed[sync_name] = "sync"     # ⇒ dispatch_harvest 去 /monitor 等「触发=自动 + 该区 + 成功」
 
-    # ④ 治理(序 33 ③,CAP-GOV):治理页「定时治理任务」页签建一个**长期示范对象**(目录同步 · 只刷 Glue,
+    # ④ 治理(CAP-GOV):治理页「定时治理任务」页签建一个**长期示范对象**(目录同步 · 只刷 Glue,
     #    零数仓唤醒成本)。已存在就复用;每次都把 cron 拉到每 N 分钟并启用(收完还原成每天)。
     #    🔴 绿标判据看**产物**(gov-schedule-armed = deployments 里真有 workflowArn),不看 scheduleEnabled。
     gov = f"{pfx}-GovCatalog"
@@ -2050,12 +2048,12 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
         ev = f"页面交互异常:{str(e)[:140]}"
     await shot(pg, shots, f"{tid}-dispatch-arm-governance")
     rep.add(tid, "5c 🔴 治理的**下发执行**:页面建定时治理任务(目录同步)⇒ 载体真挂上了(绿标看产物 deployments.workflowArn)",
-            ok_gov, f"{ev} —— WP-28:单节点 platform-action 工作流发布到**该区**的 MWAA Serverless;真跑由「收弹」等定时烧出来",
+            ok_gov, f"{ev} —— 单节点 platform-action 工作流发布到**该区**的 MWAA Serverless;真跑由「收弹」等定时烧出来",
             cap="governance", mode="dispatch")
     if ok_gov:
         armed[gov] = "governance"
 
-    # ⑤ 问数(序 33 ③,CAP-GENBI):给 9b 那张示范卡配「每 N 分钟」定时刷新(刷新同一张卡,不占额度)。
+    # ⑤ 问数(CAP-GENBI):给 9b 那张示范卡配「每 N 分钟」定时刷新(刷新同一张卡,不占额度)。
     ask_title = f"{pfx}-Ask-"
     ev, ok_card, card_name = "", False, ""
     try:
@@ -2177,7 +2175,7 @@ async def dispatch_restore(pg, base: str, t: dict, armed: dict) -> None:
             log(f"[restore] {wf} cron → {CRON_DAILY}")
         except Exception as e:
             log(f"[restore] 🔴 {wf} 还原失败(账号里还留着高频定时!):{str(e)[:120]}")
-    # 序 33 ③:治理定时 / 卡片定时 —— 还原成每天(治理)/ 停用(卡片);走页面同源的那两个接口
+    # 治理定时 / 卡片定时 —— 还原成每天(治理)/ 停用(卡片);走页面同源的那两个接口
     for name, cap_key in armed.items():
         if cap_key not in ("governance", "genbi"):
             continue
@@ -2276,24 +2274,24 @@ async def main() -> int:
                     rep.emit_matrix(a.emit_matrix, [x["targetId"] for x in targets], SOURCE)
                 except Exception as e2:
                     log(f"[headless] ⚠️ 增量落盘失败(不影响继续跑):{str(e2)[:120]}")
-        # 🔴🔴 B-09 呈现面的**总判据**:`2d②..⑤` 判的是平台级前端逻辑(不随区变)⇒ 至少一个区
+        # 🔴🔴 呈现面的**总判据**:`2d②..⑤` 判的是平台级前端逻辑(不随区变)⇒ 至少一个区
         #   端到端验过就成立;但**一个区都没验到就必须红** —— 否则「本区没夹具就跳过」会静默
         #   退化成「这条机制从来没验过」(本仓的元 bug:机制装上了,而守它的那条路径没人走)。
         if not a.skip_verify and targets:
             ok_ui = bool(_DRIFT_UI["verified_on"])
             rep.add(targets[0]["targetId"],
-                    "2d-UI 🔴🔴 B-09 呈现面端到端验过(落后⇒显示需重发且无绿标 → 点出路 → 回最新 → 收口)",
+                    "2d-UI 🔴🔴 载体落后呈现面端到端验过(落后⇒显示需重发且无绿标 → 点出路 → 回最新 → 收口)",
                     ok_ui,
                     (f"已在 {_DRIFT_UI['verified_on']} 端到端验过(平台级逻辑,不随区变)" if ok_ui else
                      "🔴 **一个区都没验到** —— 需要至少一个区有「可安全改动的验收残留工作流」"
                      "(绑该区 + 已发布 + 有 cron)。刻意不用示范对象当夹具:那会留副作用"))
 
-            # 🔴🔴 B-19 的**总判据**:同 `2d-UI` —— 陈旧响应竞态是平台级前端逻辑,至少一个区
+            # 🔴🔴该缺陷的**总判据**:同 `2d-UI` —— 陈旧响应竞态是平台级前端逻辑,至少一个区
             #   端到端验过就成立;**一个区都没验到就必须红**,否则「本区没夹具就跳过」会静默
             #   退化成「这条机制从来没验过」。
             ok_race = bool(_CLASS_RACE["verified_on"])
             rep.add(targets[0]["targetId"],
-                    "5h-UI 🔴🔴 B-19 陈旧响应竞态端到端验过(人为延迟先点的那张表 ⇒ 最终显示的必须是后一次)",
+                    "5h-UI 🔴🔴 陈旧响应竞态端到端验过(人为延迟先点的那张表 ⇒ 最终显示的必须是后一次)",
                     ok_race,
                     (f"已在 {_CLASS_RACE['verified_on']} 端到端验过(平台级逻辑,不随区变)" if ok_race else
                      "🔴 **一个区都没验到** —— 需要某个区的目录里有两张「字段集互有差异」的表当夹具;"

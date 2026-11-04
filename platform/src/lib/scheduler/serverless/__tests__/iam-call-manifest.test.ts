@@ -1,9 +1,8 @@
-// @kf-batch 50-WP15-airflow-serverless(T-8)
 // 🔴 「代码用了的调用,清单必须有;清单有的动作,栈必须给」—— 跨构建边界钉死三层一致:
 //   ① 代码 import 的每个 `XxxCommand`(client-mwaa-serverless / client-codebuild)⇒ infra/iam/platform-taskrole-calls.json 有 `<service>:Xxx`;
 //   ② 清单里的每个动作 ⇒ infra/lib/platform-stack.ts 出现该字面(TaskRole 授权的源码);
-//   ③ CreateWorkflow 的清单条目资源必须是 `workflow/*`(T-8:服务在创建时按 workflow/* 评估,名字限定永不匹配)。
-// 真环境:WP-15 一刀内 IAM 类缺陷三次(T-2 / T-7 动作缺、T-8 资源模式错)。动作名守卫只能抓前两类;第三类交给
+//   ③ CreateWorkflow 的清单条目资源必须是 `workflow/*`(服务在创建时按 workflow/* 评估,名字限定永不匹配)。
+// 真环境:一刀内 IAM 类缺陷三次(动作缺、资源模式错)。动作名守卫只能抓前两类;第三类交给
 //   scripts/iam-simulate-gate.py 在部署后拿清单对 TaskRole 做 SimulatePrincipalPolicy —— 本测试保证清单不落后于代码。
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -25,12 +24,12 @@ function commandsImportedFrom(file: string, pkg: string): string[] {
   return Array.from((block as RegExpMatchArray)[1].matchAll(/(\w+)Command\b/g)).map((m) => m[1]);
 }
 
-describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", () => {
+describe("IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", () => {
   const manifest = JSON.parse(readFileSync(MANIFEST, "utf8")) as { calls: Call[] };
   const actions = new Set(manifest.calls.map((c) => c.action));
   const plat = readFileSync(PLATFORM_STACK, "utf8");
 
-  // @kf-batch 50-rebuild-384-gaps(K-7):+`any-region` —— 必须在放行集**之外**也 allowed 的调用(EIP 预检)
+  // +`any-region` —— 必须在放行集**之外**也 allowed 的调用(EIP 预检)
   it("清单本体:非空、每条有 action / resource、axis ∈ {execution, home, any-region}、source 指向存在的文件", () => {
     expect(manifest.calls.length).toBeGreaterThanOrEqual(20);
     for (const c of manifest.calls) {
@@ -63,7 +62,7 @@ describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", ()
     }
   });
 
-  it("③ T-8:CreateWorkflow 不支持资源级权限 ⇒ 清单资源 = *,栈里它单独一条 Resource * 且不与 bgp* 名字限定同条", () => {
+  it("③:CreateWorkflow 不支持资源级权限 ⇒ 清单资源 = *,栈里它单独一条 Resource * 且不与 bgp* 名字限定同条", () => {
     const create = manifest.calls.filter((c) => c.action === "airflow-serverless:CreateWorkflow");
     expect(create.length).toBeGreaterThanOrEqual(1);
     for (const c of create) expect(c.resource, "CreateWorkflow 只能 Resource *(服务报 workflow/*;模拟器对任何 ARN 都 deny)").toBe("*");
@@ -75,18 +74,18 @@ describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", ()
     expect(stmt).not.toContain("workflow/*");
   });
 
-  it("④ T-9:服务代调用者做的 FAS 调用(CreateWorkflow 代建日志组)在清单里,且栈给了 logs:CreateLogGroup", () => {
+  it("④:服务代调用者做的 FAS 调用(CreateWorkflow 代建日志组)在清单里,且栈给了 logs:CreateLogGroup", () => {
     const fas = manifest.calls.filter((c) => c.action === "logs:CreateLogGroup");
     expect(fas.length, "清单缺 logs:CreateLogGroup(CloudTrail 坐实:CreateWorkflow 以调用者身份代建 /aws/mwaa-serverless/<workflow>/)").toBeGreaterThanOrEqual(1);
-    // @kf-batch 50-WP27-9cap-matrix —— 🔴 原来这里断言**每一条** logs:CreateLogGroup 都指向
+    // 🔴 原来这里断言**每一条** logs:CreateLogGroup 都指向
     //   `/aws/mwaa-serverless/`。那是「当时清单里只有这一条」的巧合,不是判据(与下面 PassRole
     //   那条踩过的坑同形)。本批补进 Flink 的日志组(`/aws/kinesis-analytics/bgp-flink-*`)时它当场判红。
     //   ⇒ 判据改成钉**那条 FAS 条目确实在**(至少一条、带 FAS 理由),而不是钉「只有这一种」。
     const fasMwaa = fas.filter((c) => c.resource.includes("log-group:/aws/mwaa-serverless/"));
-    expect(fasMwaa.length, "清单里 logs:CreateLogGroup 没有一条指向 /aws/mwaa-serverless/(T-9 那条 FAS 代建丢了)").toBeGreaterThanOrEqual(1);
+    expect(fasMwaa.length, "清单里 logs:CreateLogGroup 没有一条指向 /aws/mwaa-serverless/(FAS 代建那条丢了)").toBeGreaterThanOrEqual(1);
     for (const c of fasMwaa) expect(c.why ?? "").toMatch(/FAS|invokedBy/);
     expect(plat).toContain(`"logs:CreateLogGroup"`);
-    // T-10:FAS 全集的第二条 —— CreateServiceLinkedRole(SLR 已存在也每次照调);精确到该 SLR + 服务名条件
+    // FAS 全集的第二条 —— CreateServiceLinkedRole(SLR 已存在也每次照调);精确到该 SLR + 服务名条件
     const slr = manifest.calls.filter((c) => c.action === "iam:CreateServiceLinkedRole");
     expect(slr.length, "清单缺 iam:CreateServiceLinkedRole(CloudTrail 坐实:CreateWorkflow 每次以调用者身份调它)").toBe(1);
     expect(slr[0].resource).toContain("role/aws-service-role/airflow-serverless.amazonaws.com/AWSServiceRoleForAmazonMWAAServerless");
@@ -95,14 +94,14 @@ describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", ()
   });
 
   it("清单的 PassRole 条目带 iam:PassedToService 上下文(栈里该条件是硬门)", () => {
-    // @kf-batch 50-WP4quinquies-pushdown —— 🔴 原来这里把值**写死**成 airflow-serverless:
+    // 🔴 原来这里把值**写死**成 airflow-serverless:
     // 那是「当时清单里只有这一种 PassRole」的巧合,不是判据。补进 Flink 的 PassRole(MSAF 建应用要
     // 把该 target 的 flink 角色传给 kinesisanalytics)时它当场判红 —— 判据必须钉「每条都声明了
     // 消费服务、且在封闭集合里」,而不是钉某一个服务名。
     const CONSUMERS = new Set([
       "airflow-serverless.amazonaws.com",   // MWAA Serverless CreateWorkflow(RoleArn)
       "kinesisanalytics.amazonaws.com",     // MSAF CreateApplication(ServiceExecutionRole)
-      // 序 72 B-139(模块 56):任务执行角色可选 —— 用户自建角色传给 Glue / EMR Serverless(role/* + PassedToService 锁服务)
+      // 任务执行角色可选 —— 用户自建角色传给 Glue / EMR Serverless(role/* + PassedToService 锁服务)
       "glue.amazonaws.com",                 // Glue CreateJob / UpdateJob(Role)
       "emr-serverless.amazonaws.com",       // EMR Serverless StartJobRun(executionRoleArn)
     ]);
@@ -117,16 +116,15 @@ describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", ()
     const svcs = new Set(passRole.map((c) => String(c.context?.["iam:PassedToService"])));
     expect(svcs.has("kinesisanalytics.amazonaws.com"), "Flink 的 PassRole 不在清单里 ⇒ 模拟门挡不住 A3-1 那个 500").toBe(true);
     expect(svcs.has("airflow-serverless.amazonaws.com"), "MWAA Serverless 的 PassRole 从清单里丢了").toBe(true);
-    expect(svcs.has("glue.amazonaws.com") && svcs.has("emr-serverless.amazonaws.com"), "序 72 自建角色 PassRole(glue / emr-serverless)从清单里丢了 ⇒ 模拟门挡不住 B-139 复发").toBe(true);
+    expect(svcs.has("glue.amazonaws.com") && svcs.has("emr-serverless.amazonaws.com"), "自建角色 PassRole(glue / emr-serverless)从清单里丢了 ⇒ 模拟门挡不住绑定回归").toBe(true);
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // @kf-batch 50-WP27-9cap-matrix
   // 🔴🔴 **清单的覆盖面本身要有机械下限**(记忆 manifest-gate-coverage-is-the-criterion 第 N 次)。
   //
   // 上面的规则 ① 只对**两个手挑的文件**生效(workflow-client.ts / deploy-control.ts)。于是
   // 「新增 AWS 调用必须同笔登记进清单」这条纪律一直是**靠自觉**的 —— 2026-09-19 实证代价:
-  // 实时计算(模块 32)那一族(kinesis 10 个动作 + MSAF 14 个 + Flink 日志组 6 个)**从来没进过清单**,
+  // 实时计算那一族(kinesis 10 个动作 + MSAF 14 个 + Flink 日志组 6 个)**从来没进过清单**,
   // IAM 模拟门于是报「67/67 allowed」而它探过的只是 TaskRole 被授动作的 8%;
   // 而那一族的资源 ARN 恰好又钉死在部署区 ⇒ 第二个区的实时计算从第一步就废,没有任何门看得见。
   //
@@ -234,14 +232,14 @@ describe("T-8 IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", ()
   });
 
   // ══════════════════════════════════════════════════════════════════════════
-  // 序 31 三刀 IAM 侧(2026-10-21)—— …9435 observe 第四十四轮 `place.creds.denied` 量出的四族缺口,清单里必须有对应条目
+  // IAM 侧(2026-10-21)—— …9435 observe 第四十四轮 `place.creds.denied` 量出的四族缺口,清单里必须有对应条目
   //   (否则模拟门探不到它们,enforce 一开就是静默 500):
   //   ① bgp/datasource/* 的写三动作(建源 / 改口令 / 删源,execution 轴,secret 建在源所属区);
   //   ② bgp/dms/redshift-target 的 CreateSecret / PutSecretValue(实时链给 DMS 写完整字段密钥,home 轴);
   //   ③ secretsmanager:ListSecrets(RDS 发现按区列托管密钥,execution 轴,动作不支持资源级 ⇒ *);
   //   ④ s3:ListAllMyBuckets(系统设置服务状态数桶,home 轴,控制面调用);⑤ 读账号自有 RDS 主密钥(建源复制账密,home 轴)。
   // ══════════════════════════════════════════════════════════════════════════
-  describe("序 31 三刀 IAM 侧:observe 量出的数据面密钥 / 桶清单缺口都在清单里", () => {
+  describe("IAM 侧:observe 量出的数据面密钥 / 桶清单缺口都在清单里", () => {
     const find = (action: string, resourceHas: string) => manifest.calls.filter((c) => c.action === action && c.resource.includes(resourceHas));
     it("① bgp/datasource/* 的 CreateSecret / UpdateSecret / DeleteSecret 各至少一条,且是 execution 轴(读那一半早就在)", () => {
       for (const a of ["secretsmanager:CreateSecret", "secretsmanager:UpdateSecret", "secretsmanager:DeleteSecret", "secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"]) {

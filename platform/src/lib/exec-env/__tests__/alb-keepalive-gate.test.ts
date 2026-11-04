@@ -1,4 +1,3 @@
-// @kf-batch 50-WP18b-fanout-seam
 /**
  * 🔴🔴 **Node 的 keep-alive 必须活得比 ALB 的空闲超时长**,否则偶发 502(无法复现的那种)。
  *

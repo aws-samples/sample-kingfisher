@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「新建表」向导的 DDL 预览(纯生成:不落库、不打云;任一登录用户可看)。
+// 数据目录「新建表」向导的 DDL 预览(纯生成:不落库、不打云;任一登录用户可看)。
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/verify-token";

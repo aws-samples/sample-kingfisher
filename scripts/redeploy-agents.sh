@@ -10,7 +10,7 @@
 #               不改任何东西(升级前先跑它,就知道这一版要不要刷智能体)
 #     --only    只刷新列出的智能体(缺省三个全刷;镜像构建幂等,全刷最稳)
 #
-# 🔴 为什么存在(B-76,2026-10-14):`redeploy-platform.sh` 只部署 ExecEnvDeploy / AirflowServerless / Waf / OmService /
+# 🔴 为什么存在:`redeploy-platform.sh` 只部署 ExecEnvDeploy / AirflowServerless / Waf / OmService /
 #   Platform 五个栈,**不重建智能体镜像、不部署智能体栈**;而智能体容器里带着 platform/src/lib/<cap>/core 与
 #   lib/cookbook 编译出的 core-dist(问数的脚本生成配方就在里面)。10-12 → 10-13 升级后问数智能体仍跑旧配方,
 #   就是这么漏的。以后升级 = redeploy-platform.sh(平台)+ 本脚本(智能体),两个都跑;`--check` 告诉你要不要跑。
@@ -62,7 +62,7 @@ out()  { aws cloudformation describe-stacks --stack-name "$1" --profile "$PROFIL
            --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text 2>/dev/null; }
 # shellcheck source=lib/agentcore-agents.sh
 source "$HERE/lib/agentcore-agents.sh"
-source "$HERE/lib/execution-regions.sh"  # 序 48:放行清单的唯一作者(网络 / 参数顾问的技能角色也有区域条件,见第 3 步)
+source "$HERE/lib/execution-regions.sh"  # 放行清单的唯一作者(网络 / 参数顾问的技能角色也有区域条件,见第 3 步)
 
 # 部署模式:与 redeploy-platform.sh 同一条规则 —— 从 SSM /bgp/deploy-mode 读;显式给了且与 SSM 不同 ⇒ 拒。
 # 本脚本只读不写 SSM(模式的作者是 deploy-all / redeploy-platform)。synth 整个 app 时 app.ts 要知道模式(决定演示源库栈在不在)。
@@ -146,7 +146,7 @@ say "2) 构建并推送镜像(tag $HEAD_TAG,linux/arm64)"
 agentcore_build_push_images "$HEAD_TAG" "${SEL[@]}"
 
 say "3) 部署智能体栈(Runtime → 新镜像;cdk 逐个)"
-# 序 48:网络顾问 / 参数顾问的技能 Lambda 角色带 `aws:RequestedRegion` 条件(infra/lib/netadvisor-iam.ts / paramadvisor-iam.ts),
+# 网络顾问 / 参数顾问的技能 Lambda 角色带 `aws:RequestedRegion` 条件(infra/lib/netadvisor-iam.ts / paramadvisor-iam.ts),
 #   此前首装与本脚本都没把放行清单交给这两个栈 ⇒ 它们始终只放行主控区(数据源在别的区时顾问探不到)。
 #   现在与平台栈同一份清单(home ∪ 注册表在用区 ∪ 候选区),经环境变量交给 cdk(requestedRegionCondition 的第二条通道)。
 EXEC_REGIONS=$(exec_regions_resolve)

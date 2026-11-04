@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4ter-coverage
-// `GET /api/workflow` 的执行范围过滤(工单 SC-3)。响应是**裸数组**(不是 apiOk 信封),别照抄别的路由。
+// `GET /api/workflow` 的执行范围过滤。响应是**裸数组**(不是 apiOk 信封),别照抄别的路由。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 

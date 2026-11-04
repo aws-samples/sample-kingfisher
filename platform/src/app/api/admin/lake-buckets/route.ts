@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
-// 序 38 B-71 —— 执行环境的外部 S3 Tables 表桶登记(平台管理员)。
+// 执行环境的外部 S3 Tables 表桶登记(平台管理员)。
 //   GET    ?targetId=   已登记清单(任何登录用户可看:它决定表树 / 目录 / 问数里会出现什么)
 //   POST   { targetId, bucket, label? }   登记(核名字 / 不是平台表桶 / 该区真有)
 //   DELETE ?targetId=&bucket=            撤销登记(只删登记行,表桶一个不碰)
-// @kf-batch 50-WP31-place-first-class —— 落点只经点名作者 requestedTargetId(缺 / 非法 ⇒ 400,不默认主控区)
+// 落点只经点名作者 requestedTargetId(缺 / 非法 ⇒ 400,不默认主控区)
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";

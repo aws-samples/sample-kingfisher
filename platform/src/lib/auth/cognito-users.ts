@@ -3,7 +3,7 @@
 // 使后续"按 sub 精确授权"（如需求指派 isAssignee）可靠工作。Best-effort：失败返回空。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   CognitoIdentityProviderClient,
@@ -30,7 +30,7 @@ export async function resolveUserSub(
   }
 }
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)
+// (问数)
 /**
  * 一个用户**此刻**的账号状态(定时动作替作者执行前要重验:作者被禁用 / 降权 / 移出项目,定时就该停)。
  * 🔴 与上面那个 best-effort 不同:这里**查不到就抛**(fail-closed)—— 拿不到状态不许当成「还有权限」。

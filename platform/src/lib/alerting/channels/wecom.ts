@@ -1,4 +1,4 @@
-// 模块 34 — 企业微信群机器人通道。webhook 直发 markdown,无签名。
+// 企业微信群机器人通道。webhook 直发 markdown,无签名。
 // 企微失败也回 HTTP 200(errcode 在 body),故解析 errcode 做业务级判定。
 
 import type { AlertChannel } from "../types";

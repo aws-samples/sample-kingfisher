@@ -1,4 +1,3 @@
-// @kf-batch 50-WP2-one-agentcore-one-om
 // **OpenMetadata 写入原语的轻量层**(service / database / schema / table 四个 PUT + 列归一)。
 //
 // ── 为什么要单独一层(不是洁癖,是**编译边界**)────────────────────────────────

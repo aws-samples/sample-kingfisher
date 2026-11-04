@@ -1,9 +1,9 @@
-// 序 72 B-139 / B-140(模块 56)—— 作业**实际引用**的 S3 URI(纯函数,单一作者)。
+// 作业**实际引用**的 S3 URI(纯函数,单一作者)。
 //
 // 预检要量的不是「引擎基线」那几个平台桶,而是这条作业**真会去读**的东西:
 //   · Glue `--extra-jars` / `--extra-py-files`(逗号分隔的 S3 URI;客户现网 403 就是这里换成了自己的桶);
 //   · 脚本正文里出现的 `s3://` 字面(spark.read / SDK 客户端调用 / 路径常量);
-// 加上 B-140:依赖库「上传」只传主控区脚本桶 ⇒ 非主控区作业的 Glue 角色读不到。现在上传按作业绑定的每个落点各传一份
+// 加上:依赖库「上传」只传主控区脚本桶 ⇒ 非主控区作业的 Glue 角色读不到。现在上传按作业绑定的每个落点各传一份
 // (同 key),作业提交到某个区时把「平台脚本桶」形态的依赖 URI 换成**该区**的脚本桶(`localizePlatformDepUris`)。
 
 import { resourceNamePattern } from "@/lib/aws/naming";
@@ -65,7 +65,7 @@ export function s3UrisFromScript(code: unknown): string[] {
 export const PLATFORM_DEP_KEY_PREFIX = "glue-deps/";
 
 /**
- * B-140:`s3://<平台脚本桶>/glue-deps/<jobId>/<file>` 这种**平台上传的依赖**,在提交到某个落点时换成该落点的脚本桶
+ * `s3://<平台脚本桶>/glue-deps/<jobId>/<file>` 这种**平台上传的依赖**,在提交到某个落点时换成该落点的脚本桶
  * (上传路由已按每个绑定区各传一份、同 key)。其它桶 / 其它 key 一字不动 —— 客户自己的桶就是客户自己的桶。
  */
 export function localizePlatformDepUri(uri: string, landing: { scriptsBucket: string }): string {

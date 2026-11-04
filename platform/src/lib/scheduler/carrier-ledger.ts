@@ -1,7 +1,6 @@
-// @kf-batch 50-WP26-sync-schedule-carrier
 // 🔴🔴 **「调度载体」与「这次运行记在谁头上」必须分开声明。**
 //
-// 【为什么需要这个概念(WP-26 立包时勘定出来的)】
+// 【为什么需要这个概念(立包时勘定出来的)】
 //   同步任务的「启用调度 + cron」原来是个**空壳**:只往 `bgp-sync-tasks` 写两个字段,
 //   不建任何调度产物(两个区的 EventBridge Scheduler 各 0 条、MWAA Serverless 里没有 sync 的 DAG),
 //   实测配 `*/10` 等 25 分钟零次触发 —— 而页面当时还替它宣称「已启用 (EventBridge Scheduler)」。
@@ -41,7 +40,7 @@ export interface CarrierLedger {
   writesWorkflowRow: boolean;
 }
 
-/** 编排工作流自己的归属 —— **缺省值**,逐字节等于 WP-26 之前的行为。 */
+/** 编排工作流自己的归属 —— **缺省值**,逐字节等于此前的行为。 */
 export function workflowCarrierLedger(workflowId: string, table: string): CarrierLedger {
   return {
     table,
@@ -64,9 +63,8 @@ export function syncTaskCarrierLedger(taskId: string, table: string): CarrierLed
   };
 }
 
-// @kf-batch 50-WP28-platform-action-node
 /** 平台动作调度对象的 run 台账 `taskType`(监控页按它分类;闭合词表,页面与服务端同源)。 */
-// @kf-batch 50-CAPSEED-seed-dispatch —— + `seed`(在该区下发一次造数;手动那次也记 `seed`,监控页同一种类)
+// + `seed`(在该区下发一次造数;手动那次也记 `seed`,监控页同一种类)
 export const ACTION_SCHEDULE_TASK_TYPES = ["governance", "genbi-card", "seed"] as const;
 export type ActionScheduleTaskType = (typeof ACTION_SCHEDULE_TASK_TYPES)[number];
 

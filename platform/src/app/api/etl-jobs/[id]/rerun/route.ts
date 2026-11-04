@@ -5,12 +5,10 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { runEtlJob } from "@/lib/etl/job-service";
-// @kf-batch 50-P50.3-mrquery
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { recordAudit } from "@/lib/audit";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import type { EtlJob } from "@/types/etl-job";
-// @kf-batch 50-W5-seg2-WP10a
 import { requireResidencyAckForTargets, residencyErrorResponse, userActor } from "@/lib/exec-env/residency-audit";
 
 const USER_ID = "default-user";
@@ -37,7 +35,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   );
   const runDate = prev?.runDate || undefined;
 
-  // @kf-batch 50-P50.3-mrquery
   // 🔴🔴 **重跑必须跑在原来那条 run 的 region**。原实现不传 targetId ⇒ `runRedshiftSqlJob`
   // 取 `bindingTargets(job)[0]` = 绑定的第一个(通常是 home)⇒ **重跑一条 us-west-2 的 run
   // 会静默跑到 home**:业务上是"我要重算那个区的数据",结果算到了另一个区,而且不报错。
@@ -54,7 +51,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     );
   }
 
-  // @kf-batch 50-W5-seg2-WP10a —— 重跑也是一次运行提交:同意前置(409 带文案)+ 行为主体传给 job-service 写区域审计
+  // 重跑也是一次运行提交:同意前置(409 带文案)+ 行为主体传给 job-service 写区域审计
   const rerunTarget = prevTarget || bound[0];
   try {
     await requireResidencyAckForTargets(guard.identity, rerunTarget ? [rerunTarget] : []);

@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node
 // POST /api/internal/actions/run  { commandId }  —— **平台内部端点**(唯一调用方:主控区的分发 Lambda)。
 //
 // 链路:执行区 DAG 的 platform-action 节点 → 主控区命令表 `bgp-action-commands`(pending)

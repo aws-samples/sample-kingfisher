@@ -1,6 +1,5 @@
 "use client";
-// @kf-batch 70-B138-hydration-safe-initial-state
-// 🔴 B-138(2026-11-02 …2951 升 Next 15 / React 19 后页面驱动 p50 段 P50-K 抓到 pageerror「Minified React error #418」= 水合不一致):
+// 🔴 (2026-11-02 …2951 升 Next 15 / React 19 后页面驱动 p50 段 P50-K 抓到 pageerror「Minified React error #418」= 水合不一致):
 //   客户端组件在 **useState 初值函数 / 组件体** 里读 `window.location` / `localStorage`(`typeof window !== "undefined" ? 读 : 缺省`)
 //   ⇒ 服务端首帧按「缺省」渲染,浏览器首帧按「读到的值」渲染,两份 HTML 不一致。React 18 只在控制台记一条可恢复错误(没人看见);
 //   React 19 把它上报成 window error ⇒ 无头判据的 pageerror 必红,用户侧表现为首帧闪一下再重画。

@@ -1,6 +1,6 @@
-// 序 57 / B-129 —— JDBC 建源 provision 段接长操作框架:装配层判据(路由 ↔ submitLongOp ↔ 执行体 ↔ datasource-service ↔ SDK)。
+// JDBC 建源 provision 段接长操作框架:装配层判据(路由 ↔ submitLongOp ↔ 执行体 ↔ datasource-service ↔ SDK)。
 //
-// 【缺陷原形】第四十七轮 nap 首跑:主控区视角「新建数据源」点「完成」⇒ 页面 60 秒 504,服务端却在第 66 秒把源建出来(CloudTrail:
+// 【缺陷原形】主控区视角「新建数据源」点「完成」⇒ 页面 60 秒 504,服务端却在第 66 秒把源建出来(CloudTrail:
 //   CreateSecret 之后空档 64 秒才到 IAM GetRole)。请求路径同步串着 核角色 → 探网段 / 建组 → 建 Glue 连接 → 落库,没有超时预算。
 // 【判据钉的事实】
 //   ① 快路径:201 与接入前同形(data = 行 + provisionedResources);长操作行 succeeded / resultStatus 201;租约释放;
@@ -56,7 +56,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
     }
     if (cmd === "DescribeVpcsCommand") return { Vpcs: [{ VpcId: input.VpcIds[0], CidrBlock: "10.0.0.0/16" }] };
     if (cmd === "DescribeSubnetsCommand") {
-      // B-133 第二刀:写 Glue 连接前按子网事实取 AZ;用户给的子网在 1c(与下方用例给的 availabilityZone 一致),其余在 1a
+      // 第二刀:写 Glue 连接前按子网事实取 AZ;用户给的子网在 1c(与下方用例给的 availabilityZone 一致),其余在 1a
       const ids: string[] = input.SubnetIds ?? input.Filters?.find((f: any) => f.Name === "subnet-id")?.Values ?? [];
       return { Subnets: ids.map((x) => ({ SubnetId: x, VpcId: x === "subnet-user" ? "vpc-user" : "vpc-default", AvailabilityZone: x === "subnet-user" ? "us-east-1c" : "us-east-1a" })) };
     }
@@ -157,7 +157,7 @@ beforeEach(() => {
   process.env.DEFAULT_AZ = "us-east-1a";
 });
 
-describe("B-129 ①:快路径与接入前同形", () => {
+describe("①:快路径与接入前同形", () => {
   it("201;data = 行 + provisionedResources;落库恰一行(不存口令);任务行 succeeded / resultStatus 201;租约释放;收口 fire-and-forget 已接", async () => {
     const res = await post();
     expect(res.status).toBe(201);
@@ -183,7 +183,7 @@ describe("B-129 ①:快路径与接入前同形", () => {
   });
 });
 
-describe("B-129 ②:一跳停顿不再撞墙", () => {
+describe("②:一跳停顿不再撞墙", () => {
   it("🔴 IAM GetRole 挂住 600 ms(> 等待预算 150 ms)⇒ 路由在预算到点回 202 协议记号(不等停顿结束);后台建完落库恰一行、任务行 succeeded", async () => {
     h.iamDelayMs = 600;
     const started = Date.now();
@@ -217,7 +217,7 @@ describe("B-129 ②:一跳停顿不再撞墙", () => {
   });
 });
 
-describe("B-129 ③:对象租约 —— 同名再点一次不会建出第二条", () => {
+describe("③:对象租约 —— 同名再点一次不会建出第二条", () => {
   it("🔴 同名并发两次 ⇒ 一次受理(201 / 202)、一次 409 LONG_OP_IN_PROGRESS;落库恰一行;被拒那次路由建的密钥被删", async () => {
     h.iamDelayMs = 300;
     const [a, b] = await Promise.all([post(), post()]);
@@ -247,7 +247,7 @@ describe("B-129 ③:对象租约 —— 同名再点一次不会建出第二条"
   });
 });
 
-describe("B-129 ④:中途失败不留孤儿", () => {
+describe("④:中途失败不留孤儿", () => {
   it("🔴 Glue 建连接抛 ⇒ 500「创建数据源失败: …」(原口径);已建的平台安全组与密钥被清掉;不落库;Glue 连接没建成就不删", async () => {
     h.glueCreateError = new Error("InvalidInputException: subnet not found");
     const res = await post();
@@ -257,7 +257,7 @@ describe("B-129 ④:中途失败不留孤儿", () => {
     expect(h.dsRows).toHaveLength(0);
     const ec2 = cmds("ec2");
     expect(ec2.slice(0, 4)).toEqual(["CreateSecurityGroupCommand", "AuthorizeSecurityGroupIngressCommand", "DescribeVpcsCommand", "AuthorizeSecurityGroupIngressCommand"]);
-    // B-133 第二刀:建连接前先按子网事实取 AZ(DescribeSubnets),建连接抛后才是清理序
+    // 第二刀:建连接前先按子网事实取 AZ(DescribeSubnets),建连接抛后才是清理序
     expect(ec2.slice(4)).toEqual(["DescribeSubnetsCommand", "DescribeSecurityGroupsCommand", "DeleteSecurityGroupCommand"]);
     const del = h.calls.find((c) => c.svc === "ec2" && c.cmd === "DeleteSecurityGroupCommand")!;
     expect(h.sgNames[del.input.GroupId]).toBeUndefined();
@@ -277,7 +277,7 @@ describe("B-129 ④:中途失败不留孤儿", () => {
     expect(h.dsRows).toHaveLength(0);
   });
 
-  it("用户指定网络的成功路径:组全部进 Glue 连接(B-54 不回归)", async () => {
+  it("用户指定网络的成功路径:组全部进 Glue 连接(不回归)", async () => {
     const res = await post({ network: { subnetId: "subnet-user", securityGroupIds: ["sg-user-1", "sg-user-2"], availabilityZone: "us-east-1c" } });
     expect(res.status).toBe(201);
     const conn = h.calls.find((c) => c.svc === "glue" && c.cmd === "CreateConnectionCommand")!;
@@ -291,7 +291,7 @@ describe("B-129 ④:中途失败不留孤儿", () => {
   });
 });
 
-describe("B-129 ⑤:Glue 角色核验出请求路径", () => {
+describe("⑤:Glue 角色核验出请求路径", () => {
   it("🔴 IAM 抛网络类错误(TimeoutError)⇒ 503「…Glue 作业角色未就位…」;**不走 CreateRole**;密钥清掉、不落库", async () => {
     h.iamError = Object.assign(new Error("socket timed out"), { name: "TimeoutError" });
     const res = await post();

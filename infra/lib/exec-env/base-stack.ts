@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2a-exec-env-stackgroup
 // 执行环境**底座**栈:自建 VPC + 自建数据域 CMK(50 DESIGN §4.1a-2)。
 //
 // 【为什么必须自建、不能注入控制面构造】
@@ -24,7 +23,7 @@ import { Construct } from "constructs";
 import { resourceName } from "../shared/naming";
 import { buildPlatformDataRole } from "../shared/platform-data-role";
 import { ExecEnvStack, type ExecEnvStackProps } from "./exec-env-stack";
-// @kf-batch 50-WP16-zero-egress —— 端点清单的唯一作者
+// 端点清单的唯一作者
 import { endpointPlanFor, endpointServiceName } from "./endpoints";
 import { EXEC_ENV_PRIVATE_SUBNET_TYPE, EXEC_ENV_PRIVATE_SUBNET_SELECTION, execEnvPrivateSubnets } from "./private-subnets";
 
@@ -40,7 +39,7 @@ export class ExecEnvBaseStack extends ExecEnvStack {
 
     // ── 数据域 CMK(本 region 独立一把)────────────────────────────────────
     // 🔴 别名必须经命名 SSOT:`alias/bgp-data` 是 **region 级唯一名**,同 region 两 target
-    //    (蓝绿/主备)各自建 key 会撞别名。这一条是 P50.2 切片 a 开工时才被发现的
+    //    (蓝绿/主备)各自建 key 会撞别名。这一条是切片 a 开工时才被发现的
     //    —— 反向覆盖门禁 v1 只扫"以 bgp- 开头"的字面量,`"alias/bgp-data"` 溜过去了(门禁已加宽)。
     this.dataKey = new kms.Key(this, "ExecEnvDataKey", {
       alias: resourceName("dataKeyAlias", { targetId: ctx.targetId }),
@@ -50,7 +49,7 @@ export class ExecEnvBaseStack extends ExecEnvStack {
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       pendingWindow: cdk.Duration.days(30),
     });
-    // @kf-batch 50-WP30-retain-key-alias —— 🔴 `alias` 选项建出的 Alias 子资源**默认随栈删除**,只有 Key 本身 RETAIN。
+    // 🔴 `alias` 选项建出的 Alias 子资源**默认随栈删除**,只有 Key 本身 RETAIN。
     //   2026-10-11 第二账号真销毁 tgt_use1_a 实测:Key 留下了(Enabled),别名没了 ⇒ 删除预览与收口页承诺保留的
     //   `alias/bgp-data-<slug>` 找不到,运维只能拿描述文本去猜哪把钥匙解得开留下的数据桶 / 快照。
     //   ⇒ 别名与钥匙同生命周期(保持原逻辑 ID,只改 DeletionPolicy,存量栈升级不替换资源)。
@@ -59,14 +58,14 @@ export class ExecEnvBaseStack extends ExecEnvStack {
     if (!keyAlias) throw new Error("数据域 CMK 的 Alias 子资源找不到 ⇒ 无法设 RETAIN(CDK 内部结构变了?)");
     keyAlias.applyRemovalPolicy(cdk.RemovalPolicy.RETAIN);
 
-    // ── 平台数据面角色(WP-31 L5;唯一作者 shared/platform-data-role.ts)──────────────────
-    // @kf-batch 50-WP31-seq5-dataplane-role —— 平台任务角色碰本区数据时代入它(资源只限本 target ∧ 本区)。
+    // ── 平台数据面角色(L5;唯一作者 shared/platform-data-role.ts)──────────────────
+    // 平台任务角色碰本区数据时代入它(资源只限本 target ∧ 本区)。
     //   主控区的那一个建在平台栈(同名会撞:IAM 角色名全局唯一)⇒ 这里只建非主控区的。
     if (!ctx.isHome) {
       buildPlatformDataRole(this, "PlatformDataRole", { targetId: ctx.targetId, account: ctx.account, region: ctx.region, partition: this.partition });
     }
 
-    // ── VPC(🔴 WP-16 起 **零出网**:无 NAT / 无 EIP / 无 IGW / 私有路由表无 0.0.0.0/0)──
+    // ── VPC(🔴 起 **零出网**:无 NAT / 无 EIP / 无 IGW / 私有路由表无 0.0.0.0/0)──
     // 用户 2026-09-06 拍板(DESIGN §18 决策 6octies):「不都是内网地址吗?…肯定是要走端点、私有连接啊」。
     //
     // 🔴 **为什么 Public 层是 `reserved: true` 而不是直接删掉**:CDK 按 `subnetConfiguration` 的**顺序**
@@ -75,7 +74,7 @@ export class ExecEnvBaseStack extends ExecEnvStack {
     //    (正是 ACCEPTANCE N0-10 明令禁止的破坏性路径)。`reserved: true` 只保留地址空间、不建子网,
     //    于是**私有子网 CIDR 与逻辑 ID 都不动**,而公有子网连带 IGW / NAT / EIP 一起消失。
     // 🔴 **不传 availabilityZones** —— AZ 由基类 `ExecEnvStack` 覆写的 getter 提供(零 context 查找)。
-    // 🔴🔴 @kf-batch 50-WP23-xregion-peering:**CIDR 必须显式给**(`ctx.vpcCidr`,类型上必填)。
+    // 🔴🔴 **CIDR 必须显式给**(`ctx.vpcCidr`,类型上必填)。
     //    不给 `ipAddresses` 时 CDK 用默认 `10.0.0.0/16` —— 而主控区 VPC 也是这个值 ⇒ 两侧逐位相同 ⇒
     //    跨区 peering **物理上建不出来**(下面那段跨区通路的前提)。这一条 2026-09-08 就写在下面的注释里,
     //    2026-09-14 换选型时却只重勘了 SCP、没重勘 CIDR(probe 用的是两个 throwaway VPC,前提被悄悄换掉)。
@@ -99,16 +98,16 @@ export class ExecEnvBaseStack extends ExecEnvStack {
       s3: ec2.GatewayVpcEndpointAwsService.S3,
       dynamodb: ec2.GatewayVpcEndpointAwsService.DYNAMODB,
     };
-    // 🔴🔴 **构造 id 必须冻结**(2026-09-08 真环境撞到,WP-16 台账 N-1)。
-    //   S3 网关端点在 WP-16 之前就存在,构造 id 是 `S3Gw`。我按新命名规则算成 `GwS3` ⇒ CFN 认为
+    // 🔴🔴 **构造 id 必须冻结**(2026-09-08 真环境撞到,台账 N-1)。
+    //   S3 网关端点在此前就存在,构造 id 是 `S3Gw`。我按新命名规则算成 `GwS3` ⇒ CFN 认为
     //   这是一个**新资源**,于是一边建新的、一边老的还挂在同一张路由表上占着 S3 前缀列表:
     //   `route table rtb-… already has a route with destination-prefix-list-id pl-68a54001`
     //   ⇒ base 栈 UPDATE_ROLLBACK_COMPLETE,整次切换失败。
     //   教训:**逻辑 id 就是资源身份**;给存量资源换 id = 删了重建(网关端点这种「路由表里唯一」的资源
     //   会直接冲突,更隐蔽的是数据类资源会被静默替换)。⇒ 存量 id 逐个冻结在这张表里,新增的才用新规则。
     const GATEWAY_CONSTRUCT_ID: Record<string, string> = {
-      s3: "S3Gw", // 🔴 存量 id,不许改(WP-16 之前就有)
-      dynamodb: "DynamodbGw", // WP-16 新增
+      s3: "S3Gw", // 🔴 存量 id,不许改(此前就有)
+      dynamodb: "DynamodbGw", // 新增
     };
     const endpointIds: string[] = [];
     for (const svc of plan.gateway) {
@@ -150,7 +149,7 @@ export class ExecEnvBaseStack extends ExecEnvStack {
 
     // ── 🔴🔴 唯一跨区路径:**peering + 主控区同区端点 + 本区私有托管域**(SPEC §3.14ter)────
     //
-    // 【为什么不是跨区 VPC 端点了】WP-16 定的是「在本区建一个 `ServiceRegion=<home>` 的跨区接口端点」,
+    // 【为什么不是跨区 VPC 端点了】定的是「在本区建一个 `ServiceRegion=<home>` 的跨区接口端点」,
     //   理由是「home 与所有执行环境 VPC 的 CIDR 全是 10.0.0.0/16,peering 要求不重叠 ⇒ 那条路建不出来」。
     //   2026-09-14 两件事同时被推翻:
     //     ① 跨区端点这条路**被组织 SCP 拦死** —— `vpce:AllowMultiRegion` 的 `AllowedByOrganizations=False`,
@@ -260,17 +259,17 @@ export class ExecEnvBaseStack extends ExecEnvStack {
     // 🔴 OutputKey 直接用**描述符字段名**,让"部署期产出"与"注册表字段"一一对应,
     //    中间不需要任何映射表(映射表就是下一处漂移源)。
     new cdk.CfnOutput(this, "vpcId", { value: this.vpc.vpcId });
-    // @kf-batch 50-WP23-xregion-peering:占用的地址段要能被看见(描述符 / 探活 / 判据都读它)
+    // 占用的地址段要能被看见(描述符 / 探活 / 判据都读它)
     new cdk.CfnOutput(this, "vpcCidr", { value: this.vpc.vpcCidrBlock });
     new cdk.CfnOutput(this, "dataKeyArn", { value: this.dataKey.keyArn });
     new cdk.CfnOutput(this, "privateSubnetIds", {
-      // 🔴 WP-16:私有子网从 PRIVATE_WITH_EGRESS 变成 PRIVATE_ISOLATED(同名同逻辑 ID、CIDR 不变),
+      // 🔴 私有子网从 PRIVATE_WITH_EGRESS 变成 PRIVATE_ISOLATED(同名同逻辑 ID、CIDR 不变),
       //    这里的 selector 必须同步改 —— 不改的话选出空集,输出变空串,下游 core/mwaa/emr 全部拿不到子网。
       value: execEnvPrivateSubnets(this.vpc).subnetIds.join(","),
     });
-    // @kf-batch 50-WP16-zero-egress —— SPEC §3.16-E 的三个观测键(详情页「网络」行与探活读它)
+    // SPEC §3.16-E 的三个观测键(详情页「网络」行与探活读它)
     new cdk.CfnOutput(this, "endpointIds", { value: endpointIds.join(",") });
-    // @kf-batch 50-WP23-xregion-peering:跨区通路的两个实名产物(探活 `network:home-link` 读它们)。
+    // 跨区通路的两个实名产物(探活 `network:home-link` 读它们)。
     // 🔴 `crossRegionDdbEndpointId` **已退役** —— 那个形态被组织 SCP 拦死,建不出来;
     //    留着一个永远为空的字段 = 让探活对着一个不存在的形态判红(ACCEPTANCE N0-3 已改判)。
     if (homeLinkPeeringId) {

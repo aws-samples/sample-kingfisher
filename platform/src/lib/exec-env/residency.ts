@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP10a
 // **跨法域 target 的技术前置 + 项目白名单 + 法域格式**的唯一作者(50 SPEC v3.22 §1.1 / §2.1 前置 / §3.2 / §3.12;DESIGN §18 决策 6quinquies)。
 //
 // ── 用户 2026-09-05 拍板(原话)────────────────────────────────────────────────
@@ -60,7 +59,7 @@ export function residencyPrerequisite(t: ResidencyTargetLike): string | null {
   }
   const missing = missingPerTargetExecRoles({ targetId: t.targetId, components: comps, resources: t.resources });
   if (missing.length > 0) {
-    return `缺 per-target 执行角色(${missing.join(", ")};SPEC §6.1 硬门,WP-3)—— 对该执行环境执行一次「重新部署」以切换角色`;
+    return `缺 per-target 执行角色(${missing.join(", ")};SPEC §6.1 硬门)—— 对该执行环境执行一次「重新部署」以切换角色`;
   }
   return null;
 }
@@ -106,7 +105,7 @@ export function accessDeniedReason(t: { targetId: string }, projectId: string | 
   );
 }
 
-// ── @kf-batch 50-W5-seg2-WP10a:可审计闭环的**枚举与错误类**(SPEC v3.23 §3.2 第二段细化)────────────────────
+// ──:可审计闭环的**枚举与错误类**(SPEC v3.23 §3.2 第二段细化)────────────────────
 // 🔴 仍然零 AWS SDK 依赖:这里只放「词」和「错误形状」;真写库的 `residencyAudit` 在 residency-audit.ts
 //    (它要 import registry,而 registry import 本文件 —— 放这里会成环;客户端组件也要 import 这些词来判 409)。
 

@@ -10,7 +10,7 @@ import { jobEngineLabel } from "./JobNode";
 
 interface Props {
   node: Node | null;
-  /** 序 73 模块 57(R1 / R8):工作流的执行区;候选同步任务 / 离线作业按它过滤(`?scope=<落点>`),与发布期判定同一口径。 */
+  /** 工作流的执行区;候选同步任务 / 离线作业按它过滤(`?scope=<落点>`),与发布期判定同一口径。 */
   wfTargets: string[];
   onClose: () => void;
   onChange: (id: string, data: any) => void;
@@ -22,7 +22,7 @@ export interface NodeCandidates {
   syncTasks: any[];
   etlJobs: any[];
   emrJobs: any[];
-  /** 候选读取失败的原话(红字说明;不静默回空列表 —— B-109 教训) */
+  /** 候选读取失败的原话(红字说明;不静默回空列表 —— 教训) */
   error: string | null;
   loaded: boolean;
 }
@@ -91,7 +91,7 @@ export default function NodeConfigPanel({ node, wfTargets, onClose, onChange, on
         )
       }
     >
-      {/* 🔴 B-122:表单必须按节点**重开一份**(key=node.id),见 NodeConfigForm 顶部注释 */}
+      {/* 🔴 表单必须按节点**重开一份**(key=node.id),见 NodeConfigForm 顶部注释 */}
       <NodeConfigForm key={node.id} node={node} cands={cands} wfTargets={wfTargets} onChange={onChange} />
     </Drawer>
   );
@@ -119,7 +119,6 @@ function candidateLabel(name: unknown, engine: unknown, targets: unknown): strin
   return `${String(name ?? "")} · ${jobEngineLabel(engine)} · ${tg}`;
 }
 
-// @kf-batch 41-B122-node-form-per-node
 /**
  * 一个节点一份表单(连同它的 Form 实例 / 值仓)。
  *
@@ -196,7 +195,7 @@ export function NodeConfigForm({ node, cands, wfTargets, onChange }: { node: Nod
           <>
             {scopeNote}
             {candError}
-            {/* 序 73 模块 57(R1):`jobRef` 是对象 {kind, jobId},Select 用标量 `<kind>:<jobId>` 承载;kind 闭合(JOB_NODE_KINDS) */}
+            {/* `jobRef` 是对象 {kind, jobId},Select 用标量 `<kind>:<jobId>` 承载;kind 闭合(JOB_NODE_KINDS) */}
             <Form.Item
               name="jobRef"
               label={t("关联离线作业")}

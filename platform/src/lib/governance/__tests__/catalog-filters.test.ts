@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47d-catalog-filters —— 目录筛选纯模块的判据(钉事实:拆分结果 / 过滤结果 / 候选项 / URL 往返;不钉形态)。
+// 目录筛选纯模块的判据(钉事实:拆分结果 / 过滤结果 / 候选项 / URL 往返;不钉形态)。
 import { describe, it, expect } from "vitest";
 import {
   applyCatalogFilter, catalogFilterFromSearch, catalogFilterOptions, catalogFilterToSearch,

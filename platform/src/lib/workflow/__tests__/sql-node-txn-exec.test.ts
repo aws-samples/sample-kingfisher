@@ -1,6 +1,6 @@
-// @kf-batch 37-sync-capability —— B-66:工作流 SQL 节点的多语句必须**单事务**执行(与离线 Redshift 作业 / 补数同口径)。
+// 工作流 SQL 节点的多语句必须**单事务**执行(与离线 Redshift 作业 / 补数同口径)。
 //
-// 【缺陷原形(2026-10-12 第二十九轮真环境)】节点执行器 `_exec_sql` 一律 `execute_statement`(单语句、自动提交)⇒
+// 【缺陷原形】节点执行器 `_exec_sql` 一律 `execute_statement`(单语句、自动提交)⇒
 //   工作流里表达不了「DROP + CTAS」原子重算;Showcase ROI 工作流被迫拆成「DROP 节点 → CTAS 节点」,每次运行都有
 //   一两分钟 `dws_channel_roi_daily` 不存在的窗口;同一时刻定时刷新的问数卡片报 `relation does not exist`。
 //   而离线 Redshift 作业(`_run_redshift`)与补数(`runWorkflowSqlNode`)早就用 `batch_execute_statement`(单事务)——
@@ -71,7 +71,7 @@ print(json.dumps(out))
 const FINISHED: Desc = { Status: "FINISHED" };
 const TWO = ["DROP TABLE IF EXISTS showcase.t", "CREATE TABLE showcase.t AS SELECT 1 AS id"];
 
-describe("🔴 B-66 共享执行器 _exec_sql:多语句单事务,单语句老路不变", () => {
+describe("🔴 共享执行器 _exec_sql:多语句单事务,单语句老路不变", () => {
   it("单语句(sqls 缺省)⇒ 恰好一次 execute_statement,入参逐字与改动前相同;不碰 batch", () => {
     const r = runExecSql({ sql: "SELECT 1", descs: [FINISHED] });
     expect(r.ok, r.error).toBe(true);
@@ -118,7 +118,7 @@ const PLACE = {
 };
 const MULTI = "DROP TABLE IF EXISTS showcase.t; -- 先删\nCREATE TABLE showcase.t AS SELECT 1 AS id;";
 
-describe("🔴 B-66 发布侧 buildDagSpec:多语句预切成 data.sqls(splitSql 单一作者),单语句逐字节不变", () => {
+describe("🔴 发布侧 buildDagSpec:多语句预切成 data.sqls(splitSql 单一作者),单语句逐字节不变", () => {
   it("sql 节点多语句 ⇒ data.sqls 与 splitSql 结果逐条相等,data.sql 原文保留", () => {
     const spec = buildDagSpec(wf([{ id: "n1", type: "sql", data: { sql: MULTI } }]), PLACE);
     expect(spec.nodes[0].data.sqls).toEqual(splitSql(MULTI));
@@ -145,7 +145,7 @@ describe("🔴 B-66 发布侧 buildDagSpec:多语句预切成 data.sqls(splitSql
   });
 });
 
-describe("🔴 B-66 两份运行时产物都把 data.sqls 透传给共享执行器;版本号已升", () => {
+describe("🔴 两份运行时产物都把 data.sqls 透传给共享执行器;版本号已升", () => {
   it("共享块:_exec_sql 签名收 sqls,且只定义一次", () => {
     expect(NODE_EXEC_PY.split("def _exec_sql(env, sql, node_id=None, sqls=None").length - 1).toBe(1);
     expect(NODE_EXEC_PY).toContain("batch_execute_statement(Sqls=list(sqls)");

@@ -1,4 +1,3 @@
-// @kf-batch 50-WP24b-vacuous-sync
 // 🔴 **行为**判据(不是文本):空表清单的同步任务
 //   ① 建不出来(400 且**零 PutCommand**)· ② 启动不了(400 且**不建 Glue 作业**)。
 // 为什么必须是行为:第一版只断「文件里出现 syncWorkRejection(」——把那句 `return apiError(...)`
@@ -71,7 +70,7 @@ beforeEach(() => {
   h.ds = { userId: "default-user", datasourceId: "D1", type: "mysql", database: "gamedata", projectId: "p1" };
 });
 
-// @kf-batch 50-PROD-A-launch-hardening —— 段 prodA 页面实测:向导从不传 sourceDatabase ⇒ 页面新建一律 400
+// 段 prodA 页面实测:向导从不传 sourceDatabase ⇒ 页面新建一律 400
 describe("页面向导不传 sourceDatabase:源库名按执行体同一优先级从数据源取", () => {
   it("缺 sourceDatabase、数据源有库名 ⇒ 建得出来,落库 sourceDatabase = 数据源的库名", async () => {
     const r = await post({ name: "t", datasourceId: "D1", targetType: "redshift", channel: "glue",
@@ -96,9 +95,9 @@ describe("页面向导不传 sourceDatabase:源库名按执行体同一优先级
   });
 });
 
-// @kf-batch 41-B123-sync-source-locator-by-paradigm —— 页面驱动段 scq A1-2(2026-10-25,demo 账号第二区视角)真撞:
+// 页面驱动段 scq A1-2(2026-10-25,demo 账号第二区视角)真撞
 //   S3 源(湖桶 gamedata/ 前缀)在向导第 2 步列出 7 个数据集、勾一个、「完成」⇒ 400「缺少源库名」。
-describe("B-123 S3 对象存储源(没有库名)经页面向导建任务", () => {
+describe("S3 对象存储源(没有库名)经页面向导建任务", () => {
   const s3ds = { userId: "default-user", datasourceId: "D1", type: "s3", projectId: "p1",
                  connection: { bucket: "bgp-datalake-x", prefix: "gamedata/", region: "us-west-2", format: "auto" } };
 

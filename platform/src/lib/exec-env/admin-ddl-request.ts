@@ -1,5 +1,4 @@
-// @kf-batch 50-G2R
-// G2R(模块 50)—— admin-DDL 的**结构化请求合同**(50 SPEC §3.9a v3.3,用户拍板 B)。
+// G2R—— admin-DDL 的**结构化请求合同**(50 SPEC §3.9a v3.3,用户拍板 B)。
 //
 // ── 这个文件替换掉了什么 ──────────────────────────────────────────────────────
 // v3.2 的公开签名是 `executeAdminDdl(targetId, { operation, statements: string[] })`,
@@ -27,18 +26,18 @@ export type AdminDdlOperation =
   | "create-shared-schema"
   | "create-role"
   | "grant"
-  // @kf-batch 52-P52.5a-supply — 见下方 `AdminDdlRequest` 里同名分支的说明。
+  // 见下方 `AdminDdlRequest` 里同名分支的说明。
   | "grant-role-to-login"
   | "drop-project-schema"
   | "dms-ingest-bootstrap"
   | "land-code-table"
-  // @kf-batch 50-WP11b-shared-writer —— 见下方 `AdminDdlRequest` 同名分支(SPEC §3.9d.4 / §3.9d.6)
+  // 见下方 `AdminDdlRequest` 同名分支(SPEC §3.9d.4 / §3.9d.6)
   | "grant-shared-writer"
   | "land-model-table"
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 见下方同名分支
+  // 见下方同名分支
   | "alter-model-table"
   | "drop-landed-table"
-  // @kf-batch 50-WP9a-durable-jobs —— permission canary 的两条(WORK-PACKAGES WP-9 ④-3 / ⑨-7)
+  // permission canary 的两条(④-3 / ⑨-7)
   | "create-canary-probes"
   | "revoke-public-create";
 
@@ -51,7 +50,6 @@ export type AdminDdlRequest =
   | { operation: "create-shared-schema"; targetId: string }
   | { operation: "create-role"; targetId: string; projectId: string }
   | { operation: "grant"; targetId: string; projectId: string }
-  // @kf-batch 52-P52.5a-supply
   // 🔴 **为什么新增的是这个 operation,而不是 `create-project-login`**:
   // Redshift 的 RBAC 是两件事 —— `CREATE USER`(带口令的登录主体)与
   // `GRANT ROLE <role> TO <user>`(把权限集合给它)。前者**必须带口令**,而
@@ -64,7 +62,6 @@ export type AdminDdlRequest =
   | { operation: "grant-role-to-login"; targetId: string; projectId: string }
   | { operation: "drop-project-schema"; targetId: string; projectId: string; approvalId: string }
   | { operation: "dms-ingest-bootstrap"; targetId: string }
-  // @kf-batch 50-WP11b-shared-writer
   // 🔴 `land-code-table` 改成 **target 级**(原来带 projectId 且落 `shared.code_<id>`,零生产调用方):
   //    码表是平台全局的、没有项目维;落点由 SSOT `codeTableLandingFqn()` 派生(过渡期 = 现网 `public.dim_code_<code>`),
   //    列定义与 home 落地**同一个作者**(`buildCodeTableCreateStatement`)。只建结构,**不灌数**(§4.6)。
@@ -74,13 +71,12 @@ export type AdminDdlRequest =
   | { operation: "grant-shared-writer"; targetId: string; codeTableId: string }
   // 维度/事实表建表(纯 DDL)。🔴 只收 modelTableId —— schema / 表名 / 列由执行器**服务端读台账**(§3.9d.6)。
   | { operation: "land-model-table"; targetId: string; modelTableId: string }
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 图形化改表(非主控区)。🔴 同样只收 modelTableId:变更计划由执行器服务端读台账上的 `pendingAlter`
+  // 图形化改表(非主控区)。🔴 同样只收 modelTableId:变更计划由执行器服务端读台账上的 `pendingAlter`
   //    (调用方先把计划写进台账再调执行器;模板从计划生成 ALTER / COMMENT 语句,与 home 路径同一个作者 `lib/modeling/alter.ts`)。
   | { operation: "alter-model-table"; targetId: string; modelTableId: string }
   // 建模落地表的 DROP(强制重建 / 解绑并清理)。合同漏了这一项:非 home 的 DROP 只有属主(admin)做得了,
-  // 而窄权写者**刻意**没有 DROP 权(E-230 ②)⇒ 必须是 admin 模板。落点同样只来自台账。
+  // 而窄权写者**刻意**没有 DROP 权⇒ 必须是 admin 模板。落点同样只来自台账。
   | { operation: "drop-landed-table"; targetId: string; kind: ModelingObjectKind; objectId: string }
-  // @kf-batch 50-WP9a-durable-jobs
   // 建 canary 探针:`proj_<id>.bgp_canary`(授本项目 role 只读)/ `shared.bgp_canary`(授本项目 role 只读)/
   // `bgp_canary_deny.bgp_canary`(**不授任何项目** ⇒ 单项目环境也能做跨项目负测)。纯 DDL + 只读授权,不写数据。
   | { operation: "create-canary-probes"; targetId: string; projectId: string }
@@ -103,7 +99,7 @@ export type ResolvedModelingObject =
       schema: string;
       physicalTable: string;
       columns: import("@/lib/modeling/types").ModelColumn[];
-      // @kf-batch 50-SEQ47c-catalog-ddl —— 台账上的待执行改表计划(只有 alter-model-table 用得到;没有 ⇒ 模板拒绝生成)
+      // 台账上的待执行改表计划(只有 alter-model-table 用得到;没有 ⇒ 模板拒绝生成)
       pendingAlter?: import("@/lib/modeling/alter").AlterPlan;
     };
 
@@ -143,7 +139,7 @@ export interface VerifiedAdminDdlContext {
   projectSchemaName?: string;
   /** 该 target 的 credentialEpoch(§3.9b);进审计与缓存键 */
   credentialEpoch: number;
-  /** @kf-batch 50-WP11b-shared-writer —— 建模类 operation 的台账对象(服务端解析;其余 operation 为 undefined) */
+  /** 建模类 operation 的台账对象(服务端解析;其余 operation 为 undefined) */
   modelingObject?: ResolvedModelingObject;
 }
 
@@ -264,7 +260,7 @@ export function parseAdminDdlRequest(input: unknown): AdminDdlRequest {
     return { operation, targetId, codeTableId };
   }
 
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 与 land-model-table 同形:只收 modelTableId,计划在台账上
+  // 与 land-model-table 同形:只收 modelTableId,计划在台账上
   if (operation === "alter-model-table") {
     const modelTableId = o.modelTableId;
     if (typeof modelTableId !== "string" || !MODEL_TABLE_ID_RE.test(modelTableId)) {

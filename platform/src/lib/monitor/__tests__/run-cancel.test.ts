@@ -1,5 +1,4 @@
-// @kf-batch 50-WP5-rungroup
-// 「取消一条 run,在它自己那个 target 上」的装配层单测(50 SPEC v3.44 §2.7 cancel;判据 E-163)。
+// 「取消一条 run,在它自己那个 target 上」的装配层单测(50 SPEC v3.44 §2.7 cancel;判据)。
 //
 // 🔴 mock 边界:**真外部**(DDB 客户端 / 两个 per-target AWS 客户端工厂 / 引擎 provider)。
 //    `run-records` 这个兄弟模块**不 mock** —— 「取消成功后台账要变成 stopped」这一步正是接缝,
@@ -73,7 +72,7 @@ beforeEach(() => {
   store["job1#r1"] = { taskId: "job1", runId: "r1", status: "running" };
 });
 
-describe("🔴 已终态一律不连坐(E-163 的负向半边)", () => {
+describe("🔴 已终态一律不连坐(负向半边)", () => {
   for (const st of ["succeeded", "failed", "stopped"]) {
     it(`${st} ⇒ 不取消、不发任何后端调用、台账一个字节不变`, async () => {
       store["job1#r1"].status = st;

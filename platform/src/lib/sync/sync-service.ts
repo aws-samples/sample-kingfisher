@@ -3,7 +3,7 @@ import { buildRedshiftTableClause } from "@/lib/sync/glue-script-generator";
 
 // SYNC-01: Channel recommendation
 export function recommendChannel(sourceType: string, targetType: string, syncMode: string) {
-  // 模块42 P42.4/P42.5:非 JDBC 范式(nosql/object-store/stream)由 provider.capabilities.syncChannels
+  // 非 JDBC 范式(nosql/object-store/stream)由 provider.capabilities.syncChannels
   //   数据驱动,不走下面 JDBC 专属的 Zero-ETL/DMS 三通道逻辑。DynamoDB/S3 只支持 Glue 批读;
   //   stream(kinesis/msk)只支持 flink-cdc(不在本"同步任务"通道体系,实时计算页单列)。
   //   🔴 JDBC 四兄弟(needsGlueConnection=true)仍走原逻辑,逐字不变(零回归)。
@@ -31,7 +31,7 @@ export function recommendChannel(sourceType: string, targetType: string, syncMod
   const isPG = ["postgresql", "aurora-pg"].includes(sourceType);
   const toRedshift = targetType === "redshift" || targetType === "both";
 
-  // 模块 31: 实时(realtime)模式 = DMS 持续 CDC 通道(唯一实现)。Glue 是批 ETL、Zero-ETL 是托管
+  // 实时(realtime)模式 = DMS 持续 CDC 通道(唯一实现)。Glue 是批 ETL、Zero-ETL 是托管
   // 复制,都不是"实时 CDC 任务";故 realtime 直接锁定 DMS 为唯一推荐+支持,避免被误推成 Glue。
   if (syncMode === "realtime") {
     const dmsSupported = isMySQL || isPG || ["oracle", "sqlserver"].includes(sourceType);
@@ -144,7 +144,7 @@ const PG_TO_REDSHIFT: Record<string, { type: string; compat: "compatible" | "con
   "interval": { type: "VARCHAR(50)", compat: "conversion" },
 };
 
-// Oracle → Redshift(P42.3)。Oracle 类型名来自 ALL_TAB_COLUMNS.DATA_TYPE(大写,introspect 已归一
+// Oracle → Redshift。Oracle 类型名来自 ALL_TAB_COLUMNS.DATA_TYPE(大写,introspect 已归一
 // 传下来时按 toLowerCase 匹配)。NUMBER 无精度时 Redshift 用 DECIMAL(38,10) 兜底(Oracle NUMBER 最大
 // 精度 38);带精度的 NUMBER(p,s) 由下方 size 逻辑保留。VARCHAR2/NVARCHAR2 → VARCHAR;CLOB/LONG → 大 VARCHAR。
 const ORACLE_TO_REDSHIFT: Record<string, { type: string; compat: "compatible" | "conversion" | "truncation" }> = {
@@ -178,7 +178,7 @@ const ORACLE_TO_REDSHIFT: Record<string, { type: string; compat: "compatible" | 
   "rowid": { type: "VARCHAR(64)", compat: "conversion" },
 };
 
-// SQL Server → Redshift(P42.3)。类型名来自 sys.types.name(小写)。bit→BOOLEAN;nvarchar/nchar
+// SQL Server → Redshift。类型名来自 sys.types.name(小写)。bit→BOOLEAN;nvarchar/nchar
 // 归 VARCHAR/CHAR;datetime2/datetimeoffset→TIMESTAMP;money→DECIMAL;uniqueidentifier→VARCHAR(36)。
 const SQLSERVER_TO_REDSHIFT: Record<string, { type: string; compat: "compatible" | "conversion" | "truncation" }> = {
   "int": { type: "INTEGER", compat: "compatible" },
@@ -224,7 +224,7 @@ export function mapColumnType(sourceDb: string, sourceType: string): { targetTyp
   const sizeMatch = normalized.match(/\((\d+(?:,\d+)?)\)/);
   const size = sizeMatch ? sizeMatch[1] : "";
 
-  // P42.3:按源库选映射表(oracle/sqlserver 各自专属,取代此前 postgresql ? PG : MYSQL 的二选一,
+  // 按源库选映射表(oracle/sqlserver 各自专属,取代此前 postgresql ? PG : MYSQL 的二选一,
   // 后者会让 Oracle/SQLServer 全部 fallback 到 MySQL 表 → 未命中 → VARCHAR(256))。默认 MySQL(兼容旧行为)。
   const registry = TYPE_REGISTRIES[sourceDb] || MYSQL_TO_REDSHIFT;
   const mapping = registry[normalized] || registry[baseType];

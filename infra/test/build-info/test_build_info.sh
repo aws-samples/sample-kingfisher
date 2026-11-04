@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 序 39 第二刀 —— 平台镜像构建信息(infra/lib/shared/build-info.ts,唯一作者)的离线判据,在本仓库真跑:
+# 平台镜像构建信息(infra/lib/shared/build-info.ts,唯一作者)的离线判据,在本仓库真跑
 #   ① git 克隆里:四个键都在、产品提交是短哈希、提交时间是 ISO、VERSION 非空(release tag 可空 = 未发版构建,合法);
 #   ② 非 git 目录里:四个值全空且**不抛**(synth 不能因版本标签失败,页面侧如实显示「构建信息不可用」);
 #   ④ 非 git 目录 + 产品包的 BUILD-INFO.json:事实读自文件、tag 按同一规则选;坏文件当没有。

@@ -1,12 +1,10 @@
 "use client";
-// @kf-batch 53-guide-v1
-// 模块 53 「操作指引」—— 全局状态(打开 / 关闭 / 当前 tab)+ 首次登录自动打开。
+// 「操作指引」—— 全局状态(打开 / 关闭 / 当前 tab)+ 首次登录自动打开。
 // 挂在 layoutClient 的壳层里(登录页不挂);Header 的 ❓ 与首页「新手引导」卡都经 useGuide() 打开同一个抽屉。
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { GUIDE_AUTO_KEY, GUIDE_SEEN_KEY } from "@/lib/guide/content";
 import OperationGuideDrawer from "./OperationGuideDrawer";
-// @kf-batch 53-guide-tour
 import { TOUR_PROGRESS_KEY, TOUR_DONE_KEY, readProgress } from "@/lib/guide/tour";
 import TourRunner from "./TourRunner";
 
@@ -18,7 +16,7 @@ interface GuideCtx {
   openGuide: (tab?: GuideTab) => void;
   close: () => void;
   setTab: (t: GuideTab) => void;
-  // @kf-batch 53-guide-tour —— 交互式导览(用户 2026-09-14:「一步一步引导人家」)
+  // 交互式导览(用户 2026-09-14:「一步一步引导人家」)
   /** 正在跑的动线 key(null = 没在跑)。 */
   tourJourney: string | null;
   tourIndex: number;
@@ -39,7 +37,7 @@ export default function GuideProvider({ children }: { children: React.ReactNode 
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<GuideTab>("page");
   const pathname = usePathname();
-  // @kf-batch 53-guide-tour —— 导览状态 + **跨页续跑**(进度存 localStorage,换页不从头开始)
+  // 导览状态 + **跨页续跑**(进度存 localStorage,换页不从头开始)
   const [tourJourney, setTourJourney] = useState<string | null>(null);
   const [tourIndex, setTourIndex] = useState(0);
 
@@ -95,7 +93,7 @@ export default function GuideProvider({ children }: { children: React.ReactNode 
       const seen = localStorage.getItem(GUIDE_SEEN_KEY);
       if (auto !== "0" && !seen) {
         localStorage.setItem(GUIDE_SEEN_KEY, new Date().toISOString());
-        // @kf-batch 53-guide-tour —— 🔴 首次进站**直接开始导览**(不再只弹一本说明书)。
+        // 🔴 首次进站**直接开始导览**(不再只弹一本说明书)。
         //    用户 2026-09-14:「不是给一个操作说明放在那里不动的东西」。
         //    抽屉仍然留着,由 ❓ 随时打开当参考手册。
         setTourJourney("dev");

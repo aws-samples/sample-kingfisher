@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 数据面长作业表的**唯一写通道**(WORK-PACKAGES WP-9 ④-1:lease + runToken + revision 的 CAS fencing)。
+// 数据面长作业表的**唯一写通道**(④-1:lease + runToken + revision 的 CAS fencing)。
 //
 // ── 三个条件写,各挡一类事故 ─────────────────────────────────────────────────────
 //   createJob  `attribute_not_exists(jobId)`      —— 确定性 id + 这一条 ⇒ 重复入队只有一条。
@@ -117,7 +116,7 @@ export type ClaimResult =
   | { kind: "not-due"; job: DataplaneJobRow };
 
 /**
- * 抢占一条作业(WP-9 ④-1:抢占 = `lease 过期 ∧ revision = :r`)。
+ * 抢占一条作业(④-1:抢占 = `lease 过期 ∧ revision = :r`)。
  *
  * 🔴 `respectSchedule`:泵来推进时必须到期才抢(`nextRunAt <= now`);页面「立即推进」可以跳过等待
  *    (人明确要求现在就看一眼),但**租约与 revision 条件一条不少** —— 跳过的只是退避,不是互斥。
@@ -300,7 +299,7 @@ export async function listJobsByTarget(
 }
 
 /**
- * 该执行环境上**未终态**的作业数(WP-30 删除预检要读它:有在途作业的环境不许直接删)。
+ * 该执行环境上**未终态**的作业数(删除预检要读它:有在途作业的环境不许直接删)。
  * 🔴 数不清就抛,不回 0 —— 「数不清」当成「没有」就是放行删除。
  */
 export async function countActiveJobs(targetId: string): Promise<number> {

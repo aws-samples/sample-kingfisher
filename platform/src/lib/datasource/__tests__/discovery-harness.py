@@ -1,4 +1,4 @@
-# §discovery —— 序 38 B-70 数据源表发现脚本(lib/datasource/glue-reach.ts buildDiscoveryScript 的产物)的**离线替身**:
+# §discovery —— 数据源表发现脚本(lib/datasource/glue-reach.ts buildDiscoveryScript 的产物)的**离线替身**:
 #   把平台生成的 PySpark 脚本原样 exec,底下换成假的 awsglue / pyspark / boto3(内存里的 information_schema 行、假 secret、
 #   假 S3 put_object),跑完把「发了哪些 JDBC 选项、读了哪个 secret、往哪个桶 / 键写了什么 JSON、退出码」吐成 JSON。
 #   判据断的是**结果**(归一后的表 / 列 / 可空 / 缺省 schema 去前缀、库名护栏真拒),不是脚本里有没有某段文字。

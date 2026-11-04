@@ -1,4 +1,4 @@
-// @kf-batch 42-B80-revoke-readback —— `revoke-public-create` 的**收口回读**(台账 B-80)。
+// `revoke-public-create` 的**收口回读**(台账)。
 //
 // 🔴 为什么要有这一步:2026-10-14 第三十七轮硬门 MIG-CN-5 —— 撤 PUBLIC 在 public 上的 CREATE 回 200 之后**立刻**复跑 canary,
 //   C-6(项目身份在 public 建表)仍然建成;12h 后单独复跑 8/8 绿、目录里 `nspacl={…,=U/rdsdb,…}`、`has_schema_privilege=false`。

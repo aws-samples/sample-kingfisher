@@ -75,11 +75,11 @@ def admin_password(profile: str) -> str:
 
 
 # ── 平台 API(Bearer)──────────────────────────────────────────────────────────
-# 模块 55 长操作统一框架(platform/src/lib/long-ops/protocol.ts):已接入的路由在 45 秒内没到终态就回
-# **202 + `protocol:"long-op/1"`**(建源 B-129 · 引擎作业「运行」B-136 · 编排发布 / 触发 · Flink 启停 …),
+# 长操作统一框架(platform/src/lib/long-ops/protocol.ts):已接入的路由在 45 秒内没到终态就回
+# **202 + `protocol:"long-op/1"`**(建源 引擎作业「运行」· 编排发布 / 触发 · Flink 启停 …),
 # 浏览器里由全局 fetch 拦截器轮询 `GET /api/long-ops/<taskId>` 到终态再整形成与同步响应同形的状态码 / 信封。
 # 这里按 lib/long-ops/client/follow.ts 同一口径整形,调用点零改动 —— 判据看到的 HTTP 状态与页面用户看到的逐字一致。
-# 🔴 2026-10-29 B-136 之前 EMR「运行」冷启动在请求路径上等 ~60s ⇒ 这里拿到的是 CloudFront 504 HTML;接成长操作后
+# 🔴 2026-10-29 此前 EMR「运行」冷启动在请求路径上等 ~60s ⇒ 这里拿到的是 CloudFront 504 HTML;接成长操作后
 #   同一处会拿到 202,不跟进就会把「正在后台提交」误判成红(判据自己的缺陷,不是产品)。
 LONG_OP_PROTOCOL = "long-op/1"
 LONG_OPS_API = "/api/long-ops"
@@ -492,7 +492,7 @@ def main() -> int:
                       "description": "渠道行为漏斗 login → battle → purchase(最大事实表 player_events)"}, "jobId")
 
     # ── 4) 编排:两个 SQL 节点(原子重算 → ANALYZE)+ 每日定时;发布到该区的 MWAA Serverless ────
-    # 🔴 B-66(2026-10-12 第二十九轮真环境坐实):原来是「DROP 节点 → CTAS 节点」,两个节点 = 两个事务,每次运行都有
+    # 🔴 (2026-10-12 第二十九轮真环境坐实):原来是「DROP 节点 → CTAS 节点」,两个节点 = 两个事务,每次运行都有
     #   一两分钟 dws_channel_roi_daily **不存在**的窗口;同一时刻定时刷新的问数卡片(以及任何读这张表的人)报
     #   `relation does not exist`。根治在产品侧:工作流 SQL 节点多语句 ⇒ 单事务(batch_execute_statement)。
     #   示范对象随之改成一个节点里 DROP + CTAS(原子),第二个节点 ANALYZE 刷统计信息 —— 仍是「2 节点 / 1 连线」。
@@ -520,9 +520,8 @@ def main() -> int:
                                  {"name": "channel_type", "dataType": "VARCHAR", "length": 32}]},
                     "modelTableId")
 
-    # ── 7) 实时计算(模块 32):该区**自己的** Kinesis 源流 + 长期保留的流作业 ──────────
-    # @kf-batch 50-WP27-9cap-matrix
-    # 🔴 为什么要有这一段(WP-27 立包理由):实时计算原来**不在能力矩阵里**,只由「自造夹具、验完删净」
+    # ── 7) 实时计算:该区**自己的** Kinesis 源流 + 长期保留的流作业 ──────────
+    # 🔴 为什么要有这一段(立包理由):实时计算原来**不在能力矩阵里**,只由「自造夹具、验完删净」
     #   的硬门段覆盖 ⇒ 用户切到某个区,实时计算页是空的(或只剩几个停掉的夹具)。这里建的对象**不删**。
     # 🔴 流式作业天生「一区一个应用」⇒ 每个区各建一条源流 + 一个作业,名字带区。
     # 🔴 源流由**产品自己**按需新建(`provision: true`):平台刻意不建固定流,所以「那个区有没有流」
@@ -534,7 +533,7 @@ def main() -> int:
                        {"name": f"{P}-RT-Stream", "type": "kinesis", "env": "dev", "tags": ["showcase"],
                         "targetId": tid, "provision": True,
                         # 🔴 连接袋**不传 region**:物理区由「章」派生(平台会用 targetId 的 region 覆盖);
-                        #   传了不一致的 region 平台会当场拒(那正是 WP-27 同批修的洞)。
+                        #   传了不一致的 region 平台会当场拒(那正是同批修的洞)。
                         "connection": {"streamName": f"bgp-showcase-{slug}-rt", "shardCount": 1}},
                        "datasourceId")
         if rt_ds:
@@ -671,7 +670,7 @@ def main() -> int:
             led.add("治理", f"{P} 质量规则 row_count≥1 评估", st == 200 and sts and all(s_ != "error" for s_ in sts),
                     f"fqn={fqn} results={sts} {[str(x.get('message') or '')[:80] for x in results]}")
 
-    # ── 建模:落地到该区(WP-11b 已交付:非 home 与 home 同样必须 ok;credential-gap 不再是合法态)──
+    # ── 建模:落地到该区(已交付:非 home 与 home 同样必须 ok;credential-gap 不再是合法态)──
     if ct_id and want("model"):
         st, j = api.post(f"/api/modeling/codetables/{ct_id}/land", {"targets": [tid]})
         r = ddb.get_item(TableName="bgp-code-tables", Key={"pk": {"S": "codetable"}, "codeTableId": {"S": ct_id}}).get("Item") or {}
@@ -685,7 +684,6 @@ def main() -> int:
         led.add("建模", f"{P} 维度表应用", status == "ok", f"HTTP {st} landedByTarget[{tid}].status={status} {err_text(j) if st != 200 else ''}")
 
     # ── 7run) 实时计算:启动 → 等 MSAF RUNNING → 造数 → 读到聚合结果;🔴 **跑完不停** ──────
-    # @kf-batch 50-WP27-9cap-matrix
     # 🔴 与其它能力不同:流式作业的「成功」不是终态 succeeded,而是**持续 RUNNING**。
     #   所以这一段刻意**不停止、不删除** —— 用户切到那个区就应当看见一个正在跑的流作业。
     #   ⚠️ 代价要说清:MSAF 应用按 KPU-小时计费 + 每条 provisioned 流 1 shard 也在计费。
@@ -732,8 +730,7 @@ def main() -> int:
             led.add("实时", f"{P} 聚合结果真落到本区的湖", cnt > 0,
                     f"1 分钟滚动窗口产出行数={cnt}(0 = 窗口没关 / 没消费到数据)")
 
-    # ── 8run) 智能问数(模块 54):在该区问一次 + **保存成会话卡片**(长期保留、切区看得见)──────
-    # @kf-batch 50-WP27-9cap-matrix
+    # ── 8run) 智能问数:在该区问一次 + **保存成会话卡片**(长期保留、切区看得见)──────
     # 🔴 为什么必须落成**卡片**而不是只留一条历史:历史是内部台账,用户在页面上看到的「我的问数」是卡片;
     #   而卡片的正文按设计**存在该区**(54 DESIGN:标题与正文都留在各自的区)—— 这正是要验的驻留语义。
     if want("genbi"):
@@ -746,7 +743,7 @@ def main() -> int:
                          timeout=300)
         d = data_of(j) or {}
         # 🔴 问数可能是**异步**的(部署开了 `GENBI_ASYNC`):回 **202 + {taskId, status:"pending"}**,
-        #   真正的执行由轮询 `GET /api/genbi/tasks/<id>` 抢占驱动(模块 38:躲 CloudFront 60s 墙)。
+        #   真正的执行由轮询 `GET /api/genbi/tasks/<id>` 抢占驱动(躲 CloudFront 60s 墙)。
         #   第一版按同步写 ⇒ 拿到 202 就判红,而问数其实跑得很好(判据自己的 bug,不是产品)。
         #   🔴 两条分支都要能过:开关状态不该决定判据成败。
         if st == 202 and isinstance(d, dict) and d.get("taskId"):

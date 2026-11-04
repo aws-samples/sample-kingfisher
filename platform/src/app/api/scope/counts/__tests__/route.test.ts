@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4-o1-scope
-// `GET /api/scope/counts` 的可执行门禁(合同 SPEC v3.34 §2.6.6;判据 E-151)。
+// `GET /api/scope/counts` 的可执行门禁(合同 SPEC v3.34 §2.6.6;判据)。
 //
 // 🔴 为什么必须**可执行**而不是扫源码:本端点最可能出的 bug 是「静默少报」——
 // DDB 的单次返回是**过滤之前**的量,不翻页就会漏行,而界面上的表现是
@@ -60,7 +59,7 @@ vi.mock("@/lib/projects/guard", async () => {
 const modelRows: Row[] = [];
 vi.mock("@/lib/modeling/dimensions", () => ({ listModelTables: vi.fn(async () => modelRows) }));
 vi.mock("@/lib/modeling/service", () => ({ listCodeTables: vi.fn(async () => []) }));
-// @kf-batch 50-WP4bis-p1-scope —— 补数计划:`listPlans` 是这张表的唯一读法(项目维在 pk 里)
+// 补数计划:`listPlans` 是这张表的唯一读法(项目维在 pk 里)
 const planRows: Row[] = [];
 const listPlansCalls: string[] = [];
 vi.mock("@/lib/backfill/service", () => ({

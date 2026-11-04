@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 步 4 的结构性判据(ACCEPTANCE v1.43 段 `slsw`:SW-3 / SW-9 / N-3 的发布期一半;真跑那一半在段里)。
 //
 // 🔴 这一批判据的母题是本仓反复出现的那个元 bug:**机制早就建好,只是那条路径没接**。
@@ -42,8 +41,8 @@ describe("SW-3 发布:serverless 分支真的接上了", () => {
     // 🔴 切片锚点必须是**代码**:这里读的是剥过注释的源,拿注释当锚点会 indexOf === -1 ⇒
     //   `slice(x, -1)` 悄悄把整份源都切进来,判据又变成「只要别处有就算过」(第二次踩同一个坑)。
     //
-    // @kf-batch 50-B09-carrier-drift —— 🔴🔴 **改判(第三次踩同一个坑,这次终于按意图写)**:
-    //   上一版写的是「整篇 `indexOf('if (isServerlessEndpoint(ep)) {')`」。B-09 把产物生成抽成
+    // 🔴🔴 **改判(第三次踩同一个坑,这次终于按意图写)**:
+    //   上一版写的是「整篇 `indexOf('if (isServerlessEndpoint(ep)) {')`」。把产物生成抽成
     //   唯一作者 `buildCarrierArtifact` 之后,**同样的锚点在两个函数里都有**
     //   ⇒ 整篇 indexOf 命中的是**生成函数**里那一个 ⇒ 切片里当然没有 ARN 兜底 ⇒ 判据红在
     //   一次完全正确的重构上。注释里早写着「改成**逐个函数切片**断」,而实现从来没做到。
@@ -66,7 +65,7 @@ describe("SW-3 发布:serverless 分支真的接上了", () => {
     expect(strip(read("app/api/workflow/[id]/publish/route.ts"))).not.toContain("WorkflowSchedulerUnsupported");
   });
 
-  // @kf-batch 50-WP18b-fanout-seam —— 判据从「形态」改判到「事实」:
+  // 判据从「形态」改判到「事实」:
   //   承重的是**「external 节点发布 ⇒ 400」**,不是「路由源码里出现 ServerlessNodeUnsupported」。
   //   这条判定 2026-09-16 收进了单一作者 `schedulerRejectResponse`(扇出会把拒因包一层,
   //   路由各写一遍的 instanceof 全落空 ⇒ 真环境回了 500)。钉形态的写法在那次演进里假红。
@@ -79,7 +78,7 @@ describe("SW-3 发布:serverless 分支真的接上了", () => {
     const body = (await r!.json()) as { error?: { code?: string; nodeTypes?: string[] } };
     expect(body.error?.nodeTypes).toEqual(["external"]);
     expect(body.error?.code).toBe("SERVERLESS_NODE_UNSUPPORTED");
-    // 接线层:执行体必须走那个作者(自己再判一遍 = 两处判定,迟早只改一处);序 50 第二批:发布主体在 lib/workflow/long-ops.ts,路由只 submitLongOp
+    // 接线层:执行体必须走那个作者(自己再判一遍 = 两处判定,迟早只改一处);:发布主体在 lib/workflow/long-ops.ts,路由只 submitLongOp
     const route = strip(read("app/api/workflow/[id]/publish/route.ts"));
     expect(route).toContain('kind: "workflow-publish"');
     expect(route).not.toContain("publishWorkflowDag(");
@@ -103,7 +102,7 @@ describe("SW-9 下线:两种调度器都能撤,且**不许恒打主控区**", ()
     const iOff = un.indexOf("offlineServerlessWorkflow({");
     expect(iIf).toBeGreaterThan(0);
     expect(iOff).toBeGreaterThan(iIf);
-    expect(un.slice(iIf, iOff), "serverless 分支在真正下线之前就 return 了 ⇒ 孤儿 workflow(T-14 的学费)").not.toMatch(/\breturn\b/);
+    expect(un.slice(iIf, iOff), "serverless 分支在真正下线之前就 return 了 ⇒ 孤儿 workflow(真环境学费)").not.toMatch(/\breturn\b/);
     // ARN 兜底(台账丢了也不许留孤儿)
     expect(un.slice(iIf, iOff)).toMatch(/known\s*\|\|\s*\(await findWorkflowArnByName\(ep\.region, dagId\)\)/);
   });
@@ -124,7 +123,7 @@ describe("SW-9 下线:两种调度器都能撤,且**不许恒打主控区**", ()
   });
 
   it("unpublish 执行体走单一作者;撤不下来 ⇒ 502 且**不许**把记录改成 draft", () => {
-    // 序 50 第二批:下线主体在执行体 workflow-unpublish(路由只 submitLongOp 自己的 kind)
+    // 下线主体在执行体 workflow-unpublish(路由只 submitLongOp 自己的 kind)
     const unpublishRoute = strip(read("app/api/workflow/[id]/unpublish/route.ts"));
     expect(unpublishRoute).toContain('kind: "workflow-unpublish"');
     expect(unpublishRoute).not.toContain("unpublishWorkflowDag(");
@@ -153,7 +152,7 @@ describe("SW-9 下线:两种调度器都能撤,且**不许恒打主控区**", ()
 
 describe("触发 / 解挂:落点必须来自解析器", () => {
   it("🔴 serverless 手动触发 = StartWorkflowRun,且**不预写台账行**(键由服务侧决定,预写就是第二行)", () => {
-    // 序 50 第二批:逐 target 触发的主体 triggerOneTarget 在执行体文件里(路由只留子集校验 / 法域同意 / 运行组开立 + submitLongOp)
+    // 逐 target 触发的主体 triggerOneTarget 在执行体文件里(路由只留子集校验 / 法域同意 / 运行组开立 + submitLongOp)
     const triggerRoute = strip(read("app/api/workflow/[id]/trigger/route.ts"));
     expect(triggerRoute).toContain('kind: "workflow-trigger"');
     expect(triggerRoute).not.toContain("startWorkflowRun(");
@@ -169,7 +168,7 @@ describe("触发 / 解挂:落点必须来自解析器", () => {
   });
 
   it("🔴 解挂只有一个作者(`ensureDagUnpaused`),两个调用方都不许自己解析端点", () => {
-    // 序 50 第二批:发布的解挂在执行体里(且从 fire-and-forget 改为等它做完);publish 路由本身只 submitLongOp
+    // 发布的解挂在执行体里(且从 fire-and-forget 改为等它做完);publish 路由本身只 submitLongOp
     expect(strip(read("app/api/workflow/[id]/publish/route.ts"))).not.toContain("unpauseWhenLoaded(");
     expect(strip(read("lib/workflow/long-ops.ts"))).toContain("await ensureDagUnpaused(");
     for (const f of ["app/api/schedule/enable/route.ts", "lib/workflow/long-ops.ts"]) {
@@ -180,7 +179,7 @@ describe("触发 / 解挂:落点必须来自解析器", () => {
     }
     const lib = strip(read("lib/workflow/publish-dag.ts"));
     expect(lib).toMatch(/export async function ensureDagUnpaused/);
-    // @kf-batch 50-WP18-workflow-fanout —— 解挂改成**逐个绑定区**之后,这条判据钉的应该是**事实**
+    // 解挂改成**逐个绑定区**之后,这条判据钉的应该是**事实**
     //   (serverless 分支不去 unpause、如实标 scheduler),而不是当时那一行的写法。
     const fn = lib.slice(lib.indexOf("export async function ensureDagUnpaused"));
     const iSls = fn.indexOf("isServerlessEndpoint(ep)");

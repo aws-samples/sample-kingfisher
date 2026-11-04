@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-P50.3-mrquery
 // **多 region 查询结果:一个 region 一个 sheet**(50 INTERACTION §4septies,用户 2026-09-04 定的交互)。
 //
 // 🔴 本组件的全部设计压力来自用户那两条约束:
@@ -34,7 +33,7 @@ export interface Submission {
   home: boolean;
   credential: "per-project" | "shared-admin" | "worker-iam";
   jurisdiction: string;
-  /** @kf-batch 50-W5-seg2-WP10a 跨法域 target 的区域审计 ID(服务端提交前写;sheet 头显示「审计 #…」) */
+  /** 跨法域 target 的区域审计 ID(服务端提交前写;sheet 头显示「审计 #…」) */
   auditId?: string;
   statementId?: string;
   handleId?: string;
@@ -332,7 +331,7 @@ export default function MultiRegionResults({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allTerminal, sheets, submissions]);
 
-  // @kf-batch 50-W5-seg1-WP10a —— 原 `crossJur`(跨法域时禁用合并)**已删**:不设法务门,合并对跨法域 target 可用(查询已审计)。
+  // 原 `crossJur`(跨法域时禁用合并)**已删**:不设法务门,合并对跨法域 target 可用(查询已审计)。
 
   const compareRows = submissions.map((s) => {
     const st = sheets[s.targetId] || ({} as SheetState);
@@ -360,7 +359,7 @@ export default function MultiRegionResults({
         <Tag color={s.credential === "per-project" ? "green" : s.credential === "shared-admin" ? "orange" : "default"}>
           {s.credential}
         </Tag>
-        {/* @kf-batch 50-W5-seg2-WP10a —— 中性法域标签 + 区域审计 ID(INTERACTION v2.17 §4bis.1;不带任何「知情 / 担责」措辞) */}
+        {/* 中性法域标签 + 区域审计 ID(INTERACTION v2.17 §4bis.1;不带任何「知情 / 担责」措辞) */}
         {s.jurisdiction && s.jurisdiction !== "home" ? (
           <>
             {" "}· <Tag color="geekblue" data-testid="sheet-jurisdiction">🌍 {s.jurisdiction}</Tag>
@@ -538,7 +537,7 @@ export default function MultiRegionResults({
       ),
   };
 
-  // @kf-batch 50-WP4sexies-home-region —— region 在本次提交里是否**不唯一**(同区多目标 ⇒ 标签必须带 targetId)
+  // region 在本次提交里是否**不唯一**(同区多目标 ⇒ 标签必须带 targetId)
   const regionAmbiguous = (region: string) => submissions.filter((x) => x.region === region).length > 1;
   const items: any[] = [
     // 单区不放对比 tab(见上方 `single` 的说明)
@@ -547,14 +546,14 @@ export default function MultiRegionResults({
       key: s.targetId,
       label: (
         <Space size={4}>
-          {/* @kf-batch 50-WP4sexies-home-region —— 🔴 标签原来**只写 region**:同一 region 装了多个执行目标时
+          {/* 🔴 标签原来**只写 region**:同一 region 装了多个执行目标时
               (生产形态允许,旧环境 usw2_a/b/c 三个都在 us-west-2)几张 sheet 的标签**一模一样**,
               用户没法分辨哪张是哪个目标(排障第一个问题就是「我到底打到哪了」)。
               ⇒ region 不唯一时把 targetId 一起显示;唯一时保持原样(不给常见情形添噪音)。 */}
           <Tag color={s.home ? "default" : "cyan"} style={{ marginInlineEnd: 0 }} title={s.targetId}>
             {regionAmbiguous(s.region) ? `${s.region} · ${s.targetId}` : s.region}
           </Tag>
-          {/* @kf-batch 50-W5-seg2-WP10a —— 跨法域 sheet 的 tab 上也带 🌍 法域(用户一眼看出这个区不在本法域) */}
+          {/* 跨法域 sheet 的 tab 上也带 🌍 法域(用户一眼看出这个区不在本法域) */}
           {s.jurisdiction && s.jurisdiction !== "home" ? <Tag color="geekblue" style={{ marginInlineEnd: 0 }}>🌍 {s.jurisdiction}</Tag> : null}
           {badgeOf(s)}
         </Space>
@@ -571,7 +570,7 @@ export default function MultiRegionResults({
       (sheets[s.targetId].rows || []).map((r, i) => ({
         key: `${s.targetId}-${i}`,
         __region: s.region,
-        // @kf-batch 50-WP4sexies-home-region —— 🔴 同一 region 可以有**多个执行目标**
+        // 🔴 同一 region 可以有**多个执行目标**
         // (生产形态就是单账号 × 多 region,而一个 region 里可以装多套;旧环境 usw2_a/b/c 三个都在 us-west-2)。
         // 只写 region 时,两个目标的行在「来源」上**一模一样**,合并表就成了「不知道哪行来自哪」。
         __targetId: s.targetId,

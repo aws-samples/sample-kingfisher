@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 37 v2 — 字段配置器(QuickSight 式三栏拖拽工作台,治"不会用")。
+// 字段配置器(QuickSight 式三栏拖拽工作台,治"不会用")。
 // 左栏:数据集字段列表(#数值/📅日期/文本图标,可搜索,HTML5 draggable);
 // 中栏:改图表类型 + 字段架(X轴/值(聚合)/分组·颜色/筛选,拖字段进槽,槽内可删/改聚合);
 // 右栏:大画布预览(占最大面积,BiChart 出图)。
@@ -18,7 +18,7 @@ import { useT } from "@/lib/i18n/useT";
 import WidgetRenderer from "@/components/bi/WidgetRenderer";
 import { AGG_FNS, measureAlias, type AggFn, type FilterOp, type BuilderSpec } from "@/lib/bi/query-builder";
 import type { BiEngine, BiChartType, WidgetViz } from "@/lib/bi/types";
-// @kf-batch 50-WP4ter-coverage —— 字段配置器的预览也必须打到当前视角那个区(工单 SC-7):
+// 字段配置器的预览也必须打到当前视角那个区
 // 否则「预览看到的是主控区、保存后跑在别的区」—— 两个区的同名表数据不同,用户会以为保存坏了。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope } from "@/lib/scope/scope";
@@ -65,9 +65,9 @@ export default function FieldConfigurator({
   onChange: (v: FieldConfigValue) => void;
 }) {
   const t = useT();
-  // @kf-batch 50-WP4ter-coverage —— 预览落点 = 当前视角(「全部」= 主控区)
+  // 预览落点 = 当前视角(「全部」= 主控区)
   const { scope: fcScope } = useScope();
-  // @kf-batch 50-WP31-place-first-class —— 恒有(全部 = 主控区,显式;后端缺 ⇒ 400)
+  // 恒有(全部 = 主控区,显式;后端缺 ⇒ 400)
   const fcTarget = landingOfScope(fcScope);
   const [tables, setTables] = useState<SchemaTable[]>([]);
   const [loadingSchema, setLoadingSchema] = useState(false);

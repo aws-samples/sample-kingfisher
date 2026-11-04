@@ -11,7 +11,7 @@
 
 // ───────────────────────── 入参:消费方描述"在配什么" ─────────────────────────
 
-// 【模块47 L2】ParamChannel + ParamDef 已下沉 @paramadvisor/core(./core/types)——core 须独立
+// ParamChannel + ParamDef 已下沉 @paramadvisor/core(./core/types)——core 须独立
 // 编译成 CJS 给容器 import。此处反向 re-export,消费方(本文件 + prompt/heuristics/skills-handler)
 // 路径与用法逐字不变(单一定义在 core,杜绝"两个 ParamChannel"类型漂移)。
 export type { ParamChannel, ParamDef } from "./core/types";
@@ -141,7 +141,7 @@ export type ParamPrefill =
       // 复制实例规格属基建层(realtime-stack),平台表单无此字段——推荐仅展示,不入 prefill。
     }
   | {
-      // EMR Serverless Spark 作业(模块 33-A):spec 形态对齐 lib/engines/emr/spec.ts EmrSpec,
+      // EMR Serverless Spark 作业:spec 形态对齐 lib/engines/emr/spec.ts EmrSpec,
       // 消费方(EMR 提交表单)按此一键回填 driver/executor 规格与 executor 数。
       channel: "emr";
       spec: {

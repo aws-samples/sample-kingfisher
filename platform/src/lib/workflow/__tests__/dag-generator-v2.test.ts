@@ -1,4 +1,4 @@
-// 模块 33-B — 新引擎生成器单测(vitest)。验:spec 结构 / 注入面归零 / 能力门 / branch→join 拓扑。
+// 新引擎生成器单测(vitest)。验:spec 结构 / 注入面归零 / 能力门 / branch→join 拓扑。
 // Python 运行时行为(受限执行器拒危险脚本、operator 真跑)在阶段 5 部署到 MWAA 无头验证。
 import { describe, it, expect } from "vitest";
 import { buildDagSpec, generateAirflowDagV2, checkEngineCapability, assertSpecValid } from "@/lib/workflow/dag-generator-v2";
@@ -26,13 +26,13 @@ describe("registry SSOT 完整性", () => {
       expect(NODE_REGISTRY[t].minEngine).toBe("runtime-lib");
     }
   });
-  it("恰好 sql + sync + job 支持补数(sync 自序 37 起;job 自序 73 起:按业务日期跑一次引用的离线作业),其余不支持", () => {
+  it("恰好 sql + sync + job 支持补数(sync ;job :按业务日期跑一次引用的离线作业),其余不支持", () => {
     const backfillable = ALL_NODE_TYPES.filter((t) => NODE_REGISTRY[t].supportsBackfill).sort();
     expect(backfillable).toEqual(["job", "sql", "sync"]);
     expect(NODE_REGISTRY.python.supportsBackfill).toBe(false);
     expect(NODE_REGISTRY.branch.supportsBackfill).toBe(false);
   });
-  // 序 73 模块 57:离线作业节点的注册行(与 branch 同口径 minEngine=runtime-lib;serverless 可表达;可拖;未关联 ⇒ 错误键)
+  // 离线作业节点的注册行(与 branch 同口径 minEngine=runtime-lib;serverless 可表达;可拖;未关联 ⇒ 错误键)
   it("job 节点:runtime-lib · serverless task · 可拖 · validate 只认闭合 kind + 非空 jobId", () => {
     expect(NODE_REGISTRY.job.minEngine).toBe("runtime-lib");
     expect(NODE_REGISTRY.job.serverless).toBe("task");

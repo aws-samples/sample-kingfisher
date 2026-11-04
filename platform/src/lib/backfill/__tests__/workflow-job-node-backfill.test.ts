@@ -1,4 +1,4 @@
-// 序 73 模块 57(R6)—— workflow 作用域的离线作业节点补数:
+// workflow 作用域的离线作业节点补数
 //   ETL ⇒ runEtlJob(job, { runDate, triggeredBy: "backfill", targetId: 工作流的区, backfill: { planId, nodeId } });EMR ⇒ provider.submit 同形;
 //   返回 runTaskId = 作业 id;作业不绑工作流的区 ⇒ 如实失败(JobNodeUnbound,与发布期同一判定);补数标记字段只有一个作者 backfillRunExtra,
 //   两个运行核心(etl/job-service · emr/provider)都把它铺进 run 行 extra(源码字面钉接缝)。

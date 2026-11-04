@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // per-target 的 Redshift 客户端与数仓落点 —— **唯一出口**(50 SPEC §3.9a 第 8 步 / §3.4 / S10)。
 //
 // ── 为什么必须新建这个文件 ────────────────────────────────────────────────────
@@ -8,18 +7,18 @@
 // 不能来自进程 env。没有这个出口,执行器就只能把 `process.env.AWS_REGION` 再抄一遍,
 // 于是"给 us-west-2 的 target 建 schema"会**静默打到 home**(不报错、看起来正常)。
 //
-// 🔴 **本批只给执行器与供给层用,不去动那 12 处**(那是 P50.3 数据面的活)。
+// 🔴 **本批只给执行器与供给层用,不去动那 12 处**(那是数据面的活)。
 //    刻意如此:那 12 处是 execute/GenBI/建模/质量/指标的热路径,顺手改它们
-//    等于把 P52.5a 的验收面扩到整条数据面 —— 但**落点已经在这里备好**,
-//    P50.3 接线时不需要再造第二个工厂。
+//    等于把 验收面扩到整条数据面 —— 但**落点已经在这里备好**,
+//    接线时不需要再造第二个工厂。
 //
 // 🔴 **home 逐字节等价**:home 的 workgroup/database 仍走 `warehouse-location`
-//    (env → 命名 SSOT 的三级兜底,P50.1 已钉住);region 仍是 `process.env.AWS_REGION`。
+//    (env → 命名 SSOT 的三级兜底,已钉住);region 仍是 `process.env.AWS_REGION`。
 //    非 home 才从描述符 `resources` 袋取 —— 这是 `warehouse-location.ts` 文件头立的规矩:
 //    「非 home 的落点**不能从 env 猜**,必须来自该 target 描述符的实名资源袋」。
 
 import { homeRegion as readHomeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
+// 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
 import { notePlaceDecision } from "@/lib/place/context";
 import {
   RedshiftDataClient,
@@ -29,11 +28,11 @@ import {
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 import { homeDatabase, homeWorkgroup } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色键的单一作者(SPEC v3.21 §3.1a 规则 ①)
+// 执行角色键的单一作者(SPEC v3.21 §3.1a 规则 ①)
 import { assertPerTargetExecRole, roleNameOfArn } from "@/lib/exec-env/exec-roles";
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— 角色名的唯一真值源(不在这里拼字符串)
+// 角色名的唯一真值源(不在这里拼字符串)
 import { resourceName } from "@/lib/aws/naming";
-// @kf-batch 50-WP31-place-first-class —— 构造 + 按区缓存 + 越区断言收到唯一工厂;本文件的 xxxClientFor 只是薄委托(调用方不改)
+// 构造 + 按区缓存 + 越区断言收到唯一工厂;本文件的 xxxClientFor 只是薄委托(调用方不改)
 import { dynamoDocClient, redshiftDataClient, regionalClient, __resetClients } from "@/lib/aws/clients";
 
 /** 某个执行目标的 Redshift 落点(region 也是落点的一部分 —— 少了它就是跨区静默执行)。 */
@@ -132,8 +131,8 @@ export function resolveTargetGlue(t: ExecutionTarget): TargetSparkLanding {
     targetId: t.targetId,
     region,
     scriptsBucket: requireStringResource(t, "scriptsBucket"),
-    // 🔴 WP-3(SPEC v3.21 §6.1 段二):非 home 的 Glue 角色必须是**本 target 自己的**(角色名 = 命名 SSOT 的
-    //    `BgpExecEnv-<slug>-glue-role`)。P50.2 那阵子描述符里存的是 home 的 `bgp-glue-role` —— 现在那种值在这里
+    // 🔴 (SPEC v3.21 §6.1 段二):非 home 的 Glue 角色必须是**本 target 自己的**(角色名 = 命名 SSOT 的
+    //    `BgpExecEnv-<slug>-glue-role`)。那阵子描述符里存的是 home 的 `bgp-glue-role` —— 现在那种值在这里
     //    **fail-closed 并指路**(重新部署以切换角色),而不是继续拿共享角色去别的区跑(IR-P1-03 横移)。
     roleArn: assertPerTargetExecRole(t, "glueRoleArn"),
     datalakeBucket: requireStringResource(t, "datalakeBucket"),
@@ -158,7 +157,6 @@ export interface TargetEmrExecution {
  * 非 home ⇒ 描述符 `resources.emrExecutionRoleArn`,且角色名必须是本 target 的 SSOT 名(缺 / 不对即抛、**不回落** home 角色:
  *   回落 = 拿 home 的执行身份去别的区跑,正是 SPEC §6.1 要消灭的共享形态)。
  */
-// @kf-batch 50-WP4quater-reads(工单 SC-5)
 /**
  * **MSAF(Flink)提交落点**的执行角色。
  *
@@ -172,7 +170,7 @@ export interface TargetFlinkExecution {
   serviceRoleArn: string;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 序 3 收尾:🔴 **主控区也读描述符**(原来主控区分支直接回
+// 收尾:🔴 **主控区也读描述符**(原来主控区分支直接回
 //   `process.env.FLINK_RUNTIME_ROLE_ARN`,一次都不核「主控区的描述符里有没有 flink 角色、是不是那个名字」)。
 //   主控区描述符的 `flinkRoleArn` 由 seed-home 按 SSOT 名 `bgp-flink-role` 真查 IAM 写入(与原 env 同一个角色 ⇒ 值不变),
 //   名字校验对主控区同样成立(SSOT home 模板就是 `bgp-flink-role`)。入参只要 `targetId + resources`
@@ -208,8 +206,7 @@ export function resolveTargetEmr(t: ExecutionTarget): TargetEmrExecution {
 // 🔴 缓存**键只有 region**:客户端不承载任何项目/权限语义,拿它当权限缓存是 v2 P0-3 那类错。
 
 /**
- * @kf-batch 50-WP2-directquery
- * **合同规定只能在主控区跑**的那几条路径的 Redshift 客户端出口(50 SPEC §3.1 / WP-2 ③)。
+ * **合同规定只能在主控区跑**的那几条路径的 Redshift 客户端出口。
  *
  * 🔴 为什么要一个「带理由」的专用出口,而不是让它们自己 `redshiftDataClientFor(homeRegion())`:
  * 那样写出来的代码与「忘了按 target 取 region」**长得一模一样** —— 而这两件事的后果天差地别
@@ -221,18 +218,18 @@ export function resolveTargetEmr(t: ExecutionTarget): TargetEmrExecution {
  * 每个理由后面写的是**什么时候可以删掉它**(不是"永远只能 home")。
  */
 export type HomeOnlyReason =
-  // @kf-batch 50-WP7-sync-pushdown —— 原第一项 `sync-no-target-dim` 已**退役**(施工序 5):
+  // 原第一项 `sync-no-target-dim` 已**退役**:
   // 同步向导 DDL(execute-ddl / generate-ddl)按 body 的 targetId 走 resolveRedshiftBinding。
   // 🔴 这张表只减不增是设计(每删一个理由 = 一条路径完成下推);别把删掉的理由加回来。
-  /** 编排(bgp-workflows)**没有区域维** ⇒ workflow SQL 节点的补数只能在主控区跑。加维 = WP-14。 */
+  /** 编排(bgp-workflows)**没有区域维** ⇒ workflow SQL 节点的补数只能在主控区跑。加维 =。 */
   | "workflow-no-target-dim"
   /** 删项目时的资源盘点:盘的是主控区那套控制面资源;跨区盘点归 52 的删项目跨区残留项。 */
   | "project-inventory"
   /** zero-ETL 集成是**主控区里的独立 namespace**,有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)。 */
   | "zeroetl-home-namespace"
-  /** DMS 目标侧 bootstrap(建 dms_ingest 用户 / schema / 关联 COPY 角色):正确归宿是 §3.9a 闭合执行器的 `dms-ingest-bootstrap`,归 P50.3 的 DMS 组件批次。 */
+  /** DMS 目标侧 bootstrap(建 dms_ingest 用户 / schema / 关联 COPY 角色):正确归宿是 §3.9a 闭合执行器的 `dms-ingest-bootstrap`,的 DMS 组件批次。 */
   | "dms-bootstrap-home";
-// @kf-batch 50-WP11b-shared-writer —— 原末项「建模落地 DDL 缺写入通道」已**退役**:非 home 建模落地改走
+// 原末项「建模落地 DDL 缺写入通道」已**退役**:非 home 建模落地改走
 // §3.9a 闭合执行器(建表/授权)+ 窄权 shared_writer(灌数),home 走逐 target 绑定;那个模块级 home 客户端零生产调用方,已删。
 
 /**
@@ -245,7 +242,6 @@ export function redshiftClientForHomeOnly(reason: HomeOnlyReason): RedshiftDataC
 }
 
 /**
- * @kf-batch 50-WP2-directquery
  * 主控区的 region。**给「合同规定只能 home」的那几处用**(取语句结果的回落、zero-ETL、
  * 同步 DDL、删项目盘点),让 `process.env.AWS_REGION` 这个字面量收在客户端工厂这一处。
  *
@@ -253,7 +249,7 @@ export function redshiftClientForHomeOnly(reason: HomeOnlyReason): RedshiftDataC
  * 该 target 的 region —— 把这个函数当默认值用,就是把「非 home 静默打回主控区」重新引进来。
  */
 export function homeRegion(): string {
-  // WP-31 L4:薄委托给唯一作者 lib/place/home-region(调用方 import 路径不变)
+  // L4:薄委托给唯一作者 lib/place/home-region(调用方 import 路径不变)
   return readHomeRegion();
 }
 
@@ -268,23 +264,23 @@ type GlueClientT = import("@aws-sdk/client-glue").GlueClient;
 type S3ClientT = import("@aws-sdk/client-s3").S3Client;
 type EmrClientT = import("@aws-sdk/client-emr-serverless").EMRServerlessClient;
 type LogsClientT = import("@aws-sdk/client-cloudwatch-logs").CloudWatchLogsClient;
-// @kf-batch 50-WP4ter-coverage —— 「这个区有几个 Redshift 工作组」这类**控制面只读探测**用它
+// 「这个区有几个 Redshift 工作组」这类**控制面只读探测**用它
 // (与执行用的 `redshiftDataClientFor` 是两个服务:一个管资源,一个跑语句)。
 type RsServerlessClientT = import("@aws-sdk/client-redshift-serverless").RedshiftServerlessClient;
 // 🔴 CloudWatch 日志组是**region 内**的:非 home 的 Glue/EMR 作业日志在那个区的日志组里,
 //    用 home 客户端去取只会取到空 —— 而"空日志"在界面上和"作业没输出"长得一模一样。
-// @kf-batch 50-WP4quater-reads(工单 SC-30)—— EC2 按区:网络拓扑(VPC / 子网 / 安全组)是**区域资源**,
+// EC2 按区:网络拓扑(VPC / 子网 / 安全组)是**区域资源**,
 // 拿主控区的客户端去列,在别的区看到的是主控区的子网与安全组 —— 与 `/settings` 那次硬撒谎同一类:
 // 界面上是一份看着很正常、其实属于另一个区的清单,选中它建作业必然失败。
 type Ec2ClientT = import("@aws-sdk/client-ec2").EC2Client;
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— MSAF 与 CloudWatch 指标都是**区域服务**:
+// MSAF 与 CloudWatch 指标都是**区域服务**:
 // 用主控区客户端去 Describe 另一个区的 MSAF 应用,回的是 ResourceNotFound ⇒ 平台把作业标成「已删除」。
 type KdaClientT = import("@aws-sdk/client-kinesis-analytics-v2").KinesisAnalyticsV2Client;
 type CwClientT = import("@aws-sdk/client-cloudwatch").CloudWatchClient;
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— RDS 也是区域服务:用主控区客户端 DescribeDBInstances
+// RDS 也是区域服务:用主控区客户端 DescribeDBInstances
 // 查不到别区的实例 ⇒ 安全组解析为空 ⇒ 静默不接 VPC ⇒ 作业连不上私有 sink,而报错是「连接超时」。
 type RdsClientT = import("@aws-sdk/client-rds").RDSClient;
-// @kf-batch 50-WP4quater-reads(工单 SC-24)—— DMS 也是区域服务:成本优化建议只探主控区,
+// DMS 也是区域服务:成本优化建议只探主控区,
 // 别的区的空转实例永远不会被建议出来(而它一直在按小时计费)。
 type DmsClientT = import("@aws-sdk/client-database-migration-service").DatabaseMigrationServiceClient;
 
@@ -297,7 +293,7 @@ export async function s3ClientFor(region: string): Promise<S3ClientT> {
   return regionalClient("s3", region);
 }
 
-// @kf-batch 50-WP7-sync-pushdown —— S3 Tables 也是**区域服务**(table bucket 是 region 内资源):
+// S3 Tables 也是**区域服务**(table bucket 是 region 内资源):
 // 拿主控区客户端去「确保桶/namespace 存在」,会把该区任务的表桶**建到主控区**且不报错 ——
 // 数据落错了法域,而界面上一切正常。这正是同步启动路由那三个模块级单例要退役的原因之一。
 type S3TablesClientT = import("@aws-sdk/client-s3tables").S3TablesClient;
@@ -311,7 +307,6 @@ export async function emrServerlessClientFor(region: string): Promise<EmrClientT
 }
 
 /**
- * @kf-batch 50-WP4ter-coverage
  * 某个 region 的 Redshift Serverless **控制面**客户端(列工作组 / 看命名空间)。
  * 🔴 与 `redshiftDataClientFor` 分开:那是 Data API(跑语句),这是资源管理面;
  * 混用会让「这个区装没装数仓」这类探测跑到执行通道上去。
@@ -324,7 +319,6 @@ export async function logsClientFor(region: string): Promise<LogsClientT> {
   return regionalClient("logs", region);
 }
 
-// @kf-batch 50-W5-seg2-WP10a
 // 🔴 DynamoDB **文档客户端按 region**:区域审计表 / 区域结果表建在跨法域 target 所在 region(residency-stack),
 //    拿 `lib/aws/dynamodb.ts` 那个 home 的 docClient 去写只会 ResourceNotFound —— 而「审计写不成」在这条路上
 //    等于「操作被拒」(SPEC §3.2 写不成即拒),所以客户端选错区不是慢,是全部跨法域操作被拒。
@@ -335,12 +329,11 @@ export async function kdaClientFor(region: string): Promise<KdaClientT> {
   return regionalClient("kda", region);
 }
 
-// @kf-batch 50-WP27-9cap-matrix
 // 🔴🔴 **Kinesis 数据流也要按 region**:流式作业的**源流**是那个执行 region 的资源。
 //    漏掉它的后果正是本文件头上写的那种最坏形态 —— 「应用跑在那个区、数据写回主控区」:
 //    `/api/flink/jobs/[id]/produce` 原来在模块顶部建了一个**主控区** KinesisClient,于是给非 home 的
 //    流作业点「造数」时,记录被 PutRecords 到**主控区**的同名流(或直接 ResourceNotFound)——
-//    页面显示「已注入 150 条」,而那个区的作业永远等不到数据。2026-09-19 WP-27 把实时计算纳入
+//    页面显示「已注入 150 条」,而那个区的作业永远等不到数据。2026-09-把实时计算纳入
 //    能力矩阵时才现形(此前这一类根本不在矩阵里 = 默认豁免)。
 type KinesisClientT = import("@aws-sdk/client-kinesis").KinesisClient;
 
@@ -386,7 +379,7 @@ export interface ExecOnTargetResult {
  * 🔴 **`secretArn` 是必填参数,不是可选**(50 SPEC §3.9a 第 8 步:「**禁 IAM fallback**
  * (解析失败即拒,不省略 SecretArn)」)。现网既有写法是
  * `...(SecretArn ? { SecretArn } : {})` —— 那个三元在解析不到时会**静默退回联邦身份**,
- * 造成表属主分叉(正是 P52.1-L1 修过的病)。这里把它做成类型层不可省:
+ * 造成表属主分叉(正是此前修过的病)。这里把它做成类型层不可省
  * 想不传 SecretArn,连编译都过不去。
  */
 export async function execOnTarget(args: {
@@ -508,7 +501,6 @@ export async function putSecretJson(
 }
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 按**名字**删一个 secret(立即删除、不留恢复期)。回 `deleted` = 本次删掉了;`absent` = **确认**本来就没有。
  *
  * 🔴 与 `describeSecretArnByName` 同一条方向:**只有** `ResourceNotFoundException` 等于「没有」,其余一律**抛**

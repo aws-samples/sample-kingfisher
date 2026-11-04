@@ -6,7 +6,7 @@
 #     agentcore_deploy_runtimes   <tag> [agent…]   逐个部署智能体栈,让 Runtime 指向该 tag(deploy-all 第 5 步)
 #     agentcore_deployed_tag      <agent>          只读:现网 Runtime 正在用的镜像 tag(读不到 ⇒ 空 + 返回 1)
 #
-# 🔴 为什么抽出来(B-76,2026-10-14):映射表原来在 deploy-all.sh(全套)与 redeploy-platform.sh(三张)各写一份;
+# 🔴 为什么抽出来:映射表原来在 deploy-all.sh(全套)与 redeploy-platform.sh(三张)各写一份;
 #   而升级路径 redeploy-platform.sh **不重建**智能体镜像、**不部署**智能体栈 ⇒ 改了 infra/agent/** 或
 #   platform/src/lib/<cap>/core · lib/cookbook 的版本,按手册升级后智能体仍跑旧代码(10-12 → 10-13 的问数配方就是)。
 #   现在 deploy-all.sh 第 4 / 5 步、redeploy-platform.sh 第 1 步、redeploy-agents.sh 三处都 source 本文件,

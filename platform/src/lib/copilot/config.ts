@@ -1,8 +1,8 @@
-// 模块 44 — 统一 Copilot 配置。全部环境相关值走 env,默认中性(无账号/区域字面量),
+// 统一 Copilot 配置。全部环境相关值走 env,默认中性(无账号/区域字面量),
 // 面向全球用户自行下载安装:换账号/区域改 env 即跑。形态照抄 lib/genbi/config.ts。
 // 记忆:[[global-self-install-architecture]] [[module44-unified-copilot]]。
 import { homeRegion } from "@/lib/place/home-region";
-import { resolveModelId } from "@/lib/ai/model"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
+import { resolveModelId } from "@/lib/ai/model"; // 模型 ID 收敛 SSOT(ai-model.json)
 
 function int(name: string, fallback: number): number {
   const v = parseInt(process.env[name] || "", 10);
@@ -11,7 +11,7 @@ function int(name: string, fallback: number): number {
 
 export const COPILOT = {
   region: homeRegion(),
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:@deprecated 保留字段不动对象形状;agent.ts / planner.ts 已改为调用时
+  // @deprecated 保留字段不动对象形状;agent.ts / planner.ts 已改为调用时
   // 经运行时解析链求值(bgp-settings → env → SSOT)。此处只是部署期快照,不反映页面切换后的生效值。
   /** @deprecated 模块加载期快照(env ‖ SSOT),不含运行时配置层;勿在新代码读取。 */
   modelId: resolveModelId(),

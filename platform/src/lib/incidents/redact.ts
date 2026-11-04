@@ -1,5 +1,5 @@
-// 模块 43-A — 入库前错误文本脱敏。写进 bgp-incidents 的任何文本(症状摘要/根因归纳)都要先过
-// 这道,确保不落表名/路径/主机/账号/UUID(继承模块36 E5"只存元数据"铁律)。
+// 入库前错误文本脱敏。写进 bgp-incidents 的任何文本(症状摘要/根因归纳)都要先过
+// 这道,确保不落表名/路径/主机/账号/UUID(继承E5"只存元数据"铁律)。
 // 复用 signature.ts 的 normalizeErrorText(已把可变/敏感 token 抹成占位符),这里在其上做长度收敛。
 
 import { normalizeErrorText } from "./signature";

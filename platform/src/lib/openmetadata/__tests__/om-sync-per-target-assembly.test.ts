@@ -1,4 +1,3 @@
-// @kf-batch 50-o4REG-sync-om-per-target
 // 登记 o4-REG(非主控区同步的 OM schema / 列级血缘按区)的**装配层**判据。
 // 只 mock 真外部:Secrets Manager(取 OM token)· OM 的 HTTP(fetch)· 两个「去该区数据面读真实列」的读函数
 // (`introspectSchema` / `introspectS3Tables`,背后是 Redshift Data / Athena)· 主控区回填用到的表桶树与
@@ -25,7 +24,7 @@ vi.mock("@/lib/genbi/athena", () => ({ introspectS3Tables: (...a: unknown[]) => 
 const homeCalls: string[] = [];
 vi.mock("@/lib/athena/s3tables", () => ({
   resolveS3TablesPlace: async (t: string) => { homeCalls.push(`s3tablesPlace:${t}`); return { home: true }; },
-  // 序 38 B-71:表桶列回填改走「平台表桶 + 已登记外部表桶」(本判据没登记外部桶 ⇒ 只有平台表桶那一个,记同一个标记)
+  // 表桶列回填改走「平台表桶 + 已登记外部表桶」(本判据没登记外部桶 ⇒ 只有平台表桶那一个,记同一个标记)
   resolveS3TablesPlaces: async (t: string) => { homeCalls.push(`s3tablesPlace:${t}`); return [{ targetId: t, home: true, external: false, bucket: "bgp-table-bucket", catalogRef: "s3tablescatalog/bgp-table-bucket", region: "us-east-1" }]; },
   listNamespaceTree: async () => [],
 }));

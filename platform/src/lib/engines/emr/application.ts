@@ -1,4 +1,4 @@
-// 模块 33-A — EMR Serverless application per-作业生命周期（拍板④⑤：不共享，per-作业隔离）。
+// EMR Serverless application per-作业生命周期（拍板④⑤：不共享，per-作业隔离）。
 //
 // 每个 EMR 作业一个独立 application（bgp-emr-<jobId 尾段>），彻底无资源争抢/队头阻塞（"尾巴锁"）。
 // 由后端动态 Create/Delete：建作业→CreateApplication；删作业→StopApplication+DeleteApplication（零垃圾）。
@@ -15,11 +15,11 @@ import {
 } from "@aws-sdk/client-emr-serverless";
 import type { EmrEngineJob } from "./types";
 import { getEmrDefaultNetwork } from "../platform-env";
-// @kf-batch 50-P50.3-engines —— per-target 客户端 + per-target 网络事实
+// per-target 客户端 + per-target 网络事实
 import { emrServerlessClientFor } from "@/lib/exec-env/target-clients";
 import { HOME_TARGET_ID, assertTargetId, isHome, toTargetSlug } from "@/lib/exec-env/target-id";
 
-// 序 53:回落值 = 规格单一作者的缺省(原来写死 emr-7.5.0,与 spec.ts 的缺省漂移成两个作者);env 仍可覆盖(部署期 -c emr-release)。
+// 回落值 = 规格单一作者的缺省(原来写死 emr-7.5.0,与 spec.ts 的缺省漂移成两个作者);env 仍可覆盖(部署期 -c emr-release)。
 import { EMR_DEFAULT_RELEASE } from "./spec";
 const RELEASE = process.env.EMR_RELEASE_LABEL || EMR_DEFAULT_RELEASE;
 
@@ -52,7 +52,7 @@ export function allApplicationRefs(job: EmrEngineJob): Array<{ targetId: string;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // application 名:home `bgp-emr-<jobId 末12位>`;非 home 带 target slug `bgp-emr-<id12>-<slug>`(EMR application name ≤ 64 字符)。
-// @kf-batch 50-W5-seg1-WP10a —— 同 region 多 target 各建各的 application(id 已按 `applicationIdByTarget` 分开,
+// 同 region 多 target 各建各的 application(id 已按 `applicationIdByTarget` 分开,
 //   名字也分开:两个同名 application 在控制台 / 成本归因里分不清是哪个 target 的)。home 名存量不变。
 export function applicationNameFor(jobId: string, targetId: string = HOME_TARGET_ID): string {
   const base = `bgp-emr-${jobId.slice(-12)}`;
@@ -71,9 +71,8 @@ function sameNetwork(a: { subnetIds?: string[]; securityGroupIds?: string[] } | 
 // 由于 application 常在作业刚创建（network 尚空）时就建好，之后用户补填 network，故复用前必须校验并
 // UpdateApplication 同步（EMR 允许在 STOPPED 态更新 networkConfiguration）。
 /**
- * @kf-batch 50-WP31-place-first-class
  * 该 target 上建 / 用 EMR application 所需的网络事实 —— **唯一作者**(原来 submit 与调度扇出各抄一份,
- * 创建路由那条路**一份都没有** ⇒ B-30:给 us-west-2 建的作业在**主控区**先建出一个 application)。
+ * 创建路由那条路**一份都没有** ⇒:给 us-west-2 建的作业在**主控区**先建出一个 application)。
  * 非主控区只取该 target 描述符;主控区返回 null(走平台默认网络 SSOT,逐字节等价)。
  */
 export async function targetEmrNetwork(targetId: string): Promise<{ subnetIds: string[]; securityGroupIds: string[] } | null> {
@@ -88,7 +87,6 @@ export async function targetEmrNetwork(targetId: string): Promise<{ subnetIds: s
 }
 
 /**
- * @kf-batch 50-WP31-place-first-class
  * targetId → applicationId 投影回作业行的两个字段(主控区写老字段 `applicationId`,存量零迁移;其余进 `applicationIdByTarget`)。
  * 唯一作者:与 `applicationIdOf` / `allApplicationRefs` 读的是同一形状。
  */
@@ -105,7 +103,7 @@ export function applicationFields(byTarget: Record<string, string>): { applicati
 
 export async function ensureApplication(
   job: EmrEngineJob,
-  // @kf-batch 50-WP31-place-first-class —— 🔴 落点**必填**(B-30:原来可省 = 主控区,创建路由漏传 ⇒ 别区的作业在主控区建 application)
+  // 🔴 落点**必填**(原来可省 = 主控区,创建路由漏传 ⇒ 别区的作业在主控区建 application)
   landing: { targetId: string; region: string; home: boolean },
   /** 该 target 的网络事实(非 home 从描述符 `emrSubnetIds`/`emrSecurityGroupId` 取;唯一作者 targetEmrNetwork) */
   targetNetwork: { subnetIds: string[]; securityGroupIds: string[] } | null
@@ -120,7 +118,6 @@ export async function ensureApplication(
   // 唯一 choke point:前端/计划中心/调度建 application 全过此函数,一处兜底保所有入口。
   let subnetIds = job.network?.subnetIds || [];
   let securityGroupIds = job.network?.securityGroupIds || [];
-  // @kf-batch 50-P50.3-engines
   // 🔴 **非 home 绝不回落 home 的子网/SG**:那是**另一个 VPC** 里的 id,EMR 会直接
   //    `Unauthorized/InvalidRequest`(好情况),或者更糟:作业挂进错的网络、连不上该区的 S3/数仓,
   //    错误信息离根因极远。非 home 的网络事实只能来自**该 target 描述符**。
@@ -188,7 +185,7 @@ export async function ensureApplication(
 
 // 确保 application 处于可提交状态（CREATED/STOPPED → StartApplication → 等到 STARTED）。
 export async function ensureStarted(applicationId: string, region?: string): Promise<void> {
-  // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+  // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
   const emr = await emrServerlessClientFor(region || homeRegion());
   const { application } = await emr.send(new GetApplicationCommand({ applicationId }));
   const state = application?.state;
@@ -211,7 +208,7 @@ export async function ensureStarted(applicationId: string, region?: string): Pro
 // 删作业时回收 application（先 Stop 再 Delete；已不存在则静默）。零垃圾。
 export async function destroyApplication(applicationId?: string, region?: string): Promise<void> {
   if (!applicationId) return;
-  // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+  // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
   const emr = await emrServerlessClientFor(region || homeRegion());
   try {
     await emr.send(new StopApplicationCommand({ applicationId }));

@@ -3,13 +3,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/projects/guard";
-// @kf-batch 50-WP4quater-reads(工单 SC-35)—— 保存的 SQL 查询任务要有落点章。
+// 保存的 SQL 查询任务要有落点章。
 // 🔴 原来行上只有 `workgroupName`,没有区维:在 us-west-2 存的查询,回到主控区照样列出来,
 // 点开一跑就打到主控区的工作组 —— 那个工作组里根本没有这张表,报错是「relation does not exist」,
 // 看起来像数据问题(2026-09-10 问数那条真 bug 就是这个形状,只是发生在容器侧)。
 import { readScope, scopeFilter } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP31-place-first-class
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
+// 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
 import { requestedRegisteredPlace } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { snapshotVersion } from "@/lib/versions/version-service";
@@ -44,7 +43,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const now = new Date().toISOString();
   // 🔴 落点章**不从 `...body` 里裸抄**:那等于让前端随便写一个字符串进权威字段。
-  // @kf-batch 50-WP31-place-first-class —— 🔴 新建必须点名(缺 / 非法 ⇒ 400)。原来不合法就**不盖章**
+  // 🔴 新建必须点名(缺 / 非法 ⇒ 400)。原来不合法就**不盖章**
   //    ⇒ 读侧把无章行归主控区 ⇒ 漏传的保存查询静默变成主控区的。
   let bodyTarget: string;
   try {
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
   };
   await docClient.send(new PutCommand({ TableName: TABLES.REDSHIFT_TASKS, Item: item }));
   await snapshotVersion("redshift-task", item.taskId, item, ctx.identity.username, "创建").catch(() => {});
-  // 模块 17: auto-parse SQL → table-level lineage in OpenMetadata (best-effort).
+  // auto-parse SQL → table-level lineage in OpenMetadata (best-effort).
   if (item.sql) {
     pushSqlLineageToOpenMetadata({
       sql: item.sql,

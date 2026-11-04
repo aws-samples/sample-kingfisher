@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-17)
 /**
  * 钉住「Copilot 建出来的草稿必须有落点章」。
  *
@@ -16,7 +15,7 @@ const SRC = resolve(__dirname, "../../../..");
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 const read = (p: string) => strip(readFileSync(resolve(SRC, p), "utf8"));
 
-describe("Copilot 草稿的落点章(SC-17)", () => {
+describe("Copilot 草稿的落点章", () => {
   const svc = read("lib/copilot/tools/create-service.ts");
 
   it("🔴 同步草稿的章必须走**平台唯一的落点作者**,不许在这里另写一份判定", () => {
@@ -34,7 +33,7 @@ describe("Copilot 草稿的落点章(SC-17)", () => {
   });
 
   it("落点必须能一路传到执行体(规划是异步任务,只放内存里执行体拿不到)", () => {
-    // 🔴 @kf-batch 50-B39-plan-target:原来这条查的是**类型声明**里有 `targetId?: string;` ——
+    // 🔴 原来这条查的是**类型声明**里有 `targetId?: string;`
     //   类型一直有、Put 里一直没写 ⇒ 本条恒绿而落点从没落库(段 cov 真环境坐实)。
     //   接缝的真判据在 `lib/copilot/plan/__tests__/plan-target-assembly.test.ts`(只 mock 真外部);
     //   这里只钉三处写法不许回退:Put 写它 · 执行体经唯一作者读 · 计划行不再有静默缺省。
@@ -47,7 +46,7 @@ describe("Copilot 草稿的落点章(SC-17)", () => {
 
   it("🔴 提交规划的落点走 **body** 而不是 `?scope=`(写/执行路由不读 scope,SPEC §2.6.3)", () => {
     const route = read("app/api/copilot/plan/route.ts");
-    // B-39:带了就必须合法(否则 400),没带才显式定为主控区 —— 非法值不许静默改成主控区
+    // 带了就必须合法(否则 400),没带才显式定为主控区 —— 非法值不许静默改成主控区
     expect(route).toContain("isValidTargetId(rawTarget)");
     expect(route).toContain("targetId 不合法 —— 不会改用主控区");
     // 列表侧才读 scope

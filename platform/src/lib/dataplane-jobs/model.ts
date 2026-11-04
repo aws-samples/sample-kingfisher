@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 数据面长作业的**作业模型**(WORK-PACKAGES WP-9 ④-1)—— 确定性 jobId + 行形态 + 租约 / 重试的算术。
+// 数据面长作业的**作业模型**(④-1)—— 确定性 jobId + 行形态 + 租约 / 重试的算术。
 //
 // 四模式里的前两个住在这里:
 //   ① **确定性 jobId** —— `sha256("bgp-dataplane-job-v1\0" + kind + "\0" + targetId + "\0" + subject + "\0" + 幂等键)`。

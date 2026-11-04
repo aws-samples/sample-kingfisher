@@ -1,11 +1,11 @@
 "use strict";
-// 模块 44 — EMR Serverless 工程配方 + 配置约束。
+// EMR Serverless 工程配方 + 配置约束。
 // 平台用 EMR Serverless 跑大规模 Spark(见记忆 [[emr-serverless-s3tables-recipe]] [[emr-user-extra-jars-gap]])。
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EMR_RECIPES = exports.EMR_DIALECT_RULES = void 0;
 const shared_rules_1 = require("./shared-rules");
 const warehouse_facts_1 = require("./warehouse-facts");
-// @kf-batch 37-recipes-atomic-overwrite —— S3 Tables 结果表「先 drop 再建」= 非原子覆盖(唯一作者 seed/s3tables-overwrite-facts.ts)
+// S3 Tables 结果表「先 drop 再建」= 非原子覆盖(唯一作者 seed/s3tables-overwrite-facts.ts)
 const s3tables_overwrite_facts_1 = require("./s3tables-overwrite-facts");
 exports.EMR_DIALECT_RULES = [
     {
@@ -34,7 +34,7 @@ exports.EMR_DIALECT_RULES = [
         target: "code",
     },
     {
-        // 🔴🔴 2026-09-22 真环境失败(B-21 第八层):IAM 全部补齐、日志也推上去之后,用户那个 copilot
+        // 🔴🔴 2026-09-22 真环境失败(第八层):IAM 全部补齐、日志也推上去之后,用户那个 copilot
         //   生成的 ROI 作业仍然 ExitCode 1 ——
         //     botocore.exceptions.NoRegionError: You must specify a region.
         //   因为脚本写的是 `boto3.client('redshift-data')`(不带 region),而 **EMR Serverless 容器里
@@ -58,11 +58,11 @@ exports.EMR_DIALECT_RULES = [
         severity: "warn",
         target: "code",
     },
-    // 🔴 L1(52 P52.1):禁止授权给 PUBLIC(唯一作者 = seed/shared-rules.ts,三引擎共用一份)。
+    // 🔴 L1:禁止授权给 PUBLIC(唯一作者 = seed/shared-rules.ts,三引擎共用一份)。
     (0, shared_rules_1.noGrantToPublicRule)("emr"),
-    // @kf-batch 50-B27-codegen-place —— 数仓工作组写成字面量 ⇒ warn(唯一作者 seed/warehouse-facts.ts)
+    // 数仓工作组写成字面量 ⇒ warn(唯一作者 seed/warehouse-facts.ts)
     (0, warehouse_facts_1.hardcodedWarehouseRule)("emr"),
-    // @kf-batch 37-recipes-atomic-overwrite —— S3 Tables 结果表先 drop 再 createOrReplace / 建表 ⇒ warn(唯一作者 seed/s3tables-overwrite-facts.ts)
+    // S3 Tables 结果表先 drop 再 createOrReplace / 建表 ⇒ warn(唯一作者 seed/s3tables-overwrite-facts.ts)
     (0, s3tables_overwrite_facts_1.noDropBeforeS3TablesWriteRule)("emr"),
     {
         // 根治·裂缝B(error+antiPattern 纯检测):EMR PySpark【严禁】用 jdbc:redshift 连接串读写 Redshift 数仓。
@@ -126,7 +126,7 @@ exports.EMR_DIALECT_RULES = [
         severity: "warn",
     },
     {
-        // 模块42:EMR Serverless 读 DynamoDB 的正道选择(真跑坐实前的决策依据,避免再走弯路)。
+        // EMR Serverless 读 DynamoDB 的正道选择(真跑坐实前的决策依据,避免再走弯路)。
         id: "emr.dynamodb-read-via-boto3-scan",
         engine: "emr",
         title: "EMR 读 DynamoDB 用 boto3 并行分片 Scan,不用 GlueContext、不赌 emr-dynamodb jar",
@@ -196,7 +196,7 @@ exports.EMR_RECIPES = [
         tags: ["emr", "serverless", "spark", "s3table", "iceberg", "大规模", "计算"],
     },
     {
-        // 模块42:EMR Serverless 读 DynamoDB(NoSQL 范式)→ 写 S3 Tables。Glue 之外的第二条 DDB 入湖通道。
+        // EMR Serverless 读 DynamoDB(NoSQL 范式)→ 写 S3 Tables。Glue 之外的第二条 DDB 入湖通道。
         // 100万真跑坐实(账号412,2026-07-29):bgp-verify-ddb-1m 100万→S3Table 行数1000000/region各25万精确对账。
         // 配套方言 emr.dynamodb-read-via-boto3-scan(为何用 boto3 Scan 而非 GlueContext/emr-dynamodb jar)。
         id: "emr.spark-dynamodb-to-s3tables",
@@ -304,7 +304,7 @@ exports.EMR_RECIPES = [
             "REGION = os.environ.get('AWS_REGION') or spark.conf.get('spark.bgp.region')",
             "rs = boto3.client('redshift-data', region_name=REGION)",
             "# 🔴 连接事实一律取**平台注入的 conf**(别硬编码:多区执行时硬编码会把所有区打到同一个区)",
-            "# 🔴 **不给缺省值**:缺省值就是把主控区写死(B-27);取不到就让它当场报错,别静默连到别的区",
+            "# 🔴 **不给缺省值**:缺省值就是把主控区写死;取不到就让它当场报错,别静默连到别的区",
             "RS = dict(WorkgroupName=spark.conf.get('spark.bgp.redshiftWorkgroup'),",
             "          Database=spark.conf.get('spark.bgp.redshiftDatabase'),",
             "          SecretArn=spark.conf.get('spark.bgp.redshiftSecretArn'))   # 🔴 不带 SecretArn ⇒ permission denied",
@@ -316,7 +316,7 @@ exports.EMR_RECIPES = [
             "# spark.read.format('jdbc').option('url','jdbc:redshift://<cluster-endpoint>:5439')  ✗ 改用 redshift-data API",
             "# ============ 【错误反例②】redshift-data 留占位符 —— ValidationException ============",
             "# rs.execute_statement(WorkgroupName='<your-redshift-serverless-workgroup>', ...)  ✗ 取 spark.bgp.redshiftWorkgroup",
-            "# rs.execute_statement(WorkgroupName='some-workgroup', ...)  ✗ 字面量只对一个区成立,绑到别的区就错(B-27)",
+            "# rs.execute_statement(WorkgroupName='some-workgroup', ...)  ✗ 字面量只对一个区成立,绑到别的区就错",
             "# ============ 【错误反例③】自己配 warehouse ARN 编占位符 —— 多此一举且必失败 ============",
             "# .config('spark.sql.catalog.s3t.warehouse','arn:aws:s3tables:<region>:<acct>:bucket/<table-bucket>')",
             "#   ✗ 平台已自动注入 s3tablescatalog,直接 spark.table('s3tablescatalog.ns.tbl') 即可,别自己配、别编占位符。",

@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // OpenMetadata 加固的离线判据(CDK assertions,不碰 AWS):
 //   ① OM 的 CloudFront 挂 WAF(OM 专用 ACL,不是平台那张)且回源带校验头;
 //   ② ALB 监听器默认 403,只有带对回源头的规则才转发;
@@ -62,9 +61,9 @@ check("④ OM 专用 ACL:只有 IP 信誉 + 已知恶意输入,无体积限制 /
   const want = ["AWSManagedRulesAmazonIpReputationList", "AWSManagedRulesKnownBadInputsRuleSet"];
   if (JSON.stringify(rules.sort()) !== JSON.stringify(want.sort())) throw new Error(`规则=${JSON.stringify(rules)}`);
 });
-// 序 51(2026-10-26):OM 库引擎 MySQL 8.4(RDS 标准支持,消掉 8.0 的扩展支持费)+ 允许大版本原地升级(没有它 CloudFormation 拒绝版本变更、整栈回滚)。
+// OM 库引擎 MySQL 8.4(RDS 标准支持,消掉 8.0 的扩展支持费)+ 允许大版本原地升级(没有它 CloudFormation 拒绝版本变更、整栈回滚)。
 //   钉 "8.4" 这个字面:它是「只钉大版本、小版本由 RDS 选」的口径;谁把它改回 8.0 或钉死某个小版本都要在这里显式改。
-check("⑤ 序 51:OM 库引擎 MySQL 8.4 且 AllowMajorVersionUpgrade(存量 8.0 实例原地升上来)", () => {
+check("⑤:OM 库引擎 MySQL 8.4 且 AllowMajorVersionUpgrade(存量 8.0 实例原地升上来)", () => {
   Template.fromStack(db).hasResourceProperties("AWS::RDS::DBInstance", {
     Engine: "mysql",
     EngineVersion: "8.4",

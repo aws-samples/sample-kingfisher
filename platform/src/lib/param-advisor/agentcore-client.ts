@@ -4,13 +4,13 @@
 //
 // 方案 A:Runtime 是【自包含能力服务】——容器内 Lambda 已跑确定性推荐引擎,直接返回结构化结论
 // (recommendations/prefill/questions/historyFacts)。平台薄封装只透传 + 补 confidence 兜底。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } from "@aws-sdk/client-bedrock-agentcore";
 import type { HistoryFacts, ParamAdviceRequest, ParamPrefill, ParamRecommendation } from "./types";
 import type { AiModelUse } from "@/lib/ai/meta";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51(P51.2):payload 透传运行时模型 + 回执校验(缺/不等 ⇒ AgentCoreModelMismatch,fail-closed)。
+// payload 透传运行时模型 + 回执校验(缺/不等 ⇒ AgentCoreModelMismatch,fail-closed)。
 import { resolveModelRuntime } from "@/lib/ai/model";
 import { assertAgentCoreModelMeta, currentReleaseId } from "@/lib/ai/agentcore-contract";
 
@@ -36,7 +36,7 @@ export interface ParamAdvisorInvokeOutput {
   steps?: { tool: string; ok: boolean; error?: string }[];
   llmAvailable: boolean;
   usage: { inputTokens: number; outputTokens: number };
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:容器回执的实际模型(P51.2 payload 透传 + 回执校验,⑥ 填实)。
+  // 容器回执的实际模型(payload 透传 + 回执校验,⑥ 填实)。
   model?: AiModelUse;
 }
 
@@ -46,7 +46,7 @@ export function isAgentCoreConfigured(): boolean {
 
 export async function invokeParamAdvisorAgent(sessionId: string, input: ParamAdvisorInvokeInput): Promise<ParamAdvisorInvokeOutput> {
   if (!RUNTIME_ARN) throw new Error("PARAMADVISOR_RUNTIME_ARN 未配置");
-  // @kf-batch 50-W5-seg2-WP8:运行时模型透传 + releaseId。
+  // 运行时模型透传 + releaseId。
   const resolved = await resolveModelRuntime("param-advisor");
   const payload = new TextEncoder().encode(JSON.stringify({ input, modelId: resolved.modelId, releaseId: currentReleaseId() }));
   const resp = await client.send(new InvokeAgentRuntimeCommand({
@@ -67,7 +67,7 @@ export async function invokeParamAdvisorAgent(sessionId: string, input: ParamAdv
   const parsed = text ? JSON.parse(text) : {};
   const out = parsed.output || parsed;
   if (parsed.error && !Array.isArray(out.recommendations)) throw new Error(String(parsed.error).slice(0, 300));
-  // @kf-batch 50-W5-seg2-WP8:回执校验(缺 / 不等 ⇒ AgentCoreModelMismatch,fail-closed)。
+  // 回执校验(缺 / 不等 ⇒ AgentCoreModelMismatch,fail-closed)。
   const echoed = assertAgentCoreModelMeta(out, resolved.modelId, "param-advisor");
   return {
     model: { modelId: echoed, modelSource: resolved.source },

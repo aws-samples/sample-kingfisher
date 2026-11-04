@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // exec-env 控制面 API 的路由内守卫(SPEC §2.1:`/api/admin/exec-envs*`,bgp-admin)。
 //
 // 🔴 纵深防御的第二道:网关层 `middleware.ts:104` 已对 `/api/admin/**` 强制 bgp-admin,

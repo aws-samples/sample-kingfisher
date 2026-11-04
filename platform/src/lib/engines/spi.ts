@@ -1,4 +1,4 @@
-// 模块 33-A — 引擎 SPI 契约（EngineProvider）。
+// 引擎 SPI 契约（EngineProvider）。
 //
 // 方法语义一一对应仓内现有实现，不是凭空发明：
 //  submit    ← lib/etl/job-service.ts:runGlueScriptJob:223 / runRedshiftSqlJob:282
@@ -15,7 +15,6 @@ import type { EngineType, EngineJob } from "./types";
 export interface RunOpts {
   runDate?: string; // YYYY-MM-DD；默认今天（UTC）
   triggeredBy?: string; // "manual" | "backfill" | "rerun" | "dryrun" | "schedule"
-  // @kf-batch 50-P50.3-engines
   /**
    * 这次跑在**哪个执行目标**上(缺省 `tgt_home` ⇒ 存量行为逐字节不变)。
    * 🔴 一条 run 只发生在一个 target ⇒ 「一个作业绑 N 个区」= 调用方按 target 提交 N 次
@@ -23,13 +22,10 @@ export interface RunOpts {
    * 那样一个区失败就会把另一个区的结果一起丢掉。
    */
   targetId?: string;
-  // @kf-batch 50-W3f-T0-T3
   /** 同一次多区扇出的关联标识(运行路由用 `runGroupIdFor(runTargets)` 产出,单区 undefined)。只透传。 */
   runGroupId?: string;
-  // @kf-batch 50-W5-seg2-WP10a
   /** 运行提交的行为主体(区域审计 entry=run-submit;路由传用户 ⇒ 同意前置;缺省平台服务主体)。与 etl/job-service 的 RunOpts 同形。 */
   actor?: import("@/lib/exec-env/residency-audit").ResidencyActor;
-  // 序 73 模块 57(R6)
   /** 补数实例引用(计划 id + 节点 id):有则 run 行带 `backfillPlanId` / `backfillNode`(与 etl/job-service 的 RunOpts 同形)。 */
   backfill?: import("@/lib/backfill/run-extra").BackfillRunRef;
 }
@@ -58,7 +54,7 @@ export interface EngineProvider {
   type: EngineType;
   capabilities: EngineCapabilities;
   // per-作业 application：幂等创建，返回 applicationId（老引擎静态资源可返回固定标识/空实现）。
-  // @kf-batch 50-WP31-place-first-class —— 按作业**每一个绑定区**各建一个,返回 targetId → 资源 id(B-30:原来只回一个、且恒建在主控区)
+  // 按作业**每一个绑定区**各建一个,返回 targetId → 资源 id(原来只回一个、且恒建在主控区)
   ensureResource(job: EngineJob): Promise<Record<string, string>>;
   // 删作业时回收 application（StopApplication + DeleteApplication）——零垃圾。
   destroyResource(job: EngineJob): Promise<void>;

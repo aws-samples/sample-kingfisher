@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP10a
 // **可审计闭包** `residencyAudit` + 同意前置 `requireResidencyAck` 的唯一作者(50 SPEC v3.23 §3.2 / §3.3;DESIGN §18 决策 6quinquies)。
 //
 // 【它做什么、不做什么】
@@ -188,7 +187,7 @@ export async function residencyAudit(input: ResidencyAuditInput): Promise<Reside
   return { auditId, targetId, jurisdiction, region };
 }
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)
+// (问数)
 /** 定时平台动作的服务主体(审计 authKind=service;没有「用户」可当场同意)。 */
 export const SCHEDULED_ACTION_ACTOR: ResidencyActor = { identity: systemIdentity("service:action-dispatcher"), authKind: "service" };
 

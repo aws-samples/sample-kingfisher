@@ -1,4 +1,4 @@
-// 模块 32-CR — 连接器运行时:模块注册表 + resolveModules 纯函数(CR.1)。
+// 连接器运行时:模块注册表 + resolveModules 纯函数(CR.1)。
 //
 // 设计文档:docs/design/32-realtime-compute/DESIGN-connector-runtime-modular.md §2.1/§2.4。
 //
@@ -6,7 +6,7 @@
 // 把「Flink SQL 里用了哪些 connector/catalog/format → 需要哪些连接器模块」这个映射,
 // 从数据驱动的注册表 + 一个纯函数落地,并用单测锁死。后续 CR.3 才把它接进拼装。
 //
-// 与模块42 数据源 SPI registry 同精神:加一个源/sink 的连接器 = 注册表加一行,零散点。
+// 与数据源 SPI registry 同精神:加一个源/sink 的连接器 = 注册表加一行,零散点。
 
 /** 连接器模块 id(对应 S3 flink/modules/<id>-<version>.jar,CR.2 构建产物)。
  *  这里只列已在现有两个 runner(base/s3t)中真实打包、可拆出的连接器 + MSK 新增两项。

@@ -1,6 +1,6 @@
-// 序 73 模块 57 —— 离线作业节点在某个执行区的**就位**(发布的写阶段;与作业「立即运行」做的准备逐项相同)。
+// 离线作业节点在某个执行区的**就位**(发布的写阶段;与作业「立即运行」做的准备逐项相同)。
 //
-// 【为什么单独一个文件】`buildCarrierArtifact` 是只读的(B-09 判据钉死:里面不许出现任何写),而作业节点要能跑,
+// 【为什么单独一个文件】`buildCarrierArtifact` 是只读的(判据钉死:里面不许出现任何写),而作业节点要能跑,
 //   该区必须先有:Glue 作业定义(`ensureGlueJob`,与「立即运行」同一个作者)/ EMR 的脚本对象 · S3 Tables jar · application
 //   (`uploadScript` / `ensureS3TablesJar` / `ensureApplication` / `persistApplicationId`,与 provider.submit 同一组作者)。
 //   这些写放在 `publishWorkflowDagToTarget` 里、排在只读生成之前;只读解析(job-node-spec.ts)随后用确定性读法拿到同一个值。
@@ -42,7 +42,7 @@ export async function prepareJobNodesForTarget(
       missingMessage: `目标 ${wfTarget} 没有 EMR 执行角色(描述符缺 emrExecutionRoleArn)`,
     });
     if (resolvedRole.isCustom) {
-      // 序 72 B-139:自定义角色按该区预检(与 provider.submit / 发布调度同一口径),缺 ⇒ 发布如实失败
+      // 自定义角色按该区预检(与 provider.submit / 发布调度同一口径),缺 ⇒ 发布如实失败
       const pf = await preflightExecutionRole({ engine: "emr", roleArn: resolvedRole.roleArn, targetId: wfTarget, scriptCode: job.script });
       assertPreflightPassed(pf, { engine: "emr", roleArn: resolvedRole.roleArn, targetId: wfTarget, what: `workflow-job-node ${job.jobId}` });
     }

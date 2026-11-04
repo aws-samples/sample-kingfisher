@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 3 收尾 ③ —— 散建客户端的唯一构造入口 `sdkClient(use, Ctor, ...args)`。
+// 收尾 ③ —— 散建客户端的唯一构造入口 `sdkClient(use, Ctor, ...args)`。
 // 承重三条:① 构造参数**原样**交给 SDK(行为保持);② 只有 data-plane 挂越区断言(拦截模式下零网络请求就拒);
 // ③ 控制面 / 模型 / 中心件不挂(它们本来就只在主控区或按模型配置的区,不按落点)。
 // 真 SDK 客户端 + build 步网络插桩(永不出网),不 mock 兄弟模块。

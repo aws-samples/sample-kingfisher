@@ -1,4 +1,3 @@
-// @kf-batch 50-WP18-workflow-fanout
 // 编排(工作流)的**手动触发必须按全部绑定 target 扇出** —— 与离线作业同一条通道。
 //
 // 【用户 2026-09-15 逐字】「美西2的任务从来没有执行过 ETL 编排…我不是让你在美东1 发布执行多个区域吗?」
@@ -21,7 +20,7 @@ const WF = {
   },
 };
 
-// 序 50 第二批:触发经 submitLongOp ⇒ 任务表 bgp-long-ops 交给内存夹具(真求值条件写 / 租约释放),工作流表照旧回 WF
+// 触发经 submitLongOp ⇒ 任务表 bgp-long-ops 交给内存夹具(真求值条件写 / 租约释放),工作流表照旧回 WF
 vi.mock("@/lib/aws/dynamodb", async () => {
   const mem = await import("@/lib/long-ops/__tests__/fixtures/mem-long-ops");
   return {
@@ -57,7 +56,7 @@ vi.mock("@/lib/scheduler/serverless/workflow-client", () => ({
     return { RunId: `svc-${region}` };
   }),
 }));
-// 序 50 第二批:trigger 路由经 submitLongOp 带进整张执行体注册表 ⇒ 产物生成链(runtime-py)也会 import 本模块的 python 源函数,只覆盖两个被测函数
+// trigger 路由经 submitLongOp 带进整张执行体注册表 ⇒ 产物生成链(runtime-py)也会 import 本模块的 python 源函数,只覆盖两个被测函数
 vi.mock("@/lib/monitor/run-groups", async (orig) => ({
   ...(await orig() as Record<string, unknown>),
   openRunGroupIfFanout: vi.fn(async (a: Record<string, unknown>) => { groupOpens.push(a); }),
@@ -140,7 +139,7 @@ describe("🔴🔴 编排手动触发:缺省在**全部绑定区**各跑一次",
   });
 });
 
-// @kf-batch 50-WP18-workflow-fanout —— 发布侧同样要「一次发布 → 每个绑定区各一份产物」
+// 发布侧同样要「一次发布 → 每个绑定区各一份产物」
 describe("🔴🔴 编排发布:一次发布 = 全部绑定区各一份产物", () => {
   it("`publishWorkflowDag` 逐 target 发布(不再只发 bindings[0]),并逐区回报", async () => {
     const src = await import("node:fs").then((fs) =>
@@ -163,7 +162,7 @@ describe("🔴🔴 编排发布:一次发布 = 全部绑定区各一份产物", 
   });
 });
 
-// @kf-batch 50-WP18-workflow-fanout —— 入口:创建/改绑必须能给多个区,且逐个校验
+// 入口:创建/改绑必须能给多个区,且逐个校验
 describe("🔴🔴 编排的绑定入口:创建就能绑多区(否则扇出通道永远没有输入)", () => {
   const readRaw = (rel: string) =>
     require("node:fs").readFileSync(new URL(`../../../../${rel}`, import.meta.url), "utf8") as string;
@@ -175,7 +174,7 @@ describe("🔴🔴 编排的绑定入口:创建就能绑多区(否则扇出通�
   it("POST /api/workflow:`targets` 多值落库、逐个校验、非 home 逐个核调度组件", () => {
     const src = read("app/api/workflow/route.ts");
     expect(src).toContain("targets: wantTargets");
-    // @kf-batch 50-WP31-place-first-class —— 解析(多值 / 单值 / 去重 / 非法即拒 / 空即拒)收成唯一作者 requestedTargets,
+    // 解析(多值 / 单值 / 去重 / 非法即拒 / 空即拒)收成唯一作者 requestedTargets,
     //   行为判据在 lib/place/__tests__/requested-target.test.ts;这里钉「本路由走的是它」
     expect(src).toMatch(/requestedTargets\(body, "新建工作流"\)/);
     expect(src).toContain("requireMwaaForTargets(nonHome)");
@@ -184,7 +183,7 @@ describe("🔴🔴 编排的绑定入口:创建就能绑多区(否则扇出通�
   });
 
   it("发布执行体必须把**逐区结果**透出去(一个区成一个区没成,不许只回一个 dagId 藏起来)", () => {
-    // 序 50 第二批:发布主体在执行体 workflow-publish(rawBody 原样交回摊平形状);路由只 submitLongOp 自己的 kind
+    // 发布主体在执行体 workflow-publish(rawBody 原样交回摊平形状);路由只 submitLongOp 自己的 kind
     expect(read("app/api/workflow/[id]/publish/route.ts")).toContain('kind: "workflow-publish"');
     const src = read("lib/workflow/long-ops.ts");
     expect(src).toMatch(/\(\{ dagId, scheduler, perTarget \} = await publishWorkflowDag/);
@@ -194,7 +193,7 @@ describe("🔴🔴 编排的绑定入口:创建就能绑多区(否则扇出通�
 
   it("PUT /api/workflow/[id]:改绑定也要过同一道校验(原来是 ...body 裸抄进 DDB)", () => {
     const src = read("app/api/workflow/[id]/route.ts");
-    // @kf-batch 50-WP31-place-first-class —— 改绑定的判断 / 解析收成唯一作者(行为判据见 requested-target.test.ts)
+    // 改绑定的判断 / 解析收成唯一作者(行为判据见 requested-target.test.ts)
     expect(src).toMatch(/if \(hasTargetsPatch\(body\)\)/);
     expect(src).toMatch(/requestedTargets\(body, "修改编排绑定"\)/);
     expect(src).toContain("requireMwaaForTargets(nonHome)");
@@ -213,7 +212,6 @@ describe("🔴🔴 编排的绑定入口:创建就能绑多区(否则扇出通�
   });
 });
 
-// @kf-batch 50-WP18b-fanout-seam
 /**
  * 🔴🔴 **闭合式接线门**:凡是走扇出发布的路由,拒因分派必须过**同一个作者**。
  * 缘由(2026-09-16 段 slsw):扇出把 `MwaaNotInstalled` / `ServerlessNodeUnsupported` 包成裸 Error,
@@ -238,7 +236,7 @@ describe("🔴 扇出拒因分派的单一作者(闭合式接线门)", () => {
     //    「把调用删掉、只留注释」这种最典型的退化会被判成绿。
     const strip = (t: string) =>
       t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
-    // 序 50 第二批:发布路由的主体搬进执行体 lib/workflow/long-ops.ts ⇒ 调用扇出发布的载体 = 执行体 + schedule/enable 路由
+    // 发布路由的主体搬进执行体 lib/workflow/long-ops.ts ⇒ 调用扇出发布的载体 = 执行体 + schedule/enable 路由
     const EXEC = path.resolve(API_ROOT, "../../lib/workflow/long-ops.ts");
     const users = [...walk(API_ROOT), EXEC]
       .map((f) => ({ f, src: strip(fs.readFileSync(f, "utf8")) }))
@@ -253,7 +251,7 @@ describe("🔴 扇出拒因分派的单一作者(闭合式接线门)", () => {
   });
 
   it("触发路由的响应/拒因都过单一作者(顶层兼容字段 + 409 补装出路)", () => {
-    // 序 50 第二批:扇出主体在执行体 workflow-trigger;路由只留子集校验 / 法域同意 / 运行组开立 + submitLongOp
+    // 扇出主体在执行体 workflow-trigger;路由只留子集校验 / 法域同意 / 运行组开立 + submitLongOp
     const route = fs.readFileSync(new URL("../[id]/trigger/route.ts", import.meta.url), "utf8");
     expect(route).toContain('kind: "workflow-trigger"');
     const src = fs.readFileSync(new URL("../../../../lib/workflow/long-ops.ts", import.meta.url), "utf8");

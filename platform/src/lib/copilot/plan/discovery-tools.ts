@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 规划大脑的【只读发现工具】。规划前用它们摸清现状:
+// Copilot 规划大脑的【只读发现工具】。规划前用它们摸清现状
 // 广告数据在哪张表?有没有现成 ROI 指标?源数据同步过来没?在数据湖还是仓库?某任务最近跑成功没?
 //
 // 设计原则(与 create-service 同款):**直调 service 层,不自我发 HTTP**——更干净、无 token 转发。
@@ -25,7 +25,7 @@ import { GENBI } from "@/lib/genbi/config";
 import { getCookbook, listRecipeEngines } from "../recipes/registry";
 import type { RecipeEngine } from "../recipes/types";
 import type { CopilotTool, CopilotCaller, CopilotToolResult } from "../tools/types";
-// @kf-batch 52-P52.2-W2a-run-stamp — run 可见性判据(与写侧盖章成对,单作者)。
+// run 可见性判据(与写侧盖章成对,单作者)。
 import { canReadRunsOf } from "@/lib/monitor/run-owner";
 
 // 单租户分区键(与 create-service / datasources route 一致:按 id 直取用 default-user 主键)。
@@ -101,10 +101,10 @@ export const DISCOVERY_TOOLS: CopilotTool[] = [
     handler: async (args, caller) => {
       try {
         const target = String(args?.target || "warehouse").toLowerCase();
-        // 🔴🔴 B-26(2026-10-01):原来两支都不带区 ⇒ 面向 us-west-2 的计划,规划大脑看到的是**主控区**的仓/湖目录
-        //   (「源数据同步过来没」答错区)。计划面向哪个区由 `caller.targetId` 承载(SC-17 已接到这里),
+        // 🔴🔴 原来两支都不带区 ⇒ 面向 us-west-2 的计划,规划大脑看到的是**主控区**的仓/湖目录
+        //   (「源数据同步过来没」答错区)。计划面向哪个区由 `caller.targetId` 承载(已接到这里),
         //   与 `/api/bi/schema` 同一口径:选了区就不传主控区的工作组实名,由落点作者解析。
-        // @kf-batch 50-WP31-place-first-class —— 计划的落点是计划记录上的章(无章 = 存量计划 = 主控区,唯一作者 targetOfStamp)
+        // 计划的落点是计划记录上的章(无章 = 存量计划 = 主控区,唯一作者 targetOfStamp)
         const tid = targetOfStamp(caller?.targetId);
         const tables = target === "lake"
           ? await introspectS3Tables(S3TABLES_NAMESPACE, { targetId: tid })
@@ -198,10 +198,9 @@ export const DISCOVERY_TOOLS: CopilotTool[] = [
       try {
         const taskId = String(args?.taskId || "").trim();
         if (!taskId) return fail(new Error("缺少 taskId"));
-        // @kf-batch 52-P52.2-W2a-run-stamp
         // 🔴 **本批补上的越权面**:改动前本 handler 签名是 `async (args)` —— 拿到了 caller 却不用,
         //    A 项目的用户报一个 B 项目的 taskId 就能读 B 的运行流水(含 error 文本:SQL/表名/报错栈)。
-        //    判据走**资源归属项目**(与 P52.1 的 guardResourceAccess 同一条),
+        //    判据走**资源归属项目**(与  guardResourceAccess 同一条),
         //    刻意**不用** FilterExpression:这条 Query 带 `Limit: 20`,加过滤就会撞
         //    「过滤在截断之后 ⇒ 静默少报」那个 DDB 陷阱。
         if (!(await canReadRunsOf(taskId, caller.projectId))) {

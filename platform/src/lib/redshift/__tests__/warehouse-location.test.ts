@@ -1,9 +1,8 @@
-// @kf-batch 50-P50.1-workgroup-ssot
-// 数仓落点收编的门禁(P50.1「收编兜底字面量」+「缺省逐字节等价」)。
+// 数仓落点收编的门禁(「收编兜底字面量」+「缺省逐字节等价」)。
 //
 // 三件事必须钉住:
 // ① **等价性**:`homeWorkgroup()/homeDatabase()` 与改动前的 `process.env.X || "字面量"` 同值 ——
-//    这是 P50.1「无损重构」宣称的全部内容,不能只在提交信息里说;
+//    这是「无损重构」宣称的全部内容,不能只在提交信息里说;
 // ② **非 home fail-closed**:绝不 `?? home` 兜底(外部审核 P0-4 抓过的 fail-open 形状);
 // ③ **反向覆盖**:全仓不许再出现新的 `"bgp-workgroup"` 兜底字面量 —— 收编一次不难,
 //    难的是三个月后有人又写一个。所以门禁扫源码,并把**允许出现的地方**冻结成白名单。
@@ -24,7 +23,7 @@ import {
 import { resourceName } from "@/lib/aws/naming";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 
-describe("🔴 缺省逐字节等价(P50.1 的全部宣称)", () => {
+describe("🔴 缺省逐字节等价(全部宣称)", () => {
   it("home 名来自命名 SSOT,且与被收编的字面量同值", () => {
     expect(HOME_WORKGROUP).toBe(resourceName("redshiftWorkgroup", { targetId: HOME_TARGET_ID }));
     expect(HOME_DATABASE).toBe(resourceName("redshiftDatabase", { targetId: HOME_TARGET_ID }));
@@ -86,7 +85,7 @@ describe("🔴 `target?` 参数位:缺省等价、非 home 必抛(50 SPEC §3.4)
     expect(() => assertHomeOnly("tgt_usw2_a", "X")).toThrow(/不回落 home/);
   });
 
-  // @kf-batch 50-WP2-directquery / 50-WP4ter-coverage
+  // 50-WP4ter-coverage
   // 🔴🔴 **本条的口径按用户两次拍板改过两回**,每次都不是把判据放宽:
   //    ① 原契约「4 个原子函数传非 home 一律拒」—— 那时 per-target 客户端/凭证还没做,回落 home = 静默跨区;
   //    ② 用户 2026-09-09 拍板「连问数都可以切区」⇒ **Redshift 侧两个**改成按该 target 的数仓执行;
@@ -110,7 +109,7 @@ describe("🔴 `target?` 参数位:缺省等价、非 home 必抛(50 SPEC §3.4)
     vi.resetModules();
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 原判据是「缺省与显式 home 等价」;序 3 起落点必填 ⇒ 改成对:
+  // 原判据是「缺省与显式 home 等价」;落点必填 ⇒ 改成对
   //   显式 home 走存量 env 值(逐字节等价)· 缺省 / 空串 / 非法 ⇒ 拒(不再静默 = 主控区)
   it("🔴 Athena / S3Tables 落点解析:显式 home 逐字节等价;缺省 / 空串 ⇒ 拒", async () => {
     const { resolveAthenaPlace } = await import("@/lib/athena/client");
@@ -148,7 +147,7 @@ describe("🔴 `target?` 参数位:缺省等价、非 home 必抛(50 SPEC §3.4)
     expect(runSelect.length, "runSelect(sql, wg, db, opts?)").toBe(4);
     expect(introspectSchema.length, "introspectSchema(wg, db, opts?)").toBe(3);
     expect(runSelectAthena.length, "runSelectAthena(sql, opts)").toBe(2);
-    // @kf-batch 50-B26-lake-place —— namespace 去掉默认值、opts 改必填键 ⇒ 2。
+    // namespace 去掉默认值、opts 改必填键 ⇒ 2。
     // 🔴 本条当年只验「形参存在」,而问数主循环两处调用**都没传** —— 形参在、没人接 ⇒ 数据湖问数整条落回主控区。
     //    「接上了」由 `lake-target-required.test.ts` 在**调用位置**判,这里只留签名形状。
     expect(introspectS3Tables.length, "introspectS3Tables(namespace, opts)").toBe(2);

@@ -1,13 +1,13 @@
-// 模块 22 — 需求实现代码生成（研发侧 AI 辅助, v1.14.0）
+// 需求实现代码生成（研发侧 AI 辅助, v1.14.0）
 //
-// 复用 Bedrock Converse(与 GenBI 同 region;模型 @kf-batch 50-W5-seg2-WP8 起改为调用时经模块 51 解析链求值,
+// 复用 Bedrock Converse(与 GenBI 同 region;模型 改为调用时解析链求值,
 // 能力 key codegen,不再读模块加载期 GENBI.modelId)。给定需求与目标类型,
 // 生成**生产级**的 ETL 实现代码：
-//   - redshift：幂等 SQL（CREATE TABLE IF NOT EXISTS + 可重入写入），支持业务日期参数 ${ds}（模块16）。
+//   - redshift：幂等 SQL（CREATE TABLE IF NOT EXISTS + 可重入写入），支持业务日期参数 ${ds}（）。
 //   - glue：PySpark 作业骨架（读源→变换→写 Redshift/S3），带配置占位与注释。
 // 生成结果**绝不自动执行**；研发审阅后才在工作台一键建 ETL 作业（资源收口研发侧）。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { GENBI } from "@/lib/genbi/config";
@@ -15,28 +15,27 @@ import { introspectSchema, buildCatalogText } from "@/lib/genbi/schema";
 import { introspectS3Tables, S3TABLES_NAMESPACE } from "@/lib/genbi/athena";
 import { retrieve, guard, sliceToPromptText } from "@/lib/cookbook";
 import { GLUE_WAREHOUSE_HOWTO } from "@/lib/cookbook/seed/warehouse-facts";
-// 序 53:提示词里的 Glue 运行环境(版本 / Spark / Python / 迁移点)来自单一作者,不再手写「Glue 5.1」
+// 提示词里的 Glue 运行环境(版本 / Spark / Python / 迁移点)来自单一作者,不再手写「Glue 5.1」
 import { GLUE_VERSION_DEFAULT, GLUE_RUNTIME_FACTS, GLUE_VERSIONS, glueRuntimeSummary } from "@/lib/sync/glue-version";
 import type { Requirement } from "./service";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:调用时求值 + 退避/降级;结果带实际用的模型供路由 `_meta` 回显。
+// 调用时求值 + 退避/降级;结果带实际用的模型供路由 `_meta` 回显。
 import { invokeConverse } from "@/lib/ai/invoke";
 import type { AiModelUse } from "@/lib/ai/meta";
 
 const bedrock = sdkClient("model", BedrockRuntimeClient, { region: GENBI.region });
 
-/** @kf-batch 50-B27-codegen-place —— 这次生成**按哪个区的目录**做的 grounding(回显给页面,不许让用户猜)。 */
+/** 这次生成**按哪个区的目录**做的 grounding(回显给页面,不许让用户猜)。 */
 export interface CodegenGrounding { targetId: string; region: string; workgroup: string; database: string }
 
 export interface CodegenResult {
   targetType: "redshift" | "glue";
-  /** @kf-batch 50-B27-codegen-place */
   groundedOn: CodegenGrounding;
   code: string;
   explanation: string;
   usage: { inputTokens: number; outputTokens: number };
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显:实际用的模型(降级则为回落层)。
+  // `_meta` 回显:实际用的模型(降级则为回落层)。
   model: AiModelUse;
-  // 模块45:cookbook 方言校验报告(生成后已自动纠正/待提示的违规),供前端回显"AI 写了 X 已修正/违反 Y"。
+  // cookbook 方言校验报告(生成后已自动纠正/待提示的违规),供前端回显"AI 写了 X 已修正/违反 Y"。
   dialect?: { fixed: { ruleId: string; title: string }[]; violations: { ruleId: string; title: string; rule: string; severity: string }[] };
 }
 
@@ -109,24 +108,24 @@ export async function generateImplementation(
   r: Requirement,
   targetType: "redshift" | "glue",
   businessContext: string | undefined,
-  // @kf-batch 50-B27-codegen-place —— 按哪个区的目录生成(@kf-batch 50-WP31-place-first-class:必填,主控区也点名)
+  // 按哪个区的目录生成(必填,主控区也点名)
   targetId: string,
-  // @kf-batch 50-WP31-place-first-class —— 🔴 项目必填:非主控区的数仓凭证按项目发(§3.9b),缺了 ⇒ 落点解析当场拒
+  // 🔴 项目必填:非主控区的数仓凭证按项目发(§3.9b),缺了 ⇒ 落点解析当场拒
   //   ⇒ 非主控区的 AI 生成**一律 500**(2026-10-03 段 wp31 W31-R1 无头坐实;单测 mock 掉了落点解析,接缝被抹平)
   projectId: string
 ): Promise<CodegenResult> {
   return generateCore(targetType, userPrompt(r), businessContext, targetId, projectId);
 }
 
-// 作业开发（模块12）AI 辅助：自由意图（+ 可选现有代码）→ 生产级实现，复用与需求侧同一套
+// 作业开发（）AI 辅助：自由意图（+ 可选现有代码）→ 生产级实现，复用与需求侧同一套
 // system 提示与目录 grounding。不绑定 Requirement，供「作业开发」页直接调用。
 export async function generateEtlCode(
   input: { intent: string; currentCode?: string },
   targetType: "redshift" | "glue",
   businessContext: string | undefined,
-  // @kf-batch 50-B27-codegen-place —— 作业绑定的区(多区作业取第一个,页面回显「按哪个区生成」)
+  // 作业绑定的区(多区作业取第一个,页面回显「按哪个区生成」)
   targetId: string,
-  // @kf-batch 50-WP31-place-first-class —— 🔴 项目必填:非主控区的数仓凭证按项目发(§3.9b),缺了 ⇒ 落点解析当场拒
+  // 🔴 项目必填:非主控区的数仓凭证按项目发(§3.9b),缺了 ⇒ 落点解析当场拒
   //   ⇒ 非主控区的 AI 生成**一律 500**(2026-10-03 段 wp31 W31-R1 无头坐实;单测 mock 掉了落点解析,接缝被抹平)
   projectId: string
 ): Promise<CodegenResult> {
@@ -143,7 +142,7 @@ export async function generateEtlCode(
 }
 
 // 共享核心：目录 grounding + Bedrock Converse + 拆分代码/说明。
-// 🔴🔴 B-27(2026-10-01):原来仓目录 `introspectSchema(GENBI.workgroup, GENBI.database)` + 湖目录 + 提示词里的
+// 🔴🔴 原来仓目录 `introspectSchema(GENBI.workgroup, GENBI.database)` + 湖目录 + 提示词里的
 //   `workgroup=bgp-workgroup、database=dev` **全是主控区** ⇒ 给 us-west-2 的作业生成代码,模型看到的是主控区的表、
 //   写进代码的是主控区的工作组实名(在那个区根本不存在)。⇒ 三样都按**作业绑定的区**解析(唯一作者:直查落点
 //   `resolveDirectQueryPlace` / 湖 `introspectS3Tables` 的必填落点),并把「按哪个区生成」回显给页面。
@@ -161,7 +160,7 @@ async function generateCore(targetType: "redshift" | "glue", userText: string, b
     s3tablesCatalog = await buildS3TablesCatalogText(place.targetId).catch(() => undefined);
   }
   let systemText = systemPrompt(targetType, buildCatalogText(tables, groundedOn.database), groundedOn, s3tablesCatalog);
-  // 模块45(生成前引导):注入平台 cookbook 该引擎的【方言硬规则 + 验证过的范式】,让模型照正确方言写。
+  // (生成前引导):注入平台 cookbook 该引擎的【方言硬规则 + 验证过的范式】,让模型照正确方言写。
   // 成本诚实说明:seed 配方是代码常量(零 IO);admin 配方首次调用打一次 DynamoDB Query(之后 60s 走进程内缓存)。
   // 单次 Query ~数十 ms,相对 Bedrock 生成(10-30s)可忽略,不构成 60s 墙威胁;keywords 用用户意图做相关性打分。
   try {
@@ -182,7 +181,7 @@ async function generateCore(targetType: "redshift" | "glue", userText: string, b
     systemText += `\n\n## 业务口径与规则（必须遵循）\n生成代码须严格遵循以下业务口径/术语叫法/规则与注意事项（如金额单位、特定叫法、需排除的状态、测试数据标记等），与之冲突时以此为准：\n${businessContext}`;
   }
   const system = [{ text: systemText }];
-  // @kf-batch 50-W5-seg2-WP8:modelId 每次调用求值(codegen),经 invokeConverse 退避/降级。
+  // modelId 每次调用求值(codegen),经 invokeConverse 退避/降级。
   const inv = await invokeConverse("codegen", undefined, bedrock, (modelId) =>
     new ConverseCommand({
       modelId,
@@ -194,7 +193,7 @@ async function generateCore(targetType: "redshift" | "glue", userText: string, b
   const resp = inv.response;
   const out = (resp.output?.message?.content || []).map((b) => ("text" in b ? b.text : "")).join("").trim();
   const { code, explanation } = splitCodeAndExplanation(out);
-  // 模块45(生成后校验,安全网):用同源方言规则校验/纠正模型偶发违规(如 Redshift CTAS 误写 IF NOT EXISTS)。
+  // (生成后校验,安全网):用同源方言规则校验/纠正模型偶发违规(如 Redshift CTAS 误写 IF NOT EXISTS)。
   // redshift→SQL 可机械纠正;glue→PySpark 无 antiPattern 规则,guard 天然 no-op(§4.3),code 原样返回。guard 纯 CPU 无网络。
   const g = guard(targetType, code);
   return {

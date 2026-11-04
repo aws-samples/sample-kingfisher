@@ -8,7 +8,7 @@
   <version>1.0</version>
   <packaging>jar</packaging>
 
-  <!-- 模块 32 / P42.6b 路径2 — Kafka/MSK 源 → S3 Tables(托管 Iceberg)sink 【组合包】runner。
+  <!-- 路径2 — Kafka/MSK 源 → S3 Tables(托管 Iceberg)sink 【组合包】runner。
        为什么要这个独立包(Bug#5 根治):
          · s3t 包(flink-sql-runner-s3t)未打 Flink SQL kafka connector(SPI 无 KafkaDynamicTableFactory);
          · assembleModularUberJar 命中 iceberg-s3tables 即短路返回 s3t 包(§2.0 分治:iceberg 重栈 8.9万条目
@@ -24,7 +24,7 @@
     <maven.compiler.release>11</maven.compiler.release>
     <flink.version>1.20.0</flink.version>
     <kinesis.connector.version>5.0.0-1.20</kinesis.connector.version>
-    <!-- Flink CDC(MySQL binlog 源):Apache Flink CDC 3.2.1,支持 Flink 1.20。模块32 — 多 source。 -->
+    <!-- Flink CDC(MySQL binlog 源):Apache Flink CDC 3.2.1,支持 Flink 1.20。 — 多 source。 -->
     <flinkcdc.version>3.2.1</flinkcdc.version>
     <!-- MySQL JDBC 驱动:mysql-cdc 的 Debezium 运行时需 com.mysql.cj.jdbc.Driver(connector fat jar 未内嵌)。 -->
     <mysql.driver.version>8.4.0</mysql.driver.version>
@@ -68,7 +68,7 @@
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-aws-kinesis-streams</artifactId><version>${kinesis.connector.version}</version></dependency>
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-json</artifactId><version>${flink.version}</version></dependency>
 
-    <!-- Source connector(MySQL CDC,Apache Flink CDC 3.2.1):直接消费 MySQL binlog。模块32 — 多 source。 -->
+    <!-- Source connector(MySQL CDC,Apache Flink CDC 3.2.1):直接消费 MySQL binlog。 — 多 source。 -->
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-sql-connector-mysql-cdc</artifactId><version>${flinkcdc.version}</version></dependency>
     <!-- MySQL JDBC 驱动(bundled):flink-sql-connector-mysql-cdc 的 Debezium 运行时按 com.mysql.cj.jdbc.Driver
          加载,但该 fat connector 未内嵌驱动 → 运行时 NoClassDefFoundError: com/mysql/cj/jdbc/Driver。显式打入。 -->

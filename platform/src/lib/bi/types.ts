@@ -1,4 +1,4 @@
-// 模块 37 — BI 报表 / 仪表盘搭建器(F3)。类型单一事实源。
+// BI 报表 / 仪表盘搭建器(F3)。类型单一事实源。
 //
 // 一个「报表 widget」= 取数 spec(WidgetSource)+ 可视化 spec(WidgetViz)。
 // 一个「仪表盘」= 栅格布局(引用 widget)+ 仪表盘级筛选器。
@@ -18,7 +18,6 @@ export const BI_ENGINES: BiEngine[] = ["redshift", "athena"];
 // v2:sql source 可选带 `builder` spec(字段配置器所建),用于"再编辑时还原字段面板";执行仍只认 sql,
 // builder 仅是 UI 元数据。老 v1 报表无此字段,向后兼容(读取时为 undefined 即纯 SQL 模式)。
 /**
- * @kf-batch 50-WP4ter-coverage(工单 SC-7)
  * `targetId` = 这个视觉对象**在哪个区取数**。合同早已定为 **widget 级**(50 SPEC §8.3):
  * 一张仪表盘可以并排放「主控区的销量」与「us-west-2 的销量」,所以它不能是页面级的唯一值;
  * 页面上的执行范围只作**新建时的默认值**。
@@ -27,7 +26,7 @@ export const BI_ENGINES: BiEngine[] = ["redshift", "athena"];
  */
 export type WidgetSource =
   | { kind: "sql"; engine: BiEngine; sql: string; builder?: unknown; targetId?: string }
-  // @kf-batch 50-W5-seg2-WP1 — dataapi 已下线(2026-09-05,50 SPEC §3.9c):分支**保留**让存量行反序列化不炸;取数一律 410,编辑器不再提供。
+  // dataapi 已下线(2026-09-05,50 SPEC §3.9c):分支**保留**让存量行反序列化不炸;取数一律 410,编辑器不再提供。
   | { kind: "dataapi"; apiId: string; params?: Record<string, string> }
   | { kind: "genbi"; engine: BiEngine; sql: string; question?: string; targetId?: string };
 

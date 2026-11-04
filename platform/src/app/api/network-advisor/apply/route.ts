@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // @kf-batch 41-B115-netadvisor-place —— 改网络打在请求点名的执行环境所在区(缺 targetId ⇒ 400,不默认主控区)
+    // 改网络打在请求点名的执行环境所在区(缺 targetId ⇒ 400,不默认主控区)
     const placed = await placeConnectivityRequest(body.req, "network-advisor/apply");
     const result = await applyRemediation({ req: placed, type: body.type, targetIndex: body.targetIndex });
     // 审计:无论成败都记(创建了什么资源、由谁)。

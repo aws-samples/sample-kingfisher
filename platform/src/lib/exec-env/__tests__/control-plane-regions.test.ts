@@ -1,4 +1,3 @@
-// @kf-batch 50-init-region-enablement
 import { describe, it, expect } from "vitest";
 import { controlPlaneRegions, isControlPlaneRegionEnabled, regionNotEnabledHint } from "@/lib/exec-env/control-plane-regions";
 
@@ -20,13 +19,13 @@ describe("控制面放行 region 清单(init 段 I-4 真因可见化)", () => {
     expect(h).toMatch(/redeploy-platform\.sh/);
     expect(h).not.toMatch(/\d{12}/);
   });
-  // 序 48:提示语必须告诉运维「以后怎么不用每加一区跑一次」—— 候选区预授权的环境变量名要逐字出现(与 scripts/lib/execution-regions.sh 同名)
+  // 提示语必须告诉运维「以后怎么不用每加一区跑一次」—— 候选区预授权的环境变量名要逐字出现(与 scripts/lib/execution-regions.sh 同名)
   it("提示语带候选区预授权的做法(EXEC_REGION_CANDIDATES),不只给一次性的放行命令", () => {
     const h = regionNotEnabledHint("eu-central-1", { AWS_REGION: "ap-southeast-1" } as NodeJS.ProcessEnv);
     expect(h).toMatch(/EXEC_REGION_CANDIDATES=/);
     expect(h).toMatch(/all-enabled/);
   });
-  // 序 48:预授权的候选区与注册表在用区在 env 里不可区分,也不该区分 —— IAM 条件里两者同样生效
+  // 预授权的候选区与注册表在用区在 env 里不可区分,也不该区分 —— IAM 条件里两者同样生效
   it("候选区进了 EXECUTION_REGIONS 就是「已放行」(与注册表在用区同口径)", () => {
     const env = { AWS_REGION: "ap-southeast-1", EXECUTION_REGIONS: "ap-southeast-1,eu-central-1,ap-northeast-1" } as NodeJS.ProcessEnv;
     expect(isControlPlaneRegionEnabled("ap-northeast-1", env)).toBe(true);

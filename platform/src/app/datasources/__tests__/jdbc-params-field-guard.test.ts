@@ -1,4 +1,4 @@
-// @kf-batch 44-jdbc-params —— 数据源弹窗「附加 JDBC 连接参数」字段的接线判据(用户 2026-10-15 反馈 ③)。
+// 数据源弹窗「附加 JDBC 连接参数」字段的接线判据(用户 2026-10-15 反馈 ③)。
 // 「写了」≠「接上了」:字段必须在 JDBC 表单段里、用与服务端同一个校验函数、进可编辑清单;建源 POST / 编辑 PUT 都认它。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -37,7 +37,7 @@ describe("服务端接线", () => {
   it("POST 校验 + 落库 + 进 createGlueConnection;PUT 校验 + 算进 endpointChanged + 传给 updateGlueConnectionEndpoint", () => {
     const post = read("../../api/datasources/route.ts");
     expect(post).toMatch(/const jp = parseJdbcParams\(body\.jdbcParams\);\s*if \(!jp\.ok\) return apiError\(jp\.error, 400, \{ code: "VALIDATION_FAILED" \}\);\s*const jdbcParams = jp\.normalized;/);
-    // 序 57 / B-129:路由把归一化后的 jdbcParams 交进长操作参数(不填不写键);Glue 连接与落库在执行体 lib/datasource/long-ops.ts
+    // 路由把归一化后的 jdbcParams 交进长操作参数(不填不写键);Glue 连接与落库在执行体 lib/datasource/long-ops.ts
     expect(post).toContain("...(jdbcParams ? { jdbcParams } : {}),");
     const executor = read("../../../lib/datasource/long-ops.ts");
     expect(executor).toContain("createGlueConnection(datasourceId, type, host, port, database, secretArn, networkConfig, dsPlace.region, jdbcParams || undefined)");

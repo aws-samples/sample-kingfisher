@@ -1,8 +1,7 @@
-// @kf-batch 50-WP16-zero-egress
 // 执行环境私有子网类型的**唯一真值**(50 SPEC §3.16-A 不变量 2)。
 //
 // 【为什么要单独一个模块】
-//   WP-16 把执行环境底座从 `PRIVATE_WITH_EGRESS`(带 NAT 出网)改成 `PRIVATE_ISOLATED`(零出网)。
+//   把执行环境底座从 `PRIVATE_WITH_EGRESS`(带 NAT 出网)改成 `PRIVATE_ISOLATED`(零出网)。
 //   这个类型此前散在 **5 个**栈里各写一遍(base / core / redshift / mwaa / dms),而 CDK 的
 //   `selectSubnets({subnetType})` 在**选不中时返回空集、不报错** ⇒ 漏改一处的症状是
 //   「Output 变空串 / subnetIds 传空数组」,报错点离根因极远(实测:core 栈直接 synth 失败,

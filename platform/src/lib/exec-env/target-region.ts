@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // **轻量**的 target 位置解析层 —— 只回答「这个 target 在哪个 region」+ 绑定被拒的错误类型。
 //
 // ── 🔴 为什么必须单独一个文件(被真部署咬出来的)────────────────────────────
@@ -21,7 +20,7 @@
 
 import { homeRegion as readHomeRegion } from "@/lib/place/home-region";
 import { HOME_TARGET_ID, isHome, isValidTargetId } from "@/lib/exec-env/target-id";
-// @kf-batch 50-WP31-place-first-class 序 31 第二刀 ②:区解析的唯一作者**顺手记落点决策**(观测器据此归因;
+// 区解析的唯一作者**顺手记落点决策**(观测器据此归因;
 //   context.ts 已在 instrumentation 可达面上 —— observer.ts 早就 import 它,不新增 edge 编译风险)
 import { notePlaceDecision } from "@/lib/place/context";
 
@@ -39,7 +38,7 @@ export class TargetBindingRejected extends Error {
       | "missing-component"
       | "warehouse-conflict"
       | "no-credential"
-      // @kf-batch 50-W5-seg1-WP10a:项目白名单(SPEC §3.12 v3.22,通用)—— 用户可修(让管理员加白名单),不是 500
+      // 项目白名单(SPEC §3.12 v3.22,通用)—— 用户可修(让管理员加白名单),不是 500
       | "project-not-allowed",
     message: string
   ) {
@@ -48,7 +47,6 @@ export class TargetBindingRejected extends Error {
   }
 }
 
-// @kf-batch 50-P50.3-mrquery
 /**
  * **只解析 region**(给「按 statementId 所在 region 取结果 / 取消」与元数据镜像用)。
  *
@@ -71,11 +69,11 @@ export function __resetRegionCache(): void {
 
 export async function regionOfTarget(targetId: string): Promise<string> {
   const homeRegion = readHomeRegion();
-  // 序 31 第二刀 ②:第四十轮 observe 的「未归因在途调用榜」里,同步任务的日志 / Glue 状态 / 输出、数仓工作组清单、
+  // 第四十轮 observe 的「未归因在途调用榜」里,同步任务的日志 / Glue 状态 / 输出、数仓工作组清单、
   //   统一结果 / 取消 … 全是「经本函数拿到了正确的区、客户端也建对了,却没有一笔决策」⇒ 观测器判不了。
   //   区解析就是落点决策 ⇒ 在这里记(第一个 await 之前;请求外无账本则 no-op)。
-  //   🔴 `targetId` 为空 ⇒ 如实记 `null`:那是「调用方没传、按老规矩回主控区」(B-26 原形),观测器在非主控区视角下
-  //   会据此报 implicit-home-under-target-view —— 这正是序 3 下一批要收的静默默认值,不许在这里替它洗白成 tgt_home。
+  //   🔴 `targetId` 为空 ⇒ 如实记 `null`:那是「调用方没传、按老规矩回主控区」(原形),观测器在非主控区视角下
+  //   会据此报 implicit-home-under-target-view —— 这正是下一批要收的静默默认值,不许在这里替它洗白成 tgt_home。
   if (!targetId || isHome(targetId)) {
     notePlaceDecision({ targetId: targetId || null, via: REGION_OF_TARGET_VIA });
     return homeRegion;

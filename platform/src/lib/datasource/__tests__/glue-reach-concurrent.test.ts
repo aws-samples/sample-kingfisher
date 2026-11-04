@@ -1,4 +1,4 @@
-// B-97(2026-10-18 第三十九轮硬门 s38 70f):发现作业 StartJobRun 撞 Glue 并发上限不许原样 502。
+// (2026-10-18 第三十九轮硬门 s38 70f):发现作业 StartJobRun 撞 Glue 并发上限不许原样 502。
 //   CloudTrail 坐实:同一作业 07:32:04Z 起一次(已 SUCCEEDED),07:34:13Z 再起被拒 ConcurrentRunsExceededException —— Glue 的并发计数在
 //   上一次运行刚结束后滞后几十秒释放;用户在表刚发现完就点「刷新」就会撞上。
 //   只 mock 真外部(Glue 客户端对象,经参数注入);算法 `startRunAdoptingConcurrent` 是唯一作者,`startDiscovery` 必须经它起运行(调用点判据)。
@@ -34,7 +34,7 @@ function fakeGlue(plan: { starts: Array<(() => { JobRunId: string }) | (() => ne
   return { glue, calls, slept, sleep };
 }
 
-describe("B-97 StartJobRun 撞并发上限:认领在途运行 / 退避重试 / 其它错误直抛", () => {
+describe("StartJobRun 撞并发上限:认领在途运行 / 退避重试 / 其它错误直抛", () => {
   it("撞上 + 有同库在途运行 ⇒ 认领它(adopted=true,jobRunId = 在途那次),不 sleep", async () => {
     const f = fakeGlue({
       starts: [() => { throw concurrentErr(); }],
@@ -93,7 +93,7 @@ describe("B-97 StartJobRun 撞并发上限:认领在途运行 / 退避重试 / �
   });
 });
 
-describe("B-97 接缝:startDiscovery 起运行**只**经 startRunAdoptingConcurrent(调用点判据,不是 import 判据)", () => {
+describe("接缝:startDiscovery 起运行**只**经 startRunAdoptingConcurrent(调用点判据,不是 import 判据)", () => {
   const src = readFileSync(resolve(__dirname, "..", "glue-reach.ts"), "utf-8");
   it("glue-reach.ts 里 `new StartJobRunCommand(` 只出现在 startRunAdoptingConcurrent 体内一处", () => {
     const occurrences = src.split("new StartJobRunCommand(").length - 1;

@@ -1,10 +1,8 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.2c-control-api
 // GET /api/admin/exec-envs —— 执行环境列表(SPEC §2.1)。
 //
 // 🔴 管理面读走 **raw 口径**(SPEC:241):不过滤、不校验 —— 运维必须能看到坏 item /
 // 失败 target 才修得了它。准入/扇出那侧另有 `listActiveTargets()`(带校验剔除),两者绝不混用。
-// @kf-batch 50-init-region-enablement
 import { isControlPlaneRegionEnabled } from "@/lib/exec-env/control-plane-regions";
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -37,7 +35,7 @@ export async function GET(req: NextRequest) {
       filtered.map((t) => ({
         ...t,
         serviceability: describeServiceability(t, String(t.sk ?? t.targetId ?? ""), now),
-        // @kf-batch 50-init-region-enablement —— 卡片 / 抽屉据此明示「控制面尚未放行该 region」(init 段 I-4)
+        // 卡片 / 抽屉据此明示「控制面尚未放行该 region」(init 段 I-4)
         controlPlaneRegionEnabled: isControlPlaneRegionEnabled(String(t.region ?? "")),
       }))
     );

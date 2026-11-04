@@ -1,4 +1,4 @@
-// 模块 42 — 数据源连接归一层(向后兼容的关键)。
+// 数据源连接归一层(向后兼容的关键)。
 //
 // 【零迁移策略】现网 DynamoDB 里已有 MySQL 数据源 item 是扁平 host/port/database/username。
 // 不做破坏性数据迁移(违「零迁移」稳态),改用归一读取层:把任意 item(旧扁平 / 新属性袋)
@@ -19,7 +19,7 @@ interface DataSourceItemLike {
   port?: number;
   database?: string;
   username?: string;
-  // @kf-batch 44-jdbc-params —— JDBC 源的附加连接参数(扁平字段,与 host/port/database 同列;归一进袋供 buildConnection 读)
+  // JDBC 源的附加连接参数(扁平字段,与 host/port/database 同列;归一进袋供 buildConnection 读)
   jdbcParams?: string;
   secretArn?: string;
   glueConnectionName?: string;
@@ -30,7 +30,7 @@ interface DataSourceItemLike {
 //  · 旧格式(扁平 host/port/database)兜底映射进袋——这是 JDBC 四兄弟旧数据的兼容路径。
 export function readConnection(ds: DataSourceItemLike): Record<string, any> {
   if (ds.connection && typeof ds.connection === "object" && Object.keys(ds.connection).length > 0) {
-    // @kf-batch 44-jdbc-params —— 既有袋又有扁平 jdbcParams(编辑 PUT 只写扁平键)⇒ 扁平的补进袋,不让它被袋静默盖掉
+    // 既有袋又有扁平 jdbcParams(编辑 PUT 只写扁平键)⇒ 扁平的补进袋,不让它被袋静默盖掉
     if (ds.jdbcParams !== undefined && ds.connection.jdbcParams === undefined) return { ...ds.connection, jdbcParams: ds.jdbcParams };
     return ds.connection;
   }

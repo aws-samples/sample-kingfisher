@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // 🔴 **闭合 admin-DDL 执行器**(50 SPEC §3.9a v3.3,用户拍板 B)—— P0-4 的真正关闭点。
 //
 // ── 这个文件把什么从"地基"变成"边界" ──────────────────────────────────────────
@@ -31,7 +30,7 @@
 //     语句由**本文件私有**的 builder 产出、**不铸 branded**、**不进审计明细**、错误文本先脱敏;
 //     口令**从生成到写入 Secrets Manager 全程不出这个函数**(所以也就不存在"返回口令"的接口面)。
 //
-// @kf-batch 50-WP11b-shared-writer —— 第三个公开入口 `provisionSharedWriter()`(SPEC §3.9d.4):每个 target 一个
+// 第三个公开入口 `provisionSharedWriter()`(SPEC §3.9d.4):每个 target 一个
 //   窄权写者 `shared_writer`,与 `provisionProjectLogin` 同形态、同纪律(口令不出函数、不进模板 / 审计 / 返回值)。
 //
 // 🔴 **返回面封闭**:本模块任何导出都不返回 secret 明文 / admin secret ARN / 口令。
@@ -45,18 +44,18 @@ import {
   type ResolvedModelingObject,
   type VerifiedAdminDdlContext,
 } from "@/lib/exec-env/admin-ddl-request";
-// @kf-batch 50-WP11b-shared-writer —— 窄权写者身份名的唯一作者
+// 窄权写者身份名的唯一作者
 import { sharedWriterSecretName, sharedWriterUserName } from "@/lib/modeling/landing-fqn";
 import { buildAdminDdlStatements } from "@/lib/exec-env/admin-ddl-templates";
 import { lintGeneratedStatement, sqlSkeleton } from "@/lib/exec-env/admin-ddl-guards";
 import { withSchemaCreateRetry } from "@/lib/redshift/concurrent-schema";
 import { requireCredentialIsolationState } from "@/lib/exec-env/privileged-cred";
 import { requireReadyTarget, type ExecutionTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-WP31-place-first-class(序 31 第二刀 ① = B-98)
+// (=)
 // 🔴 本文件是**第二条**数据面执行通道(建模码表落地 / 维表应用 DDL 的非主控区一跳走这里,不走 resolveRedshiftBinding),
 //   原来只做准入、不记落点决策 ⇒ 请求上下文里只有主控区那一条决策 ⇒ observe 观测器把本就该落到第二区的
-//   redshift-data / secretsmanager 调用判成 cross-region(第三十九 / 四十轮各 16 / 12 条,全部 = B-98);
-//   序 31 第二刀 enforce(SDK middleware 越区即抛)一开,这条路会被**误拦**。⇒ 准入之后、执行之前记一笔决策。
+//   redshift-data / secretsmanager 调用判成 cross-region(第三十九 / 四十轮各 16 / 12 条,全部 =);
+//   enforce(SDK middleware 越区即抛)一开,这条路会被**误拦**。⇒ 准入之后、执行之前记一笔决策。
 import { notePlaceDecision } from "@/lib/place/context";
 
 /** 本通道在落点决策账本里的署名(观测清单按它归类;判据按它过滤)。 */
@@ -75,7 +74,7 @@ import {
   type TargetWarehouse,
 } from "@/lib/exec-env/target-clients";
 import { writeAuditRecord, writeAuditRecordOnce, type AuditActorRef } from "@/lib/audit";
-// @kf-batch 50-WP9a-durable-jobs —— 两段式入口的提交 / 读终态原语(不改 target-clients.ts;客户端走唯一工厂)
+// 两段式入口的提交 / 读终态原语(不改 target-clients.ts;客户端走唯一工厂)
 import { describeStatementState, submitStatements } from "@/lib/dataplane-jobs/statement";
 import { getApproval, getProject } from "@/lib/projects/project-service";
 import type { Identity } from "@/lib/auth/identity";
@@ -144,7 +143,7 @@ interface OperationPolicy {
  * **这不是把功能做窄**:这 8 个 operation 现在**一个生产调用方都没有**(G2R 起就是无副作用地基),
  * 本批的调用方是供给层的 `systemActor`。将来 `land-code-table` 接到建模页时,
  * 它需要的是"项目 owner + 该码表属 modeling-global"这样的窄规则 ——
- * 那条规则要和真实调用点一起落(P52.5b / P50.3),**现在写一个猜的规则等于给自己一个假门**。
+ * 那条规则要和真实调用点一起落,**现在写一个猜的规则等于给自己一个假门**。
  * 所以这里的口径是:**先全部收紧到管理员**,接线时按调用点逐个放开并补测。
  */
 const OPERATION_POLICY: Record<AdminDdlRequest["operation"], OperationPolicy> = {
@@ -156,14 +155,14 @@ const OPERATION_POLICY: Record<AdminDdlRequest["operation"], OperationPolicy> = 
   "drop-project-schema": { requirePlatformAdmin: true, requireApproval: true, auditKind: "destructive" },
   "dms-ingest-bootstrap": { requirePlatformAdmin: true, requireApproval: false, auditKind: "bootstrap" },
   "land-code-table": { requirePlatformAdmin: true, requireApproval: false, auditKind: "code-table" },
-  // @kf-batch 50-WP11b-shared-writer —— 建模页的落地 / 解绑路由本就只许平台管理员(路由层 403),这里同口径。
+  // 建模页的落地 / 解绑路由本就只许平台管理员(路由层 403),这里同口径。
   //   drop-landed-table 不走审批单:它的有损确认是路由层的机制 A(逐字确认串 FORCE-REBUILD / 物理表名)。
   "grant-shared-writer": { requirePlatformAdmin: true, requireApproval: false, auditKind: "grant" },
   "land-model-table": { requirePlatformAdmin: true, requireApproval: false, auditKind: "model-table" },
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 图形化改表:同建表口径(平台管理员);删列的不可逆确认与 prod 审批都是路由层机制,不在这里二次设门
+  // 图形化改表:同建表口径(平台管理员);删列的不可逆确认与 prod 审批都是路由层机制,不在这里二次设门
   "alter-model-table": { requirePlatformAdmin: true, requireApproval: false, auditKind: "model-table" },
   "drop-landed-table": { requirePlatformAdmin: true, requireApproval: false, auditKind: "modeling-drop" },
-  // @kf-batch 50-WP9a-durable-jobs —— permission canary(WP-9 ④-3);两条都只由平台管理员 / systemActor 发起
+  // permission canary(④-3);两条都只由平台管理员 / systemActor 发起
   "create-canary-probes": { requirePlatformAdmin: true, requireApproval: false, auditKind: "canary" },
   "revoke-public-create": { requirePlatformAdmin: true, requireApproval: false, auditKind: "grant" },
 };
@@ -191,7 +190,7 @@ function adminSecretArnOf(t: ExecutionTarget): string {
       "7-credential",
       `target ${t.targetId} 的描述符里没有可用的 redshiftSecretArn —— 拒绝执行。` +
         `§3.9a 第 8 步禁 IAM fallback:解析不到凭证就拒,绝不省略 SecretArn 退回联邦身份` +
-        `(那会造成表属主分叉 —— P52.1-L1 修过的病)`
+        `(那会造成表属主分叉 —— 此前修过的病)`
     );
   }
   return arn;
@@ -209,7 +208,7 @@ export interface AdminDdlResult {
 /**
  * 九步里 1–6 的**共同前半段**(同步入口 `executeAdminDdl` 与两段式入口 `submitAdminDdl` 共用)。
  *
- * @kf-batch 50-WP9a-durable-jobs —— 🔴 为什么抽出来而不是在 submit 里再写一遍:两份前半段 = 两份 RBAC /
+ * 🔴 为什么抽出来而不是在 submit 里再写一遍:两份前半段 = 两份 RBAC /
  *   两份审批 / 两份 lint,漂移一处就是「同步入口拒的东西,异步入口放行」。抽成一个私有函数,
  *   两个入口的差别只剩第 8 步「原地等终态」还是「只提交」。顺序与原实现逐行一致(6 在 7 之前,7 在 4 之后)。
  */
@@ -237,7 +236,7 @@ async function prepareAdminDdl(actor: AuthenticatedActor, input: unknown) {
     }
   }
 
-  // @kf-batch 50-WP11b-shared-writer —— 🔴 建模类 operation 的**台账成员资格**(SPEC §3.9d.7(a))
+  // 🔴 建模类 operation 的**台账成员资格**(SPEC §3.9d.7(a))
   //   codeTableId → 码表台账、modelTableId → 模型表台账,**查不到即拒**。对象属于哪一类由它来自哪本台账决定
   //   (编不出来),业务表压根不在这两本台账里 ⇒「禁业务表进平台全局 schema」原样成立。
   //   落点 / 列也只从这里取(模板不认 request 里的任何名字)。
@@ -245,7 +244,7 @@ async function prepareAdminDdl(actor: AuthenticatedActor, input: unknown) {
 
   // ── 3) 强一致读 target + 准入 + 凭证隔离状态 ─────────────────────────────
   const target = await requireReadyTarget(request.targetId); // ConsistentRead + 整包校验 + 可服务性
-  // B-98:准入**之后**才记(被拒的请求不许被归到某个区),执行**之前**记(第 8 步的每次数据面调用都要能归因)
+  // 准入**之后**才记(被拒的请求不许被归到某个区),执行**之前**记(第 8 步的每次数据面调用都要能归因)
   notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA });
   const iso = requireCredentialIsolationState(target); // 缺状态/未知即抛,绝不隐式当 legacy
 
@@ -340,7 +339,6 @@ export async function executeAdminDdl(actor: AuthenticatedActor, input: unknown)
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// @kf-batch 50-WP9a-durable-jobs
 // 公开入口 ④⑤:submitAdminDdl / settleAdminDdl —— 两段式(50 SPEC §3.9a 合同差分 ③-1)
 // ──────────────────────────────────────────────────────────────────────────────
 //
@@ -412,7 +410,7 @@ export async function settleAdminDdl(submission: AdminDdlSubmission): Promise<Ad
   if (!submission?.auditId || !Array.isArray(submission.statementIds) || submission.statementIds.length === 0) {
     throw new AdminDdlDenied("9-settle", "settleAdminDdl:提交凭据不完整(缺 auditId / statementIds)⇒ 拒绝当成任何一种结论");
   }
-  // B-98:收口发生在**另一个请求**(轮询 / 泵)里,它对 submission.region 的 redshift-data 读也要能归因
+  // 收口发生在**另一个请求**(轮询 / 泵)里,它对 submission.region 的 redshift-data 读也要能归因
   notePlaceDecision({ targetId: submission.targetId, via: ADMIN_DDL_PLACE_VIA });
   let affected = 0;
   for (const id of submission.statementIds) {
@@ -490,7 +488,7 @@ export async function provisionProjectLogin(
   }
   // 3) 强一致读 target + 准入 + 隔离状态
   const target = await requireReadyTarget(args.targetId);
-  notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA }); // B-98
+  notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA });
   const iso = requireCredentialIsolationState(target);
   // 4) RBAC:建登录身份是特权动作,一律要求平台管理员(供给层用 systemActor)
   if (!actor.isPlatformAdmin) {
@@ -567,7 +565,7 @@ export async function provisionProjectLogin(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 公开入口 ③:provisionSharedWriter —— 建窄权写者 + 设口令 + 写 secret(@kf-batch 50-WP11b-shared-writer)
+// 公开入口 ③:provisionSharedWriter —— 建窄权写者 + 设口令 + 写 secret
 // ──────────────────────────────────────────────────────────────────────────────
 
 export interface SharedWriterResult {
@@ -596,7 +594,7 @@ export async function provisionSharedWriter(
   assertActor(actor);
   // 3) 强一致读 target + 准入 + 隔离状态
   const target = await requireReadyTarget(args.targetId);
-  notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA }); // B-98
+  notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA });
   const iso = requireCredentialIsolationState(target);
   // 4) RBAC:建登录身份是特权动作,一律要求平台管理员
   if (!actor.isPlatformAdmin) {
@@ -674,7 +672,7 @@ export async function provisionSharedWriter(
 // ──────────────────────────────────────────────────────────────────────────────
 
 /**
- * @kf-batch 50-WP11b-shared-writer —— 第 2 步的建模台账成员资格(SPEC §3.9d.7(a))。
+ * 第 2 步的建模台账成员资格(SPEC §3.9d.7(a))。
  * 非建模类 operation ⇒ undefined。台账模块**动态** import:`modeling/landing.ts` 反过来要调本执行器,
  * 静态 import 会成环。
  */
@@ -724,7 +722,7 @@ async function resolveModelingObject(request: AdminDdlRequest): Promise<Resolved
     schema: mt.schema,
     physicalTable: mt.physicalTable,
     columns: mt.columns,
-    // @kf-batch 50-SEQ47c-catalog-ddl —— 改表计划随台账行带给模板(没有就是 undefined,模板会拒)
+    // 改表计划随台账行带给模板(没有就是 undefined,模板会拒)
     ...(mt.pendingAlter ? { pendingAlter: mt.pendingAlter } : {}),
   };
 }

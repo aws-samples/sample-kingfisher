@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 🔴🔴 **「落点」这一类缺陷的结构性拦截**(不是再补一个点,而是把这一类关进笼子)。
 //
 // 【为什么必须有这道门】2026-09-11 一天之内,同一类缺陷在**六个**互不相干的地方各犯了一次:
@@ -6,7 +5,7 @@
 //   ② `schedule/enable` 解挂写 `homeMwaaEndpoint()` ⇒ 页面显示「已开启」而那个区的 DAG 永远 paused;
 //   ③ 运行状态回填用**模块级** MWAA 客户端 + 主控区环境名 ⇒ 把别区**跑成功**的 run 在 3 分钟后标成 failed;
 //   ④ 监控页任务日志的**日志组名**用主控区环境名 ⇒ 「暂无日志」和「真的没输出」长得一样;
-//   ⑤ run 记录的**章**用行上的字段而不是落点 ⇒ 作业锁属性名与台账 runId 一起错(T-12 的坑复发);
+//   ⑤ run 记录的**章**用行上的字段而不是落点 ⇒ 作业锁属性名与台账 runId 一起错;
 //   ⑥ 依赖链(SCH-03)下游触发整条链打主控区 ⇒ 台账写着 running,其实一次都没跑。
 // 共同根因**不是粗心**,而是:**「落点」是个有静默合法默认值的参数** —— `= HOME_TARGET_ID` 的默认值、
 // `targetId?` 的可选参数、`process.env.AWS_REGION` 的模块级客户端、`homeMwaaEndpoint()` 这个永远可调的函数。
@@ -63,7 +62,7 @@ const MAY_RESOLVE_PLACE = [
   // ── 工作流 seam(目标态:下面那些路由都该只调它)──
   "lib/workflow/publish-dag.ts",
   // ── ⏳ 仍自己解析的路由(欠账,只减不增;每减一个把它从这里删掉)──
-  // 序 50 第二批:手动触发的扇出主体从 trigger 路由搬进执行体(逐 target schedulerEndpointFor),欠账名额随之转移、不新增
+  // 手动触发的扇出主体从 trigger 路由搬进执行体(逐 target schedulerEndpointFor),欠账名额随之转移、不新增
   "lib/workflow/long-ops.ts",
   "app/api/workflow/[id]/runs/[runId]/status/route.ts",
   "app/api/workflow/[id]/runs/[runId]/nodes/route.ts",

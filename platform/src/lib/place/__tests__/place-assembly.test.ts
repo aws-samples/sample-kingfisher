@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1 装配层:types ↔ resolve ↔ context ↔ route ↔ aws/clients ↔ observer 之间**一律不 mock**。
+// 装配层:types ↔ resolve ↔ context ↔ route ↔ aws/clients ↔ observer 之间**一律不 mock**。
 // 只替换真外部:注册表(DDB 边界)、Next 请求存储(Next 之外不存在)、网络(SDK build 步插桩,永不出网)。
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import http from "node:http";
@@ -212,7 +211,7 @@ describe("🔴 唯一工厂的越区断言(L3):拦截模式零网络请求;观�
     expect([net.n, net2.n]).toEqual([1, 1]);
   });
 
-  it("observe(缺省)与拼错的模式值:越区也放行(序 6 之前不拦)", async () => {
+  it("observe(缺省)与拼错的模式值:越区也放行(此前不拦)", async () => {
     for (const mode of [undefined, "ENFORCE", "on"]) {
       if (mode === undefined) delete process.env.BGP_PLACE_GUARD;
       else process.env.BGP_PLACE_GUARD = mode;
@@ -276,7 +275,7 @@ describe("🔴🔴 全局观测器(真 SDK → 真 Node http → 诊断通道;�
   const violations = () => lines.filter((l) => l.event === "place.observe.violation");
   const athena = (region: string) => new AthenaClient({ region, endpoint: ep("athena", region), credentials: creds, requestHandler: handler, maxAttempts: 1 });
 
-  it("B-26 形态:us-west-2 视角 + 解析层走了「没传 = 主控区」+ 主控区单例 ⇒ 记违规 + EMF 指标", async () => {
+  it("形态:us-west-2 视角 + 解析层走了「没传 = 主控区」+ 主控区单例 ⇒ 记违规 + EMF 指标", async () => {
     fakeRequest("/api/genbi/ask?scope=tgt_usw2_a");
     notePlaceDecision({ targetId: null, via: "resolveAthenaPlace" });
     await singletonHomeAthena.send(new StartQueryExecutionCommand({ QueryString: "q", WorkGroup: "bgp-athena" })).catch(() => {});
@@ -439,7 +438,7 @@ describe("judgeCall / 资源抽取(纯函数)", () => {
     expect(judgeCall({ ...f, service: "monitoring", operation: "PutMetricData", clientRegion: "eu-west-1" }, idx).kinds).toEqual(["cross-region"]);
   });
 
-  // 序 31 三刀 IAM 侧(2026-10-21):账号级清点 s3.ListBuckets @ 主控区 = 控制面(测试账号 observe 实测它是 unattributedTop 仅剩的 1 类);
+  // IAM 侧(2026-10-21):账号级清点 s3.ListBuckets @ 主控区 = 控制面(测试账号 observe 实测它是 unattributedTop 仅剩的 1 类);
   //   同服务别的操作(ListObjectsV2 等)碰的是某个区的桶 ⇒ 仍按区判;在别的区发 ListBuckets 也不豁免。
   it("账号级清点 s3.ListBuckets @ 主控区 = 控制面;s3 别的操作仍按区判;别的区发 ListBuckets 不豁免", () => {
     const f = { decisions: [], view: { kind: "target" as const, targetId: "tgt_usw2_a" }, resourceIds: [] };
@@ -448,7 +447,7 @@ describe("judgeCall / 资源抽取(纯函数)", () => {
     expect(judgeCall({ ...f, service: "s3", operation: "ListBuckets", clientRegion: "eu-west-1" }, idx).kinds).toEqual(["cross-region"]);
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 第十一轮越区清单只剩中心件两类 ⇒ 声明它们(central.ts),且**只认资源名 / 显式决策**
+  // 第十一轮越区清单只剩中心件两类 ⇒ 声明它们(central.ts),且**只认资源名 / 显式决策**
   it("🔴 中心件 OM:请求明确落在 us-west-2 时取 OM bot 密钥 @ 主控区 = 合法;同场景取数据源密钥 = 越区(负向对照)", () => {
     const f = { service: "secretsmanager", operation: "GetSecretValue", clientRegion: "us-east-1", explicit: { targetId: "tgt_usw2_a", region: "us-west-2" }, decisions: [], view: null };
     expect(judgeCall({ ...f, resourceIds: ["bgp/om/ingestion-bot-token"] }, idx).kinds).toEqual(["control"]);
@@ -459,7 +458,7 @@ describe("judgeCall / 资源抽取(纯函数)", () => {
     expect(judgeCall({ ...f, clientRegion: "eu-west-1", resourceIds: ["bgp/om/ingestion-bot-token"] }, idx).kinds, "中心件只在主控区").toEqual(["cross-region"]);
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 序 31 第二刀 ②:平台自身的内部端点共享密钥(推进泵 / 内部守卫每 5 分钟读一次,
+  // 平台自身的内部端点共享密钥(推进泵 / 内部守卫每 5 分钟读一次,
   //   第四十三轮 observe 实测 16 次请求外 + 8 次 sweep 路由)= 控制面;靠 env 里那一个 ARN 的资源 token 认,不整块豁免 secretsmanager。
   it("🔴 平台控制面密钥(ACTION_DISPATCH_SECRET_ARN)@ 主控区 = control;数据源密钥 / 别的区 / 索引没登记 ⇒ 照常判", () => {
     const ARN = "arn:aws:secretsmanager:us-east-1:000000000000:secret:bgp/internal/action-dispatch-key-Ab12Cd";

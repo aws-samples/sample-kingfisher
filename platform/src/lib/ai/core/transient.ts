@@ -1,4 +1,4 @@
-// @kf-batch 51-v2-multi-vendor(模块 51 v2.0 多厂商模型通道;51 SPEC §7.2b / DESIGN §12 D17)
+// (多厂商模型通道;51 SPEC §7.2b / DESIGN §12 D17)
 // 🔴 模型调用的**瞬态流错误**判定 + 有界抖动退避 —— 单一作者,编进三个 AgentCore 容器的 core-dist/ai,
 //   容器的 Strands agent 循环与平台侧共用同一张清单(写第二份清单 = 迟早漂移)。
 //

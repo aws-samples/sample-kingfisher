@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
 // 🔴 **改动前**:本端点**零守卫**(52 SPEC §2 缺口B 第 7 面;台账 52 DESIGN §11.2 第 4 项)。两条危害:
 //   ① 带 `datasourceId` 时会**回写该数据源的 `status`/`testResult`** ⇒ 任一登录用户可跨项目改别人数据源的状态;
 //   ② 不带 id 时按表单里的 host/port/账密真发起连接 ⇒ 平台变成一个**带凭证的对内网连通性探测器**。
@@ -17,7 +16,7 @@ import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 import { regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import type { DataSource } from "@/types/datasource";
 import { apiOk, apiError } from "@/lib/api-response";
-// 模块 42:建源表单校验 + JDBC URL 由数据源 SPI 提供(取代此前本文件写死的第 3 份 JDBC_URL 副本)。
+// 建源表单校验 + JDBC URL 由数据源 SPI 提供(取代此前本文件写死的第 3 份 JDBC_URL 副本)。
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 import { toSourceRef } from "@/lib/datasource-spi/normalize";
 
@@ -43,7 +42,7 @@ export async function POST(req: NextRequest) {
       if (rctx instanceof NextResponse) return rctx;
       if (!Item?.glueConnectionName) return apiOk({ success: false, steps: [{ name: "error", status: "fail", message: "数据源未关联 Glue Connection" }], totalMs: 0 });
 
-      // 序 49 ② B-73:① 配置核对打**该源所在区**的 Glue(原来不带区 ⇒ 恒查主控区,非主控区的源必报「连接不存在」);
+      // ① 配置核对打**该源所在区**的 Glue(原来不带区 ⇒ 恒查主控区,非主控区的源必报「连接不存在」);
       //   ② 不再拿配置核对写 active —— 配好了就接着做真正的连通性检测(与「检测」按钮同一作者),结论才写 status。
       const region = await regionOfTarget(datasourceOwnerTarget(Item));
       const result = await testConnection(Item.glueConnectionName, region);
@@ -54,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 模块42 §10.5:非 JDBC 源(DynamoDB/S3 等,iam-role,needsGlueConnection=false)按范式分流,
+  // §10.5:非 JDBC 源(DynamoDB/S3 等,iam-role,needsGlueConnection=false)按范式分流,
   //   走 provider.testConnection 做真连测试(DescribeTable/HeadBucket),不要求 host/port/db/账密。
   //   JDBC 路径逐字保持不变(向后兼容零回归)。
   if (isDataSourceType(body.type)) {
@@ -95,7 +94,7 @@ export async function POST(req: NextRequest) {
   const provider = getProvider(type);
 
   // Step 2: 由 provider 校验连接配置(取代散落的 host/端口/库字符串校验)。JDBC URL 也由 provider 产出。
-  // @kf-batch 44-jdbc-params —— 用户填的附加参数一起校验、一起进 JDBC URL(与建源落库同一份 provider 逻辑);不合法时不构造 URL
+  // 用户填的附加参数一起校验、一起进 JDBC URL(与建源落库同一份 provider 逻辑);不合法时不构造 URL
   const conn = { host, port, database, ...(body.jdbcParams ? { jdbcParams: body.jdbcParams } : {}) };
   const v = provider.validateConfig(conn);
   const jdbcUrl = v.ok ? provider.buildConnection({ type, connection: conn }).jdbcUrl || "" : "";

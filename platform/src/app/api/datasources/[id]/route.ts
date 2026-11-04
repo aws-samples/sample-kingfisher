@@ -3,27 +3,27 @@ import { homeRegion } from "@/lib/place/home-region";
 import { pickEditableDatasourceFields } from "@/lib/datasources/editable-fields";
 import { parseJdbcParams } from "@/lib/datasource-spi/jdbc/jdbc-params";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 存量源的章:无章 = 主控区(唯一作者)
+// 存量源的章:无章 = 主控区(唯一作者)
 import { targetOfStamp } from "@/lib/exec-env/target-id";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { deleteSecret, deleteGlueConnection, deleteSecurityGroup, isUserNetworkConfig, getSecret, updateSecret, updateGlueConnectionEndpoint, updateGlueConnectionNetwork } from "@/lib/aws/datasource-service";
-// @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 改网络 / 删源都必须打**这条源自己那个区**:
+// 🔴 改网络 / 删源都必须打**这条源自己那个区**:
 // 打主控区的后果是「行删了、那个区的 Glue 连接与安全组留着」——残留资源占着 SG,
 // 后面删整个执行环境时会被卡住(记忆 `retain-orphans-and-dryrun-false-green` 就是这个形状)。
 import { resolveDsPlace, noteDatasourceRowPlace } from "@/lib/datasource/ds-place";
-// 序 38 B-70:探测方式闭合清单(表单 / 路由同一份);删源连带撤发现作业
+// 探测方式闭合清单(表单 / 路由同一份);删源连带撤发现作业
 import { DS_PROBE_VIA, type DataSource } from "@/types/datasource";
 import { teardownDiscoveryArtifacts } from "@/lib/datasource/glue-reach";
 import { settleGlueProbeRows } from "@/lib/datasource/glue-probe-settle";
-// 序 59 B-131:删源前读引用清单(同步 / 实时任务),非空 ⇒ 409 逐条点名;读不到 ⇒ 抛,不当 0
+// 删源前读引用清单(同步 / 实时任务),非空 ⇒ 409 逐条点名;读不到 ⇒ 抛,不当 0
 import { listDatasourceReferences, describeDatasourceReferences } from "@/lib/datasource/references";
-// 序 58 B-130:平台自建安全组的持久清理作业(入队在动任何资源之前;泵按网卡事实收口)
+// 平台自建安全组的持久清理作业(入队在动任何资源之前;泵按网卡事实收口)
 import { enqueueSgCleanup } from "@/lib/datasource/sg-cleanup-job";
 import { apiOk, apiError } from "@/lib/api-response";
 import { recordAudit } from "@/lib/audit";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// 模块 55 / 序 50 第二批 —— 对象租约 `datasource:<id>`:为这条源建 Athena 外部表(长操作 datasource-s3-external)进行中,编辑 / 删除 ⇒ 409
+// 对象租约 `datasource:<id>`:为这条源建 Athena 外部表(长操作 datasource-s3-external)进行中,编辑 / 删除 ⇒ 409
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
 import { resourceKey } from "@/lib/long-ops/kinds";
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     if (!Item) return apiError("数据源不存在", 404);
     const guard = await guardResourceAccess(req, Item, "viewer");
     if (guard instanceof NextResponse) return guard;
-    // 序 38 B-70:「经 Glue 连接验证中」的行读到就推进到结论;推进失败不影响读取
+    // 「经 Glue 连接验证中」的行读到就推进到结论;推进失败不影响读取
     const row = await settleGlueProbeRows([Item as DataSource]);
     return apiOk(row[0]);
   } catch (e: any) {
@@ -50,7 +50,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const params = await props.params;
   try {
     const raw = await req.json();
-    // @kf-batch 42-ux-feedback —— 🔴 只认闭合清单里的可编辑字段(lib/datasources/editable-fields.ts 单一作者)。
+    // 🔴 只认闭合清单里的可编辑字段(lib/datasources/editable-fields.ts 单一作者)。
     //   2026-10-15 …7698 页面复现:编辑弹窗把整条记录原样 PUT 回来(datasourceId / userId / updatedAt / status / secretArn …),
     //   下面的 `SET` 把它们全拼进去又另加 `#upd = :now` ⇒ DynamoDB「Two document paths overlap … [updatedAt]」500,改个名字都报错。
     //   不在清单的键一律丢弃并记一行日志(便于发现新的客户端漏网字段),不把记录回显当成写意图。
@@ -68,13 +68,13 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const busy = await resourceBusyResponse([resourceKey("datasource", params.id)]);
     if (busy) return busy;
 
-    // @kf-batch 42-B83-ds-edit-sync —— 🔴 改了连接要素(type / host / port / database)或登录名 / 口令,先同步到**这条源自己那个区**的
+    // 🔴 改了连接要素(type / host / port / database)或登录名 / 口令,先同步到**这条源自己那个区**的
     //   Glue 连接(JDBC URL · USERNAME · PASSWORD)与 secret,再落库;任一步失败 ⇒ 502 且记录不改(落库了而 Glue 还指旧 host = 页面说「已更新」实际没同步)。
-    //   原来只有改密码才写 secret、改 host 只落库(台账 B-83):同步作业 / 发现作业 / 探测走的 Glue 连接仍指着旧库;只改登录名则连 secret 都不动。
+    //   原来只有改密码才写 secret、改 host 只落库(台账):同步作业 / 发现作业 / 探测走的 Glue 连接仍指着旧库;只改登录名则连 secret 都不动。
     const cur = current as Record<string, any>;
-    // 序 31 二刀 ⑤:读旧凭证(getSecret,区来自 ARN)发生在下面的 resolveDsPlace 之前 ⇒ 先按行上的章记一笔落点决策
+    // 读旧凭证(getSecret,区来自 ARN)发生在下面的 resolveDsPlace 之前 ⇒ 先按行上的章记一笔落点决策
     noteDatasourceRowPlace(cur);
-    // @kf-batch 44-jdbc-params —— 附加 JDBC 参数:形态不合法 ⇒ 400 记录不改;落库归一化形态;空串 = 清空。变了与改 host 同列(Glue 连接的 URL 要跟着变)。
+    // 附加 JDBC 参数:形态不合法 ⇒ 400 记录不改;落库归一化形态;空串 = 清空。变了与改 host 同列(Glue 连接的 URL 要跟着变)。
     if (body.jdbcParams !== undefined) {
       const jp = parseJdbcParams(body.jdbcParams);
       if (!jp.ok) return apiError(jp.error, 400, { code: "VALIDATION_FAILED" });
@@ -134,10 +134,10 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     delete body.projectId;
     delete body.createdBy;
     delete body.createdBySub;
-    // @kf-batch 50-W3f-T0-T3 —— 落点(ownerTargetId)同列不可变:本刀只落字段与迁移,不接线;
+    // 落点(ownerTargetId)同列不可变:本刀只落字段与迁移,不接线;
     // 让客户端能随手 PUT 一个别的 target 进来 = 在 O4 定义授权动作之前就开了改落点的口子。
     delete body.ownerTargetId;
-    // 序 38 B-70:探测结果 / 发现作业状态 / 发现结果只由服务端写;探测方式按闭合清单校验
+    // 探测结果 / 发现作业状态 / 发现结果只由服务端写;探测方式按闭合清单校验
     delete body.heartbeat;
     delete body.discovery;
     delete body.discoveredSchema;
@@ -206,7 +206,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     if (guard instanceof NextResponse) return guard;
     const busy = await resourceBusyResponse([resourceKey("datasource", params.id)]);
     if (busy) return busy;
-    // 序 59 B-131:仍被同步 / 实时任务引用 ⇒ 409 并逐条列出(删源不留孤儿任务,纪律 7)。原来只核权限与自身租约,
+    // 仍被同步 / 实时任务引用 ⇒ 409 并逐条列出(删源不留孤儿任务,纪律 7)。原来只核权限与自身租约,
     //   源删了、Glue 连接 / 密钥 / 安全组照删,引用它的任务留在列表里,下一次定时触发才报「连接不存在」。
     const refs = await listDatasourceReferences(params.id);
     if (refs.total > 0) {
@@ -235,7 +235,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
       ...(isUserNetworkConfig(nc as any) ? [] : [nc.securityGroupId]),
     ].filter(Boolean) as string[]));
 
-    // 序 58 B-130:先给每个候选组登记一条**持久**清理作业,再动任何资源 ——
+    // 先给每个候选组登记一条**持久**清理作业,再动任何资源
     //   · 入队是一次条件写(幂等),之后由泵按网卡事实收口(网卡为 0 才删;30 分钟预算到期如实「需人工」,停在系统设置「后台清理任务」里);
     //   · 入队失败 ⇒ 拒绝删除(源还在、什么都没动,可重试),绝不出现「源删了、组没人管」(原来是进程内存里 10 × 30 秒重试,耗尽即永久遗留);
     //   · 下面同步删组成功时,作业下一步查到组已不在 ⇒ 自行收口成功,路由不必回头改它。
@@ -256,7 +256,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     }
 
     if (Item.glueConnectionName) {
-      // 序 38 B-70:连带撤掉发现作业与它的产物(作业 / 脚本);删不净只记日志、照常往下删(连接 / 密钥 / 组是承重的清理)
+      // 连带撤掉发现作业与它的产物(作业 / 脚本);删不净只记日志、照常往下删(连接 / 密钥 / 组是承重的清理)
       const leftover = await teardownDiscoveryArtifacts(Item as unknown as DataSource).catch((e) => [String((e as Error)?.message || e)]);
       if (leftover.length) console.warn("[datasource.delete] 发现作业 / 对象未清净,需人工确认", { datasourceId: params.id, leftover });
     }
@@ -282,7 +282,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
       detail: {
         name: Item.name,
         type: Item.type,
-        // 序 58 B-130:两态如实记 —— 组当场删掉 / 交后台清理(作业 id 可在系统设置「后台清理任务」里对上)
+        // 两态如实记 —— 组当场删掉 / 交后台清理(作业 id 可在系统设置「后台清理任务」里对上)
         securityGroupCleanup: sgCandidates.length === 0 ? "none" : pendingCleanup.length ? "scheduled" : "deleted",
         ...(cleanupJobIds.length ? { cleanupJobIds } : {}),
       },

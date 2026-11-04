@@ -4,7 +4,6 @@ import { CancelStatementCommand, DescribeStatementCommand } from "@aws-sdk/clien
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireQueryHandle } from "@/lib/security/query-handle";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-P50.3-mrquery
 import { redshiftDataClientFor } from "@/lib/exec-env/target-clients";
 import { regionOfTarget } from "@/lib/exec-env/data-plane-target";
 
@@ -25,7 +24,6 @@ export async function POST(req: NextRequest) {
   if (chk instanceof NextResponse) return chk;
 
   try {
-    // @kf-batch 50-P50.3-mrquery
     // 🔴 **只取消这一个 target 的语句**(INTERACTION §4septies.4:超时不连坐其它区)。
     // region 取自**句柄**里的 targetId —— 客户端无从指定,拿 home 的客户端去 cancel 非 home
     // 的语句只会静默无效(那比报错更坏:界面显示"已取消"而那个区还在跑还在计费)。
@@ -35,7 +33,6 @@ export async function POST(req: NextRequest) {
     recordAudit(req, "redshift.cancel", { resourceType: "redshift-statement", resourceId: statementId });
     return apiOk({ cancelled: true });
   } catch (e: any) {
-    // @kf-batch 50-P50.3-mrquery
     // 🔴 **「语句已经跑完了」不是平台故障,不许报 500**(与 W3a-9 教过的同一类错误分类:
     // 500 会把人引去查平台健康,而真相是"你按取消的时候它已经结束了" —— 用户可理解的正常情形)。
     // 🔴 判据取**权威状态**(再 Describe 一次),不靠匹配 AWS 的错误文案 ——

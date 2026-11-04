@@ -1,5 +1,4 @@
-// @kf-batch 50-WP2-directquery
-// **数仓直查的单一作者**(50 SPEC §3.4;施工包 WORK-PACKAGES WP-2 ④ B 组)。
+// **数仓直查的单一作者**(50 SPEC §3.4;施工包 ④ B 组)。
 //
 // ── 为什么必须有这个文件 ──────────────────────────────────────────────────────
 // 收编之前,治理目录 / 质量 / 指标 / 建模 / 敏感扫描(+ 问数两处)各自持有:
@@ -8,7 +7,7 @@
 //   ③ 一份**逐字复制**的轮询循环(50 次 × 700ms、同样的错误文案)。
 // 七份副本 = 七处都要改才能支持按区执行,而漏改的那处**不会报错** —— 它会安安静静地
 // 把「我在看 us-west-2」的查询打到主控区的数仓上,返回一份看起来很正常的结果。
-// 这正是「非 home 静默取不到 / 写回 home」那类 bug 的模板(WP-2 ④ 原话)。
+// 这正是「非 home 静默取不到 / 写回 home」那类 bug 的模板(④ 原话)。
 //
 // ⇒ 本文件收口三件事:**落点解析** + **客户端** + **轮询**;并把「该区没装数仓」这件事
 //    表达成一个**能力态**(`unavailable`)而不是异常,因为它是**正常的产品状态**:
@@ -20,16 +19,16 @@
 //    质量把非数字字符串判成 `null`,指标原样返回字符串;统一了就是悄悄改行为)。
 // ② **home 分支不许传 projectId**。治理 / 质量 / 指标 / 敏感扫描是**平台级只读**
 //    (52 §3.9 的静态归类 `governance-read`),它们本来就没有项目;而 home 的
-//    `getRedshiftSecretArn({project})` 会去查 per-project 凭证 ⇒ 在 P52.5a 交付之前
+//    `getRedshiftSecretArn({project})` 会去查 per-project 凭证 ⇒ 交付之前
 //    一律 fail-closed(那四个文件里都写着这句警告)。⇒ home 走**无 project** 的老路,
 //    与改动前逐字节等价。
 // ③ **非 home 必须带 projectId**:`resolveRedshiftBinding` 在非 home 上要 project-context
 //    凭证(50 SPEC §3.9b),缺 projectId 它自己抛 `no-credential`。平台级页面把
 //    **当前活跃项目头**交给它(与建模页按区过滤同一条口径)——那只满足凭证契约与审计,
 //    真正拿到的仍是该 target 的 per-target admin(`degradedToLegacyAdmin`),
-//    不是 per-project 身份;per-project 化归 WP-9。
+//    不是 per-project 身份;per-project 化。
 
-// @kf-batch 50-WP31-place-first-class —— 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
+// 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
 import { notePlaceDecision } from "@/lib/place/context";
 import {
   ExecuteStatementCommand,
@@ -43,14 +42,14 @@ import { assertTargetId, isHome } from "@/lib/exec-env/target-id";
 
 /**
  * 调用点给的范围。
- * @kf-batch 50-WP31-place-first-class —— 🔴 `targetId` **必填**(原来「缺省 = 主控区」⇒ 指标计算 / 治理 / 目录
+ * 🔴 `targetId` **必填**(原来「缺省 = 主控区」⇒ 指标计算 / 治理 / 目录
  *   任何一处漏传就静默在主控区数仓上跑)。主控区也要点名 `HOME_TARGET_ID`。
  */
 export interface DirectQueryScope {
   targetId: string;
   /**
    * 🔴 只在**非 home** 时被使用(见文件头规矩 ②③)。
-   * @kf-batch 50-WP31-place-first-class —— **必填**(原来可选 ⇒ 非主控区漏传在编译期看不出来,到真环境才 500:
+   * **必填**(原来可选 ⇒ 非主控区漏传在编译期看不出来,到真环境才 500:
    *   AI 代码生成 / 敏感扫描 2026-10-03 实测)。主控区分支照旧丢掉它(规矩 ②)。
    */
   projectId: string | null;
@@ -84,7 +83,7 @@ export interface DirectQueryUnavailable {
   reason: string;
 }
 
-// @kf-batch 50-PROD-B-seq33 ② —— 精简形态已取消(用户 2026-10-10):注册 / 部署 / 摘组件都不再产出「没有数仓」的环境,
+// ② —— 精简形态已取消(用户 2026-10-10):注册 / 部署 / 摘组件都不再产出「没有数仓」的环境,
 //   本分支只剩**防御**(存量不完整的环境)⇒ 文案说清这是「不完整」而不是一种可选形态,出路是〔补齐缺失组件〕。
 export const NO_WAREHOUSE_REASON =
   "该执行环境不完整:未部署数据仓库(redshift 组件),暂时只能查数据湖(Athena / S3 Tables)。" +
@@ -142,7 +141,6 @@ export interface NoWarehouseMeta {
 }
 
 /**
- * @kf-batch 50-E140b-catalog-no-warehouse
  * 「这个 target 没装数仓」⇒ 给一句**和直查那条路逐字相同**的说明;装了 / 没点名 target ⇒ `undefined`。
  *
  * 🔴 为什么要有它:目录现在主要走 OpenMetadata(用户 2026-09-10 拍板),那条路上**没有** `capability`

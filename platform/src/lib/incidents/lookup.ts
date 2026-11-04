@@ -1,4 +1,4 @@
-// 模块 43-A.2 — 运维知识库检索(供诊断编排 grounding + /api/incidents/lookup 端点复用)。
+// 运维知识库检索(供诊断编排 grounding + /api/incidents/lookup 端点复用)。
 //
 // 复利闭环的"读"半环:诊断发起前,用故障指纹去 bgp-incidents 查"这个客户上次这么修好的"——
 // 命中且【人工已验证】的修复手册,注入进喂给 DevOps Agent 的证据 prompt,让 RCA 带着历史修复

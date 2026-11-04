@@ -10,7 +10,7 @@ import { Button, Input, Space, Alert, Spin, Table, Tag, Divider, Tooltip, messag
 import { BulbOutlined, SendOutlined, CheckOutlined, HistoryOutlined } from "@ant-design/icons";
 import type { ParamAdviceRequest, ParamAdvice, ParamPrefill, ParamRecommendation } from "@/lib/param-advisor";
 import { useT } from "@/lib/i18n/useT";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 
 interface Props {

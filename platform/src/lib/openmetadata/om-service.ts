@@ -1,4 +1,3 @@
-// @kf-batch 50-WP2-one-agentcore-one-om
 // **OpenMetadata 服务名与执行环境的映射**(单一作者;纯函数、零依赖 AWS)。
 //
 // ── 为什么需要它 ──────────────────────────────────────────────────────────────
@@ -21,7 +20,6 @@ import { HOME_TARGET_ID, isHome, toTargetSlug } from "@/lib/exec-env/target-id";
 /**
  * 实体种类 ↔ OM service 前缀(与 om-push 里既有的常量同名同值,不许再起第二套)。
  *
- * @kf-batch 50-o4REG-sync-om-per-target
  * 🔴 原来只有 `redshift` / `glue` 两类(元数据镜像用);同步推送(源表 → S3 Tables → 数仓 + 物理端点)
  *    的另外三类 service(`bgp-sources` / `bgp-s3tables` / `bgp-physical`)在 om-push 里各自是常量 ——
  *    非主控区一推就只能推进主控区的 service(= 把该区的表当成主控区的挂进 OM),于是原来干脆不推(登记 o4-REG)。

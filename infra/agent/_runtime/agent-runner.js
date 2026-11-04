@@ -1,27 +1,27 @@
-// 模块47 L2 ②runtime 件 —— 顾问型 Agent 容器运行时装配模板(平台级共享源)。
+// runtime 件 —— 顾问型 Agent 容器运行时装配模板(平台级共享源)。
 //
 // 【为什么存在】测绘铁证:netadvisor 与 paramadvisor 的 runAgent() 循环骨架 89 行里 65 行逐字相同
 // (73%),唯一真差异 = finalize 返回哪些字段。若各容器复刻 = 把这 73% 抄 N 遍(与 modelId 散落同病)。
 // 本模块把通用循环骨架收敛成【一份源】,经 prebuild 分发进各容器;各能力只声明"我的差异"(spec)。
 //
 // 【循环框架】用 Strands Agent(与 GenBI 阶段3 同,已线上 Runtime READY 验证生产可用),
-// 替代 net/param 的手写 for(iter) ConverseCommand 循环——统一到模块47 的 Strands 初衷。
+// 替代 net/param 的手写 for(iter) ConverseCommand 循环——统一到 Strands 初衷。
 //
 // 【射程】L-Read 顾问型能力(paramadvisor/netadvisor);copilot 远程(L-Create)在其上叠加扩展契约。
 // GenBI 暂不迁(镜像红线 + retrieval 复杂 prepare 阶段特例 + 已 P1 收官作样板/容灾)。
 import { Agent, BedrockModel, tool } from "@strands-agents/sdk";
 import { MCPClient } from "./mcp.js";
-// @kf-batch 51-v2-multi-vendor —— 模块 51 v2.0(51 SPEC §7.2 容器落点):厂商档案的 maxTokens 系数(Kimi K3 ×2;Claude 恒等)。
+// (51 SPEC §7.2 容器落点):厂商档案的 maxTokens 系数(Kimi K3 ×2;Claude 恒等)。
 //   路径按**容器内布局**写:本文件经 core-prebuild 分发到 <容器>/_runtime/,core-dist/ai 在 <容器>/core-dist/ai ⇒ ../core-dist/ai。
 //   (在 infra/agent/_runtime 这个源位置它不被执行,只被分发。)
 import { shapeInferenceConfig } from "../core-dist/ai/converse-shape.js";
-// @kf-batch 51-v2-multi-vendor(D17)—— 瞬态流错误判定 + 有界抖动退避(与 genbi 容器 / 平台同一份清单)
+// 瞬态流错误判定 + 有界抖动退避(与 genbi 容器 / 平台同一份清单)
 import { describeModelError, TRANSIENT_MAX_RETRIES, transientBackoffMs } from "../core-dist/ai/transient.js";
 
 const REGION = process.env.AWS_REGION || "us-east-1";
 const GATEWAY_URL = process.env.GATEWAY_URL || "";
 
-// @kf-batch 50-W5-seg2-WP8 — 模块 51(P51.2 容器读侧,SPEC §4-B / §6.1⑤):
+// (容器读侧,SPEC §4-B / §6.1⑤):
 // 模型 = payload.modelId(平台按运行时配置透传,热生效)‖ env BEDROCK_MODEL_ID(CDK 从 SSOT 注入)。
 // 🔴 删掉了此前手抄的兜底字面量(sonnet-4-5,已与 SSOT opus-4-6 漂移 —— DESIGN §1.1 坐实):容器是纯 JS、
 // 读不到 repo 的 ai-model.json,任何手抄值都会再漂;唯一不漂的做法 = 只认注入来源,两者都缺就**明确报错**(fail-closed),
@@ -49,7 +49,7 @@ export function resolveContainerModelId(input) {
 export async function runAdvisorAgent(input, spec) {
   const req = input.request;
   if (!GATEWAY_URL) throw new Error("GATEWAY_URL 未配置");
-  // @kf-batch 50-W5-seg2-WP8:每次 invoke 求值(payload 优先),并把实际用的模型回显在 wire 的 _meta(平台侧校验相等)。
+  // 每次 invoke 求值(payload 优先),并把实际用的模型回显在 wire 的 _meta(平台侧校验相等)。
   const { modelId: MODEL_ID, source: modelSource } = resolveContainerModelId(input);
   const withMeta = (wire) => ({ ...wire, _meta: { modelId: MODEL_ID, modelSource } });
 
@@ -91,7 +91,7 @@ export async function runAdvisorAgent(input, spec) {
     },
   }));
 
-  // @kf-batch 51-v2-multi-vendor(D17)—— Agent 用工厂建:瞬态流错误重试时**重建**(上一轮可能留下半截 assistant 消息),历史用浅拷贝不被改。
+  // Agent 用工厂建:瞬态流错误重试时**重建**(上一轮可能留下半截 assistant 消息),历史用浅拷贝不被改。
   const mkAgent = () => new Agent({
     model: new BedrockModel({ modelId: MODEL_ID, region: REGION, maxTokens: shapeInferenceConfig(MODEL_ID, { maxTokens }).config.maxTokens }),
     systemPrompt: spec.systemPrompt(req),

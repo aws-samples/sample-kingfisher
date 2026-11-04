@@ -1,11 +1,11 @@
 "use client";
-// 序 73 模块 57(57 DESIGN R3 / R8 ③)—— 运行历史「触发」格的**唯一作者**(离线计算页 / EMR 面板 / 同步任务详情页三处共用)。
+// 运行历史「触发」格的**唯一作者**(离线计算页 / EMR 面板 / 同步任务详情页三处共用)。
 //
 //   · `triggeredBy === "workflow"`(工作流里的离线作业 / 同步节点写的回链行)⇒ 「由工作流「<名字>」触发」,是一个 Next <Link>,
 //     点过去 = 那个工作流详情页并自动打开**这次**运行的「节点详情」(`/workflow/<id>?run=<workflowRunId>`,地址作者 workflowRunHref);
 //     老行没有 workflowName ⇒ 显示 workflowId(不编名字);
-//   · 其余值照旧:原值 + 调度器 tag(Serverless / MWAA;@kf-batch 50-WP15 的那颗 `run-scheduler-tag`)。
-// 🔴 不读任何浏览器状态 ⇒ 服务端 / 客户端首帧一致(B-138)。
+//   · 其余值照旧:原值 + 调度器 tag(Serverless / MWAA;那颗 `run-scheduler-tag`)。
+// 🔴 不读任何浏览器状态 ⇒ 服务端 / 客户端首帧一致。
 import React from "react";
 import Link from "next/link";
 import { Space, Tag } from "antd";

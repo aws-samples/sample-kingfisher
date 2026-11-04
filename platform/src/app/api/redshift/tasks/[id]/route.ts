@@ -40,7 +40,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     })
   );
   await snapshotVersion("redshift-task", params.id, Attributes as any, guard.identity.username, "保存").catch(() => {});
-  // 模块 17: re-parse SQL → lineage on save (best-effort).
+  // re-parse SQL → lineage on save (best-effort).
   const saved = Attributes as any;
   if (saved?.sql) {
     pushSqlLineageToOpenMetadata({

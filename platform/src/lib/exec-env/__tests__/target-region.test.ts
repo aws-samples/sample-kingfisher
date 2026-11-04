@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// 序 31 第二刀 ②:区解析的唯一作者 `regionOfTarget` 记落点决策 —— 观测器据此把「同步任务日志 / Glue 状态 / 输出、
+// 区解析的唯一作者 `regionOfTarget` 记落点决策 —— 观测器据此把「同步任务日志 / Glue 状态 / 输出、
 // 数仓工作组清单、统一结果 / 取消 …」这一族调用归到它们真正服务的 target(第四十轮 observe 未归因榜的请求内大头)。
 // 🔴 只 mock 真外部(DynamoDB 文档客户端):注册表 `getTargetRaw` 走真实现(它是本文件被测函数的兄弟模块,mock 掉 = 抹平接缝,
 //    mock-hygiene-guard 棘轮会拦);账本(context.ts)走真实现,请求存储用最小替身。
@@ -39,7 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => __setRequestStoreProvider(null));
 
-describe("🔴 regionOfTarget 记落点决策(序 31 第二刀 ②)", () => {
+describe("🔴 regionOfTarget 记落点决策", () => {
   it("非主控区:回该区 + 记 {targetId}(观测器据此把这次请求后续的数据面调用归到该 target)", async () => {
     fakeRequest();
     expect(await regionOfTarget("tgt_usw2_a")).toBe("us-west-2");

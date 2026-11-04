@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— `PUT /api/datasources/[id]`:只认闭合清单里的可编辑字段(用户 2026-10-15 反馈 ①「编辑数据源改名报错」)。
+// `PUT /api/datasources/[id]`:只认闭合清单里的可编辑字段(用户 2026-10-15 反馈 ①「编辑数据源改名报错」)。
 //
 // 🔴 为什么必须可执行:2026-10-15 05:24Z …7698 页面复现 —— 编辑弹窗把整条记录原样 PUT 回来,路由把 `updatedAt` 等全拼进
 //   UpdateExpression 又另加 `#upd = :now` ⇒ DynamoDB「Two document paths overlap … [updatedAt]」500。判据钉**真组出来的表达式**:
@@ -18,7 +18,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { DATASOURCES: "bgp-datasources", LONG_OPS: "bgp-long-ops" },
   docClient: {
     send: vi.fn(async (cmd: { constructor: { name: string }; input?: Record<string, unknown> }) => {
-      // 序 50 第二批:PUT 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
+      // PUT 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
       if (cmd.input?.TableName === "bgp-long-ops") return {};
       sent.push({ name: cmd.constructor.name, input: (cmd.input ?? {}) as Record<string, any> });
       if (cmd.constructor.name === "GetCommand") return { Item: { ...CURRENT } };
@@ -45,10 +45,10 @@ const updateSecret = vi.fn(async () => {});
 vi.mock("@/lib/aws/datasource-service", () => ({
   createSecret: vi.fn(), updateSecret: (...a: unknown[]) => updateSecret(...(a as [])), detectNetwork: vi.fn(), ensureGlueRole: vi.fn(),
   createGlueConnection: vi.fn(), testConnection: vi.fn(), updateGlueConnectionNetwork: vi.fn(), deleteGlueConnection: vi.fn(), deleteSecret: vi.fn(),
-  // @kf-batch 42-B83-ds-edit-sync —— 连接要素 / 凭证同步(本文件不验它的参数,见 put-connection-sync.test.ts)
+  // 连接要素 / 凭证同步(本文件不验它的参数,见 put-connection-sync.test.ts)
   getSecret: vi.fn(async () => ({ username: "app", password: "old-fixture-pass" })), updateGlueConnectionEndpoint: vi.fn(async () => ({ jdbcUrl: "jdbc:x" })),
 }));
-// 序 31 二刀 ⑤:路由另 import 了同模块的 `noteDatasourceRowPlace`(纯记账,请求外 no-op)⇒ 部分 mock 要 importOriginal 展开,只替换 resolveDsPlace
+// 路由另 import 了同模块的 `noteDatasourceRowPlace`(纯记账,请求外 no-op)⇒ 部分 mock 要 importOriginal 展开,只替换 resolveDsPlace
 vi.mock("@/lib/datasource/ds-place", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/datasource/ds-place")>()),
   resolveDsPlace: vi.fn(async () => ({ region: "us-east-1" })),

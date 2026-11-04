@@ -1,6 +1,5 @@
-// @kf-batch 52-s3-external-entry
-// 序 52(用户 2026-10-25 拍板「做」)—— 数据源页 S3 源行「建外部表(Athena 直查)」页面入口:
-//   ① 成功块服务端真渲染(与 B-93 / B-115 判据同法:renderToStaticMarkup + 真 I18nProvider,不 mock 兄弟模块):表名 / 落点区 /
+// (用户 2026-10-25 拍板「做」)—— 数据源页 S3 源行「建外部表(Athena 直查)」页面入口
+//   ① 成功块服务端真渲染(与判据同法:renderToStaticMarkup + 真 I18nProvider,不 mock 兄弟模块):表名 / 落点区 /
 //      「去数据湖直查」链接 = /athena?scope=<表真落的区>&sql=<示例查询>;
 //   ② 接缝(源码调用点):数据源页只给 S3 源渲染入口按钮、按行上的章(datasourceOwnerTarget)算落点、真渲染弹窗;
 //      弹窗 POST 的是 …/s3-external 且带 dataset;直查页读 ?sql= 预填且不盖用户已写内容。
@@ -30,7 +29,7 @@ const RESULT = {
   region: "us-west-2",
 };
 
-describe("序 52 S3 外表页面入口", () => {
+describe("S3 外表页面入口", () => {
   it("「去数据湖直查」链接锚到表真落的区(?scope=targetId)并预填示例查询(?sql=)", () => {
     expect(athenaLinkFor(RESULT)).toBe("/athena?scope=tgt_usw2_a&sql=SELECT%20*%20FROM%20bgp_s3_ext.players%20LIMIT%20100");
   });

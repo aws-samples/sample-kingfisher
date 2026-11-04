@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { listBaselines } from "@/lib/baseline/learn";
-// @kf-batch 50-WP4quater-reads(工单 SC-15)—— 基线按执行范围,且**摊平成「任务 × 区」**。
+// 基线按执行范围,且**摊平成「任务 × 区」**。
 // 🔴 摊平而不是只过滤:同一个任务在两个区有两份基线,合成一行只能显示其中一个(或一个混合值)。
 // 用户 2026-09-10 的原话是「基线行按任务聚合、跨区混在一起」——一行一区才是那句话的解。
 // 🔴 `legacy: true` 的行如实标出「落章之前学的,没有区维」:把它冒充成某个区的基线,

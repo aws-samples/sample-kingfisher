@@ -1,4 +1,4 @@
-// 模块 55 长操作统一框架 —— 把路由层既有的「错误 ⇒ Response」映射器(targetNotReadyResponse / residencyErrorResponse /
+// 长操作统一框架 —— 把路由层既有的「错误 ⇒ Response」映射器(targetNotReadyResponse / residencyErrorResponse /
 // catalogDdlErrorResponse / placeErrorResponse …)吸收成可落库、可还原的 LongOpHttpError。
 //
 // 为什么不在执行体里把每种错误再翻译一遍:那些映射器已经是「错误 ⇒ 状态码 + 信封」的单一作者(各自文件头都这么写),

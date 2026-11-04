@@ -1,4 +1,4 @@
-// 模块 33-B — 新引擎 DAG 生成器(runtime-lib)。
+// 新引擎 DAG 生成器(runtime-lib)。
 //
 // 与 legacy dag-generator.ts 的本质区别(DESIGN §10.1):
 //   legacy = 把业务逻辑(sql/script)字符串拼进 Python 代码文本 → 注入/转义/缩进风险;
@@ -11,13 +11,13 @@
 import type { Workflow, WorkflowNodeType, TriggerRule } from "@/types/workflow";
 import { NODE_REGISTRY, nodesExceedingEngine } from "@/lib/workflow/node-registry";
 import { RUNTIME_LIB_MODULE } from "@/lib/workflow/runtime-lib";
-// @kf-batch 52-P52.2-W2a-run-stamp — 章的派生与 TS 写通道同源(不各算一遍)。
+// 章的派生与 TS 写通道同源(不各算一遍)。
 import { resolveRunStamp } from "@/lib/monitor/run-records";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口。
+// 数仓落点唯一出口。
 import { homeWorkgroup, homeDatabase } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-WP4quinquies-pushdown —— 落点规则的单一作者(与冻结的 legacy 生成器共用同一份)
+// 落点规则的单一作者(与冻结的 legacy 生成器共用同一份)
 import { assertDagPlace, ctrlRegionOf, hasSqlNode, type WorkflowDagPlace } from "@/lib/workflow/dag-place";
-// @kf-batch 37-sync-capability —— B-66:节点 SQL 的语句切分只此一把刀(离线 Redshift 作业 / 补数 / 工作流节点同源)。
+// 节点 SQL 的语句切分只此一把刀(离线 Redshift 作业 / 补数 / 工作流节点同源)。
 import { splitSql } from "@/lib/etl/dag-generator";
 
 // task_id 归一(§15.2 标识符归一原则,唯一权威 sanitize 处)。
@@ -39,7 +39,7 @@ function sanitizeBase(id: string): string {
  * 后者追加 _2/_3… 保证唯一(否则 Airflow 报 duplicate task_id)。
  * "_status_done" 是内部保留 task_id,任何用户节点归一撞它也让路。
  */
-// 序 73 模块 57(R3):导出给 run-node-back-links.ts —— 节点详情里的 task_id 要对回原始节点,必须用这同一份映射(不许页面自己再 sanitize 一遍)。
+// 导出给 run-node-back-links.ts —— 节点详情里的 task_id 要对回原始节点,必须用这同一份映射(不许页面自己再 sanitize 一遍)。
 export function buildIdMap(nodes: Array<{ id: string }>): Record<string, string> {
   const used = new Set<string>(RESERVED_TASK_IDS); // 保留内部 task_id(经典收尾 + serverless 两个收口 task)
   const map: Record<string, string> = {};
@@ -54,7 +54,6 @@ export function buildIdMap(nodes: Array<{ id: string }>): Record<string, string>
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 平台**保留的 task_id**(用户节点归一后撞上就让路;唯一作者在此,两个生成器都读它)。
  *   · `_status_done` = 经典 runtime-lib 的收尾回调 task;
  *   · `__start` / `__finish` = serverless 台账三写点里的两个(SPEC v3.43 §3.15)——
@@ -73,25 +72,25 @@ export interface DagSpecNode {
 export interface DagSpec {
   dag_id: string;
   workflow_id: string;
-  // 序 73 模块 57(R3):工作流名字随产物进运行期 ⇒ 作业 / 同步任务自己的运行行能写「由工作流 X 触发」(workflowName),
+  // 工作流名字随产物进运行期 ⇒ 作业 / 同步任务自己的运行行能写「由工作流 X 触发」(workflowName),
   //   页面不用再按 workflowId 反查(工作流被删后也还读得出当时的名字)。没有名字的合成载体 ⇒ null。
   workflow_name: string | null;
   schedule: string | null;
-  // @kf-batch 50-WP4quinquies-pushdown —— 🔴 单一 `region` 拆成两个轴(与 etl / emr 两个生成器同形):
+  // 🔴 单一 `region` 拆成两个轴(与 etl / emr 两个生成器同形):
   //   `exec_region` = 干活的区(glue / redshift-data);`ctrl_region` = 主控区(DynamoDB 台账)。
   //   合成一个 `region` 时,「调度在 usw2 而活儿打回主控区」这种错**不会报错**,只会跑错区。
   exec_region: string;
   ctrl_region: string;
   redshift_secret_arn: string | null;
-  // @kf-batch 52-P52.2-W2a-run-stamp — run 记录的归属两维(runtime-lib v3 读它盖章)。
+  // run 记录的归属两维(runtime-lib v3 读它盖章)。
   project_id: string;
   target_id: string;
-  // @kf-batch 50-P50.1-workgroup-ssot — 数仓落点(runtime-lib v3 的 _exec_sql_once 读它)。
+  // 数仓落点(runtime-lib v3 的 _exec_sql_once 读它)。
   workgroup: string;
   database: string;
   nodes: DagSpecNode[];
   edges: Array<{ source: string; target: string; sourceHandle?: string | null }>;
-  // @kf-batch 50-WP26-sync-schedule-carrier —— **台账归属**(载体 ≠ 记在谁头上)。
+  // **台账归属**(载体 ≠ 记在谁头上)。
   //   缺省:`ledger_task_id = workflow_id`、`ledger_task_type = "workflow"`、`writes_workflow_row = true`
   //   ⇒ 编排那条路的产物逐字节同改动前。同步任务的调度载体给自己一份(见 carrier-ledger.ts)。
   ledger_task_id: string;
@@ -104,24 +103,23 @@ export interface DagSpec {
  * 单独导出以便单测断言"结构正确 + 注入面归零"。
  */
 export function buildDagSpec(workflow: Workflow, opts: WorkflowDagPlace = {}): DagSpec {
-  // @kf-batch 50-WP4quinquies-pushdown —— 执行面 / 控制面两个轴(说明见 dag-place.ts)。
+  // 执行面 / 控制面两个轴(说明见 dag-place.ts)。
   const ctrlRegion = ctrlRegionOf();
   const execRegion = opts.execRegion || ctrlRegion;
   const { nodes = [], edges = [] } = workflow.dagDefinition || {};
   const dagId = workflow.airflowDagId || `bgp_${workflow.workflowId}`;
-  // @kf-batch 50-WP17-serverless-workflow
   // 🔴 章的 target **必须等于这份产物真正执行的那个 target**(= 落点),不是行上那个可能过期/非法的字段。
   //   ETL 与 EMR 两个生成器早就是这么做的(`resolveRunStamp(job, ctx.targetId)`),**只有工作流这条路没接** ——
   //   本仓第 N 次同一个元 bug:机制建好了,某条路径没接上。
   //   不接的后果不报错:`bindingTargets()` 先看 `targets[]`(路由写的那个),而 `resolveRunStamp` 只看 `targetId`
   //   ⇒ 两者能分叉(如 body 里带了个非法 `targetId`,被 `...body` 存下来了)⇒ DAG 在 A 区跑、
   //   台账行盖 B 区的章、**作业锁也用 B 区的属性名**(两个执行体各锁各的),而且 `runId` 复合段也跟着错
-  //   —— 正是 T-12 修掉的那种「两区互相覆盖」再来一遍。
+  //   正是修掉的那种「两区互相覆盖」再来一遍。
   const runStamp = resolveRunStamp(workflow, opts.targetId);
 
   // branch → join 拓扑:branch 的多分支若汇到同一 join,该 join 的 trigger_rule 需
   // none_failed_min_one_success,否则被上游 skip 连带 skip(DESIGN §11.3)。这里按拓扑注入。
-  // 🔴🔴 @kf-batch 50-WP17-serverless-workflow —— **由「直接相邻」改成「可达」**(2026-09-12 真环境 slsw SW-7 抓到)。
+  // 🔴🔴 **由「直接相邻」改成「可达」**(2026-09-12 真环境 slsw SW-7 抓到)。
   //   原来只认「branch 的**直接**下游是 join」。而最普通的画法就会绕开它:
   //     br ─→ yes ──────────────→ j
   //      └─→ no ─→ nod ─────────↗
@@ -185,7 +183,7 @@ export function buildDagSpec(workflow: Workflow, opts: WorkflowDagPlace = {}): D
       }
       if ((data as any).default) (data as any).default = tid(String((data as any).default));
     }
-    // @kf-batch 37-sync-capability —— B-66:sql 节点含多条语句 ⇒ 发布时预切成 data.sqls(splitSql 单一作者),
+    // sql 节点含多条语句 ⇒ 发布时预切成 data.sqls(splitSql 单一作者),
     //   runtime 据此走 batch_execute_statement 单事务;原来 runtime 一律 execute_statement 只收单语句 ⇒
     //   工作流里表达不了「DROP + CTAS」原子重算。单语句**不加字段** ⇒ 存量 spec 逐字节不变。foreach 的 sql 子任务同口径。
     if (n.type === "sql" && typeof data.sql === "string") {
@@ -211,13 +209,13 @@ export function buildDagSpec(workflow: Workflow, opts: WorkflowDagPlace = {}): D
     exec_region: execRegion,
     ctrl_region: ctrlRegion,
     redshift_secret_arn: opts.redshiftSecretArn || null,
-    // @kf-batch 52-P52.2-W2a-run-stamp — 与 TS 写通道同一个派生函数,口径不分叉。
+    // 与 TS 写通道同一个派生函数,口径不分叉。
     project_id: runStamp.projectId,
     target_id: runStamp.targetId,
     workgroup: opts.workgroup || homeWorkgroup(),
     database: opts.database || homeDatabase(),
     nodes: specNodes,
-    // @kf-batch 50-WP26-sync-schedule-carrier —— 缺省即「工作流自己」,零回归
+    // 缺省即「工作流自己」,零回归
     ledger_task_id: opts.ledger?.taskId || workflow.workflowId,
     ledger_task_type: opts.ledger?.taskType || "workflow",
     writes_workflow_row: opts.ledger ? opts.ledger.writesWorkflowRow : true,

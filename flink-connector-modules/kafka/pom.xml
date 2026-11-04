@@ -11,7 +11,7 @@
   <artifactId>flink-module-kafka</artifactId>
   <packaging>jar</packaging>
 
-  <!-- 模块 32-CR — MSK/Kafka 源连接器模块。connector id = "kafka"(对齐 connector-modules.ts)。
+  <!-- MSK/Kafka 源连接器模块。connector id = "kafka"(对齐 connector-modules.ts)。
        含 flink-sql-connector-kafka;msk-iam-auth(IAM 认证类)是独立模块 "msk-iam-auth",
        由 resolveModules 在 SQL 含 AWS_MSK_IAM 时追加拼入(§2.1 条件依赖),不在此打入。 -->
   <dependencies>

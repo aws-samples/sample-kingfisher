@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { CognitoUserPool, CognitoUser, AuthenticationDetails, CognitoUserSession } from "amazon-cognito-identity-js";
 import { useT } from "@/lib/i18n/useT";
 import { normalizeApiResponse } from "@/lib/http/non-json-envelope";
-// 模块 55 / 序 50 —— 长操作统一框架的客户端传输层:202(协议 long-op/1)在这里跟到终态再交回同形响应,页面调用点零改动。
+// 长操作统一框架的客户端传输层:202(协议 long-op/1)在这里跟到终态再交回同形响应,页面调用点零改动。
 import { peekLongOpAccepted, followLongOp } from "@/lib/long-ops/client/follow";
 
 // Module-level pool ref so non-React helpers (the fetch interceptor below) can read the
@@ -76,7 +76,7 @@ function installFetchInterceptor() {
   (window as any).__bgpFetchPatched = true;
   const orig = window.fetch.bind(window);
   window.fetch = async (input: any, init?: any) => {
-    // 序 49 ⑨ B-110:所有 /api/ 下的响应(含 /api/public/)在这里过一遍 normalizeApiResponse —— 状态 ≥ 400 且正文不是 JSON
+    // 所有 /api/ 下的响应(含 /api/public)在这里过一遍 normalizeApiResponse —— 状态 ≥ 400 且正文不是 JSON
     //   (边缘访问规则 403 / 网关 502 504 的 HTML 页)整形成标准错误信封,调用点的 `res.json()` 不再抛「Unexpected token <」。
     const isApi = typeof input === "string" && input.startsWith("/api/");
     if (isApi && input.startsWith("/api/public/")) return normalizeApiResponse(await orig(input, init));
@@ -96,9 +96,9 @@ function installFetchInterceptor() {
       if (res.status === 401 && window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
-      // 模块 55:已接入长操作的路由在 45s 内没出结果会回 202 `{ taskId, kind, label, async:true, protocol:"long-op/1" }` ——
+      // 已接入长操作的路由在 45s 内没出结果会回 202 `{ taskId, kind, label, async:true, protocol:"long-op/1" }`
       //   这里用原生 fetch(带同一套头)轮询 GET /api/long-ops/[taskId] 到终态,再整形成与同步响应**完全一样**的 Response 交回,
-      //   调用点的 `res.status` / `res.json()` 分支一行不改。只认协议记号:GenBI / B-95 warming 的 202 原样放行。
+      //   调用点的 `res.status` / `res.json()` 分支一行不改。只认协议记号:GenBI warming 的 202 原样放行。
       const accepted = await peekLongOpAccepted(res);
       if (accepted) return followLongOp(accepted, { fetchImpl: orig, headers });
       return normalizeApiResponse(res);

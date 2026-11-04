@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// B-35 后一半(2026-10-11 真环境坐实):模型目录原来 `region = opts.region || process.env.AWS_REGION`,路由只传 targetId ⇒
+// 后一半(2026-10-11 真环境坐实):模型目录原来 `region = opts.region || process.env.AWS_REGION`,路由只传 targetId ⇒
 // **任何 targetId 查的都是主控区的 Bedrock 目录**。本文件钉行为:目录的 Bedrock 控制面调用打在**落点的区**,与本进程 env 无关。
 // 只 mock 真外部:Bedrock SDK(记下客户端建在哪个区、零网络)+ DynamoDB(探测缓存读)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -38,7 +37,7 @@ beforeEach(() => {
   h.probeTargets.length = 0;
 });
 
-describe("🔴 B-35:模型目录打在**落点的区**(不是 process.env.AWS_REGION)", () => {
+describe("🔴 模型目录打在**落点的区**(不是 process.env.AWS_REGION)", () => {
   it("点名 us-west-2 的落点 ⇒ Bedrock 客户端建在 us-west-2,探测缓存按该 target 读;env 是别的区也不影响", async () => {
     const saved = process.env.AWS_REGION;
     process.env.AWS_REGION = "us-east-1";

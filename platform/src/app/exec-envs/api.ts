@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // 执行环境管理页的**客户端侧**类型与取数帮手(50 INTERACTION §1;API 合同 = 50 SPEC §2.1)。
 //
 // 🔴 本文件不 import registry.ts / deploy-control.ts —— 那两个模块顶层构造 AWS SDK client,
@@ -16,9 +15,9 @@ export interface ExecEnvTarget {
   cellId?: string;
   stage?: string;
   jurisdiction?: string;
-  /** @kf-batch 50-W5-seg1-WP10a 项目白名单(通用;缺省全部项目) */
+  /** 项目白名单(通用;缺省全部项目) */
   access?: { mode: "all-projects" } | { mode: "allowlist"; projects: string[] };
-  /** @kf-batch 50-W5-seg1-WP10a 注册跨法域 target 时 admin 对免责告知的同意(只读、不可改) */
+  /** 注册跨法域 target 时 admin 对免责告知的同意(只读、不可改) */
   residencyAck?: { by: string; at: string; version: string; textHash: string };
   displayName?: string;
   status: string;
@@ -28,19 +27,19 @@ export interface ExecEnvTarget {
   updatedAt?: string;
   lastBuildId?: string;
   lastOperationId?: string;
-  /** @kf-batch 50-init-region-enablement 控制面是否已放行该 region(服务端算;false ⇒ 抽屉顶部 Alert + 运维命令) */
+  /** 控制面是否已放行该 region(服务端算;false ⇒ 抽屉顶部 Alert + 运维命令) */
   controlPlaneRegionEnabled?: boolean;
   version?: number;
   probe?: { at?: string; ok?: boolean; items?: Array<{ name: string; ok: boolean; error?: string }> };
   /**
-   * 🔴 P50.3b 双轴(SPEC §1.1):`status`/`ready` 是**派生投影**,真相在 spec/observed。
+   * 🔴 双轴(SPEC §1.1):`status`/`ready` 是**派生投影**,真相在 spec/observed。
    * 客户端只读自己要用的两个字段:`spec.intent`(排空按钮的状态)与 `observed.phase`(阶段文案)。
    * 存量 legacy 描述符两者都缺 ⇒ 调用方**必须**有退路(不许猜成 serve —— 那会把正在退役的环境说成在服务)。
    */
   spec?: { intent?: string; desiredComponents?: string[]; desiredTemplateVersion?: string };
-  /** @kf-batch 50-WP15-airflow-serverless(施工序 6):两者都装时走哪个调度器;缺省 serverless(SPEC §3.15) */
+  /** 两者都装时走哪个调度器;缺省 serverless(SPEC §3.15) */
   schedulerPreference?: "serverless" | "mwaa";
-  /** @kf-batch 50-WP15-airflow-serverless(K-5):网络规模 standard(2 NAT)/ economy(1 NAT);缺省 standard */
+  /** 网络规模 standard(2 NAT)/ economy(1 NAT);缺省 standard */
   observed?: { phase?: string; health?: string; components?: string[]; baselineRef?: string };
   /**
    * 🔴 **只读**可服务性(服务端 `describeServiceability`,与数据面准入**同一内核**)。
@@ -56,7 +55,7 @@ export interface ExecEnvTarget {
     freshnessMaxAgeSeconds: number;
     staleExempt: boolean;
   };
-  /** @kf-batch 50-WP9a-durable-jobs 凭证隔离状态机(50 SPEC §3.9b;只读展示,写只经专用端点) */
+  /** 凭证隔离状态机(50 SPEC §3.9b;只读展示,写只经专用端点) */
   credentialIsolationState?: "legacy-seeded" | "provisioning" | "isolated";
   credentialEpoch?: number;
   provisioningDeadlineAt?: string;
@@ -76,7 +75,7 @@ export interface ProbeResult {
   finalized?: boolean;
   ready?: boolean;
   status?: string;
-  /** @kf-batch 50-init-region-enablement 完成序(finalize)失败的**真因**(init 段 I-4:9 行红只是衍生症状);页面必须渲染它 */
+  /** 完成序(finalize)失败的**真因**(init 段 I-4:9 行红只是衍生症状);页面必须渲染它 */
   finalizeError?: string;
   /** 该 target 的 region 是否已被控制面放行(false ⇒ finalizeError 前缀已带运维命令) */
   regionEnabled?: boolean;
@@ -122,13 +121,13 @@ export const getTarget = (id: string) => apiFetch<ExecEnvTarget>(`/api/admin/exe
 export const getBuildStatus = (id: string, buildId?: string) =>
   apiFetch<BuildStatus>(
     `/api/admin/exec-envs/${encodeURIComponent(id)}/build-status` +
-      // 🔴 P50.2e3:向导刚触发部署时显式带 buildId —— 首拉若靠注册表的 lastBuildId,会与 broker
+      // 🔴 向导刚触发部署时显式带 buildId —— 首拉若靠注册表的 lastBuildId,会与 broker
       //    的回写竞态,拿到 phase="none" 被 BuildProgress 当终态停轮询(页面永远「当前无构建」,实测)。
       (buildId ? `?buildId=${encodeURIComponent(buildId)}` : "")
   );
 
 export interface RegisterInput {
-  /** @kf-batch 50-WP15-airflow-serverless(K-5):网络规模;缺省 standard */
+  /** 网络规模;缺省 standard */
   networkProfile?: "standard" | "economy";
   region: string;
   // 🔴 用户拍板(2026-09-01):accountId/partition **不由客户端提供**(服务端自取;带上会被 400)。
@@ -137,7 +136,7 @@ export interface RegisterInput {
   stage?: string;
   jurisdiction: string;
   components: string[];
-  /** @kf-batch 50-W5-seg1-WP10a 跨法域注册必带(当前版本的免责告知同意) */
+  /** 跨法域注册必带(当前版本的免责告知同意) */
   residencyAck?: { version: string; textHash: string };
 }
 /** home seed(SPEC §1.1 的 seed 入口;bgp-admin 显式动作):真探全绿才落库。 */
@@ -154,7 +153,7 @@ export const registerTarget = (input: RegisterInput) =>
     body: JSON.stringify(input),
   });
 /**
- * 触发部署。@kf-batch 50-W5-seg1-WP3:已启用 target 的「重新部署」= 升级,先 `previewComponents(id, 已装全集)` 看计划,
+ * 触发部署。:已启用 target 的「重新部署」= 升级,先 `previewComponents(id, 已装全集)` 看计划,
  * 计划需审批时带 `approvedPlanHash`(SPEC §2.1 v3.21;不带也能发起 —— 真判要不要审批的是 build 侧重算)。
  */
 export const deployTarget = (id: string, approvedPlanHash?: string) =>
@@ -228,15 +227,15 @@ export const getPreviewVerdict = (id: string, buildId: string) =>
     `/api/admin/exec-envs/${encodeURIComponent(id)}/preview?buildId=${encodeURIComponent(buildId)}`
   );
 /**
- * 🔴 P50.3b-4:排空 / 回服务(SPEC §1.1 双轴:spec 由人写,phase 由控制器驱动)。
+ * 🔴 4:排空 / 回服务(SPEC §1.1 双轴:spec 由人写,phase 由控制器驱动)。
  * `drain` = 停止承接**新**工作(准入**同步**生效);`serve` = 恢复承接意图(phase 需下一次**全绿探活**才回 ready)。
  * 🔴 只这两个值 —— 退役/删除走 §4.6 销毁流程,不许只改标记(否则造出"标成已退役而资源全在"的谎)。
  */
 /**
- * @kf-batch 50-W5-seg1-WP10a 设置项目白名单(SPEC §2.1 v3.22 `POST .../access`,全集语义,bgp-admin)。
+ * 设置项目白名单(SPEC §2.1 v3.22 `POST .../access`,全集语义,bgp-admin)。
  * 通用:任何 target 都可设;`{mode:"all-projects"}` 回缺省。
  */
-// @kf-batch 50-WP9a-durable-jobs —— 延期 provisioning 截止(50 SPEC §3.9b 专用操作;服务端校验前态 + epoch + ≤30 天 + 审计)
+// 延期 provisioning 截止(50 SPEC §3.9b 专用操作;服务端校验前态 + epoch + ≤30 天 + 审计)
 export const extendProvisioningDeadline = (
   id: string,
   body: { extendDays: number; reason: string; expectedEpoch?: number }
@@ -263,7 +262,7 @@ export const enableTarget = (id: string) =>
   });
 
 /**
- * 🔴 P50.3b-2b:失败会话恢复(SPEC §3.5b)。
+ * 🔴 2b:失败会话恢复(SPEC §3.5b)。
  * 页面**不自己判断**"能不能恢复" —— 判据只有一处(服务端 `assessRecovery`),GET 回什么就渲染什么,
  * 否则会出现"页面说可以恢复、接口却拒"。
  */
@@ -319,27 +318,27 @@ export const STATUS_META: Record<string, { color: string; label: string }> = {
  * 🔴 权威枚举 = SPEC §1.1 / registry.ts 的 TARGET_COMPONENTS —— 这里是**展示层副本**(不 import
  *    registry,见文件头),漂移风险仅限文案。
  * 🔴 **`available` 不再手写**:它 = `isComponentImplemented()`(`lib/exec-env/implemented-components`
- *    的零依赖 SSOT,服务端 add-components 校验用的是同一份)。P50.2 时代这里手写 false,与服务端
+ *    的零依赖 SSOT,服务端 add-components 校验用的是同一份)。时代这里手写 false,与服务端
  *    各持一份判断 ⇒ 放开组件时必然漏改一边,现在改成派生(change-safety A1)。
  */
 export const COMPONENT_META: Array<{ key: string; label: string; desc: string; cost: string; available: boolean; retired?: boolean }> = [
   { key: "core", label: "core", desc: "计算+存储+网络+数据湖(必装)", cost: "零出网,无 NAT 常驻费用" },
   { key: "redshift", label: "redshift", desc: "Redshift Serverless 数据仓库", cost: "按用量(RPU),空闲不计费" },
   { key: "kafka", label: "kafka(MSK)", desc: "流消息源", cost: "≈$180/月起" },
-  // @kf-batch 50-WP13-mwaa-region —— 用户拍板:每个区域的定时任务由本区域的 MWAA 执行;非 home 区要配调度 / 编排必装
-  // @kf-batch 50-WP17-serverless-workflow —— 🔴 用户 2026-09-11 拍板:「后面也不部署普通版本的 mwaa 了。」
+  // 用户拍板:每个区域的定时任务由本区域的 MWAA 执行;非 home 区要配调度 / 编排必装
+  // 🔴 用户 2026-09-11 拍板:「后面也不部署普通版本的 mwaa 了。」
   //   **不再提供新装**(向导不可勾),但**存量环境照旧可用** —— 所以这一行刻意**留着**并写清原因:
   //   让手上已经有 mwaa 的人看得懂「为什么它在这儿却勾不了」,比让它凭空消失诚实。
   { key: "mwaa", label: "mwaa", desc: "定时调度 / 编排(经典 Airflow,常驻)—— 已停止提供:请用 airflow-serverless;已装的环境照旧可用", cost: "≈$350/月(常驻)" },
-  // @kf-batch 50-WP15-airflow-serverless —— 用户拍板:经典 MWAA 保留、新增 serverless 入口;两者都装时 serverless 优先
+  // 用户拍板:经典 MWAA 保留、新增 serverless 入口;两者都装时 serverless 优先
   { key: "airflow-serverless", label: "airflow-serverless", desc: "定时调度 / 编排(Serverless Airflow;按任务秒计费、最少 1 分钟;分钟级开通,零常驻)", cost: "按任务运行秒数,空闲 $0" },
   { key: "dms", label: "dms", desc: "数据迁移/CDC", cost: "子网组免费,复制实例按需" },
   { key: "flink", label: "flink", desc: "流计算(MSAF)", cost: "角色免费,作业按 KPU" },
   { key: "agentcore", label: "agentcore", desc: "本 region 问数三件套", cost: "按调用" },
-  { key: "residency-api", label: "residency-api", desc: "区域审计 / 结果存储(非 home 法域必装 —— 技术前置,不是审批;WP-10a)", cost: "DDB 按量 + S3 桶,近零" },
+  { key: "residency-api", label: "residency-api", desc: "区域审计 / 结果存储(非 home 法域必装 —— 技术前置,不是审批)", cost: "DDB 按量 + S3 桶,近零" },
 ].map((c) => ({ ...c, available: isComponentImplemented(c.key) && !isComponentRetired(c.key), retired: isComponentRetired(c.key) }));
 
-// (P50.2e2:客户端不再提供 partition —— partitionForRegion 客户端副本已删,权威在 registry.ts)
+// (客户端不再提供 partition —— partitionForRegion 客户端副本已删,权威在 registry.ts)
 
 /**
  * 预览用 targetId(**仅展示**):真 id 由服务端生成(可能是 `_b`/`_c` 进位),这里按
@@ -353,7 +352,7 @@ export function previewTargetId(region: string): string {
 }
 
 
-/** @kf-batch 50-WP15-airflow-serverless(施工序 6):改调度器偏好(只影响之后的发布;已发布作业保持原调度器直到重新发布)。 */
+/** 改调度器偏好(只影响之后的发布;已发布作业保持原调度器直到重新发布)。 */
 export const setTargetSchedulerPreference = (targetId: string, schedulerPreference: "serverless" | "mwaa", expectedVersion: number) =>
   apiFetch<{ schedulerPreference: string; changed: boolean; hint: string }>(`/api/admin/exec-envs/${encodeURIComponent(targetId)}/scheduler-preference`, {
     method: "POST",
@@ -361,7 +360,6 @@ export const setTargetSchedulerPreference = (targetId: string, schedulerPreferen
     body: JSON.stringify({ schedulerPreference, expectedVersion }),
   });
 
-// @kf-batch 50-WP27b-n-region-auto
 /** 新建执行环境可选的 region —— **从账号真值派生**(`ec2:DescribeRegions` + 注册表占位),
  *  不是写死的候选表。已被占的区一并回,界面要「列出来但点不动」并写明占位者。 */
 export const getCandidateRegions = () =>
@@ -369,9 +367,8 @@ export const getCandidateRegions = () =>
     regions: string[];
     occupied: Array<{ region: string; targetId: string; status: string }>;
     available: string[];
-    // 序 48:控制面已放行(含预授权候选区)的区 —— 在这些区新建不需要运维放行
+    // 控制面已放行(含预授权候选区)的区 —— 在这些区新建不需要运维放行
     controlPlaneEnabled?: string[];
-    // @kf-batch 50-B40-candidate-blocked
     blocked?: Array<{ region: string; actions: string[]; layer: string; reason: string }>;
     orgPolicy?: { principal: string | null; unverified: Array<{ region: string; reason: string }>; checkedAt: string; source: string };
     source: string;
@@ -379,7 +376,7 @@ export const getCandidateRegions = () =>
     queriedAt: string;
   }>("/api/admin/exec-envs/candidate-regions", { cache: "no-store" });
 
-// ══ @kf-batch 50-WP30-decommission —— 删除执行环境(路 B)的取数帮手(合同:WORK-PACKAGES WP-30 ③ / SPEC §2.1)══
+// ══ —— 删除执行环境的取数帮手(合同:③ / SPEC §2.1)══
 
 export interface DeleteImpactItem { kind: string; label: string; id: string; name: string; projectId?: string }
 export interface RetainedResourceView { kind: string; name: string; note: string }

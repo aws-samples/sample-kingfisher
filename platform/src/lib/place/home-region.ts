@@ -1,14 +1,13 @@
 /**
- * @kf-batch 50-WP31-place-first-class
- * WP-31 L4「环境无默认区域」—— **全仓唯一**允许读进程区变量(`BGP_HOME_REGION` / `AWS_REGION`)的地方。
+ * L4「环境无默认区域」—— **全仓唯一**允许读进程区变量(`BGP_HOME_REGION` / `AWS_REGION`)的地方。
  *
- * 为什么要收成一个作者:序 6 要把平台 ECS 任务的 `AWS_REGION` 设成空串(D1b 实测 Fargate 会自注入
+ * 为什么要收成一个作者:要把平台 ECS 任务的 `AWS_REGION` 设成空串(D1b 实测 Fargate 会自注入
  * `AWS_DEFAULT_REGION`,任务定义里设 `""` 才能盖掉),让「忘了给区」当场报错、而不是静默落到主控区。
  * 前提是业务代码里**不再直接读** `process.env.AWS_REGION`:那 78 处散读一旦被清空,行为就散落地变;
- * 收到这里之后,序 6 只需改这一个文件的回落语义。棘轮 `place-ratchets.test.ts` 的 L4 是**闭合门**:
+ * 收到这里之后,只需改这一个文件的回落语义。棘轮 `place-ratchets.test.ts` 的 L4 是**闭合门**:
  * 进程区变量的读取只许出现在本文件。
  *
- * 读取顺序:`BGP_HOME_REGION`(序 6 由平台栈注入;本包不改 infra,当前环境里没有它)→ `AWS_REGION`
+ * 读取顺序:`BGP_HOME_REGION`(由平台栈注入;本包不改 infra,当前环境里没有它)→ `AWS_REGION`
  * → 回落。两处都用 `||`(空串当作没有),与迁移前 `process.env.AWS_REGION || …` 的语义逐字节一致。
  *
  * 🔴 零依赖:不许 import 任何 SDK / node 内置 / 别的业务模块 —— `src/middleware.ts` 跑在 edge,
@@ -20,7 +19,7 @@
  *
  * 🔴 末尾的 `"us-east-1"` 回落属于「静默合法默认值」缺陷类(没配区 ⇒ 悄悄落到一个看起来合法的区)。
  * 这里**有意保留**,只为本包「收口、行为不变」:迁移前 78 处读取几乎都是 `|| "us-east-1"`。
- * 序 6 平台栈注入 `BGP_HOME_REGION` 后,这一条改成「缺即抛」(两者都没有 ⇒ throw),届时全仓同时生效。
+ * 平台栈注入 `BGP_HOME_REGION` 后,这一条改成「缺即抛」(两者都没有 ⇒ throw),届时全仓同时生效。
  */
 export function homeRegion(): string {
   return process.env.BGP_HOME_REGION || process.env.AWS_REGION || "us-east-1";

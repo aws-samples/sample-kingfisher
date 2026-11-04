@@ -1,5 +1,4 @@
-// @kf-batch 50-B02-spec-vs-observed
-// 🔴🔴 **呈现面不许把「声称要装」显示成「已经装好」**（B-02）。
+// 🔴🔴 **呈现面不许把「声称要装」显示成「已经装好」**（）。
 //
 // 【真环境形态（2026-09-20，用户从页面复制给我的那三行之一）】
 //   页面上：`eu-west-1 不承接新工作 已注册 tgt_euw1_a  core redshift  法域 eu-sim  探活 09-20 12:09`
@@ -48,8 +47,8 @@ const USW2_OK = {
 };
 const FRESH_REGISTERED = { components: undefined, observed: {}, ready: false }; // 新注册(走了双轴)的样子
 
-describe("呈现面的组件状态:以 observed 为准、fail-closed(B-02)", () => {
-  it("① 🔴 观测态被污染的那一行:两个组件都必须显示成**待部署**(B-02 真环境形态)", () => {
+describe("呈现面的组件状态:以 observed 为准、fail-closed", () => {
+  it("① 🔴 观测态被污染的那一行:两个组件都必须显示成**待部署**(真环境形态)", () => {
     const items = componentViewItems(EUW1_BROKEN);
     expect(items.map((x) => x.name)).toEqual(["core", "redshift"]);
     expect(
@@ -84,7 +83,7 @@ describe("呈现面的组件状态:以 observed 为准、fail-closed(B-02)", () 
       expect(items.length, `${label} 的组件行数不对`).toBe(t.components!.length);
       expect(
         items.every((x) => x.installed),
-        `${label} 明明装好了却被显示成待部署 ⇒ 这一改把好的也打红了(比 B-02 本身更糟)`
+        `${label} 明明装好了却被显示成待部署 ⇒ 这一改把好的也打红了(比原缺陷本身更糟)`
       ).toBe(true);
       expect(claimsNothingInstalled(t)).toBe(false);
     }

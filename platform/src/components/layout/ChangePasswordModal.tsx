@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-PROD-A-launch-hardening
 // 登录用户在页面上修改自己的密码(用户 2026-10-09:「MFA 暂时不需要,只要能允许管理员能在页面自己修改密码即可」)。
 // 走 Cognito ChangePassword(先校验当前密码);前端预校验与用户池策略同口径(infra/lib/auth-stack.ts:
 // ≥12 位 + 大小写 + 数字 + 符号),最终以 Cognito 服务端为准(它拒绝时把原因如实显示)。

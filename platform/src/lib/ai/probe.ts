@@ -1,9 +1,8 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — 模型探测器(51 SPEC §3.2;DESIGN D5「ACTIVE 不可信,保存前必须真 invoke」)。
+// 模型探测器(51 SPEC §3.2;DESIGN D5「ACTIVE 不可信,保存前必须真 invoke」)。
 //
 //   probeModel(modelId, { place: { targetId, region } })
 //     ① tiny invoke:Converse maxTokens=24、超时 = **本系列的探测预算**(vendors.probeTimeoutMs;超时单列 Timeout 类)
-//        @kf-batch 51-v2-multi-vendor:8 → 24 —— Kimi K3 恒先出 reasoningContent 块,16 个 token 全被推理吃掉仍是 200,
+//        8 → 24 —— Kimi K3 恒先出 reasoningContent 块,16 个 token 全被推理吃掉仍是 200,
 //        给 24 是为了至少看得见一个块;探测请求同样经 shapeConverseInput(与真调用同一条路,SPEC §7.3)
 //     ② 六类错误分类:NotAvailableForAccount(v2.0 新,放最前)/ MarketplaceSCP / AccessDenied / Timeout(v3 新)/ Throttle / NotFound
 //        (classifyProbeError,净新;git 4fe5c28 只换了默认模型没留分类)
@@ -13,7 +12,7 @@
 //        ⇒ 恒 "unknown",**绝不阻断保存**;冷悬崖真实防线是 invoke.ts 的运行期退避 + 降级(P2-2)
 //     ⑤ 写探测缓存 `ai-model#probe#<targetId>#<modelId>`(store 坏了静默跳过)
 //
-// @kf-batch 51-v3-probe-budget(序 46 / B-106,2026-10-20 临时账号真测):
+// (2026-10-20 临时账号真测):
 //   原来两探串行、各 10s、超时归 Throttle。Kimi K3 的 tiny invoke / tool-use 探测 8 次采样 3.0–39.4s(us. / global. 都抖),
 //   10s 下 5 次超时 ⇒ 页面「测试该模型」时而「探测通过 · tool-use 不可用」(二探超时被记成不支持工具)、时而保存路由二次探测超时
 //   ⇒ 「探测被限流,请稍候重试」(其实不是限流)。改法三件:预算按系列(Kimi 45s)· 两探并行(墙钟留在 ALB 60s 内)·
@@ -21,13 +20,13 @@
 //
 // 🔴 探测会烧真 Bedrock:调用面只有 PUT /model-config(保存前强制;有新鲜缓存则免)与 POST /probe(限频 6/min)。
 //    单测用 deps.send 注入假客户端,零真 invoke。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand, type ConverseCommandInput, type ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
 import type { Place } from "@/lib/place/types";
 import { putProbe, type ProbeCacheItem } from "@/lib/settings/model-store";
 import type { ProbeError, ProbeOk, ProbeResult } from "./capabilities";
-// @kf-batch 51-v2-multi-vendor —— 二探与否看厂商档案;探测请求也走整形(单一通道)
+// 二探与否看厂商档案;探测请求也走整形(单一通道)
 import { vendorOf } from "./core/vendors";
 import { shapeConverseInput } from "./core/converse-shape";
 
@@ -173,7 +172,7 @@ export function freshProbeFromCache(
  * 真探测。返回值同时写进探测缓存(带 targetId 维;P0-8)。
  * 🔴 本函数**不抛**:任何失败都归成 `{ ok:false, error, errorDetail }`。
  */
-// @kf-batch 50-WP31-place-first-class —— B-35 同形:🔴 原来 `targetId || HOME_TARGET_ID` + `region || process.env.AWS_REGION`
+// 同类缺陷:🔴 原来 `targetId || HOME_TARGET_ID` + `region || process.env.AWS_REGION`
 //   ⇒ 只传 targetId 时探的是主控区、缓存却记在那个 target 名下(张冠李戴:在别的区判 available)。落点必填,region 只从落点来。
 export async function probeModel(
   modelId: string,

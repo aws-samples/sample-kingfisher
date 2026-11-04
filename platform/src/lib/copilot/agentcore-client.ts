@@ -1,13 +1,13 @@
-// 模块 44 — 平台侧调用 Copilot AgentCore Runtime(数据面 invoke_agent_runtime,IAM 鉴权)。
-// 照抄 lib/genbi/agentcore-client.ts,换 env 前缀 COPILOT_*。P44.1 默认 inprocess,本文件供
-// COPILOT_BACKEND=agentcore 时使用(P44.1b 部署 Runtime 后启用);未配置则 isAgentCoreConfigured()=false。
+// 平台侧调用 Copilot AgentCore Runtime(数据面 invoke_agent_runtime,IAM 鉴权)。
+// 照抄 lib/genbi/agentcore-client.ts,换 env 前缀 COPILOT_*。默认 inprocess,本文件供
+// COPILOT_BACKEND=agentcore 时使用(部署 Runtime 后启用);未配置则 isAgentCoreConfigured()=false。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } from "@aws-sdk/client-bedrock-agentcore";
 import { COPILOT } from "./config";
 import type { CopilotAskOutput } from "./agent";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51(P51.2):payload 透传运行时模型。🔴 copilot 的 Runtime **不在本仓**(DESIGN D7 R1),
+// payload 透传运行时模型。🔴 copilot 的 Runtime **不在本仓**(DESIGN D7 R1),
 // 容器无法回显 _meta ⇒ 这里**不做**回执断言(否则该后端永久 503);回执若带 _meta.modelId 则如实带回,否则 model 缺省。
 import { resolveModelRuntime } from "@/lib/ai/model";
 import { agentCoreEchoedModelId, currentReleaseId } from "@/lib/ai/agentcore-contract";

@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-audit 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-audit 1`] = `
 [
   {
     "action": "sync.start",
@@ -18,7 +18,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-calls 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-calls 1`] = `
 [
   {
     "cmd": "GetCommand",
@@ -119,7 +119,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
   {
     "cmd": "PutObjectCommand",
     "input": {
-      "Body": "sha256:ec419a53b3fc49d1",
+      "Body": "sha256:6f05e052cae617ef",
       "Bucket": "bgp-glue-scripts-123456789012",
       "Key": "glue-scripts/01TASKSYNC00000000000FX001.py",
     },
@@ -362,7 +362,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-seq 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下 > home-both-create-seq 1`] = `
 [
   "ddb:GetCommand",
   "ddb:GetCommand",
@@ -396,7 +396,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 作业已存在 ⇒ GetJob 判存在 → UpdateJob(定义以最新为准)再启动;**不再先试 CreateJob** > exists-glue-calls 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 作业已存在 ⇒ GetJob 判存在 → UpdateJob(定义以最新为准)再启动;**不再先试 CreateJob** > exists-glue-calls 1`] = `
 [
   {
     "cmd": "GetCatalogCommand",
@@ -452,7 +452,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 建作业报其它错 ⇒ 500 如实上抛,**不再**「去掉 --conf 重建一次」,不启动、不写 run > other-error-glue-calls 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 建作业报其它错 ⇒ 500 如实上抛,**不再**「去掉 --conf 重建一次」,不启动、不写 run > other-error-glue-calls 1`] = `
 [
   {
     "cmd": "GetCatalogCommand",
@@ -499,7 +499,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 执行角色 ARN 非法 ⇒ 400,零作业副作用 > bad-role-seq 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 执行角色 ARN 非法 ⇒ 400,零作业副作用 > bad-role-seq 1`] = `
 [
   "ddb:GetCommand",
   "ddb:GetCommand",
@@ -510,7 +510,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 ]
 `;
 
-exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 非 home · 只写数仓 · 执行失败:按落点区取客户端、章盖真落点、失败不扇出不回填 > usw2-redshift-failed-calls 1`] = `
+exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法) > 非 home · 只写数仓 · 执行失败:按落点区取客户端、章盖真落点、失败不扇出不回填 > usw2-redshift-failed-calls 1`] = `
 [
   {
     "cmd": "GetCommand",
@@ -568,7 +568,7 @@ exports[`序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
   {
     "cmd": "PutObjectCommand",
     "input": {
-      "Body": "sha256:1ea07b78ac940f64",
+      "Body": "sha256:cc447eb927b22382",
       "Bucket": "bgp-glue-scripts-usw2",
       "Key": "glue-scripts/01TASKSYNC00000000000FX001.py",
     },

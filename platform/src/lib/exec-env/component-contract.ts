@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // 探活项 ↔ 组件 的归属契约(SSOT)+「本次 green probe 是否**精确**覆盖了目标组件集」的纯判定。
 //
 // 【为什么单独一个低层文件】lifecycle.ts(`validateExactGreenLifecycleEvidence`)与
@@ -20,9 +19,9 @@ const CORE_PROBE_ITEMS: ReadonlySet<string> = new Set([
   "athenaWorkgroup",
   "emrSecurityGroupId",
   "glueRoleArn",
-  // @kf-batch 50-W5-seg1-WP3:EMR 执行角色(core 键,描述符有才出项)
+  // EMR 执行角色(core 键,描述符有才出项)
   "emrExecutionRoleArn",
-  // @kf-batch 50-WP16-zero-egress:零出网两项属于**底座**(base 栈),归 core。
+  // 零出网两项属于**底座**(base 栈),归 core。
   // 🔴 必须登记在这里:`probeItemComponent` 认不出的项会让 `isExactGreenCoverage` fail-closed
   //    ⇒ target 永远进不了 ready(整块功能被自己的覆盖判定挡死)。
   // 🔴 出项条件(probe-runner 的灰度门):**非 home ∧ 已切到零出网底座**(资源袋有 endpointIds)。
@@ -30,7 +29,7 @@ const CORE_PROBE_ITEMS: ReadonlySet<string> = new Set([
   //    「漏切」由 net0 段 N0-1 逐 target 扫现网 NAT 兜住,不靠探活把好环境报红。
   "network:egress-none",
   "network:home-link",
-  // 序 48 / B-105:区级 S3 Tables 联邦目录 s3tablescatalog(数据湖直查 / 问数的前提,core 袋;home 与非 home 都出项)。
+  // 区级 S3 Tables 联邦目录 s3tablescatalog(数据湖直查 / 问数的前提,core 袋;home 与非 home 都出项)。
   // 🔴 2026-10-19 …7237 演练实撞:probe-runner 加了这一项、这里没登记 ⇒ 所有环境「精确 green 覆盖」恒 false ⇒
   //    新区探活全绿却停在 provisioning(「启用」灰)、存量在用区几个 tick 后全部掉成 degraded。
   //    棘轮:component-contract.test.ts 直接扫 probe-runner.ts 源码字面量 + probe-runner.test.ts 用真跑产物装配判;再加项两边必红。
@@ -101,7 +100,6 @@ export function sameComponentSet(a: readonly string[], b: readonly string[]): bo
  *   ③ 声明组件集里**每个**组件都至少被一项覆盖(杜绝「声称了却没探」的 partial green)。
  */
 /**
- * @kf-batch 50-WP20-retire-classic-mwaa
  * 🔴 **这一份探活是否positively 证明「某个组件已经不在了」**。
  *
  * 为什么要单独一个谓词:`isGreenProbeForComponents` 问的是**完全不同**的问题 ——

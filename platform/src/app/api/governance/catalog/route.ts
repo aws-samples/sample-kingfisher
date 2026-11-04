@@ -5,7 +5,6 @@ import { omRequest, isOmConfigured } from "@/lib/openmetadata/om-client";
 import { apiOk } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/verify-token";
 import { listAllClassifications, strongerLevel } from "@/lib/governance/classification";
-// @kf-batch 50-WP2-one-agentcore-one-om
 // 🔴🔴 **用户 2026-09-10 拍板:「治理目录必须走同一个 OpenMetaData,不然又多维护一套东西,
 //    到时候极其容易出现不兼容和忘记修复的情况。」**
 // ⇒ 目录**只有一条呈现路径 = OM**;「哪个区」是 OM 里的 **per-target service** 维度(`om-service.ts`),
@@ -39,9 +38,9 @@ import { buildMirrorOverview } from "@/lib/exec-env/metadata-mirror";
 // Map an OM service name -> { type (frontend icon key), source (tag label), format }.
 // FQNs are <service>.<db>.<schema>.<table>; the service prefix identifies the system.
 function describeService(service?: string, serviceType?: string): { type: string; source: string; format: string } {
-  // @kf-batch 50-WP2-one-agentcore-one-om —— per-target service 名带 `-<targetSlug>` 后缀:
+  // per-target service 名带 `-<targetSlug>` 后缀
   // 图标与来源标签按**去后缀**的基名判(否则每加一个区,目录里那些行的图标全退化成默认值)。
-  // @kf-batch 50-o4REG-sync-om-per-target —— 去后缀收成单一作者 `omServiceBase`(五类 service 一起认;
+  // 去后缀收成单一作者 `omServiceBase`(五类 service 一起认;
   //   原来这里只认 redshift / glue,同步推进非主控区的 `bgp-s3tables-<slug>` / `bgp-sources-<slug>` 会退化成默认图标)。
   const base = omServiceBase(service || "");
   switch (base) {
@@ -79,7 +78,7 @@ function toRow(t: any, knownTargetIds: readonly string[] = []) {
     format: d.format,
     columns: Array.isArray(t?.columns) ? t.columns.length : 0,
     updatedAt: t?.updatedAt ? new Date(t.updatedAt).toISOString() : null,
-    // @kf-batch 50-WP2-one-agentcore-one-om —— 这张表属于哪个执行环境(service 后缀判;无后缀 = 主控区)。
+    // 这张表属于哪个执行环境(service 后缀判;无后缀 = 主控区)。
     // 加这个字段是为了让「全部」视角也能一眼看出跨区归属,而不是只能靠切区来分辨。
     targetId: service ? omServiceTargetOf(service, knownTargetIds) : undefined,
   };
@@ -104,7 +103,7 @@ async function listOmTables(): Promise<any[] | null> {
 
 // Legacy fallback: direct query of Glue Data Catalog + Redshift (pre-OM behavior).
 async function fromDirectQuery(keyword: string, scope: DirectQueryScope): Promise<any[] | { capability: "unavailable"; targetId: string; missing: "redshift"; reason: string }> {
-  // @kf-batch 50-WP2-directquery —— 落点先解析:「该区没装数仓」⇒ 能力态(Glue 那半边也不再单独列,
+  // 落点先解析:「该区没装数仓」⇒ 能力态(Glue 那半边也不再单独列,
   // 因为页面此时整块降级;真要只看数据湖是 Athena 那条路,属另一个包)。
   const pre = await resolveDirectQueryPlaceSafe(scope);
   if (pre.capability === "unavailable") return pre;
@@ -165,14 +164,13 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const keyword = (req.nextUrl.searchParams.get("keyword") || "").trim();
-  // @kf-batch 50-WP2-directquery —— 执行范围(读路由 ⇒ 只认 URL 的 `?scope=`)
+  // 执行范围(读路由 ⇒ 只认 URL 的 `?scope=`)
   const scope = await requireScope(req, getActiveProjectId(req));
   if (scope instanceof NextResponse) return scope;
   const picked = scopeTargets(scope);
   // 🔴 **非 home 视角不走 OpenMetadata**:OM 是**中央单实例、只 ingest 主控区**(W3-e 实测结论),
   const single = picked.length === 1 ? picked[0] : undefined;
 
-  // @kf-batch 50-WP2-one-agentcore-one-om
   // **Primary(而且是唯一的呈现路径):OpenMetadata**。
   // 视角过滤 = 按 OM 的 service 归属(`bgp-*-<targetSlug>` 属那个区;无后缀属主控区)。
   if (isOmConfigured()) {
@@ -181,8 +179,8 @@ export async function GET(req: NextRequest) {
       // 已装好的执行环境清单 —— 用来判 service 后缀属于谁。
       // 🔴 用「装好了吗」而不是「此刻能不能承接」(阶段 1 的 N-9 教训:呈现面不许用可服务性当判据)。
       // 🔴 一次取全,`known` 与「这个 target 装了数仓吗」都从它派生 —— **零额外 I/O**
-      //    (E-140b 的修法不许为了一句提示再多打一次注册表)。
-      // @kf-batch 50-WP11b-shared-writer —— scope 必填:与顶栏下拉(exec-targets)同一个口径 = 当前项目
+      //    (修法不许为了一句提示再多打一次注册表)。
+      // scope 必填:与顶栏下拉(exec-targets)同一个口径 = 当前项目
       //   (原来不传 ⇒ 无项目上下文 ⇒ 白名单区的 service 后缀认不出,行被归到主控区)。
       const knownTargets = await listScopeTargets({ scope: "per-project", projectId: getActiveProjectId(req) }).catch(() => [] as Awaited<ReturnType<typeof listScopeTargets>>);
       const known = knownTargets.map((t) => t.targetId);
@@ -198,7 +196,7 @@ export async function GET(req: NextRequest) {
           r.database?.toLowerCase().includes(kw)
         )
         .sort((a, b) => (a.fqn || "").localeCompare(b.fqn || ""));
-      // 模块 18: annotate each row with its strongest sensitivity level (for the catalog tag).
+      // annotate each row with its strongest sensitivity level (for the catalog tag).
       const cls = await listAllClassifications().catch(() => []);
       const levelByFqn = new Map<string, string | undefined>();
       for (const c of cls) levelByFqn.set(c.fqn, strongerLevel(levelByFqn.get(c.fqn), c.level));
@@ -226,13 +224,12 @@ export async function GET(req: NextRequest) {
           // 读不到新鲜度**不影响目录**,但也不编一个「刚刚同步」——缺就是缺(页面按 undefined 处理)
         }
       }
-      // @kf-batch 50-E140b-catalog-no-warehouse
-      // 🔴 **该 target 没装数仓 ⇒ 必须说出来**(2026-09-12 写 E-140 判据时挖出的缺口)。
+      // 🔴 **该 target 没装数仓 ⇒ 必须说出来**(2026-09-12 写判据时挖出的缺口)。
       //   背景:用户 2026-09-10 拍板「目录都走同一个 OpenMetadata」之后,本路由不再走直查
       //   ⇒ 直查那条路上的 `capability:"unavailable"` **走不到** ⇒ 页面横幅不会出现
       //   ⇒ core-only 目标的目录是一张**不给原因的空表**,用户会以为同步坏了 / 表丢了。
       //   平台自己的规矩是「读不到就说读不到」(§2.6 护栏一「不丢东西」的同一条),所以这里补一句。
-      // 🔴 走 `_meta` 而**不改 `data` 形状**:目录数据仍是数组,消费者(页面表格、E-137/E-139 判据)
+      // 🔴 走 `_meta` 而**不改 `data` 形状**:目录数据仍是数组,消费者(页面表格、判据)
       //   一个字节都不用改;拒因文案复用 `NO_WAREHOUSE_REASON` **单一作者**,与直查那条路逐字一致
       //   —— 两处各写一份措辞,用户就会看到「同一件事两种说法」。
       const warehouse = noWarehouseMeta(single ? knownTargets.find((x) => x.targetId === single) : undefined);
@@ -243,6 +240,6 @@ export async function GET(req: NextRequest) {
 
   // Fallback: 仅当 **OM 未配置 / 不可达** 时的兜底(legacy 直查,主控区那套)——
   // 🔴 它**不是**「非 home 的第二条路」(那条已按用户拍板删除),只是 OM 停机时页面不至于全白。
-  // @kf-batch 50-WP31-place-first-class —— 落点显式:单区视角 = 该区;「全部 / 对比」视角的兜底 = 主控区那套(本分支只为 OM 停机时页面不全白)
+  // 落点显式:单区视角 = 该区;「全部 / 对比」视角的兜底 = 主控区那套(本分支只为 OM 停机时页面不全白)
   return apiOk(await fromDirectQuery(keyword, { targetId: single ?? HOME_TARGET_ID, projectId: getActiveProjectId(req) }));
 }

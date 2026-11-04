@@ -1,4 +1,3 @@
-// @kf-batch 53-guide-tour
 // 新手引导的**交互式导览**纯逻辑(单一作者)。
 //
 // 用户 2026-09-14 原话:「我要的新手指引是那种一步一步引导人家的,不是给一个操作说明放在那里不动的东西……
@@ -167,13 +166,12 @@ export function unanchoredSteps(): Array<{ journeyKey: string; title: string; pa
 
 /**
  * 只减不增。当前值 = 现网真实欠账数;改小才允许提交。
- * @kf-batch 50-WP21-step7 —— **归 0**(2026-09-14):16 个动线步全部配上了页内锚点,
+ * **归 0**(2026-09-14):16 个动线步全部配上了页内锚点,
  * 每一步都会高亮那一页上**无条件渲染**的主控件(逐页新加 11 个 `data-testid`)。
  * 🔴 归 0 之后这条棘轮的作用变成**防回退**:谁新增一个没有 `target` 的动线步就会红。
  */
 export const TOUR_UNANCHORED_LIMIT = 0;
 
-// @kf-batch 50-WP23-guide-scope-gate
 /** 锚点缺失时给什么话 —— 纯函数,便于离线钉住(渲染只负责把它显示出来)。 */
 export type MissingAnchorAdvice = {
   kind: "need-scope" | "generic";

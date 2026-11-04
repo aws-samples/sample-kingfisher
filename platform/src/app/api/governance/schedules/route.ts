@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 治理)
+// (治理)
 // GET  /api/governance/schedules?scope=   当前项目的定时治理任务(按执行范围过滤;读路由口径)
 // POST /api/governance/schedules          建一个定时治理任务(**未启用**;启用走 POST /api/schedule/enable taskType=governance)
 //

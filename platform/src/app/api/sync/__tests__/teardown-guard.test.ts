@@ -1,4 +1,3 @@
-// @kf-batch 50-WP24-sync-teardown
 // 🔴🔴 同步任务的「停止 / 删除」必须**真的把后台通道停掉**,停不掉就不许改状态 / 不许删行。
 // 改动前三处都不成立(2026-09-16 全仓核实):
 //   ① `DELETE /api/sync/[id]` **只删 DDB 行**,零后台清理 ⇒ 通道继续搬数据、继续计费,
@@ -127,7 +126,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("同步通道的下线(WP-24)", () => {
+describe("同步通道的下线", () => {
   it("🔴 Glue:停止必须带**真实 runId**(改动前传空数组 ⇒ 什么都没停,而页面说已停止)", async () => {
     h.task = glueTask(); h.jobRuns = [{ Id: "jr_1", JobRunState: "RUNNING" }, { Id: "jr_old", JobRunState: "SUCCEEDED" }];
     const r = await stop();
@@ -195,7 +194,7 @@ describe("同步通道的下线(WP-24)", () => {
     expect(deletes()).toHaveLength(0);
   });
 
-  // @kf-batch 50-WP24-sync-teardown —— 「还在停的路上」与「停不下来」必须**分开**
+  // 「还在停的路上」与「停不下来」必须**分开**
   // 🔴 真环境实测(段 wp24 第一版):等终态的默认预算是 240s,而请求要过 60s 边缘超时 ⇒
   //    任务处于 creating/stopping 时**必然 504**(「不知道成没成」,最坏的一种答复)。
   //    现在:预算装进一次请求(20s),等不到就回 **409 TEARDOWN_IN_PROGRESS**(可重试),

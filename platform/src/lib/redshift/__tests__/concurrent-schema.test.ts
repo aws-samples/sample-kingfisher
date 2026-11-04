@@ -1,4 +1,3 @@
-// @kf-batch 50-concurrent-schema-create
 // 「`CREATE SCHEMA IF NOT EXISTS` 不是并发安全的」这一**类**缺陷的判据:
 //   ① 判别函数的行为(含负向:真故障不许被重试掩盖);
 //   ② 重试包装器的行为;
@@ -114,7 +113,7 @@ describe("🔴 零棘轮:每个发 CREATE SCHEMA IF NOT EXISTS 的地方都必�
   // 发出点 → 负责加固的文件(发出与执行常常不在一处:模板只拼语句,重试在执行器里)
   const HARDENED_BY: Record<string, string> = {
     "lib/exec-env/admin-ddl-templates.ts": "lib/exec-env/admin-ddl-executor.ts",
-    // @kf-batch 50-WP11b-shared-writer —— 发出点(建模 DDL 生成)不变,加固点改到**真正执行它的那条路**:
+    // 发出点(建模 DDL 生成)不变,加固点改到**真正执行它的那条路**:
     //   原映射指向 redshift.ts 自己的 execStatements,而那个函数零生产调用方(已删)⇒ 这条门禁一直在给死代码打勾。
     "lib/modeling/redshift.ts": "lib/modeling/landing.ts",
     "lib/realtime/redshift-target.ts": "lib/realtime/redshift-target.ts",

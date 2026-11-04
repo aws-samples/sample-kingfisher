@@ -1,6 +1,6 @@
-// 序 37 B-65 → 序 58 B-130:删数据源时平台自建安全组被 Glue 作业的网卡占着(DependencyViolation)。
-//   B-65 把它如实区分成 failed-dependency 后交给**进程内存里**的 10 × 30 秒重试 —— 2026-10-28 CloudTrail 坐实预算耗尽即永久遗留。
-//   B-130 起由持久清理作业(lib/datasource/sg-cleanup-job.ts)按网卡事实收口,本文件只钉两件底层事实:
+// →:删数据源时平台自建安全组被 Glue 作业的网卡占着(DependencyViolation)。
+//   把它如实区分成 failed-dependency 后交给**进程内存里**的 10 × 30 秒重试 —— 2026-10-28 CloudTrail 坐实预算耗尽即永久遗留。
+//   由持久清理作业(lib/datasource/sg-cleanup-job.ts)按网卡事实收口,本文件只钉两件底层事实
 //     ① deleteSecurityGroup 如实区分 deleted / gone / skipped-not-platform / failed / failed-dependency;
 //     ② countNetworkInterfacesInSecurityGroup 翻到底累加、读失败抛(不回 0)。
 //   只 mock 真外部(EC2)。
@@ -55,7 +55,7 @@ beforeEach(() => {
   h.groups = { "sg-plat": "bgp-ds-12345678", "sg-cust": "customer-db-access" };
 });
 
-describe("🔴 B-65 / B-130 ① deleteSecurityGroup 五种结论如实区分", () => {
+describe("🔴 ① deleteSecurityGroup 五种结论如实区分", () => {
   it("DependencyViolation ⇒ failed-dependency(不是笼统的 failed)", async () => {
     h.depFails = 1;
     expect(await deleteSecurityGroup("sg-plat", "us-east-1", DSID)).toBe("failed-dependency");
@@ -72,7 +72,7 @@ describe("🔴 B-65 / B-130 ① deleteSecurityGroup 五种结论如实区分", (
   });
 });
 
-describe("🔴 B-130 ② countNetworkInterfacesInSecurityGroup:网卡事实翻到底", () => {
+describe("🔴 ② countNetworkInterfacesInSecurityGroup:网卡事实翻到底", () => {
   it("按 group-id 过滤;两页累加 = 3", async () => {
     h.eniPages = [
       { NetworkInterfaces: [{ NetworkInterfaceId: "eni-1" }, { NetworkInterfaceId: "eni-2" }], NextToken: "1" },

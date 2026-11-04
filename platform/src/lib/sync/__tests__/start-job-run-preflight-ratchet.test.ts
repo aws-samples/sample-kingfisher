@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 棘轮:凡是会起 Glue 作业的 TS 入口,起作业之前必须经数据源外部网络对象的核对自愈(唯一作者 lib/datasource/network-reconcile.ts)。
+// 棘轮:凡是会起 Glue 作业的 TS 入口,起作业之前必须经数据源外部网络对象的核对自愈(唯一作者 lib/datasource/network-reconcile.ts)。
 //
 // 「写了」≠「接上了」:核对函数再完整,少接一个 StartJobRun 入口就是一条仍会给用户 AWS 原话的路。本判据钉三件事:
 //   ① 全仓 lib 下含 `StartJobRunCommand` 的文件 == 封闭清单(新冒出一个入口 ⇒ 红,来这里登记并决定要不要接);
@@ -44,7 +44,7 @@ function bodyOf(src: string, fnName: string): string {
   return next === -1 ? rest : rest.slice(0, next + 1);
 }
 
-describe("B-133 棘轮:StartJobRun 入口封闭 + 三个数据源入口先核对再起作业", () => {
+describe("棘轮:StartJobRun 入口封闭 + 三个数据源入口先核对再起作业", () => {
   it("① lib 下含 StartJobRunCommand 的文件 == 封闭清单", () => {
     const files = walk(resolve(SRC, "lib"))
       .filter((p) => readFileSync(p, "utf8").includes("StartJobRunCommand"))

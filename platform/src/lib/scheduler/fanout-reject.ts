@@ -1,9 +1,8 @@
-// @kf-batch 50-WP18b-fanout-seam
 /**
  * 扇出的**接缝**:「逐 target 各自 try」之后,怎么把 N 个拒因合成**一个仍然可分派**的错误,
  * 以及单区扇出的响应怎么与扇出前**逐字兼容**。
  *
- * 🔴🔴 为什么要有这个文件(2026-09-16 段 slsw 真环境抓到):WP-18 把发布/触发改成逐区扇出时,
+ * 🔴🔴 为什么要有这个文件(2026-09-16 段 slsw 真环境抓到):把发布/触发改成逐区扇出时,
  *   「一个区都没成」那一支写的是 `new Error(聚合文本)` —— 它把**类型化拒因**抹平成裸 Error,
  *   于是路由里那几条 `instanceof` 分派**全部落空**:
  *     · `ServerlessNodeUnsupported`(这张图里有 external 节点,服务侧表达不了 ⇒ 400「改图」)
@@ -25,7 +24,7 @@ import { MwaaNotInstalled, mwaaErrorResponse } from "@/lib/scheduler/mwaa-endpoi
 import type { ServerlessNodeUnsupported } from "@/lib/scheduler/serverless/workflow-yaml";
 /** `ServerlessNodeUnsupported` 的 code(与类上的字面量同源,单测拿真实例核对过) */
 const SERVERLESS_NODE_UNSUPPORTED = "SERVERLESS_NODE_UNSUPPORTED";
-// 序 73 模块 57(R5 / R7):发布期**落点一致性 / 作业引用**拒因 —— 作业不绑该区 / 项目不符 / 作业不存在 / 同步任务不绑该区
+// 发布期**落点一致性 / 作业引用**拒因 —— 作业不绑该区 / 项目不符 / 作业不存在 / 同步任务不绑该区
 //   ⇒ 400「改图或改绑定」,不是 409「补装」,更不是 500。同样 type-only(job-node-spec 会拖进 DDB 与两个 spec 作者)。
 import type { JobNodeUnbound } from "@/lib/workflow/job-node-spec";
 const JOB_NODE_UNBOUND = "JOB_NODE_UNBOUND";
@@ -89,7 +88,7 @@ export function schedulerRejectResponse(
       { status: 400 }
     );
   }
-  // 序 73 模块 57:离线作业 / 同步节点在发布期不满足落点一致性(或作业不存在 / 项目不符)⇒ 400 点名节点与作业
+  // 离线作业 / 同步节点在发布期不满足落点一致性(或作业不存在 / 项目不符)⇒ 400 点名节点与作业
   if ((e as { code?: string })?.code === JOB_NODE_UNBOUND) {
     const u = e as JobNodeUnbound;
     return NextResponse.json(
@@ -111,7 +110,7 @@ export function schedulerRejectResponse(
 /**
  * 扇出成功响应体(**单一作者**)。
  * 🔴 扇出必须与「扇出之前」逐字兼容:那时候的响应是 `{success, dagId, scheduler, serviceRunId|runId}`,
- *   WP-18 把这些事实整体搬进 `runs[]` ⇒ **所有老消费者(界面/脚本/下游依赖)读到的是 undefined**
+ *   把这些事实整体搬进 `runs[]` ⇒ **所有老消费者(界面/脚本/下游依赖)读到的是 undefined**
  *   —— 症状是「点了触发、接口 200、而谁都找不到这次运行」。
  * ⇒ 顶层**摊平第一条 run**,与离线作业侧那条已经跑了很久的扇出**同一个约定**
  *   (`etl-jobs/[id]/run`:「顶层仍摊平第一条 run(存量调用方读的是 data.runId),多区结果在 runs 里」)。
@@ -138,7 +137,6 @@ export function fanoutRunBody(args: {
 }
 
 /**
- * @kf-batch 50-WP18b-fanout-seam
  * 给拒因加上「哪个区」的前缀,**但不丢它的语义**。
  * 🔴 原来这里是 `new Error(\`触发失败(…): \${err.message}\`)` —— 把 `code` 一并丢了,
  *   于是上面那条「拒因一致就把 code 抬到顶层」永远拿不到 `SCHEDULER_ARTIFACT_MISSING`

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, DeleteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// 序 72 B-139(模块 56):执行角色 ARN 形态 / 保存期预检的唯一作者
+// 执行角色 ARN 形态 / 保存期预检的唯一作者
 import { roleArnShapeRejection } from "@/lib/execution-role/resolve";
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -11,7 +11,7 @@ import { recordAudit } from "@/lib/audit";
 import { normalizeFlinkSql, flinkJobTarget } from "@/lib/realtime/flink-service";
 import { guardCode } from "@/lib/cookbook";
 import { getCorrelationId } from "@/lib/observability/logger";
-// 模块 55 / 序 50 第二批:删除主体(requestFlinkDeletion 等 MSAF 停稳 → 销毁 → 删行 / 已受理 202)在 lib/realtime/long-ops.ts(flink-delete);
+// 删除主体(requestFlinkDeletion 等 MSAF 停稳 → 销毁 → 删行 / 已受理 202)在 lib/realtime/long-ops.ts(flink-delete);
 //   对象租约 `flink:<jobId>`:启动 / 停止 / 删除进行中,PUT 编辑 ⇒ 409「正在进行中」。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
@@ -61,7 +61,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const shapeReject = v ? roleArnShapeRejection(v) : null;
     if (shapeReject) return apiError(shapeReject, 400, { code: "VALIDATION_FAILED" });
     body.executionRoleArn = v || null;
-    // 序 72 B-139:改成自定义角色 ⇒ 按作业落点预检(信任 kinesisanalytics + 引擎基线),缺 ⇒ 400 指路、不落库
+    // 改成自定义角色 ⇒ 按作业落点预检(信任 kinesisanalytics + 引擎基线),缺 ⇒ 400 指路、不落库
     if (v) {
       const pfRes = await preflightCustomRoleForTargets({ engine: "flink", customRoleArn: v, targets: [flinkJobTarget(job)] });
       if (pfRes) return pfRes;
@@ -111,7 +111,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
 // DELETE /api/flink/jobs/[id] — 删除作业:真正销毁 MSAF 应用(+删日志组)再删记录(长操作 flink-delete)。
 // 用户拍板:只有删除才销毁后台 Flink 应用;停止仅暂停保留。
-// @kf-batch 50-WP18d-unpublish-seam —— 🔴🔴 销毁失败**不许删记录**(T-14):执行体 502 并保留行;还在停 ⇒ 202 已受理,后台停稳后销毁并删行。
+// 🔴🔴 销毁失败**不许删记录**:执行体 502 并保留行;还在停 ⇒ 202 已受理,后台停稳后销毁并删行。
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const job = await getJob(params.id);

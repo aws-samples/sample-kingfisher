@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — AgentCore 模型回执校验(51 SPEC §6.1⑤;ACCEPTANCE M17)。
+// AgentCore 模型回执校验(51 SPEC §6.1⑤;ACCEPTANCE M17)。
 //
 // 平台调 Runtime 时 payload 带 `{ modelId, releaseId }`;容器读 `payload.modelId ‖ env ‖ (无兜底,抛)` 并把**实际用的**
 // 模型回显在 `output._meta.modelId`。平台侧 `assertAgentCoreModelMeta()`:回执缺 `_meta.modelId` 或 ≠ 期望 ⇒ 抛
@@ -19,7 +18,7 @@ export class AgentCoreModelMismatch extends Error {
   ) {
     super(
       actual === null
-        ? `AgentCore ${capability} 回执缺少 _meta.modelId(期望 ${expected});Runtime 镜像可能未含模块 51 透传,已 fail-closed`
+        ? `AgentCore ${capability} 回执缺少 _meta.modelId(期望 ${expected});Runtime 镜像可能未含 _meta.modelId 透传,已 fail-closed`
         : `AgentCore ${capability} 回执模型 ${actual} ≠ 期望 ${expected};Runtime 未按 payload 切模型,已 fail-closed`
     );
   }

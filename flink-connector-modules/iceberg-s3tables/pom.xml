@@ -11,7 +11,7 @@
   <artifactId>flink-module-iceberg-s3tables</artifactId>
   <packaging>jar</packaging>
 
-  <!-- 模块 32-CR — Iceberg + S3 Tables catalog 模块。connector id = "iceberg-s3tables"。
+  <!-- Iceberg + S3 Tables catalog 模块。connector id = "iceberg-s3tables"。
        🔴 采纳【官方已 relocate 的 runtime jar】(§2.4bis/§2.6 实测结论):
          · iceberg-flink-runtime-1.20:官方 fat jar,内部 Jackson relocate 到 org/apache/iceberg/shaded/,
            与 kafka 模块【实测 0 同名类冲突】(vs 手工拼 iceberg-core+flink+aws 裸版的 352 冲突)。

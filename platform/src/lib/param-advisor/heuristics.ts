@@ -13,7 +13,7 @@ import { catalogFor } from "./catalog";
 import { GLUE_MAX_WORKERS } from "@/lib/etl/worker-types";
 // EMR Serverless 规格默认值/上限来自「单一事实源」(lib/engines/emr/spec.ts),引擎按数据量在其档位内推荐。
 import { EMR_SPEC_DEFAULT, EMR_MAX_EXECUTORS } from "@/lib/engines/emr/spec";
-// 序 53:Glue 版本缺省来自单一作者(清单最高;用户可降版,所以推荐值不是红线)
+// Glue 版本缺省来自单一作者(清单最高;用户可降版,所以推荐值不是红线)
 import { GLUE_VERSION_DEFAULT } from "@/lib/sync/glue-version";
 import type {
   HistoryFacts,
@@ -147,7 +147,7 @@ function recommendGlueEtl(w: WorkloadProfile, history: HistoryFacts | null | und
     out.push({ key: "glueConfig.numberOfWorkers", value: n, reason: `${gb}GB 按每 G.2X worker ~40GB 配 ${n} 个 worker(上限 ${GLUE_MAX_WORKERS})。`, confidence: 0.75 });
   }
 
-  // Glue 版本:缺省取平台清单里的最高版本(序 53;用户可在表单里降版,这里给的是推荐值)。
+  // Glue 版本:缺省取平台清单里的最高版本(用户可在表单里降版,这里给的是推荐值)。
   out.push({ key: "glueConfig.glueVersion", value: GLUE_VERSION_DEFAULT, reason: "平台缺省取清单里最高的 Glue 版本(Spark 与 S3 Tables / Iceberg 兼容性最好);需特定旧依赖再降版。", confidence: 0.95 });
 
   // 超时:有历史 → P90×1.5;无历史按数据量估。
@@ -375,7 +375,7 @@ function recommendDms(w: WorkloadProfile, history: HistoryFacts | null | undefin
   }
 }
 
-// ── 离线多引擎 EMR Serverless:release/架构 + driver/executor 规格 + executor 数(模块 33-A)──
+// ── 离线多引擎 EMR Serverless:release/架构 + driver/executor 规格 + executor 数──
 // 规格默认锚定 EMR_SPEC_DEFAULT(单一事实源);按数据量分档:小=默认规格靠多 executor 并行,
 // 大=升 8vCPU/32GB 减 spill。release/架构恒取默认(最新版 + ARM64 省成本)。EMR Serverless 无平台侧
 // 运行历史探测(非 Glue/Flink/DMS 三类 jobRef),故不引用 history。

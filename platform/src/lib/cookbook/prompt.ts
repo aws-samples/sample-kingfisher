@@ -1,4 +1,4 @@
-// 模块 45 — 检索切片 → 提示词文本(所有 codegen 出口共用同一注入格式)。
+// 检索切片 → 提示词文本(所有 codegen 出口共用同一注入格式)。
 //
 // 定位:retrieve(engine, opts) 拿到 CookbookSlice 后,用本函数渲染成一段可直接拼进 system prompt 的文本。
 // 离线 ETL、GenBI、Flink 等所有出口复用同一格式 → 大模型看到的方言/范式呈现一致,一处维护多处生效。

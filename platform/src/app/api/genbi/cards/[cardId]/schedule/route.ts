@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // GET  /api/genbi/cards/[cardId]/schedule   这张卡的定时刷新(没有 ⇒ null)
 // POST /api/genbi/cards/[cardId]/schedule   { cronExpression, enabled, turnIndex? } 建 / 改 / 启停
 //   (用 POST 不用 PUT:运营分析账号在网关层只放行 /api/genbi 的 GET/POST,它们也要能给自己的卡定时)

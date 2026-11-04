@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101)
 // 「运行日志」弹窗的唯一作者:原来内联在任务监控页里;补数中心的实例抽屉也要看同一条 run 的日志,
 // 抄一份 = 两处各自漂移(取哪个接口 / 怎么渲染 / 取不到怎么说)。两页都用这一个。
 //   日志来源 = `GET /api/monitor/tasks/<taskId>/logs?runId=<runId>`(按 run 行的章去**该区**取;接口自己说清取不到的原因)。

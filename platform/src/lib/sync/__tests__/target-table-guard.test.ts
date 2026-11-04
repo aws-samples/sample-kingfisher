@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 「不许静默清空客户已有的表」的判据(规则见 lib/sync/target-table-guard.ts 文件头)。
 //
 // 🔴 守卫的**本体在 Python 里**(Glue 脚本清表前那一段)⇒ 只比字符串证明不了它会拦。
@@ -28,7 +27,7 @@ beforeEach(() => {
 const ds = { datasourceId: "ds1", name: "src", type: "x-fixture", secretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:s-AbC", database: "gamedb" } as unknown as DataSource;
 async function bindings(): Promise<GlueScriptBindings> {
   const landing = await resolveGlueBinding({ targetId: HOME_TARGET_ID });
-  // @kf-batch 50-WP31-place-first-class —— 凭证 ARN 用真实形态(数仓落点以 PlaceWire 进脚本,生成期按 schema 自校验)
+  // 凭证 ARN 用真实形态(数仓落点以 PlaceWire 进脚本,生成期按 schema 自校验)
   return { landing, rsb: { region: "us-east-1", workgroup: "wg", database: "dev", secretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:wg-admin-AbC" } };
 }
 const task = (over: Record<string, unknown> = {}) => ({
@@ -41,7 +40,7 @@ describe("纯判定:与脚本里两条整表 DELETE 的条件逐字对齐", () =
     [{ syncMode: "full", writeMode: "overwrite" }, true],
     [{ syncMode: "full", writeMode: "append" }, false],
     [{ syncMode: "full", writeMode: "merge" }, false],
-    [{ syncMode: "incremental", writeMode: "merge" }, false], // 序 37 B-61:增量 + merge 走 merge 分支,不预删不清表
+    [{ syncMode: "incremental", writeMode: "merge" }, false], // 增量 + merge 走 merge 分支,不预删不清表
     [{ syncMode: "incremental", writeMode: "merge", incrementalColumn: "id" }, false],
     [{ syncMode: "incremental", writeMode: "append" }, true], // 没有增量列 ⇒ inc_where 空 ⇒ 整表清空
     [{ syncMode: "incremental", incrementalColumn: "id" }, true], // 有列无水位 ⇒ 整表清空
@@ -120,7 +119,7 @@ function guardBlock(script: string): string {
   return lines.map((l) => l.slice(Math.min(indent, l.length - l.trimStart().length))).join("\n");
 }
 
-// B-126:守卫段现在经真实的 run_stmt / run_batch / _query_rows(含瞬态重试)打 Data API ⇒ 把脚本里那一段助手也切出来一起真执行,
+// 守卫段现在经真实的 run_stmt / run_batch / _query_rows(含瞬态重试)打 Data API ⇒ 把脚本里那一段助手也切出来一起真执行,
 //   假客户端只扮 Data API(execute / batch_execute / describe / get_statement_result),不再在夹具里另写一份 run_stmt。
 const HELPERS_BEGIN = '_last_err = {"msg": ""}';
 const HELPERS_END = "def _is_concurrent_schema_create(err):";
@@ -176,7 +175,7 @@ print(json.dumps({"raised": raised, "stmts": STMTS, "batches": BATCHES}))
   return JSON.parse(execFileSync("python3", [py, JSON.stringify(c.existing)], { encoding: "utf8" }).trim().split("\n").pop()!);
 }
 
-/** B-126 瞬态重试判据:outcomes = 每次提交(execute / batch_execute)后 describe 回什么 —— "ok" / "io"(连接层瞬态)/ "perm"(权限)。 */
+/** 瞬态重试判据:outcomes = 每次提交(execute / batch_execute)后 describe 回什么 —— "ok" / "io"(连接层瞬态)/ "perm"(权限)。 */
 function runHelpers(script: string, outcomes: string[], mode: "stmt" | "batch"): { raised: string | null; executes: number } {
   const dir = mkdtempSync(join(tmpdir(), "kf-ttg-helpers-"));
   const py = join(dir, "h.py");
@@ -239,7 +238,7 @@ describe("🔴🔴 守卫段真执行(python3):清空客户已有的表之前拦
     const s = generateGlueScript(task({ overwriteConfirmedTables: ["public.other"] }), ds, await bindings());
     expect(runGuard(s, { existing: { "public.orders": "" } }).raised).toMatch(/SYNC_REFUSED/);
   });
-  it("表不存在 ⇒ 建表 + 打平台标记在**同一个事务**里(B-126:标记打不上就连表也不留,不再先建后标两条语句)", async () => {
+  it("表不存在 ⇒ 建表 + 打平台标记在**同一个事务**里(标记打不上就连表也不留,不再先建后标两条语句)", async () => {
     const s = generateGlueScript(task(), ds, await bindings());
     const r = runGuard(s, { existing: {} });
     expect(r.raised).toBeNull();
@@ -274,8 +273,8 @@ describe("建表唯一作者 buildTargetDdl:服务端现生成,不信客户端",
   });
 });
 
-// ── B-126:Data API 连接层瞬态错**有界**重试,且只认连接层签名(真执行脚本里的 run_stmt / run_batch;假客户端只扮 Data API)──
-describe("🔴 B-126:Redshift Data API 瞬态错重试有界、只认连接层签名", () => {
+// ──:Data API 连接层瞬态错**有界**重试,且只认连接层签名(真执行脚本里的 run_stmt / run_batch;假客户端只扮 Data API)──
+describe("🔴 Redshift Data API 瞬态错重试有界、只认连接层签名", () => {
   it("COMMENT 第一次撞「I/O error occurred while sending to the backend」⇒ 重试一次成功(两次提交、不抛)", async () => {
     const s = generateGlueScript(task(), ds, await bindings());
     expect(runHelpers(s, ["io", "ok"], "stmt")).toEqual({ raised: null, executes: 2 });

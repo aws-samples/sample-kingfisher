@@ -1,4 +1,4 @@
-// 模块 43-C — 补数计划/实例的存储服务层(bgp-backfill-plans / bgp-backfill-instances)。
+// 补数计划/实例的存储服务层(bgp-backfill-plans / bgp-backfill-instances)。
 // 计划 CRUD + 实例批量落库 + 进度聚合 + 控制动作(暂停/恢复/取消/续跑)。乐观锁 version 防并发覆盖。
 
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
@@ -33,7 +33,7 @@ export function previewInstances(input: CreatePlanInput, dag?: { nodes?: any[]; 
     cascade: input.cascade,
     dag,
     maxInstances: input.maxInstances,
-    // @kf-batch 50-P50.3-mrquery —— 执行目标集合(API 层从资源行解析,不接受客户端指定)。
+    // 执行目标集合(API 层从资源行解析,不接受客户端指定)。
     execTargets: input.execTargets,
   });
 }
@@ -72,7 +72,7 @@ export async function createPlan(input: CreatePlanInput, dag?: { nodes?: any[]; 
     nodeId: s.nodeId,
     nodeName: s.nodeName,
     nodeType: s.nodeType,
-    // @kf-batch 50-P50.3-mrquery —— 实例带上它自己的执行目标(执行侧据它解析落点与凭证)。
+    // 实例带上它自己的执行目标(执行侧据它解析落点与凭证)。
     ...(s.targetId ? { targetId: s.targetId } : {}),
     status: s.dependsOn.length > 0 ? "blocked" : "pending",
     dependsOn: s.dependsOn,
@@ -114,14 +114,12 @@ export async function listPlans(projectId: string): Promise<BackfillPlanRow[]> {
   return Items as BackfillPlanRow[];
 }
 
-// @kf-batch 50-project-delete-orphans
-// @kf-batch 50-B51-backfill-pump —— 「计划是否未收口」的定义挪到零依赖的 types.ts(后台推进泵在 instrumentation 可达面上,
+// 「计划是否未收口」的定义挪到零依赖的 types.ts(后台推进泵在 instrumentation 可达面上,
 //   不能 import 本文件:本文件 import ulid / plan 展开)。这里原样再导出,存量调用方不变。
 import { BACKFILL_PLAN_STATUS_OPEN, isBackfillPlanOpen } from "./types";
 export { BACKFILL_PLAN_STATUS_OPEN, isBackfillPlanOpen };
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 该项目**拥有**的、**未收口**的补数计划(删项目前置校验用)。
  * 与 `listPlans` 的区别:🔴 翻页到底(`listPlans` 单次 Query,只数第一页 ⇒ fail-open)、翻不完就**抛**、
  * 只收 `projectId` 恰为本项目的行(pk 已是 `backfill#<projectId>`,这是防脏数据的第二道)。

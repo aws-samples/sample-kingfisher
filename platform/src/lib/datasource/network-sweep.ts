@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 数据源外部网络对象的**定时巡检**(推进泵每 10 分钟一轮,只在持 leader 租约的副本上;与 sweepAutoSupply 同一 tick)。
+// 数据源外部网络对象的**定时巡检**(推进泵每 10 分钟一轮,只在持 leader 租约的副本上;与 sweepAutoSupply 同一 tick)。
 //
 // 【为什么使用时刻的三处接缝还不够】启动核心(`lib/sync/start-run.ts`)/ 发现作业(`glue-reach.ts`)/ 扇出(`scheduler/dependency.ts`)
 //   只覆盖经本进程的路径;**定时同步**由 MWAA Serverless 的 Python 运行时直接 `glue.start_job_run`(`lib/workflow/node-exec-py.ts`),

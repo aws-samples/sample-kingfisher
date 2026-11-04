@@ -1,13 +1,13 @@
-// 模块 44 — Copilot 创建服务(P44.2)。只做【纯草稿、不碰云资源】的创建:同步/离线作业/Flink/业务口径。
+// Copilot 创建服务。只做【纯草稿、不碰云资源】的创建:同步/离线作业/Flink/业务口径。
 // 数据源刻意不在此(其 POST 会真建 Secret+Glue 连接,碰云资源,违背"创建即草稿"——Copilot 对数据源只给建议)。
 // 一律 status:"draft" / scheduleEnabled:false —— 建出来绝不运行/调度(安全契约:可建不可跑)。
 // 直写 DynamoDB(照对应 route 的 item 结构),不改任何现有 route(纯增量)。审计由调用方(工具)统一记 copilot.*。
 
 import { isSyncWriteMode } from "@/lib/sync/target-table-guard";
-// 序 37 B-61:合并键的规整与校验(单一作者)
+// 合并键的规整与校验(单一作者)
 import { mergeKeysOf, usesGlueWriteMode, validateSyncCapabilityFields } from "@/lib/sync/run-vars";
 import { PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
-// @kf-batch 50-WP4quater-reads(工单 SC-17)—— 落点章的唯一作者(不在这里另写一份判定)
+// 落点章的唯一作者(不在这里另写一份判定)
 import { bindingForNewSyncTask } from "@/lib/exec-env/definition-binding";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
@@ -65,7 +65,7 @@ export async function createSyncDraft(args: any, caller: CopilotCaller): Promise
   //   Copilot 替用户选写模式时只许选「不删数据」的那个;要覆盖必须由用户在页面上显式改。
   //   同理 targetType 缺省给 redshift 保证向导可推进。合法值唯一来源 = target-table-guard。
   const writeMode = isSyncWriteMode(args?.writeMode) ? args.writeMode : "append";
-  // 序 37 B-61:merge 必须带合并键(planner 产出的字段名就叫 mergeKeys;没有就在这里**响亮**拒绝,不许落一个
+  // merge 必须带合并键(planner 产出的字段名就叫 mergeKeys;没有就在这里**响亮**拒绝,不许落一个
   //   运行时才现形的草稿)。规则单一作者 = run-vars.validateSyncCapabilityFields / mergeKeysOf。
   const channel = syncMode === "realtime" ? "dms" : (args?.channel || "glue");
   const mergeKeys = writeMode === "merge" ? mergeKeysOf({ mergeKeys: args?.mergeKeys }) : [];
@@ -73,7 +73,7 @@ export async function createSyncDraft(args: any, caller: CopilotCaller): Promise
     const bad = validateSyncCapabilityFields({ writeMode, syncMode, channel, mergeKeys: Array.isArray(args?.mergeKeys) ? args.mergeKeys : undefined });
     if (bad) throw new Error(`合并写入(merge)必须给合并键 mergeKeys(非空列名数组):${bad}`);
   }
-  // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 🔴 落点章。
+  // 🔴 落点章。
   // 同步任务的章由**它引用的数据源**派生(与 `/api/sync` POST 同一个作者 `bindingForNewSyncTask`),
   // 拿不到数据源行时回落到计划面向的区。绕过这个作者的后果:草稿无章 ⇒ 读侧全归主控区,
   // 而用户在 us-west-2 视角下让 Copilot 建的任务**在他的列表里根本看不见**。
@@ -126,7 +126,7 @@ export async function createEtlDraft(args: any, caller: CopilotCaller): Promise<
     jobId: ulid(),
     projectId: caller.projectId,
     env: caller.env,
-    // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 离线作业的章 = 计划面向的区(缺省主控区)
+    // 离线作业的章 = 计划面向的区(缺省主控区)
     targets: [caller.targetId || HOME_TARGET_ID],
     name,
     type,

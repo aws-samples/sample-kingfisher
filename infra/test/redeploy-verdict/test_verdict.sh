@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# @kf-batch 50-WP27-9cap-matrix
 # IAM 模拟门裁决的**三态接线**离线判据 —— 把 `scripts/redeploy-platform.sh` 里那一段**逐字抽出来**,
 # 在与真脚本相同的 `set -euo pipefail` 之下,对门的退出码 rc ∈ {0,1,2,3,4} 各跑一次。
 #

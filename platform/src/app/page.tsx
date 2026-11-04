@@ -17,9 +17,8 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { groupsFromToken, isAnalystOnly } from "@/lib/auth/roles";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 53-guide-v1 —— 首页新手引导入口
+// 首页新手引导入口
 import GuideHomeCard from "@/components/guide/GuideHomeCard";
-// @kf-batch 50-WP4ter-coverage
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint from "@/components/scope/OtherScopesHint";
 import { toScopeParam } from "@/lib/scope/scope";
@@ -91,7 +90,7 @@ export default function HomePage() {
     })();
   }, [getToken, router]);
 
-  // @kf-batch 50-WP4ter-coverage —— 当前执行范围(顶栏选的那个;URL 是权威)。
+  // 当前执行范围(顶栏选的那个;URL 是权威)。
   // `scopeQs` 用于「本来没有 query 的地址」,`scopeAmp` 用于「已经带了 query 的地址」——
   // 两个变量而不是一个字符串拼接:拼错一个 `?`/`&` 的症状是**参数被静默丢掉**(过滤看起来没生效)。
   const { scope } = useScope();
@@ -108,7 +107,7 @@ export default function HomePage() {
         return;
       }
       try {
-        // @kf-batch 50-WP4ter-coverage —— 🔴 六块统计逐个带上当前执行范围(工单 SC-1)。
+        // 🔴 六块统计逐个带上当前执行范围。
         // 以前这里一个 scope 都不带 ⇒ 切到某个区,首页数字仍是全平台合计,而各详情页已按区过滤 ——
         // **同一份数据在两页给出两个数**,比「没过滤」更让人不信任界面。
         const [ds, sync, wf, etl, emr, runData, mt] = await Promise.all([
@@ -116,11 +115,11 @@ export default function HomePage() {
           fetch(`/api/sync${scopeQs}`).then((r) => r.json()).then(arr),
           fetch(`/api/workflow${scopeQs}`).then((r) => r.json()).then(arr),
           fetch(`/api/etl-jobs${scopeQs}`).then((r) => r.json()).then(arr),
-          // 模块 33-A：EMR Serverless 离线作业(独立表 bgp-engine-jobs），首页资源计数须纳入。
+          // ：EMR Serverless 离线作业(独立表 bgp-engine-jobs），首页资源计数须纳入。
           fetch(`/api/engines/emr-serverless${scopeQs}`).then((r) => r.json()).then((d) => arr(d?.success ? d.data : d)),
           fetch(`/api/monitor/runs?limit=500${scopeAmp}`).then((r) => r.json()),
-          // 模块39:指标已收敛到「数据建模 → 指标体系」——首页核心业务指标改读该唯一指标源。
-          // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 🔴🔴 上一版这里写的是「刻意不带 scope:
+          // 指标已收敛到「数据建模 → 指标体系」——首页核心业务指标改读该唯一指标源。
+          // 🔴🔴 上一版这里写的是「刻意不带 scope:
           // 指标是平台级定义,本身不分区」。用户 2026-09-10 驳回:「这里为什么不能做成区域维度?
           // 我认为都可以切出来的。」而且这个说法本身站不住 —— 指标**定义**是一份,但它的**计算值**
           // 是从某个区的数仓算出来的:把主控区算出的数字挂在 us-west-2 视角上,就是个错数字。
@@ -142,7 +141,7 @@ export default function HomePage() {
         setLoading(false);
       }
     })();
-    // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,靠 deps 重拉(护栏 4)
+    // 切区不重载页面,靠 deps 重拉(护栏 4)
   }, [getToken, scopeQs, scopeAmp]);
 
   // 运行状态分布
@@ -160,7 +159,7 @@ export default function HomePage() {
   // 近 7 日运行趋势
   const trend: { label: string; value: number }[] = (() => {
     const days: { key: string; label: string }[] = [];
-    // B-138:按 UTC 算日期(key 本来就是 toISOString 的 UTC 日),服务端(UTC)与浏览器(本地时区)首帧才一致;按本地时区算在跨日时段会水合不一致
+    // 按 UTC 算日期(key 本来就是 toISOString 的 UTC 日),服务端(UTC)与浏览器(本地时区)首帧才一致;按本地时区算在跨日时段会水合不一致
     const now = new Date();
     for (let i = 6; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
@@ -222,7 +221,7 @@ export default function HomePage() {
       </div>
       <GuideHomeCard />
 
-      {/* @kf-batch 50-WP4ter-coverage —— 护栏 1:单区视角常驻「其他执行范围还有 N 条」。
+      {/* 护栏 1:单区视角常驻「其他执行范围还有 N 条」。
           首页是**计数页**,漏掉的东西在这里最难被发现(数字小了没人会察觉),所以这条尤其必要。 */}
       <OtherScopesHint resources={["datasource", "sync", "workflow", "etl-job", "engine-job"]} />
 

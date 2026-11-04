@@ -7,21 +7,21 @@ import { snapshotVersion } from "@/lib/versions/version-service";
 import { apiError } from "@/lib/api-response";
 import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OVERWRITE_CONFIRM_KIND, overwriteConfirmMessage, writesS3Tables, clearsWholeTable } from "@/lib/sync/target-table-guard";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP24-sync-teardown —— 停/删共用**同一个**下线作者
+// 停/删共用**同一个**下线作者
 import { teardownSyncChannel, teardownFailureMessage, teardownIsRetryable } from "@/lib/sync/teardown";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
-// @kf-batch 37-sync-capability —— 序 37 新字段的合法形态(唯一作者)
+// 新字段的合法形态(唯一作者)
 import { validateSyncCapabilityFields, whereOf, syncTaskUsesRunDate } from "@/lib/sync/run-vars";
-// 序 38 B-69:写 S3 Tables 的任务 Glue 版本必须 ≥ 5.1(唯一作者;按「改完之后」的整条任务判)
+// 写 S3 Tables 的任务 Glue 版本必须 ≥ 5.1(唯一作者;按「改完之后」的整条任务判)
 import { validateSyncGlueVersion } from "@/lib/sync/glue-version";
-// @kf-batch 56-B127-exec-env-own-table-bucket —— 自带 Table Bucket 的准入(保存与启动同一份判定)
+// 自带 Table Bucket 的准入(保存与启动同一份判定)
 import { tableBucketSaveRejection } from "@/lib/sync/table-bucket";
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
-// 序 37 B-67:保存也要让 Glue 脚本跟上定义(作业已存在时)—— 与启动路径同一个作者 ensureGlueSyncJob;收养同一规则
+// 保存也要让 Glue 脚本跟上定义(作业已存在时)—— 与启动路径同一个作者 ensureGlueSyncJob;收养同一规则
 import { ensureGlueSyncJob } from "@/lib/sync/start-run";
 import { adoptExistingTargetsOnce } from "@/lib/sync/foreign-guard-adoption";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 44-sync-switch-datasource —— 换源时读新源的章(与启动路由的跨区判法同一个作者)
+// 换源时读新源的章(与启动路由的跨区判法同一个作者)
 import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 import type { DataSource } from "@/types/datasource";
 
@@ -60,9 +60,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   delete body.updatedAt;
   delete body.taskId;
   delete body.createdAt;
-  // 序 37 B-60:既有目标收养的时间戳只有服务端写(lib/sync/foreign-guard-adoption.ts);客户端传了一律剔除。
+  // 既有目标收养的时间戳只有服务端写(lib/sync/foreign-guard-adoption.ts);客户端传了一律剔除。
   delete body.foreignGuardAdoptedAt;
-  // 模块 31: 实时(CDC)任务通道恒为 DMS——编辑时同样兜底(取本次或现存 syncMode 判定)。
+  // 实时(CDC)任务通道恒为 DMS——编辑时同样兜底(取本次或现存 syncMode 判定)。
   const effectiveSyncMode = body.syncMode ?? current.syncMode;
   if (effectiveSyncMode === "realtime") body.channel = "dms";
   // B7-FIX: 同 POST,规整增量字段 incrementalConfig.{field,startValue} → 顶层 incrementalColumn/Value。
@@ -75,10 +75,10 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const merged = { ...current, ...body } as Record<string, unknown>;
   const writeReject = validateSyncWriteFields(merged);
   if (writeReject) return apiError(writeReject, 400, { code: "VALIDATION_FAILED" });
-  // 序 38 B-69:改目标类型 / 改 Glue 版本之后的整条任务,写 S3 Tables 就必须是 Glue 5.1+
+  // 改目标类型 / 改 Glue 版本之后的整条任务,写 S3 Tables 就必须是 Glue 5.1+
   const glueVersionReject = validateSyncGlueVersion(merged);
   if (glueVersionReject) return apiError(glueVersionReject, 400, { code: "VALIDATION_FAILED" });
-  // @kf-batch 37-sync-capability —— 按「改完之后」的整条任务校验序 37 新字段;用到过滤条件 / 表名模板时
+  // 按「改完之后」的整条任务校验新字段;用到过滤条件 / 表名模板时
   //   才读数据源取范式(只支持 JDBC),不用这两样的保存不多一次读。
   //   🔴 只在这次**改了**过滤条件或源表清单时才按范式拒:存量任务里那条从前不生效的过滤条件(老向导允许在
   //   非 JDBC 源上填),不因一次与它无关的编辑就保存失败(与向导 paradigmForCapabilityCheck 同一口径;
@@ -87,7 +87,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     (body.sourceTables !== undefined && JSON.stringify(body.sourceTables) !== JSON.stringify(current.sourceTables));
   let paradigm: string | undefined;
   let dsRow: Record<string, unknown> | undefined;
-  // @kf-batch 44-sync-switch-datasource(用户 2026-10-15 反馈 ②「同步任务切换个数据源,没法保存」;…7698 页面探针坐实)—— 换了数据源:
+  // (用户 2026-10-15 反馈 ②「同步任务切换个数据源,没法保存」;…7698 页面探针坐实)—— 换了数据源
   //   ① 新源必须存在(404);② 新源的章必须 ∈ 任务绑定的执行环境(同步任务跟随源所在的区运行;跨区换源 = 409 CROSS_REGION_SOURCE,与启动路由同一条铁律);
   //   ③ sourceDatabase 跟着新源走 —— 编辑表单用整条记录预填,PUT 回来的是**旧库名**,原样落库就成了「数据源指 sys 库、任务记着 ecommerce」。
   //   这里读到的新源行下面复用(范式校验 / 预检 / 刷脚本),不多读一次。
@@ -109,7 +109,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const newDb = typeof dsRow.database === "string" ? dsRow.database.trim() : "";
     if (newDb) { body.sourceDatabase = newDb; merged.sourceDatabase = newDb; }
   }
-  // 序 37 B-60:S3 Tables 目标的提前告知要知道 namespace;任务没自带时取数据源库名 ⇒ 这种情形也读一次数据源行。
+  // S3 Tables 目标的提前告知要知道 namespace;任务没自带时取数据源库名 ⇒ 这种情形也读一次数据源行。
   //   (不整表清空 / 不写 S3 / 自带 namespace 的保存仍然不多读。)
   const needDsForS3 = writesS3Tables(merged as never) && clearsWholeTable(merged as never) &&
     !(typeof (merged.s3Config as { namespace?: unknown } | undefined)?.namespace === "string" && (merged.s3Config as { namespace: string }).namespace);
@@ -123,12 +123,12 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const capReject = validateSyncCapabilityFields(merged, paradigm);
   if (capReject) return apiError(capReject, 400, { code: "VALIDATION_FAILED" });
   if (body.overwriteConfirmedTables !== undefined) body.overwriteConfirmedTables = merged.overwriteConfirmedTables;
-  // B-127:按「改完之后」的整条任务判自带 Table Bucket 的准入(与 POST / 启动守卫同一份):非主控区只许平台表桶或已登记外部表桶,否则 400 指路
+  // 按「改完之后」的整条任务判自带 Table Bucket 的准入(与 POST / 启动守卫同一份):非主控区只许平台表桶或已登记外部表桶,否则 400 指路
   if (writesS3Tables(merged as never)) {
     const bucketReject = await tableBucketSaveRejection(merged as never);
     if (bucketReject) return apiError(bucketReject.message, bucketReject.status, { code: "VALIDATION_FAILED" });
   }
-  // 序 37 B-67:**作业已存在**的任务(跑过至少一次)—— 原来保存只写 DDB,脚本只在平台启动时重生成,而调度载体只起旧作业
+  // **作业已存在**的任务(跑过至少一次)—— 原来保存只写 DDB,脚本只在平台启动时重生成,而调度载体只起旧作业
   //   ⇒ 改了 WHERE / 分区 / 合并键 / 逐表确认之后定时运行一直跑旧脚本(真环境 2026-10-12 坐实)。
   //   ① 先做一次既有目标收养(与启动路径同一规则、幂等;放在预检之前 —— 否则守卫上线前的老任务一保存就被伪 409 挡住);
   //   ② 预检通过后、**落库之前**重生成脚本并更新作业(ensureGlueSyncJob,唯一作者);刷新不成 ⇒ 不落库、如实报错,
@@ -162,7 +162,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const names = Object.fromEntries(fields.map((k, i) => [`#f${i}`, k]));
   const values = Object.fromEntries(fields.map((k, i) => [`:v${i}`, body[k]]));
 
-  // @kf-batch 50-B08-sync-task-write-guard —— 走唯一写通道(条件写)。
+  // 走唯一写通道(条件写)。
   // 🔴 上面那道 Get + 404 是主防线;这里兜的是并发窗口(强读之后、写之前那一瞬被别人删掉)。
   //   少了条件写,「保存」就会把一条已删的任务**凭空造回来**,而且只带本次提交的那几个字段。
   const { ok, Attributes } = await updateSyncTaskIfExists({
@@ -186,10 +186,9 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   if (!Item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
-  // @kf-batch 50-WP24-sync-teardown
   // 🔴🔴 **先把后台通道撤掉,再删行**。改动前这里**只删 DDB 行**:DMS 复制任务 / Glue 作业 /
   //   Zero-ETL 集成继续存在 —— 继续搬数据、继续计费,而它们的 identifier/ARN 随行消失
-  //   ⇒ 平台再也定位不到(多法域下 = 停不下来的跨境数据流动)。与 WP-18d 同一条不变量:
+  //   ⇒ 平台再也定位不到(多法域下 = 停不下来的跨境数据流动)。与同一条不变量
   //   **撤不下来就不许删记录**(留着行,用户还能再点一次)。
   const td = await teardownSyncChannel(Item as never, { purge: true });
   if (td.hardFailures.length) {

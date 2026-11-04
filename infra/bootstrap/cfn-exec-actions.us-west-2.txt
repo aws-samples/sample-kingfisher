@@ -1,4 +1,4 @@
-# cfn-exec-role(cdk-hnb659fds-cfn-exec-role-<acct>-us-west-2)实际调用集 —— WP-3 目标 b 采集步(SPEC v3.21 §6.2「先采集后收窄」)
+# cfn-exec-role(cdk-hnb659fds-cfn-exec-role-<acct>-us-west-2)实际调用集 —— 目标 b 采集步(SPEC v3.21 §6.2「先采集后收窄」)
 # 采集 2026-09-05 06:49Z..12:49Z(us-west-2 区域事件)+ 同窗口 us-east-1 记录的全局服务事件(IAM);来源 CloudTrail bgp-management-trail lookup-events
 # 已覆盖路径:tgt_usw2_b 首装(base/core/redshift)· 补组件 residency-api(P0-E 预演空壳栈建/删 + 真部署)· tgt_usw2_a 升级(四类 per-target 角色)
 # 🔴 未覆盖:临时 target 销毁(产品尚无销毁路径,SPEC §4.6 后补)⇒ 收窄策略必须给 Delete* 留位,或在销毁路径落地后再采一轮

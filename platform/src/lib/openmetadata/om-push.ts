@@ -13,7 +13,7 @@
 //   Source   : bgp-sources.<sourceDb>.default.<table>   (CustomDatabase; P2 may supersede)
 
 import { omRequest, getEntityByName, isOmConfigured } from "./om-client";
-// @kf-batch 50-WP2-one-agentcore-one-om —— 四个写入原语搬到轻量层 `om-write.ts`(编译边界:
+// 四个写入原语搬到轻量层 `om-write.ts`(编译边界
 // 元数据镜像是周期任务、跑在 instrumentation 的 edge 面上,不能经本文件的 genbi/athena 链碰 node:crypto)。
 // 🔴 这里**再导出**是为了不动既有消费者的 import 路径(单一作者仍在 om-write)。
 import { ensureService, customDbService, putDatabase, putSchema, putTable, omColumnNames } from "./om-write";
@@ -25,10 +25,10 @@ import { sanitizeS3TablesIdentifier } from "@/lib/sync/s3tables-identifier";
 import { resolveTargetTableName } from "@/lib/sync/target-naming";
 import { syncOmCoords, type SyncOmPlace } from "@/lib/openmetadata/om-sync-coords";
 import { OM_SERVICE_PREFIX, omServiceFor } from "@/lib/openmetadata/om-service";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup, resolveWorkgroup } from "@/lib/redshift/warehouse-location";
 
-// @kf-batch 50-o4REG-sync-om-per-target —— 三个基名从 service 维度的单一事实源取(值不变)。
+// 三个基名从 service 维度的单一事实源取(值不变)。
 //   🔴 这三个常量只剩**主控区口径**的消费者(主控区列回填 / 计算血缘);同步推送一律走 `syncOmCoords`。
 const SRC_SERVICE = OM_SERVICE_PREFIX.sources;
 const S3T_SERVICE = OM_SERVICE_PREFIX.s3tables;
@@ -91,7 +91,6 @@ function deriveColumnPairs(maps: any[], fallbackNames: string[]): { from: string
 /**
  * Push entities + cross-system column lineage for a sync task. Best-effort; never throws.
  *
- * @kf-batch 50-o4REG-sync-om-per-target
  * 🔴 `place` 必填:坐标(service / 库 / schema / FQN)全部由 `syncOmCoords` 一处算出 ——
  *    主控区逐字节等于改动前;其它区落该区的 per-target service(登记 o4-REG 的交付)。
  */
@@ -260,7 +259,7 @@ export async function pushPhysicalEndpointsToOM(task: any, ds: DataSource, place
     const tables: string[] = task.sourceTables || [];
     if (!tables.length) return;
 
-    // @kf-batch 50-o4REG-sync-om-per-target —— 坐标同一作者(主控区逐字节不变;其它区落 per-target 的 bgp-physical-<slug>)
+    // 坐标同一作者(主控区逐字节不变;其它区落 per-target 的 bgp-physical-<slug>)
     const c = syncOmCoords(task, ds, place);
     const { writeS3, writeRs } = c;
 
@@ -303,7 +302,7 @@ export async function pushPhysicalEndpointsToOM(task: any, ds: DataSource, place
 export async function pushDataSourceToOpenMetadata(
   ds: { database?: string },
   tables: { name: string; columns?: { name: string; type?: string }[] }[],
-  // @kf-batch 50-o4REG-sync-om-per-target —— 🔴 必填:数据源的落点(`ownerTargetId`)。
+  // 🔴 必填:数据源的落点(`ownerTargetId`)。
   //   源表实体的 service 与同步推送同一个作者(`omServiceFor("sources", 源落点)`)⇒ 建源时推的表
   //   与之后同步推的源表是**同一个** OM 实体(否则非主控区的源在 OM 里一份在主控区 service 下、一份在该区下)。
   ownerTargetId: string
@@ -330,7 +329,7 @@ export async function pushDataSourceToOpenMetadata(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 模块 24 修复 (v1.17.0): Redshift 真实列回填 OpenMetadata
+// 修复 (v1.17.0): Redshift 真实列回填 OpenMetadata
 //
 // 背景：OM 采集连接器栈未部署，Redshift 表此前仅由事件推送/SQL 血缘解析建出"占位列"
 // （单列 _row），导致治理目录「字段数」恒为 1。这里直接 introspect Redshift 真实 schema
@@ -342,7 +341,7 @@ export async function pushRedshiftSchemaToOpenMetadata(
   database: string = process.env.REDSHIFT_DATABASE || "dev"
 ): Promise<{ tables: number; columns: number }> {
   if (!isOmConfigured()) return { tables: 0, columns: 0 };
-  // @kf-batch 50-WP31-place-first-class —— 落点显式:OM 是唯一中心件、只 ingest 主控区(central.ts)⇒ 回填的是主控区数仓的列
+  // 落点显式:OM 是唯一中心件、只 ingest 主控区(central.ts)⇒ 回填的是主控区数仓的列
   const { HOME_TARGET_ID } = await import("@/lib/exec-env/target-id");
   const tables = await introspectSchema(workgroup, database, { targetId: HOME_TARGET_ID, project: null }); // 平台级、只读主控区:显式无项目 // 失败会抛，由调用方处理
 
@@ -373,7 +372,7 @@ export async function pushRedshiftSchemaToOpenMetadata(
 // Replaces the "_row" placeholder so column-level lineage (sync + compute shared-column heuristic)
 // has real column names to work with. Iterates ALL namespaces in the bucket (not just one) so it
 // works regardless of namespace naming. Idempotent, FQN = bgp-s3tables.<bucket>.<namespace>.<table>.
-// 序 38 B-71:不止平台表桶 —— 主控区**登记过的外部表桶**(客户自有)也进目录,每个桶一个 database(FQN 仍是 bgp-s3tables.<bucket>.<ns>.<table>)。
+// 不止平台表桶 —— 主控区**登记过的外部表桶**(客户自有)也进目录,每个桶一个 database(FQN 仍是 bgp-s3tables.<bucket>.<ns>.<table>)。
 //   原来 `bucket` 形参只会是主控区平台表桶;现在落点由 resolveS3TablesPlaces(HOME) 给全,形参保留只为兼容旧调用方(传了也不再决定扫哪些桶)。
 export async function pushS3TablesSchemaToOpenMetadata(
   _bucket: string = process.env.S3TABLES_BUCKET || "bgp-table-bucket"
@@ -383,7 +382,7 @@ export async function pushS3TablesSchemaToOpenMetadata(
   const { listNamespaceTree, resolveS3TablesPlaces } = await import("@/lib/athena/s3tables");
   const { HOME_TARGET_ID } = await import("@/lib/exec-env/target-id");
 
-  // 🔴 B-26:落点显式写成主控区(原来靠「不传 = 主控区」)。B-71:平台表桶 + 已登记外部表桶,逐桶扫。
+  // 🔴 落点显式写成主控区(原来靠「不传 = 主控区」)。:平台表桶 + 已登记外部表桶,逐桶扫。
   const places = await resolveS3TablesPlaces(HOME_TARGET_ID); // throws on failure; caller handles
   await ensureService(S3T_SERVICE, customDbService(S3T_SERVICE));
 
@@ -422,7 +421,7 @@ export async function pushS3TablesSchemaToOpenMetadata(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 模块 17 (v1.8.0): SQL 血缘自动解析 → OpenMetadata
+// SQL 血缘自动解析 → OpenMetadata
 //
 // Parse Redshift SQL (ETL Redshift SQL jobs / saved Redshift tasks) into TABLE-level
 // lineage and push it to OM (system-of-record), reusing the same Redshift service + FQN

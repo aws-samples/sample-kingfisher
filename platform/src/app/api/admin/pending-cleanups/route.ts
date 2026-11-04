@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// 序 58 B-130 —— GET /api/admin/pending-cleanups:平台自建安全组的后台清理作业清单(全平台所有执行环境)。
+// GET /api/admin/pending-cleanups:平台自建安全组的后台清理作业清单(全平台所有执行环境)。
 //
 // 回什么:kind = sg-cleanup 里**未终态**(还在等网卡释放)与 **failed**(预算耗尽 ⇒ 需人工)的作业;成功的不列(删源响应与审计已记)。
 // 🔴 回的是 DTO(`toPublicJob` 允许列表):lease / runToken / revision / 私有 state 永不出去;evidence 里有 sgId / region / eniCount / outcome。

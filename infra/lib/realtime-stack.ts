@@ -4,10 +4,10 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as dms from "aws-cdk-lib/aws-dms";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
-// @kf-batch 52-P52.5a-supply — 资源 ARN 的 region 段唯一出口 + 显式轴声明。
+// 资源 ARN 的 region 段唯一出口 + 显式轴声明。
 import { regionalStatement } from "./shared/execution-regions";
 
-// 模块 31 (R2) — 实时数据集成基建(DMS CDC 的耐久依赖)。
+// 实时数据集成基建(DMS CDC 的耐久依赖)。
 //
 // ⚠️ 门控栈,但**默认打开**(bin/app.ts 默认 enable-realtime=1):本栈现在只创建**≈零成本的耐久基建**
 // (子网组 + 安全组 + 角色),不再建常驻计费资源,故默认全开也几乎零常驻计费。
@@ -84,7 +84,7 @@ export class RealtimeStack extends cdk.Stack {
     // 读凭证:平台 bgp/* + bgp-* + RDS/Redshift 的 CDK 默认命名 secret(BgpRdsStack*/redshift!*)。
     dmsTargetRole.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "本角色是 home 的 DMS 统一角色(信任主体已含 dms.<home-region>);per-target DMS 随 P50.3 由 exec-env 栈在目标 region 各建一套",
+      reason: "本角色是 home 的 DMS 统一角色(信任主体已含 dms.<home-region>);per-target DMS 由 exec-env 栈在目标 region 各建一套",
       actions: ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
       resources: (r) => [
         `arn:aws:secretsmanager:${r}:${acct}:secret:bgp/*`,

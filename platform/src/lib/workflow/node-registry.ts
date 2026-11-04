@@ -1,4 +1,4 @@
-// 模块 33-B — 节点类型单一事实源(SSOT / change-safety A1)。
+// 节点类型单一事实源(SSOT / change-safety A1)。
 //
 // 为什么存在:节点类型的合法值/校验/补数白名单原散落 5 处(见 DESIGN-B-rich-nodes.md §1.1),
 // 迟早各自漂移。这里把【与 UI 无关】的节点元数据收敛成一张表,供:
@@ -15,7 +15,7 @@
 // 只有共享层(校验/补数)与新引擎读这里。"5 处散落"里的旧引擎翻译处随删旧一并消失(§13)。
 
 import { JOB_NODE_KINDS, type WorkflowNodeType } from "@/types/workflow";
-// @kf-batch 50-WP28-platform-action-node —— 平台动作节点的白名单 + 参数校验(单一作者,纯函数)
+// 平台动作节点的白名单 + 参数校验(单一作者,纯函数)
 import { isDispatchableAction, validateActionParams } from "@/lib/scheduler/action-commands";
 
 export type DagEngine = "legacy" | "runtime-lib";
@@ -31,7 +31,7 @@ export interface NodeTypeDef {
   /** 引擎能力门:该节点最低需要的引擎。老三=legacy(双引擎都支持);六新=runtime-lib。*/
   minEngine: DagEngine;
   /**
-   * @kf-batch 50-WP17-serverless-workflow(SPEC v3.43 §3.15)
+   * (SPEC v3.43 §3.15)
    * MWAA Serverless(dag-factory YAML)能不能把这类节点表达成**它自己的一个 task**:
    *   · `"task"`        = 生成一个 PythonOperator task,语义由 `bgp_runtime.run_node` 承担;
    *   · `"unsupported"` = 服务侧**没有对应物**,发布期如实拒(绝不静默降级成别的语义)。
@@ -45,7 +45,6 @@ export interface NodeTypeDef {
    */
   serverless: "task" | "unsupported";
   /**
-   * @kf-batch 50-WP28-platform-action-node
    * 用户能不能在编排画布上**拖出**这个节点。`false` = 只由平台的调度载体合成(治理定时 / 卡片定时刷新)。
    * 🔴 平台动作节点刻意不进面板:它的参数(哪个动作 / 哪个对象)由载体的建立入口校验并定权限
    *    (治理定时要平台管理员、卡片刷新要卡片作者);让任何编辑者在画布上随手拖一个,
@@ -63,7 +62,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeTypeDef> = {
   // ── 老三节点(legacy + runtime-lib 双引擎共有)──
   sync: {
     type: "sync", labelKey: "数据同步节点", runtimeExecutor: "sync",
-    // @kf-batch 37-wf-sync-backfill —— 序 37:同步任务已能按业务日期补数(lib/backfill/sync-task.ts),工作流里的同步节点
+    // 同步任务已能按业务日期补数(lib/backfill/sync-task.ts),工作流里的同步节点
     //   跟着放开:补数实例 = 用实例日期跑一次 data.syncTaskId 指向的同步任务(与手动运行同一个启动核心)。
     //   「这个任务能不能补」仍只有 syncTaskBackfillRejection 一个作者,执行时判;不能补 ⇒ 实例如实失败并带原因。
     supportsBackfill: true, minEngine: "legacy", serverless: "task", userPlaceable: true,
@@ -127,7 +126,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeTypeDef> = {
       String(d.externalDagId || "").trim() ? null : { key: "跨周期依赖节点「{nm}」未指定外部 DAG" },
   },
 
-  // ── 平台动作节点(WP-28)──
+  // ── 平台动作节点──
   // 🔴 节点只负责「按时、带身份、往主控区命令表投一条命令并等它收口」;业务逻辑**一行都不在 python 侧**
   //    (执行器 `_exec_platform_action` 在 node-exec-py.ts;消费端调产品自己的库函数)。
   // minEngine=runtime-lib:冻结的 legacy 生成器不认识它 ⇒ 能力门当场拒,不会被静默丢掉。
@@ -140,7 +139,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeTypeDef> = {
     },
   },
 
-  // ── 离线作业节点(序 73 模块 57,57 DESIGN §3.1)──
+  // ── 离线作业节点──
   // 引用本项目、且绑定含该工作流落点的一个离线计算作业(Glue / Redshift)或 EMR Serverless 作业;
   // 执行语义 = 作业「立即运行」同一核心(同一个按区 Glue 作业名 / 同一个 EMR application + 执行角色 / 同一组 Redshift 语句、
   // 同一把作业运行锁、同一张 `bgp-task-runs` 回链)。执行体 `_exec_job` 在 node-exec-py.ts,作业族在 job-exec-py.ts(两载体同一份字节)。

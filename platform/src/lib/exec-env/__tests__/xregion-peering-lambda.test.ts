@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-xregion-peering
 // **跨区通路 home 侧接线**(`infra/lambda/xregion-peering`)的门禁。
 //
 // 【为什么这段一定要有真行为测试】它是全仓唯一会**改主控区路由表**的代码:

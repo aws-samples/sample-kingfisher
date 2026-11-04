@@ -13,9 +13,9 @@
             ④ 标题行、链接、图片、表格分隔行不动。
   ledger    generic + 文件头 `> 版本:` 历史搬进 `## 0. 版本记录` + 「条目表」(每行首格 `B-<n>`)改成
             `## 0bis. 条目索引`(短格:编号 | 标题 | 状态 | 发现 | 修复 / 发版 | 详情)+ 每条一个小节
-            (`### B-146 · <标题>`,每个源列一个 `**<列名>**:` 字段,长格按句切成 `- ` 项;必有 `**状态**:` 行,
+            (`### <标题>`,每个源列一个 `**<列名>**:` 字段,长格按句切成 `- ` 项;必有 `**状态**:` 行,
             `.claude/skills/multi-region-gate/ledger_sync.py` 读它)。
-  schedule  同 ledger,条目表 = 表头首格为「序」的表;索引列:序 | 标题 | 状态 | 版本 | 工期 | 详情;小节 `### 序 75 · <标题>`。
+  schedule  同 ledger,条目表 = 表头首格为「序」的表;索引列:序 | 标题 | 状态 | 版本 | 工期 | 详情;小节 `### <标题>`。
 
 用法(Python 3.9+,只用标准库,`python3 -I` 可跑):
   python3 -I scripts/lib/docs_restructure.py restructure docs/BUG-LEDGER.md --kind ledger --out docs/BUG-LEDGER.md
@@ -520,7 +520,7 @@ def build_entries(kind: str, t: Table, level: int, section: str, anchors: dict) 
     for cells in t.rows:
         cells = list(cells)
         if 1 < len(cells) < len(t.headers) and re.sub(r"\*+", "", t.headers[-1]).strip() == "状态":
-            # 🔴 残缺行(台账 B-06 行少了「严重度」格):状态列在表尾时把最后一格对齐到状态列,中间补空
+            # 🔴 残缺行(台账行少了「严重度」格):状态列在表尾时把最后一格对齐到状态列,中间补空
             cells = cells[:-1] + [""] * (len(t.headers) - len(cells)) + cells[-1:]
         cells = cells + [""] * (len(t.headers) - len(cells))
         first = cells[0]

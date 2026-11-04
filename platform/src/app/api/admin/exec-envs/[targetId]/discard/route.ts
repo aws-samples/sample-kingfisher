@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-discard
-// POST /api/admin/exec-envs/[targetId]/discard —— WP-30 路 A「弃置」:从没装出来的执行环境退役(→ deleted),释放该区名额。
+// POST /api/admin/exec-envs/[targetId]/discard ——「弃置」:从没装出来的执行环境退役(→ deleted),释放该区名额。
 // 入参 `{confirm, decisionId}`:`confirm` 必须**逐字等于 targetId**(机制 A 强确认,防手滑);`decisionId` 是审计键。
 // 判定与写入全在 `lib/exec-env/discard.ts`(路由不判「这算 409 还是 403」)。
 import { NextRequest, NextResponse } from "next/server";

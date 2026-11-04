@@ -1,4 +1,4 @@
-// 模块 20 — 指标中台 / Metrics Store 服务 (v1.11.0)
+// 指标中台 / Metrics Store 服务 (v1.11.0)
 //
 // 指标定义 CRUD + 安全聚合 SQL 生成 + 对 Redshift 计算（统一 admin 身份，复用 v1.6.1）
 // 当前值 / 维度分布 / 时间趋势 + 值快照历史。
@@ -6,7 +6,7 @@
 // 安全（防注入）：标识符（schema/表/列）严格白名单校验后双引号包裹；聚合仅用固定关键字；
 // 无自由用户 SQL；只读执行。
 
-// @kf-batch 50-WP2-directquery —— 裸客户端 + 自带轮询已收编进 `lib/redshift/direct-query.ts`
+// 裸客户端 + 自带轮询已收编进 `lib/redshift/direct-query.ts`
 import {
   directQueryRaw,
   resolveDirectQueryPlaceSafe,
@@ -14,12 +14,11 @@ import {
   type DirectQueryScope,
   type DirectQueryUnavailable,
 } from "@/lib/redshift/direct-query";
-// @kf-batch 50-WP4quater-reads(工单 SC-13)
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
 
 const METRIC_PK = "metric";
@@ -50,7 +49,7 @@ export interface Metric {
   lastValue?: number;
   lastComputedAt?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-13)—— **每个执行区一份计算结果**。
+   * **每个执行区一份计算结果**。
    * 计算路径本来就已经按区解析落点(`computeMetric(metricId, scope)`),只有**值的存储**没有区维 ⇒
    * 在 usw2 算一次就把主控区的值覆盖掉,而两个数字看起来都很正常。
    */
@@ -189,7 +188,6 @@ function cellValue(c: any): string | number | null {
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// @kf-batch 50-WP2-directquery
 // 🔴 只留**行形状**:指标这边 `cellValue` 把非数字字符串**原样返回**(质量那边判成 null)——
 //    两种归一口径不同,所以归一必须留在各自领域(见 direct-query.ts 规矩 ①)。
 // 🔴 落点由调用方解析一次后传进来(一次计算要跑 3 条 SQL,解析三次等于三次强一致读)。
@@ -212,7 +210,7 @@ const num = (v: string | number | null): number => (v == null ? 0 : typeof v ===
 // (so the dashboard/list can show the current value without re-running the query).
 async function recordValue(metricId: string, value: number, targetId: string): Promise<string> {
   const ts = new Date().toISOString();
-  // @kf-batch 50-WP4quater-reads(工单 SC-13)—— 🔴 值按区存。
+  // 🔴 值按区存。
   // 快照表的键是 (metricId, ts) ⇒ 两个区在同一毫秒算完的概率可忽略,所以**不改键**,
   // 只在行上加 `targetId` 属性 + 读侧过滤(改键要动 CDK 与全部存量)。
   const tid = targetId;
@@ -264,14 +262,14 @@ export interface ComputeResult {
   metricId: string;
   value: number;
   computedAt: string;
-  /** @kf-batch 50-WP4quater-reads(工单 SC-13)—— 这个值是在哪个区算出来的(WP-31:恒有,来自解析出的落点) */
+  /** 这个值是在哪个区算出来的(恒有,来自解析出的落点) */
   targetId: string;
   dimension?: Array<{ k: string; value: number }>;
   series?: Array<{ d: string; value: number }>;
   snapshots: Array<{ ts: string; value: number }>;
 }
 
-// @kf-batch 50-WP2-directquery —— @kf-batch 50-WP31-place-first-class:`scope.targetId` 必填(不再「缺省 = 主控区」);
+// `scope.targetId` 必填(不再「缺省 = 主控区」);
 // 「该区没装数仓」回能力态,由路由透传、页面整块降级(不是"指标算不出来")。
 export async function computeMetric(
   metricId: string,
@@ -307,7 +305,7 @@ export async function computeMetric(
     series = sRows.map((r) => ({ d: String(r.d), value: num(r.value) })).reverse();
   }
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-13)—— 🔴 值与快照都盖**真跑的那个区**
+  // 🔴 值与快照都盖**真跑的那个区**
   // (`place.targetId` 由 `resolveDirectQueryPlaceSafe` 解出来,不是调用方声称的)。
   const ts = await recordValue(metricId, value, place.targetId);
   const snapshots = await getSnapshots(metricId, 30, place.targetId);
@@ -315,7 +313,7 @@ export async function computeMetric(
 }
 
 // Dashboard batch: current value + snapshot per metric (no dimension/time breakdown).
-// @kf-batch 50-WP2-directquery —— 同 computeMetric:落点解析一次,降级整体回。
+// 同 computeMetric:落点解析一次,降级整体回。
 export async function computeAll(
   scope: DirectQueryScope
 ): Promise<Record<string, { value?: number; computedAt?: string; snapshots?: Array<{ ts: string; value: number }>; error?: string }> | DirectQueryUnavailable> {

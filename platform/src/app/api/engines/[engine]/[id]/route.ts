@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 改绑定的落点只认点名(空列表 ⇒ 400,不再静默改绑主控区)
+// 改绑定的落点只认点名(空列表 ⇒ 400,不再静默改绑主控区)
 import { hasTargetsPatch, requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
@@ -10,17 +10,16 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { isEngineType, getProvider } from "@/lib/engines/registry";
-// @kf-batch 50-P50.3-engines
 import { assertBindableTargetsForEngine, TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
 import { snapshotVersion } from "@/lib/versions/version-service";
-// @kf-batch 50-WP18d-unpublish-seam —— 删引擎作业**也必须先把它的调度产物撤掉**(ETL 侧早就这么做,这条路一直没做)
+// 删引擎作业**也必须先把它的调度产物撤掉**(ETL 侧早就这么做,这条路一直没做)
 import { offlineEmrFanout } from "@/lib/engines/emr/schedule-fanout";
 import { offlineFailures, offlineFailureMessage } from "@/lib/etl/dag-fanout";
 import type { EmrEngineJob } from "@/lib/engines/emr/types";
-// 模块 55 / B-136:「运行」的提交段是长操作(engine-run,租约 engine-job:<jobId>)⇒ 提交进行中改 / 删这条作业 ⇒ 409 LONG_OP_IN_PROGRESS
+// 「运行」的提交段是长操作(engine-run,租约 engine-job:<jobId>)⇒ 提交进行中改 / 删这条作业 ⇒ 409 LONG_OP_IN_PROGRESS
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
 import { resourceKey } from "@/lib/long-ops/kinds";
-// 序 73 模块 57(R7)—— 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
+// 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
 import { workflowsReferencingJob, hasJobReferences, jobInUseResponse } from "@/lib/workflow/job-references";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
 
@@ -53,19 +52,19 @@ export async function PUT(
   if (!current) return apiError("作业不存在", 404, { code: "NOT_FOUND" });
   const guard = await guardResourceAccess(req, current, "editor");
   if (guard instanceof NextResponse) return guard;
-  // B-136:「运行」提交进行中(等 EMR 应用 STARTED)⇒ 改作业 409,不让定义在提交途中被改
+  // 「运行」提交进行中(等 EMR 应用 STARTED)⇒ 改作业 409,不让定义在提交途中被改
   const busy = await resourceBusyResponse([resourceKey("engine-job", params.id)]);
   if (busy) return busy;
 
   const body = await req.json().catch(() => ({}));
-  // @kf-batch 50-P50.3-engines —— 改绑定 = 改"在哪个区跑",必须连校验一起进(与创建同一作者)
+  // 改绑定 = 改"在哪个区跑",必须连校验一起进(与创建同一作者)
   if (hasTargetsPatch(body)) {
     try {
       body.targets = await assertBindableTargetsForEngine(
         params.engine,
         requestedTargets(body, "修改作业绑定"),
         "core",
-        { scope: "per-project", projectId: guard.projectId } // @kf-batch 50-W5-seg1-WP10a 项目白名单(WP-11b:scope 必填)
+        { scope: "per-project", projectId: guard.projectId } // 项目白名单(scope 必填)
       );
       delete body.targetId;
     } catch (e) {
@@ -121,10 +120,10 @@ export async function DELETE(
   if (!Item) return apiError("作业不存在", 404, { code: "NOT_FOUND" });
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
-  // B-136:「运行」提交进行中 ⇒ 删作业 409(删掉会让正在提交的那次运行成为再也定位不到的孤儿)
+  // 「运行」提交进行中 ⇒ 删作业 409(删掉会让正在提交的那次运行成为再也定位不到的孤儿)
   const busy = await resourceBusyResponse([resourceKey("engine-job", params.id)]);
   if (busy) return busy;
-  // 序 73 模块 57(R7):仍被工作流的离线作业节点引用 ⇒ 409 逐条点名工作流,作业行 / application / 调度产物一个都不动(与 B-131 删源同口径)
+  // 仍被工作流的离线作业节点引用 ⇒ 409 逐条点名工作流,作业行 / application / 调度产物一个都不动(与删源同口径)
   //   §3.7 项目内:本项目的工作流逐条点名;其他项目的只给数量(名字不出项目),一样拒
   const jobRefs = await workflowsReferencingJob(params.id, resolveRunStamp(Item as { projectId?: string }).projectId);
   if (hasJobReferences(jobRefs)) return jobInUseResponse(jobRefs);
@@ -132,7 +131,7 @@ export async function DELETE(
   // 🔴🔴 **先撤调度产物,再删行**(2026-09-16:这条路一直缺 —— ETL 侧 `DELETE /api/etl-jobs/[id]`
   //   早就这么做了,引擎作业这条**从来没做**)。少了它的下场:一个开着定时的 EMR 作业被删掉之后,
   //   `<base>__<target>` 的 DAG / serverless workflow **继续按 cron 触发**,而它的落点章与 workflowArn
-  //   随 DDB 行一起消失 ⇒ 平台再也定位不到它(T-14 的孤儿,非 home 的那份还长在别的区)。
+  //   随 DDB 行一起消失 ⇒ 平台再也定位不到它(孤儿,非 home 的那份还长在别的区)。
   //   「有没有产物」的判据与 ETL 侧同款:调度开着 / 有 dagId / 台账非空,任一为真都要走下线。
   const ej = Item as unknown as EmrEngineJob & { scheduleEnabled?: boolean; airflowDagId?: string; deployments?: Record<string, unknown> };
   const everPublished = Boolean(ej.scheduleEnabled) || Boolean(ej.airflowDagId)

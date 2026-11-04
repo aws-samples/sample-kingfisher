@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP11a
 // `unlandFromTarget`(解绑并清理的 DROP 一步)—— 真调实现,打桩只到 AWS SDK 边界(与 landing.test.ts 同一条纪律)。
 //   ① 表不存在 ⇒ **一条语句都不执行**(零副作用);
 //   ② 存在 ⇒ 恰好一条 `DROP TABLE IF EXISTS <schema>.<table>`,前后各观测一次;
@@ -68,7 +67,7 @@ vi.mock("@/lib/exec-env/data-plane-target", async (importOriginal) => {
 });
 
 import { unlandFromTarget as unlandFromTargetRaw } from "@/lib/modeling/landing";
-// 模块 55 / 序 50:landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
+// landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
 //   判据直接调库函数,所以在 op 帧里调(与真路由同一条路;「无上下文即抛」本身由 lib/long-ops/__tests__/context-await.test 钉)。
 import { runInLongOp } from "@/lib/long-ops/context";
 const inOp = <T,>(fn: () => Promise<T>): Promise<T> => runInLongOp({ taskId: "test", opKind: "modeling-land" }, fn);

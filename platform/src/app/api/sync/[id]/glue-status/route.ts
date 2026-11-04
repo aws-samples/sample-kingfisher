@@ -6,9 +6,9 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { fireDownstreamOnce } from "@/lib/scheduler/dependency";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { updateRunRecord, resolveRunStamp } from "@/lib/monitor/run-records";
-// @kf-batch 50-WP7-sync-pushdown —— 状态查询按任务章取区(home 客户端查非 home 的 JobRun 必然
+// 状态查询按任务章取区(home 客户端查非 home 的 JobRun 必然
 // 查不到,而本路由还会**写状态** ⇒ 用错区的「查不到」改状态就是写坏数据;区解析失败即抛,不回落)。
 import { bindingTargets, regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import { glueClientFor } from "@/lib/exec-env/target-clients";
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       const newStatus = state === "SUCCEEDED" ? "succeeded" : "error";
 
       // Update task status
-      // @kf-batch 50-B08-sync-task-write-guard —— 唯一写通道
+      // 唯一写通道
       await updateSyncTaskIfExists({
         taskId: params.id,
         UpdateExpression: "SET #s = :s, updatedAt = :now",
@@ -57,14 +57,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
         }));
         if (Items[0] && Items[0].status === "running") {
           latestRunId = Items[0].runId;
-          // @kf-batch 52-P52.2-W2a-run-stamp
           await updateRunRecord({
             taskId: params.id, runId: Items[0].runId,
             set: {
               status: state === "SUCCEEDED" ? "succeeded" : "failed",
               finishedAt: now, duration: run.ExecutionTime || 0, error: run.ErrorMessage || null,
             },
-            // @kf-batch 50-WP7-sync-pushdown —— 章按真落点显式盖(同步任务区维在 targets[],裸调必盖 home)
+            // 章按真落点显式盖(同步任务区维在 targets[],裸调必盖 home)
             stamp: resolveRunStamp(task, tid),
           });
         }

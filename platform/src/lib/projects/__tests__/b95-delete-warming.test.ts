@@ -1,9 +1,9 @@
-// 序 49 ③ B-95 → 序 50 第二批 —— 删项目空间的数据面盘点撞数仓冷启动(纯逻辑判据 + 调用点判据)。
+// → —— 删项目空间的数据面盘点撞数仓冷启动(纯逻辑判据 + 调用点判据)。
 //
 // 【缺陷原形(…4216 production 全新账号,2026-10-18)】盘点 `proj_<id>` 表数预算 20×500ms = 10s;Redshift Serverless 闲置后
 //   恢复常超 10s ⇒ 盘点记成「无法核实」⇒ fail-closed 400「…数仓不可达或无凭证…请稍后重试」;约 1 分钟后原样再发 200。
-// 【序 49 的修法】第三态 pending + 路由 202 `{ status:"warming", retryAfterMs }` + 页面自动重发 —— 一套删项目专用的 202 协议。
-// 【序 50 第二批】那套协议退役(B-111 同病同治,55 DESIGN §2.6a):删项目改成长操作 project-delete,盘点语句在执行体里经**唯一原语**
+// 【修法】第三态 pending + 路由 202 `{ status:"warming", retryAfterMs }` + 页面自动重发 —— 一套删项目专用的 202 协议。
+// 那套协议退役(同病同治,55 DESIGN §2.6a):删项目改成长操作 project-delete,盘点语句在执行体里经**唯一原语**
 //   awaitTerminal 等到终态(最多 150 轮,500ms 起 ×1.5 顶 2s ≈ 296s,< 300s 天花板),数仓冷恢复超 45s 时整条删除由 submitLongOp 转 202
 //   `protocol:"long-op/1"`,页面右下「正在后台执行:删除项目空间」;SchemaCheck 回到两态 ok / unavailable(fail-closed 不变)。
 // 真环境那一半(页面一次点击最终删掉)由页面驱动段盯;这里钉等待逻辑、阻断算法与调用点。
@@ -56,8 +56,8 @@ function virtualClock() {
 /** 与执行体 project-delete 同一种等待上下文(判据直接调盘点函数时用它包一层)。 */
 const inOp = <T,>(fn: () => Promise<T>) => runInLongOp({ taskId: "t-b95-judge", opKind: "project-delete" }, fn);
 
-describe("🔴 B-95 awaitSchemaCountStatement:两态 + 预算 + 退避(经唯一原语 awaitTerminal)", () => {
-  it("🔴 模块 55 闸门 ②:请求路径裸调(无长操作上下文)⇒ 抛 LongOpContextMissing,DescribeStatement 一次都不发", async () => {
+describe("🔴 awaitSchemaCountStatement:两态 + 预算 + 退避(经唯一原语 awaitTerminal)", () => {
+  it("🔴 闸门 ②:请求路径裸调(无长操作上下文)⇒ 抛 LongOpContextMissing,DescribeStatement 一次都不发", async () => {
     const rs = fakeRs(["STARTED", "FINISHED"], "7");
     await expect(awaitSchemaCountStatement(rs, CMDS, "st-0", { ...virtualClock() })).rejects.toBeInstanceOf(LongOpContextMissing);
     expect(rs.seen).toEqual([]);
@@ -110,7 +110,7 @@ describe("🔴 B-95 awaitSchemaCountStatement:两态 + 预算 + 退避(经唯一
   });
 });
 
-describe("🔴 B-95 buildBlockers:两态 —— ok 不阻断,unavailable 仍阻断(fail-closed)", () => {
+describe("🔴 buildBlockers:两态 —— ok 不阻断,unavailable 仍阻断(fail-closed)", () => {
   const base = { counted: [], otherMembers: 0, schemaName: "proj_abc" };
   it("ok 且 0 张表 ⇒ 零阻断", () => {
     expect(buildBlockers({ ...base, schema: { tables: 0, check: "ok" } })).toEqual([]);
@@ -127,7 +127,7 @@ describe("🔴 B-95 buildBlockers:两态 —— ok 不阻断,unavailable 仍阻�
   });
 });
 
-describe("🔴 B-95 调用点判据:路由只 submitLongOp · 执行体顺序 · 页面不再有专用 202 分支 · 文案词典", () => {
+describe("🔴 调用点判据:路由只 submitLongOp · 执行体顺序 · 页面不再有专用 202 分支 · 文案词典", () => {
   const read = (rel: string) => fs.readFileSync(path.join(process.cwd(), "src", rel), "utf8");
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 

@@ -67,13 +67,13 @@
     },
     {
       "id": "codegen:platform/src/lib/cookbook/seed/warehouse-facts.ts",
-      "what": "配方种子(数据):Glue/EMR 连本区数仓的唯一教法 + warn 级判据(B-27)",
+      "what": "配方种子(数据):Glue/EMR 连本区数仓的唯一教法 + warn 级判据",
       "executor": "—",
       "reason": "not-executed-code"
     },
     {
       "id": "codegen:platform/src/lib/cookbook/seed/s3tables-overwrite-facts.ts",
-      "what": "配方种子(数据):S3 Tables 结果表原子覆盖的唯一教法 + 「先 drop 再建」warn 级判据(序 37 配方根治)",
+      "what": "配方种子(数据):S3 Tables 结果表原子覆盖的唯一教法 + 「先 drop 再建」warn 级判据(配方根治)",
       "executor": "—",
       "reason": "not-executed-code"
     },
@@ -132,7 +132,7 @@
     },
     {
       "id": "codegen:platform/src/lib/scheduler/action-commands.ts",
-      "what": "「按时跑一次平台动作」的合同:可下发动作白名单 + 命令行属性名 + 纯解析器(WP-28)",
+      "what": "「按时跑一次平台动作」的合同:可下发动作白名单 + 命令行属性名 + 纯解析器",
       "executor": "—",
       "reason": "not-executed-code",
       "note": "它不产出任何在别处执行的代码 —— 被发现纯粹因为**注释里**提到 boto3(在解释「为什么传输走 DDB 而不是 SQS」)。规则刻意写宽,所以这里按设计**显式登记排除**,而不是去改窄规则。离线判据:platform/src/lib/scheduler/__tests__/action-commands.test.ts(6 条 / 4 变异全红)"
@@ -145,7 +145,7 @@
     },
     {
       "id": "codegen:platform/src/lib/datasource/glue-reach.ts",
-      "what": "数据源表发现脚本(序 38 B-70:经数据源自己的 Glue 连接读 information_schema,结果 JSON 落脚本桶)",
+      "what": "数据源表发现脚本(经数据源自己的 Glue 连接读 information_schema,结果 JSON 落脚本桶)",
       "executor": "AWS Glue 5.1 PySpark + boto3",
       "harness": {
         "kind": "offline-real-run",
@@ -153,7 +153,7 @@
         "marker": "§discovery",
         "cases": 6
       },
-      "note": "序 38(2026-10-13):平台生成的脚本原样 exec,假 awsglue / pyspark / boto3;断结果 JSON(表 / 列序 / 可空 / 缺省 schema 去前缀)、库名护栏真拒、JDBC 失败不写结果 —— discovery-script-behavior.test.ts"
+      "note": "平台生成的脚本原样 exec,假 awsglue / pyspark / boto3;断结果 JSON(表 / 列序 / 可空 / 缺省 schema 去前缀)、库名护栏真拒、JDBC 失败不写结果 —— discovery-script-behavior.test.ts"
     },
     {
       "id": "codegen:platform/src/lib/sync/glue-script-generator.ts",
@@ -175,7 +175,7 @@
     },
     {
       "id": "codegen:platform/src/lib/workflow/job-exec-py.ts",
-      "what": "作业族执行体(台账 / 作业锁 / 软限 / 落点 / 三引擎)的 Python 单一作者:单作业 run_job 与工作流离线作业节点 _exec_job 共用,两载体拼同一份字节(序 73 模块 57)",
+      "what": "作业族执行体(台账 / 作业锁 / 软限 / 落点 / 三引擎)的 Python 单一作者:单作业 run_job 与工作流离线作业节点 _exec_job 共用,两载体拼同一份字节",
       "executor": "Airflow / MWAA(Serverless 与经典)",
       "harness": {
         "kind": "offline-real-run",
@@ -198,7 +198,7 @@
     },
     {
       "id": "lambda:action-dispatcher",
-      "what": "WP-28 平台动作命令分发:DDB Streams(INSERT + pending)→ 平台内部端点 /api/internal/actions/run;交不出去就把命令判 failed",
+      "what": "平台动作命令分发:DDB Streams(INSERT + pending)→ 平台内部端点 /api/internal/actions/run;交不出去就把命令判 failed",
       "executor": "Lambda(DynamoDB Streams 事件源)",
       "harness": {
         "kind": "offline-real-run",
@@ -226,7 +226,7 @@
       "harness": {
         "kind": "offline-real-run",
         "where": "infra/scripts/exec-env-synth-gate.mjs",
-        "marker": "E-49",
+        "marker": "broker 入参用例",
         "cases": 46
       }
     },
@@ -344,11 +344,11 @@
       "what": "把**所有** drift 非 `ok` 的已发布载体重新发布,让它与当前定义一致(幂等,可反复跑);判据夹具留下副作用时的收口工具",
       "executor": "本机 python3 + playwright(走产品自己的 publish 通道)",
       "reason": "is-the-gate-itself",
-      "note": "🔴 它是「判据不许留下副作用」这条纪律的收口工具:B-09 的 `2d` 夹具被 timeout 杀在还原之前,示范对象被留成 stale ⇒ 这个脚本把它收回来。闭合式(不列名单,收所有 drift 非 ok 的)。2026-09-22 真跑过两次:第一次收两个示范对象、第二次收一个残留工作流,都逐层复读确认回到 ok。"
+      "note": "🔴 它是「判据不许留下副作用」这条纪律的收口工具:该缺陷的 `2d` 夹具被 timeout 杀在还原之前,示范对象被留成 stale ⇒ 这个脚本把它收回来。闭合式(不列名单,收所有 drift 非 ok 的)。2026-09-22 真跑过两次:第一次收两个示范对象、第二次收一个残留工作流,都逐层复读确认回到 ok。"
     },
     {
-      "id": "script:38-b09-drift-discrim.py",
-      "what": "B-09 载体落后检测的**判别力**验证:改一个验收残留的 cron 而不重发 ⇒ 必须判 stale;含负向控制组(同一次读里别的已发布行仍全 ok)与收口(还原后回 ok)",
+      "id": "script:38-drift-discrim.py",
+      "what": "载体落后检测的**判别力**验证:改一个验收残留的 cron 而不重发 ⇒ 必须判 stale;含负向控制组(同一次读里别的已发布行仍全 ok)与收口(还原后回 ok)",
       "executor": "本机 python3 + playwright + DDB(只动验收残留,绝不碰 Showcase-*)",
       "reason": "is-the-gate-itself",
       "note": "🔴 每次动 `buildCarrierArtifact` / 归一清单都要重跑它 —— 它回答的是「这条机制到底分不分得清 ok 与 stale」。2026-09-22 真跑 5/5 全绿(①改之前是 ok 排除恒 stale · ②接口真读到改后的 cron · ③落后判 stale · ④负向控制排除「一改就全红」· ⑤还原后回 ok)。"
@@ -482,7 +482,7 @@
     },
     {
       "id": "script:redeploy-agents.sh",
-      "what": "升级 / 刷新三个 AgentCore 智能体镜像与栈的唯一入口(B-76):--check 只读三态(一致 / 需要刷新 / 读不到)· 重编 core-dist · 构建推送 arm64 镜像 · 逐栈部署 · 回读核对",
+      "what": "升级 / 刷新三个 AgentCore 智能体镜像与栈的唯一入口:--check 只读三态(一致 / 需要刷新 / 读不到)· 重编 core-dist · 构建推送 arm64 镜像 · 逐栈部署 · 回读核对",
       "executor": "本机 bash → docker buildx + cdk + AWS(与 deploy-all 第 4 / 5 步共用 scripts/lib/agentcore-agents.sh 一份映射表与函数)",
       "harness": {
         "kind": "offline-real-run",
@@ -490,7 +490,7 @@
         "marker": "✅ redeploy-agents 离线判据全过",
         "cases": 27
       },
-      "note": "2026-10-14 立(序 39):替身用假 aws / docker / npx 真跑脚本本体 —— 参数校验(旗标当 profile / 漏参)、凭证核验(坏凭证不许误诊成「栈没建」)、部署模式护栏(SSM 与显式值不同即拒)、--check 三态(一致 / 需要刷新 / 读不到,三态分开说)、本机没有该提交按需要刷新、--only 过滤;由 platform/src/lib/exec-env/__tests__/redeploy-agents-harness.test.ts 在 vitest 里真跑。🔴 诚实边界:构建推送镜像 / cdk 部署 / 回读核对那一段只有真环境能跑(第三十七轮重建链真跑一次,结论回写台账 B-76)。"
+      "note": "2026-10-14 立:替身用假 aws / docker / npx 真跑脚本本体 —— 参数校验(旗标当 profile / 漏参)、凭证核验(坏凭证不许误诊成「栈没建」)、部署模式护栏(SSM 与显式值不同即拒)、--check 三态(一致 / 需要刷新 / 读不到,三态分开说)、本机没有该提交按需要刷新、--only 过滤;由 platform/src/lib/exec-env/__tests__/redeploy-agents-harness.test.ts 在 vitest 里真跑。🔴 诚实边界:构建推送镜像 / cdk 部署 / 回读核对那一段只有真环境能跑(结论回写台账)。"
     },
     {
       "id": "script:redline-scan.sh",
@@ -536,7 +536,7 @@
         "marker": "scanForPermissions",
         "cases": 10
       },
-      "note": "2026-09-22 B-21 根治的一部分。夹具是**用户那次真实作业的脚本**;含一条「认不出来的 AWS 调用必须进 unknown、不许静默丢掉」的判据。变异 5/5 抓到。"
+      "note": "2026-09-22 根治的一部分。夹具是**用户那次真实作业的脚本**;含一条「认不出来的 AWS 调用必须进 unknown、不许静默丢掉」的判据。变异 5/5 抓到。"
     },
     {
       "id": "codegen:platform/src/lib/role-advisor/advise.ts",
@@ -549,7 +549,7 @@
         "cases": 4,
         "note": "🔴 marker 刻意取**断言本身**而不是断言消息:第一版写 `await adviseRole`,它命中的是消息字符串 `\"provisionRole 必须 await adviseRole(...)\"` ⇒ 把断言改坏、只留消息,指针照样绿(台账在说谎)。"
       },
-      "note": "接线判据钉「provisionRole 必须 await adviseRole、不许绕回纯规则那层」(剥 import 后查调用位置)。2026-09-22 B-21。"
+      "note": "接线判据钉「provisionRole 必须 await adviseRole、不许绕回纯规则那层」(剥 import 后查调用位置)。2026-09-22。"
     },
     {
       "id": "codegen:platform/src/lib/engines/emr/spec.ts",
@@ -561,7 +561,7 @@
         "marker": "regionEnvParameters(\"us-west-2\")",
         "cases": 5
       },
-      "note": "2026-09-22 被发现规则抓进来:本文件的注释里出现了 `boto3.client('redshift-data')`(在解释 NoRegionError 的成因)—— 发现规则按 `boto3` 特征词扫,刻意宽。🔴 它确实是**运行期**装配代码,且判据钉住「driver 与 executor 都注入」「两条提交路径同一个作者」「区域四键是保留键(覆盖=驻留问题)」。B-21 第八层。"
+      "note": "2026-09-22 被发现规则抓进来:本文件的注释里出现了 `boto3.client('redshift-data')`(在解释 NoRegionError 的成因)—— 发现规则按 `boto3` 特征词扫,刻意宽。🔴 它确实是**运行期**装配代码,且判据钉住「driver 与 executor 都注入」「两条提交路径同一个作者」「区域四键是保留键(覆盖=驻留问题)」。第八层。"
     },
     {
       "id": "script:om-secure-admin.sh",
@@ -572,7 +572,7 @@
     },
     {
       "id": "script:resolve-home-model.sh",
-      "what": "按主控区账号真值为候选链(ai-model.json candidateModelIds:Claude Opus → GLM 5.3 → Kimi K3)逐个选默认大模型:列推理配置 → 用 modelArn 真值反推基础模型 → 本区地理配置 / global. / 基础 id 逐个真 converse 一次,第一个成功的注入 BEDROCK_MODEL_ID;全链失败非零退出并逐条说明(模块 51 v2.0 D14)",
+      "what": "按主控区账号真值为候选链(ai-model.json candidateModelIds:Claude Opus → GLM 5.3 → Kimi K3)逐个选默认大模型:列推理配置 → 用 modelArn 真值反推基础模型 → 本区地理配置 / global. / 基础 id 逐个真 converse 一次,第一个成功的注入 BEDROCK_MODEL_ID;全链失败非零退出并逐条说明",
       "executor": "deploy-all 2) / redeploy-platform 开头(bash + 内嵌 python)",
       "harness": {
         "kind": "offline-real-run",
@@ -580,7 +580,7 @@
         "marker": "✅ 主控区模型解析判据全过",
         "cases": 24
       },
-      "note": "生产上线批次 A · h(2026-10-09):出厂默认 us.* 在非美国主控区调不通;假 aws 真跑五态 + 两个部署脚本接线 · 序 40(2026-10-14):候选链 + 真值反推(不写厂商正则),替身 24 例,由 platform/src/lib/ai/__tests__/resolve-home-model-harness.test.ts 在 vitest 里真跑"
+      "note": "生产上线批次 A · h(2026-10-09):出厂默认 us.* 在非美国主控区调不通;假 aws 真跑五态 + 两个部署脚本接线:候选链 + 真值反推(不写厂商正则),替身 24 例,由 platform/src/lib/ai/__tests__/resolve-home-model-harness.test.ts 在 vitest 里真跑"
     },
     {
       "id": "script:lib/docs_restructure.py",
@@ -599,7 +599,7 @@
         "marker": "放行清单唯一作者",
         "cases": 42
       },
-      "note": "2026-11-04 发现规则扩到 scripts/lib 后登记(序 48 立 lib 时替身就在:假 aws 驱动每个分支,42 条判据 0 失败,`bash infra/test/execution-regions/test_lib.sh` 退 0 = 全过)。诚实边界:该 harness 目前不由 vitest 调用,靠开发机 / 硬门手工跑"
+      "note": "2026-11-04 发现规则扩到 scripts/lib 后登记(立 lib 时替身就在:假 aws 驱动每个分支,42 条判据 0 失败,`bash infra/test/execution-regions/test_lib.sh` 退 0 = 全过)。诚实边界:该 harness 目前不由 vitest 调用,靠开发机 / 硬门手工跑"
     },
     {
       "id": "script:lib/agentcore-agents.sh",
@@ -615,9 +615,9 @@
     },
     {
       "id": "script:lib/s3tables-catalog.sh",
-      "what": "S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(B-91;deploy-all 第 6.3 步 / redeploy-platform 第 3c 步开通 Glue / Athena 联邦目录)",
+      "what": "S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(deploy-all 第 6.3 步 / redeploy-platform 第 3c 步开通 Glue / Athena 联邦目录)",
       "executor": "本机 bash(被 deploy-all.sh / redeploy-platform.sh source)→ AWS Glue",
-      "note": "2026-11-04 发现规则扩到 scripts/lib 后才进台账(此前根本不在清单上)。每次空账号从零重建都执行它:deploy-all 第 6.3 步经 run_step 调 `ensure_s3tables_catalog`(失败记账、收尾以非零码退出,响亮不静默;B-91 正是 …7698 全新账号首装暴露的),升级链 redeploy-platform 第 3c 步在 `set -euo pipefail` 下裸调(失败立即中止)。platform/src/lib/aws/__tests__/s3tables-catalog.test.ts 只钉「安装脚本与运行时入参逐字段相同」(文本判据,不执行脚本)⇒ 不算替身;想翻成 harness 要照 execution-regions/test_lib.sh 的手法用假 aws 离线真跑每个分支",
+      "note": "2026-11-04 发现规则扩到 scripts/lib 后才进台账(此前根本不在清单上)。每次空账号从零重建都执行它:deploy-all 第 6.3 步经 run_step 调 `ensure_s3tables_catalog`(失败记账、收尾以非零码退出,响亮不静默;正是 …7698 全新账号首装暴露的),升级链 redeploy-platform 第 3c 步在 `set -euo pipefail` 下裸调(失败立即中止)。platform/src/lib/aws/__tests__/s3tables-catalog.test.ts 只钉「安装脚本与运行时入参逐字段相同」(文本判据,不执行脚本)⇒ 不算替身;想翻成 harness 要照 execution-regions/test_lib.sh 的手法用假 aws 离线真跑每个分支",
       "reason": "covered-by-fresh-account-rebuild"
     }
   ]

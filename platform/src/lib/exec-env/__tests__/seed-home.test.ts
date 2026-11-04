@@ -1,7 +1,6 @@
-// @kf-batch 50-P50.2e2-seed-home
 // home seed 组装的单测(SPEC §1.1 实时查询分支)。
 //
-// 🔴 涉网依赖一律【顶层 import + 顶层 vi.mock】(事故 E1 的回归要求 E-64:
+// 🔴 涉网依赖一律【顶层 import + 顶层 vi.mock】(事故 E1 的回归要求
 //    动态 import × vi.mock 包名会 mock 不接管、拿本机凭证真打 AWS)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -31,7 +30,7 @@ vi.mock("@aws-sdk/client-iam", () => ({
   IAMClient: class { send = iamSend; },
   GetRoleCommand: class { constructor(public input: unknown) {} },
 }));
-// @kf-batch 50-WP15-airflow-serverless:S3 也必须顶层 mock(HeadBucket 探 workflowBucket;漏 mock = 拿本机凭证真打 AWS,E-64)
+// S3 也必须顶层 mock(HeadBucket 探 workflowBucket;漏 mock = 拿本机凭证真打 AWS)
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class { send = s3Send; },
   HeadBucketCommand: class { constructor(public input: unknown) {} },
@@ -61,7 +60,7 @@ const FACTS: HomeFacts = {
   dmsPresent: true,
   flinkPresent: true,
   flinkRoleArn: "arn:aws:iam::123456789012:role/bgp-flink-role",
-  // @kf-batch 50-WP20-retire-classic-mwaa —— 默认 false = 用户 2026-09-14 拍板后的现实(经典 MWAA 不再部署)
+  // 默认 false = 用户 2026-09-14 拍板后的现实(经典 MWAA 不再部署)
   mwaaPresent: false,
 };
 
@@ -89,7 +88,7 @@ describe("buildHomeDescriptor(纯函数)", () => {
     expect(r.datalakeBucket).toBe("bgp-datalake-123456789012");
     expect(r.redshiftWorkgroup).toBe("bgp-workgroup");
     expect(r.athenaWorkgroup).toBe("bgp-athena");
-    // @kf-batch 50-WP20-retire-classic-mwaa —— 名字仍要出自 SSOT,但只在**真有那个环境**时才写进袋子
+    // 名字仍要出自 SSOT,但只在**真有那个环境**时才写进袋子
     expect(r.mwaaEnvName, "经典 MWAA 不在时不许声称环境名(声称 = 描述符撒谎)").toBeUndefined();
     const withMwaa = buildHomeDescriptor({ ...FACTS, mwaaPresent: true }, "admin", "2026-09-01T00:00:00.000Z");
     expect((withMwaa.resources as Record<string, unknown>).mwaaEnvName).toBe("bgp-mwaa");
@@ -168,7 +167,7 @@ describe("fetchHomeFacts(fail-closed:core 真值缺任一即抛)", () => {
     expect(f.airflowServerless).toBeUndefined();
   });
 
-  // @kf-batch 50-WP15-airflow-serverless —— 真环境撞过:TaskRole 缺 GetRole ⇒ AccessDenied 被吞成「未部署」,seed-home 200 却不声称
+  // 真环境撞过:TaskRole 缺 GetRole ⇒ AccessDenied 被吞成「未部署」,seed-home 200 却不声称
   it("🔴 门控组件探测 **AccessDenied** ⇒ 抛(权限错不是「未部署」;不许静默不声称)", async () => {
     iamSend.mockRejectedValue(Object.assign(new Error("User is not authorized to perform: iam:GetRole"), { name: "AccessDenied", $metadata: { httpStatusCode: 403 } }));
     await expect(fetchHomeFacts()).rejects.toThrow(/探测出错.*AccessDenied.*TaskRole/);
@@ -192,7 +191,7 @@ describe("fetchHomeFacts(fail-closed:core 真值缺任一即抛)", () => {
   });
 });
 
-describe("🔴 agentcore 门控(P50.2e3:runtime/memory/gateway 全健康才声称)", () => {
+describe("🔴 agentcore 门控(runtime/memory/gateway 全健康才声称)", () => {
   const RT_ARN = "arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/bgp_genbi_agent-AbCd1234";
   beforeEach(() => {
     vi.clearAllMocks();
@@ -261,7 +260,6 @@ describe("🔴 agentcore 门控(P50.2e3:runtime/memory/gateway 全健康才声�
   });
 });
 
-// @kf-batch 50-WP20-retire-classic-mwaa
 describe("🔴🔴 经典 MWAA 下线:home 也不再部署它(用户 2026-09-14 拍板)", () => {
   it("`mwaa` 必须是**按事实门控**的,不许写死在组件字面量里", () => {
     const off = buildHomeDescriptor(FACTS, "a", "2026-09-01T00:00:00.000Z");

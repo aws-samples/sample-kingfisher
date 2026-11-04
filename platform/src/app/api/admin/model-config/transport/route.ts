@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — GPT 传输门控端点(P51.2 代码侧;51 SPEC §2 `PUT /transport` + §3.4 补强①–④)。
+// GPT 传输门控端点(代码侧;51 SPEC §2 `PUT /transport` + §3.4 补强①–④)。
 //
 //   GET  → 现状:DDB 项 + 真实现判定(readTransportGate)+ 硬闸当前值(gptTransportReady,本波恒 false)
 //   PUT  { gptReady, branch } →

@@ -1,4 +1,4 @@
-// 模块 37 — 报表 widget CRUD(bgp-bi-reports)。键式隔离:pk=projectId, sk=reportId(ULID)。
+// 报表 widget CRUD(bgp-bi-reports)。键式隔离:pk=projectId, sk=reportId(ULID)。
 // Query(pk=projectId) 天然 per-project 列表;更新走 version 乐观锁(照抄告警规则,并发一成功一 409)。
 
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";

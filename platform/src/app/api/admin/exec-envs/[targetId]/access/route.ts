@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg1-WP10a
 // POST /api/admin/exec-envs/[targetId]/access —— 设置执行目标的**项目白名单**(50 SPEC v3.22 §1.1 `access?` / §2.1;§3.12 RBAC×target)。
 //
 // 【通用,不对跨法域特殊化】任何 target(含 home)都可设;缺省 all-projects。判据单作者 `accessAllows`(lib/exec-env/residency.ts),

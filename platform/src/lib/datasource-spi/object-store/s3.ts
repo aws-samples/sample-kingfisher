@@ -1,4 +1,4 @@
-// 模块 42 — S3 provider(对象存储范式 object-store,P42.4)。
+// S3 provider(对象存储范式 object-store)。
 //
 // 【为什么】数据源 SPI 的第一个对象存储范式 provider。S3 无库无表无端口:一个 bucket + prefix 下是
 // 一堆文件(CSV/Parquet/JSON)。introspect 靠 ListObjectsV2 按【一级子前缀】分组成「逻辑数据集」
@@ -14,7 +14,7 @@
 //   Glue crawler」阶段才权威确定,introspect 阶段对它们只识别 format、列留空(kind:"prefix" + meta.format)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   S3Client,
@@ -33,7 +33,7 @@ import type {
   DataSourceCapabilities,
 } from "../types";
 
-// L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+// L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
 const REGION = homeRegion();
 
 // introspect 列 prefix 下对象的上限(只为分组出「逻辑数据集」+ 找采样文件,不需要拉全量)。

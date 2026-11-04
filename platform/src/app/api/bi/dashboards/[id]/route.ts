@@ -1,4 +1,4 @@
-// 模块 37 — 仪表盘单资源路由:GET / PUT(乐观锁)/ DELETE。
+// 仪表盘单资源路由:GET / PUT(乐观锁)/ DELETE。
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 序 39 B-76(2026-10-14)—— scripts/redeploy-agents.sh 的离线替身(假 aws / docker / npx,零凭证、零真调用、零构建)。
+# scripts/redeploy-agents.sh 的离线替身(假 aws / docker / npx,零凭证、零真调用、零构建)。
 #   真的执行脚本本体,覆盖**升级前客户要跑的那条路**:参数校验 + 凭证核验 + 部署模式护栏 + `--check` 三态
 #   (一致 / 需要刷新 / 读不到 —— 三态必须分开说,「读不到」≠「一致」)+ `--only` 过滤。
-#   🔴 边界(诚实):构建推送镜像 / cdk 部署 / 回读核对那一段仍只有真环境能跑(第三十七轮链真跑一次,结论回写台账 B-76)。
+#   🔴 边界(诚实):构建推送镜像 / cdk 部署 / 回读核对那一段仍只有真环境能跑(结论回写台账)。
 #   由 platform/src/lib/exec-env/__tests__/redeploy-agents-harness.test.ts 在 vitest 里真跑(「写了」≠「接上了」)。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -64,7 +64,7 @@ rc=$(FAKE_TAG="$HEAD_TAG" run "$WORK/c5" p us-east-1 --check); expect_rc "C5 tag
 echo "C6 本机没有该提交"
 rc=$(FAKE_TAG=deadbee run "$WORK/c6" p us-east-1 --check);   expect_rc "C6 未知 tag ⇒ exit 0" "$rc" 0; expect_has "C6 说「本机没有提交」" "$WORK/c6" "本机没有提交 deadbee"; expect_has "C6 按需要刷新处理" "$WORK/c6" "3 个智能体需要刷新"
 echo "C7 旧提交 vs HEAD 的差异计数"
-# 🔴 源码路径清单只认 scripts/lib/agentcore-agents.sh 一份(单一作者):这里原来手抄了一份,序 40 给清单加了 platform/src/lib/ai/core
+# 🔴 源码路径清单只认 scripts/lib/agentcore-agents.sh 一份(单一作者):这里原来手抄了一份,给清单加了 platform/src/lib/ai/core
 #   之后两边就漂了(脚本数 26、替身数 22 ⇒ 假红)。该文件「只定义,不执行」,先给它要的三个变量 / 三个函数占位再 source。
 PROFILE=p; REGION=us-east-1; ROOT="$ROOT"; info() { :; }; die() { echo "$*" >&2; exit 1; }; out() { echo None; }
 # shellcheck source=/dev/null

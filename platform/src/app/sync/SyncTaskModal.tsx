@@ -2,25 +2,25 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { Modal, Form, Input, Select, Steps, InputNumber, Space, Button, Table, Switch, Checkbox, Tag, Divider, Radio, Alert, message } from "antd";
-import TableBucketPicker from "@/components/lake/TableBucketPicker"; // 序 45 B-93:S3 Tables 表桶下拉(唯一作者)
+import TableBucketPicker from "@/components/lake/TableBucketPicker"; // S3 Tables 表桶下拉(唯一作者)
 import { MinusCircleOutlined, PlusOutlined, SwapOutlined, CheckCircleOutlined, WarningOutlined, ThunderboltOutlined, InfoCircleOutlined } from "@ant-design/icons";
 import type { SyncTask } from "@/types/sync-task";
 import type { DataSource } from "@/types/datasource";
 import { DS_TYPE_OPTIONS } from "@/types/datasource";
 import { resolveTargetTableName } from "@/lib/sync/target-naming";
-// @kf-batch 37-sync-capability —— 新字段合法形态的唯一作者 = lib/sync/run-vars.ts;提交整形的唯一作者 = ./sync-task-payload.ts
+// 新字段合法形态的唯一作者 = lib/sync/run-vars.ts;提交整形的唯一作者 = ./sync-task-payload.ts
 import { validateSyncCapabilityFields } from "@/lib/sync/run-vars";
-// 序 38 B-69 —— Glue 版本清单与「写 S3 Tables 的最低版本」的唯一作者(后端新建 / 保存 / 启动三处同一份)
+// Glue 版本清单与「写 S3 Tables 的最低版本」的唯一作者(后端新建 / 保存 / 启动三处同一份)
 import { GLUE_VERSIONS, GLUE_VERSION_DEFAULT, GLUE_VERSION_FOR_UNVERSIONED_RECORDS, S3_TABLES_MIN_GLUE_VERSION, glueVersionSupportsS3Tables, glueVersionLabel } from "@/lib/sync/glue-version";
 import { buildSyncTaskPayload, paradigmForCapabilityCheck } from "./sync-task-payload";
-// 序 38 B-70:取表清单的唯一作者(直连 / 经 Glue 连接发现 + 轮询)
+// 取表清单的唯一作者(直连 / 经 Glue 连接发现 + 轮询)
 import { fetchSourceTables } from "@/lib/datasource/tables-client";
-// @kf-batch 42-ux-feedback —— 向导本地草稿(单一作者 lib/sync/wizard-draft.ts):每步改动落 localStorage,保存成功才清;再打开问「恢复 / 丢弃」
+// 向导本地草稿(单一作者 lib/sync/wizard-draft.ts):每步改动落 localStorage,保存成功才清;再打开问「恢复 / 丢弃」
 import { clearSyncDraft, describeDraftAge, loadSyncDraft, saveSyncDraft, type SyncWizardDraft } from "@/lib/sync/wizard-draft";
-// 序 49 ⑥ UX ②:第一步三个选择题的缺省值(唯一作者)
+// UX ②:第一步三个选择题的缺省值(唯一作者)
 import { SYNC_WIZARD_DEFAULTS } from "@/lib/sync/wizard-defaults";
 import { WhereClauseHelp, BusinessTimezoneField, TemplateTablesEditor, WriteOptionsSection } from "./SyncCapabilityControls";
-// 序 56(客户 2026-10-27 反馈):模板实例识别(守卫 1 黄标)与样例列映射复制(纯函数,单测在 __tests__/template-sample-table.test.ts)
+// 模板实例识别(守卫 1 黄标)与样例列映射复制(纯函数,单测在 __tests__/template-sample-table.test.ts)
 import { templateInstanceOf, cloneColumnMapping } from "./sync-capability-helpers";
 
 // 数据源类型→图标(由 DS_TYPE_OPTIONS 单一事实源派生,不再散落硬编码 mysql?🐬:🐘)。
@@ -29,7 +29,7 @@ import { GLUE_WORKER_TYPES, GLUE_MAX_WORKERS } from "@/lib/etl/worker-types";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
 import RoleAdvisorPanel from "@/components/role-advisor/RoleAdvisorPanel";
-// 序 72 B-139:Glue 通道的执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
+// Glue 通道的执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
@@ -37,17 +37,17 @@ import type { ComputeKind, Target } from "@/lib/network-advisor";
 import { useT } from "@/lib/i18n/useT";
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope } from "@/lib/scope/scope";
-// @kf-batch 50-WP31-place-first-class —— 存量源(无 ownerTargetId)= 主控区,前端显式给(后端缺 targetId ⇒ 400)
+// 存量源(无 ownerTargetId)= 主控区,前端显式给(后端缺 targetId ⇒ 400)
 import { targetOfStamp } from "@/lib/exec-env/target-id";
-// @kf-batch 50-WP7-sync-pushdown —— P50.1 的 `HOME_WORKGROUP` import 在此**已退役**:
+// `HOME_WORKGROUP` import 在此**已退役**:
 // 落点(workgroup/database/表桶)的唯一作者在服务端(按任务所在章的描述符解析),向导一律留空。
 // 🔴 别再把它加回来:客户端引用 home 的 workgroup 常量,等于在前端造第二个落点真值源
-// (段 o4 的 E-218 就是这条路上的红)。要列 workgroup 就用 `/api/redshift/connections?targetId=`。
+// (段 o4 的就是这条路上的红)。要列 workgroup 就用 `/api/redshift/connections?targetId=`。
 
 interface Props { open: boolean; editing?: SyncTask; onClose: () => void; onSuccess: () => void; }
 
 /**
- * 序 53:编辑**存量**任务时,记录里没有 Glue 版本的,表单里显示并保存它被写下时的缺省(5.1)—— 否则 antd 的 initialValue(新缺省 6.0)会顶上去,
+ * 编辑**存量**任务时,记录里没有 Glue 版本的,表单里显示并保存它被写下时的缺省(5.1)—— 否则 antd 的 initialValue(新缺省 6.0)会顶上去,
  *   用户只是改个别字段点「完成」,任务就被静默换到 6.0(与运行侧 glueVersionOfRecord 同一口径)。新建任务不经这里,缺省仍是最高版本。
  */
 function withRecordGlueVersion(task: SyncTask): SyncTask {
@@ -57,7 +57,7 @@ function withRecordGlueVersion(task: SyncTask): SyncTask {
 }
 
 export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Props) {
-  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— targetId → 可读 region(拿不到就退回 targetId,绝不显示空)
+  // targetId → 可读 region(拿不到就退回 targetId,绝不显示空)
   const { scope, targets: scopeTargets } = useScope();
   const regionLabelOf = (tid?: string) => {
     const id = tid || "tgt_home";
@@ -71,7 +71,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const watchDsId = Form.useWatch("datasourceId", form);
   const watchChannel = Form.useWatch("channel", { form, preserve: true });
   const watchTargetType = Form.useWatch("targetType", form);
-  // @kf-batch 50-WP7-sync-pushdown —— 网络预检要跟着用户选的 workgroup 走(getFieldValue 不触发重算)。
+  // 网络预检要跟着用户选的 workgroup 走(getFieldValue 不触发重算)。
   const watchRsWorkgroup = Form.useWatch(["redshiftConfig", "workgroupName"], form) as string | undefined;
   const { getToken } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -80,22 +80,22 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [tables, setTables] = useState<any[]>([]);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
-  // @kf-batch 37-sync-capability —— 带日期变量的源表名单独存:它们不在源库表清单里,而 antd 的
+  // 带日期变量的源表名单独存:它们不在源库表清单里,而 antd 的
   // Checkbox.Group 在 onChange 时会把「没有对应复选框」的值滤掉(混在 selectedTables 里一勾选就丢了)。
   const [templateTables, setTemplateTables] = useState<string[]>([]);
-  // 序 56:模板 → 样例表(源库里一张同结构的真表,只用来读列结构,不会被同步)。ref 镜像给异步的 onDatasourceChange 读最新值:
+  // 模板 → 样例表(源库里一张同结构的真表,只用来读列结构,不会被同步)。ref 镜像给异步的 onDatasourceChange 读最新值
   //   拉表回来后按样例表新拉到的列重建模板的列映射(编辑打开 / 恢复草稿 / 换源都走那条路)。
   const [templateSamples, setTemplateSamples] = useState<Record<string, string>>({});
   const templateSamplesRef = useRef(templateSamples);
   templateSamplesRef.current = templateSamples;
-  // @kf-batch 44-sync-switch-datasource —— 拉表请求序号:只有**最后一次**选源的结果能落进 tables / fieldMappings。
+  // 拉表请求序号:只有**最后一次**选源的结果能落进 tables / fieldMappings。
   //   编辑打开时自动按旧源拉表(经 Glue 发现要 1–3 分钟),此时用户换源 ⇒ 两次拉表并发,先发后到的旧源结果会盖掉新源表清单(stale-response 竞态)。
   const dsReqSeq = useRef(0);
   // 提交前前端校验(validateSyncCapabilityFields)的错误;显示在表单顶上并阻止提交
   const [capabilityError, setCapabilityError] = useState<string | null>(null);
   const [fieldMappings, setFieldMappings] = useState<Record<string, any[]>>({});
   const [saving, setSaving] = useState(false);
-  // @kf-batch 42-ux-feedback —— 打开时发现的未保存草稿(用户决定恢复 / 丢弃前先不动表单);tableFilter / onlySelected 是选表步的筛选器
+  // 打开时发现的未保存草稿(用户决定恢复 / 丢弃前先不动表单);tableFilter / onlySelected 是选表步的筛选器
   const [pendingDraft, setPendingDraft] = useState<SyncWizardDraft | null>(null);
   const [tableFilter, setTableFilter] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
@@ -103,14 +103,14 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const [channelRec, setChannelRec] = useState<any>(null);
   // 🔴 生产上线批次 A:exists 三态(true / false / null = 探测不到);platformCreated 区分「平台建的」与「客户已有的」。
   const [ddlPreview, setDdlPreview] = useState<Record<string, { ddl: string; table?: string; exists: boolean | null; platformCreated?: boolean | null }>>({});
-  // 序 31 三刀 IAM 侧(2026-10-21):原来这里还有一个 `s3Buckets` 状态 + 打开向导就 fetch("/api/s3/buckets"),但**没有任何 JSX 消费它**
+  // IAM 侧(2026-10-21):原来这里还有一个 `s3Buckets` 状态 + 打开向导就 fetch("/api/s3/buckets"),但**没有任何 JSX 消费它**
   //   (表桶下拉早已是 TableBucketPicker 按落点读 S3 Tables 候选)⇒ 每开一次向导白打一次账号级 ListBuckets。死请求删掉,不是搬轴。
   const [rsWorkgroups, setRsWorkgroups] = useState<any[]>([]);
   const [rsDatabases, setRsDatabases] = useState<string[]>([]); // 空 = 还不知道是哪个区的数仓(别拿 home 的 dev 打底)
-  // @kf-batch 50-WP7-sync-pushdown(施工序 6)—— 任务跟随源的执行环境(章 = ds.ownerTargetId,
+  // 任务跟随源的执行环境(章 = ds.ownerTargetId,
   // 服务端 bindingForNewSyncTask 同一条判据)。`dsNonHome` 只用来决定**查哪个区**的清单/带不带
   // targetId;落点值本身**不分 home 与否,一律不预填**(留空 = 服务端按该章解析,前端不造第二个
-  // 落点真值源;「只在非 home 清空」那种分叉靠挂载时序,已被 E-218 判死)。
+  // 落点真值源;「只在非 home 清空」那种分叉靠挂载时序,已被判死)。
   const watchDsOwnerTarget = ((dataSources.find((d) => d.datasourceId === watchDsId) as any)?.ownerTargetId as string) || "tgt_home";
   const dsNonHome = watchDsOwnerTarget !== "tgt_home";
   // SCH-03: options (other sync tasks + workflows) for the downstream-dependency selector.
@@ -123,15 +123,15 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
   useEffect(() => {
     if (!open) return;
-    // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 **刻意不按当前范围过滤数据源**。
+    // 🔴 **刻意不按当前范围过滤数据源**。
     // 用户 2026-09-10:「所有的任务都要创建在当前区域…**除非在主控区创建任务,可以选择在主控区
     // 下发到其他指定区域执行**。」同步任务的落点由它引用的数据源派生 ⇒ 只有让用户看得到别区的源,
     // 「站在主控区往别的区下发」才成立。所以这里给全清单,并在下拉里**标出每个源在哪个区**(护栏 2:
     // 选的时候就知道这个任务会在哪儿跑),而不是过滤掉再让用户纳闷「我的源哪去了」。
     fetch("/api/datasources").then((r) => r.json()).then((d) => setDataSources(d.success ? d.data : d));
-    // @kf-batch 50-WP31-place-first-class —— 还没选源时先列主控区的(与改动前一致,显式写明);选了源由下面按源的章重拉
+    // 还没选源时先列主控区的(与改动前一致,显式写明);选了源由下面按源的章重拉
     fetch("/api/redshift/connections?targetId=tgt_home").then((r) => r.json()).then((d) => { if (Array.isArray(d)) setRsWorkgroups(d); });
-    // @kf-batch 50-WP7-sync-pushdown —— 🔴 这里原来硬编码 `workgroup=bgp-workgroup` 预拉库清单:
+    // 🔴 这里原来硬编码 `workgroup=bgp-workgroup` 预拉库清单
     // 选了非 home 的源,下拉里列的却是**主控区**的库名,选中就在真跑时被 409 拒。库清单只能在
     // 「知道是哪个 workgroup」之后拉(见 Workgroup 选择器的 onChange),选源时先清空防跨区串味。
     // SCH-03: build the list of downstream targets (other sync tasks + workflows).
@@ -158,18 +158,18 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing, dataSources]);
 
-  // @kf-batch 44-sync-switch-datasource —— userSwitched = 用户在下拉里换了源(编辑打开时的自动回填 / 草稿恢复不算):
+  // userSwitched = 用户在下拉里换了源(编辑打开时的自动回填 / 草稿恢复不算):
   //   换源后原已选的表若不在新源的表清单里一律移除并告知 —— 否则保存下去的任务引用新源不存在的表,一跑必失败(…7698 探针 2026-10-15 坐实:
   //   换到 sys 库后计数「已选 2 / 共 101」,其中 products 是旧源的,PUT 的 sourceTables 带着它、fieldMappings.products 为空)。
   const onDatasourceChange = async (dsId: string, opts?: { userSwitched?: boolean }) => {
     const ds = dataSources.find((d) => d.datasourceId === dsId);
     if (!ds) return;
     const seq = ++dsReqSeq.current;
-    // @kf-batch 50-WP7-sync-pushdown —— 源在哪个区,任务就在那个区跑。workgroup 下拉改拉**该区**清单。
+    // 源在哪个区,任务就在那个区跑。workgroup 下拉改拉**该区**清单。
     // 🔴 落点字段(表桶/workgroup/库)在前端**一律不预填**:留空 = 服务端按该章的描述符解析
     // (start 路由 tableBucketName / resolveRedshiftBinding 是唯一作者)。此处刻意不按 home 与否
     // 分两条路——「非 home 才清空」曾靠挂载时序,而 S3 / Redshift 区块是选完 targetType 才挂载,
-    // 挂载时 initialValue 又把 home 桶名填回去(段 o4 的 E-218 就是这么红的)。
+    // 挂载时 initialValue 又把 home 桶名填回去(段 o4 的就是这么红的)。
     const ownerTid = ((ds as any).ownerTargetId as string) || "tgt_home";
     const nonHome = ownerTid !== "tgt_home";
     fetch(`/api/redshift/connections?targetId=${encodeURIComponent(ownerTid)}`)
@@ -179,13 +179,13 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     // SYNC-FIX(namespace): 自动模式下 namespace 恒跟随所选数据源库名(切库实时更新,修此前
     // 「只在为空时填」导致换库残留旧库名的陈旧 bug);手动模式尊重用户输入不动。
     // 后端 fallback 同为 ds.database,避免非 ecommerce 用户数据落进硬编码的 ecommerce namespace。
-    // 模块42:namespace 跟随源标识——JDBC 用库名;DDB 无库,用表名;S3 用桶名(非 JDBC 源 ds.database 为 undefined)。
+    // namespace 跟随源标识——JDBC 用库名;DDB 无库,用表名;S3 用桶名(非 JDBC 源 ds.database 为 undefined)。
     if (nsMode === "auto") {
       const c = (ds as any).connection || {};
       const nsFallback = ds.database || c.tableName || c.bucket || "default";
       form.setFieldValue(["s3Config", "namespace"], nsFallback);
     }
-    // 序 38 B-70:直连读不到且有 Glue 连接时后端起发现作业(202),唯一作者 fetchSourceTables 负责轮询;源在自有网络的客户向导才建得了任务
+    // 直连读不到且有 Glue 连接时后端起发现作业(202),唯一作者 fetchSourceTables 负责轮询;源在自有网络的客户向导才建得了任务
     let tableList: any[] = [];
     try {
       const r = await fetchSourceTables(dsId, ds.database, {
@@ -208,7 +208,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         setSelectedTables(selectedTables.filter((x) => names.has(x)));
         message.info(t("已切换数据源:原已选的 {n} 张表不在新源里,已移除({list})", { n: String(dropped.length), list: dropped.slice(0, 5).join(", ") }), 8);
       }
-      // 序 56:样例表不在新源里的模板 ⇒ 样例作废(模板本身保留,用户可重新选样例)
+      // 样例表不在新源里的模板 ⇒ 样例作废(模板本身保留,用户可重新选样例)
       const samplesNow = templateSamplesRef.current;
       const keptSamples = Object.fromEntries(Object.entries(samplesNow).filter(([, sampleName]) => names.has(sampleName)));
       if (Object.keys(keptSamples).length !== Object.keys(samplesNow).length) { templateSamplesRef.current = keptSamples; setTemplateSamples(keptSamples); }
@@ -221,7 +221,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         mappings[tbl.name] = (mapData.success ? mapData.data : mapData).map((m: any) => ({ ...m, include: true }));
       }
     }
-    // 序 56:模板的列映射 = 它的样例表的列(按新拉到的样例列重建;样例不在清单里 ⇒ 模板暂时没有列)
+    // 模板的列映射 = 它的样例表的列(按新拉到的样例列重建;样例不在清单里 ⇒ 模板暂时没有列)
     for (const [tpl, sampleName] of Object.entries(templateSamplesRef.current)) {
       if (mappings[sampleName]) mappings[tpl] = cloneColumnMapping(mappings[sampleName]);
     }
@@ -243,7 +243,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     if (!cols?.length) return;
     // SYNC-07: generate the DDL for the resolved target table name (default = source name).
     const targetName = resolveTargetTableName(tableName, form.getFieldsValue(true));
-    // @kf-batch 50-WP7-sync-pushdown —— DDL 的落点 = 源的执行环境(服务端 resolveRedshiftBinding 按它取四样)
+    // DDL 的落点 = 源的执行环境(服务端 resolveRedshiftBinding 按它取四样)
     const res = await fetch("/api/sync/generate-ddl", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceDb: ds?.type, tableName: targetName, columns: cols.map((c: any) => ({ name: c.source, type: c.sourceType })), redshiftConfig: form.getFieldValue("redshiftConfig"), targetId: targetOfStamp((ds as any)?.ownerTargetId) }) });
     const data = await res.json();
     if (data.success) setDdlPreview((prev) => ({ ...prev, [tableName]: { ddl: data.data.ddl, table: data.data.table, exists: data.data.tableExists ?? null, platformCreated: data.data.platformCreated ?? null } }));
@@ -251,7 +251,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
   const executeDDL = async (tableName: string) => {
     if (!ddlPreview[tableName]?.ddl) return;
-    // @kf-batch 50-WP7-sync-pushdown —— 预建表建到源所在的区(targetId 派生自 ds.ownerTargetId)
+    // 预建表建到源所在的区(targetId 派生自 ds.ownerTargetId)
     // 🔴 生产上线批次 A:不再把 SQL 文本发给服务端执行 —— 发的是与「生成 DDL」同一份建表参数,
     //   服务端现生成那条 CREATE TABLE 并打平台标记(见 lib/sync/target-ddl.ts)。
     const ds = dataSources.find((d) => d.datasourceId === form.getFieldValue("datasourceId"));
@@ -263,7 +263,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     else message.error(data.error?.message || t("建表失败"));
   };
 
-  // @kf-batch 42-ux-feedback —— 草稿:每一步 / 每次改值都存(便宜,不防抖);保存成功才清。恢复 = 回填表单 + 选表 + 映射 + 步骤,再按源重拉表清单(映射以草稿为准)。
+  // 草稿:每一步 / 每次改值都存(便宜,不防抖);保存成功才清。恢复 = 回填表单 + 选表 + 映射 + 步骤,再按源重拉表清单(映射以草稿为准)。
   const draftKey = editing?.taskId;
   const saveDraftNow = () => {
     if (!open) return;
@@ -290,9 +290,9 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const discardDraft = () => { clearSyncDraft(draftKey); setPendingDraft(null); };
 
   const handleSubmit = async () => {
-    // @kf-batch 42-ux-feedback —— 🔴 整个提交路径都在 try 里:原来整形 / 校验在 try 之外,一旦抛错 Modal 的 onOk 静默吞掉 ⇒ 用户看到的就是「点『完成』没反应」;
+    // 🔴 整个提交路径都在 try 里:原来整形 / 校验在 try 之外,一旦抛错 Modal 的 onOk 静默吞掉 ⇒ 用户看到的就是「点『完成』没反应」;
     //   现在任何异常都落成一条 message.error,且草稿一直在,关掉重开能恢复。
-    //   「完成」从第 2 步起任何一步都能点(序 49 UX ②:第 1 步只留「下一步」,三个选择题有缺省)⇒ 先按用户的话复述前两步的必填项(任务名称 / 数据源 / 模式 / 至少一张表),
+    //   「完成」从第 2 步起任何一步都能点(UX ②:第 1 步只留「下一步」,三个选择题有缺省)⇒ 先按用户的话复述前两步的必填项(任务名称 / 数据源 / 模式 / 至少一张表),
     //   而不是让后端那句带字段名的拒绝(「`sourceTables` 为空 …」)当第一道提示(2026-10-15 页面驱动 p42b W3 看到的就是它)。
     if (!validateUpTo(1)) return;
     try {
@@ -303,7 +303,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   };
 
   const handleSubmitInner = async () => {
-    // @kf-batch 37-sync-capability —— 整形抽成纯函数(判据钉住改动前的输出 + 存量任务逐键不变)
+    // 整形抽成纯函数(判据钉住改动前的输出 + 存量任务逐键不变)
     const values: Record<string, any> = buildSyncTaskPayload({
       formValues: form.getFieldsValue(true),
       selectedTables,
@@ -371,7 +371,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const validateStep = () => validateUpTo(step, step);
 
   const STEPS = [{ title: t("源端配置") }, { title: t("选表 & 映射") }, { title: t("目标配置") }, { title: t("建表预览") }, { title: t("调度设置") }];
-  // 序 56:有样例表(⇒ 有列)的模板,在字段映射(只读)/ 建表预览 / 派生列与合并键候选里与普通表一起列出;
+  // 有样例表(⇒ 有列)的模板,在字段映射(只读)/ 建表预览 / 派生列与合并键候选里与普通表一起列出;
   //   模板的目标名 = 固定目标名(resolveTargetTableName 读 targetTableNames[模板])
   const templatesWithColumns = templateTables.filter((x) => (fieldMappings[x] || []).length > 0);
   const previewTables = [...selectedTables, ...templatesWithColumns];
@@ -379,13 +379,13 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
   return (
     <Modal title={isEdit ? t("编辑同步任务") : t("新建同步任务")} open={open} width={900} onCancel={onClose} onOk={handleSubmit} confirmLoading={saving} okText={t("完成")}
-      // 序 49 ⑥ UX ②:第一步只留「下一步」(用户 10-20 拍板);第 2 步起「完成」才出现(后面几步都有缺省,可直接完成)
+      // UX ②:第一步只留「下一步」(用户 10-20 拍板);第 2 步起「完成」才出现(后面几步都有缺省,可直接完成)
       okButtonProps={{ "data-testid": "sync-wizard-finish", style: step === 0 ? { display: "none" } : undefined } as any}
       afterOpenChange={(o) => { if (o) { form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS); setStep(0); setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType); setChannelRec(null); setDdlPreview({}); setCapabilityError(null); setPendingDraft(loadSyncDraft(editing?.taskId)); setTableFilter(""); setOnlySelected(false);
-        // @kf-batch 37-sync-capability —— 带日期变量的表名与普通表分开回填(见 templateTables 的注释)
+        // 带日期变量的表名与普通表分开回填(见 templateTables 的注释)
         const editTables = editing?.sourceTables || [];
         setSelectedTables(editTables.filter((x) => !x.includes("$" + "{"))); setTemplateTables(editTables.filter((x) => x.includes("$" + "{")));
-        // 序 56:样例表随任务回填(拉表回来后 onDatasourceChange 按样例列重建模板的列映射)
+        // 样例表随任务回填(拉表回来后 onDatasourceChange 按样例列重建模板的列映射)
         setTemplateSamples(editing?.templateSampleTables || {}); templateSamplesRef.current = editing?.templateSampleTables || {};
         // 编辑已有任务:若保存的 namespace 与源库名不同,说明用户曾自定义 → 手动模式;否则自动。新建默认自动。
         const editNs = (editing as any)?.s3Config?.namespace;
@@ -405,7 +405,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         <div style={{ display: step === 0 ? undefined : "none" }}>
           <Form.Item name="name" label={t("任务名称")} rules={[{ required: true }]}><Input placeholder={t("例如：订单表同步到S3")} /></Form.Item>
           <Form.Item name="datasourceId" label={t("选择数据源")} rules={[{ required: true }]}>
-            {/* 模块42:数据源下拉按范式渲染标识(JDBC=host/库;DDB=表名;S3=桶/前缀)。仅列可批同步(glue 通道)的源:
+            {/* 数据源下拉按范式渲染标识(JDBC=host/库;DDB=表名;S3=桶/前缀)。仅列可批同步(glue 通道)的源
                 JDBC 四兄弟 + DynamoDB + S3;stream(kinesis/msk)走实时计算页 flink-cdc,不在批同步向导。 */}
             <Select onChange={(v) => { void onDatasourceChange(String(v), { userSwitched: true }); }} options={dataSources
               .filter((ds) => ds.type !== "kinesis" && ds.type !== "msk")
@@ -415,7 +415,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                   : ds.type === "s3" ? `${c.bucket || "-"}/${c.prefix || ""}`
                   : `${ds.host?.split(".")[0] || "-"}/${ds.database || "-"}`;
                 return {
-                  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 标出这个源在哪个区:同步任务的执行落点
+                  // 🔴 标出这个源在哪个区:同步任务的执行落点
                   // 就是它,选的时候必须看得见(护栏 2)。无章的存量源如实显示主控区,不留空。
                   label: (
                     <Space>
@@ -463,7 +463,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             const ck: ComputeKind = watchChannel === "glue" ? "glue" : watchChannel === "zero-etl" ? "zeroetl" : "dms";
             const targets: Target[] = [{ kind: "datasource", datasourceId: watchDsId }];
             if (watchTargetType === "redshift" || watchTargetType === "both") {
-              // @kf-batch 50-WP7-sync-pushdown —— 🔴 预检的数仓**绝不回落 home 的 workgroup**:那会在
+              // 🔴 预检的数仓**绝不回落 home 的 workgroup**:那会在
               // 非 home 源上拿主控区的数仓去量网络,给出与真跑无关的结论。用户已选的优先;未选就取
               // **该源所在区**清单的第一个(同区的 workgroup 共享该 target 的 VPC/子网,量可达性等价);
               // 清单还没到就干脆不列这个目标(宁可少量一项,不量错一项)。
@@ -484,7 +484,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
           <Form.Item name="whereClause" label={t("数据过滤条件 (WHERE)")}>
             <Input.TextArea rows={2} placeholder={"created_at >= '${run_date}' AND status = 'completed'"} />
           </Form.Item>
-          {/* @kf-batch 37-sync-capability —— 可用变量取自 SYNC_RUN_VAR_NAMES + 按今天渲染预览 + 方言说明 */}
+          {/* 可用变量取自 SYNC_RUN_VAR_NAMES + 按今天渲染预览 + 方言说明 */}
           <WhereClauseHelp form={form} />
           <BusinessTimezoneField form={form} />
           <Form.Item noStyle shouldUpdate>
@@ -515,7 +515,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         <div style={{ display: step === 1 ? undefined : "none" }}>
           <Divider>{t("选择同步表")}</Divider>
           {tables.length > 0 ? (() => {
-            // @kf-batch 42-ux-feedback(用户 2026-10-15:「选表最好是筛选确认,而不是全量展示,否则要不断向下拉,影响 column 的映射关系确认」)
+            // (用户 2026-10-15:「选表最好是筛选确认,而不是全量展示,否则要不断向下拉,影响 column 的映射关系确认」)
             //   搜索框按表名子串(不分大小写)筛;「只看已选」只列勾过的;计数行一直显示「已选 n / 共 m」。
             //   🔴 不用 Checkbox.Group:它在 onChange 时会把**没渲染出来**的已选值滤掉(筛掉一半表再勾一个 = 其余已选全丢),所以逐个 Checkbox 自己维护。
             const kw = tableFilter.trim().toLowerCase();
@@ -533,7 +533,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                 <div style={{ maxHeight: 320, overflowY: "auto" }}>
                   <Space direction="vertical" style={{ width: "100%" }}>
                     {shown.map((tbl) => {
-                      // 序 56 守卫 1:勾选了某个模板按日期渲染出来的实例表(orders_202609 之于 orders_${bizmonth})⇒ 黄标 + 提示:
+                      // 守卫 1:勾选了某个模板按日期渲染出来的实例表(orders_202609 之于 orders_${bizmonth})⇒ 黄标 + 提示
                       //   勾了就会把它当普通表多同步一份,并与模板写同一张目标表(客户 2026-10-27 撞到的正是这个)
                       const instanceOfTpl = selectedTables.includes(tbl.name) ? templateInstanceOf(String(tbl.name), templateTables) : null;
                       return (
@@ -553,8 +553,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
               </div>
             );
           })() : <Alert type="info" message={t("请先在上一步选择数据源")} />}
-          {/* @kf-batch 37-sync-capability —— 带日期变量的源表名(加进 sourceTables + 固定目标表名进 targetTableNames) */}
-          {/* 序 56:样例表候选 = 源库表清单;添加 / 改样例把样例列映射复制给模板 */}
+          {/* 带日期变量的源表名(加进 sourceTables + 固定目标表名进 targetTableNames) */}
+          {/* 样例表候选 = 源库表清单;添加 / 改样例把样例列映射复制给模板 */}
           <TemplateTablesEditor form={form} templateTables={templateTables} setTemplateTables={setTemplateTables}
             sourceTableNames={tables.map((x) => String(x.name))} templateSamples={templateSamples} setTemplateSamples={setTemplateSamples}
             fieldMappings={fieldMappings} setFieldMappings={setFieldMappings} />
@@ -625,18 +625,18 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             <div>
               <Divider>{t("S3 Tables 数据湖配置")}</Divider>
               <Space size={16}>
-                {/* @kf-batch 50-WP7-sync-pushdown —— 🔴 **不设 initialValue**:落点的唯一作者在服务端
+                {/* 🔴 **不设 initialValue**:落点的唯一作者在服务端
                     (按任务所在章的描述符解析)。留空 = 自动解析;填了与该章不一致的值会被 409 拒,
                     不静默取一个。曾用「initialValue 填 home 桶 + 选非 home 源时清空」,但本区块是选完
-                    targetType 才挂载 ⇒ 挂载时 initialValue 后手把 home 桶名填回去(E-218 红)。 */}
+                    targetType 才挂载 ⇒ 挂载时 initialValue 后手把 home 桶名填回去(红)。*/}
                 <Form.Item
                   name={["s3Config", "tableBucket"]}
                   label="Table Bucket"
                   extra={t("留空 = 按该数据源所在执行环境的表桶自动解析(推荐);选客户自有表桶时,非主控区的执行环境须先在「系统设置 → 数据湖外部表桶」登记该桶")}
                 >
-                  {/* 序 45 B-93(客户待改进项):原来只能手填表桶名 ⇒ 改为下拉(可仍手填),清单 = 该源所在执行环境那个区账号内的
+                  {/* (客户待改进项):原来只能手填表桶名 ⇒ 改为下拉(可仍手填),清单 = 该源所在执行环境那个区账号内的
                       S3 Tables 表桶,平台表桶 / 已登记外部表桶带标;仍不设 initialValue,留空照旧由服务端解析。
-                      B-127:writeIntent ⇒ 未登记的桶带「未登记」标,选中后出提示 + 去登记链接(保存会被 400 指路,不等到启动才 409) */}
+                      writeIntent ⇒ 未登记的桶带「未登记」标,选中后出提示 + 去登记链接(保存会被 400 指路,不等到启动才 409)*/}
                   <TableBucketPicker targetId={watchDsOwnerTarget} style={{ width: 250 }} placeholder={t("留空自动解析")} writeIntent data-testid="sync-s3t-bucket-picker" />
                 </Form.Item>
                 <Form.Item label="Namespace" tooltip={t("自动=跟随所选数据源库名；手动=自定义")} style={{ marginBottom: 0 }}>
@@ -704,7 +704,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             <div>
               <Divider>{t("Redshift 配置")}</Divider>
               <Space size={16}>
-                {/* @kf-batch 50-WP7-sync-pushdown —— 下拉列**该源所在区**的 workgroup(onDatasourceChange
+                {/* 下拉列**该源所在区**的 workgroup(onDatasourceChange
                     已按 ownerTargetId 重拉);空态**不回落 home 的名字**,也不设 initialValue
                     (留空 = 服务端按该章解析,同 Table Bucket);databases 带 targetId 查该区。 */}
                 <Form.Item name={["redshiftConfig", "workgroupName"]} label="Workgroup" extra={t("留空 = 按执行环境自动解析")}>
@@ -721,7 +721,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
               </Space>
             </div>
           )}
-          {/* @kf-batch 37-sync-capability —— 派生列 / 覆盖范围 / 空结果开关 */}
+          {/* 派生列 / 覆盖范围 / 空结果开关 */}
           <WriteOptionsSection form={form} targetType={targetType} sourceColumns={Array.from(new Set(previewTables.flatMap((tb) => (fieldMappings[tb] || []).map((f: any) => String(f.source)))))} />
         </div>
 
@@ -857,8 +857,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                 <Form.Item name={["glueConfig", "numberOfWorkers"]} label={t("Worker 数量")} initialValue={2}>
                   <InputNumber min={2} max={GLUE_MAX_WORKERS} style={{ width: 100 }} />
                 </Form.Item>
-                {/* 序 38 B-69:写 S3 Tables 时 5.1 以下**禁选**(选了后端也会 400;原来三个版本随便选,5.0 跑到写表才报 Invalid S3 URI)。
-                    序 53:缺省 = 清单最高版本,用户可自己选更低的;文案带 Spark / Python 版本让人知道选的是什么(单一作者 lib/sync/glue-version.ts) */}
+                {/* 写 S3 Tables 时 5.1 以下**禁选**(选了后端也会 400;原来三个版本随便选,5.0 跑到写表才报 Invalid S3 URI)。
+                    缺省 = 清单最高版本,用户可自己选更低的;文案带 Spark / Python 版本让人知道选的是什么(单一作者 lib/sync/glue-version.ts)*/}
                 <Form.Item name={["glueConfig", "glueVersion"]} label={t("Glue 版本")} initialValue={GLUE_VERSION_DEFAULT}
                   extra={(targetType === "s3-tables" || targetType === "both") ? t("写 S3 Tables 需要 Glue {v} 及以上", { v: S3_TABLES_MIN_GLUE_VERSION }) : undefined}>
                   <Select style={{ width: 250 }} data-testid="sync-glue-version"
@@ -883,7 +883,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             <div>
               <Divider>{t("执行角色")}</Divider>
               {watchChannel === "glue" ? (
-                /* 序 72 B-139:Glue 通道 = 账号内任何 glue.amazonaws.com 可承担的角色都能选(落点 = 源所在章);值仍是 glueConfig.executionRoleArn,空 = 平台默认 */
+                /* Glue 通道 = 账号内任何 glue.amazonaws.com 可承担的角色都能选(落点 = 源所在章);值仍是 glueConfig.executionRoleArn,空 = 平台默认 */
                 <Form.Item name={["glueConfig", "executionRoleArn"]} label={t("执行角色")}
                   tooltip={t("执行角色决定同步作业能访问哪些 AWS 资源。留空=用平台默认角色;自建角色须信任 glue.amazonaws.com。")}>
                   <ExecutionRolePicker

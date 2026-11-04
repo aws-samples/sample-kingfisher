@@ -1,4 +1,4 @@
-// 序 38 B-70 —— 经 Glue 连接探测 / 发现表的纯函数判据(脚本内容 / 各源 SQL / 库名校验 / 作业名)。
+// 经 Glue 连接探测 / 发现表的纯函数判据(脚本内容 / 各源 SQL / 库名校验 / 作业名)。
 import { describe, it, expect } from "vitest";
 import {
   discoverySqlFor, buildDiscoveryScript, assertDiscoveryDatabase, discoveryJobName, glueReachNote, GLUE_DISCOVERY_JOB,
@@ -6,7 +6,7 @@ import {
 } from "@/lib/datasource/glue-reach";
 import { GLUE_VERSION_DEFAULT } from "@/lib/sync/glue-version";
 
-describe("B-70 发现脚本的 JDBC 超时(同一个作业也是「检测」的载体:源 host 不通要在十几秒内失败,不能等内核 TCP 重试)", () => {
+describe("发现脚本的 JDBC 超时(同一个作业也是「检测」的载体:源 host 不通要在十几秒内失败,不能等内核 TCP 重试)", () => {
   it("四种源各用自己 driver 的属性名与单位(MySQL / Oracle 毫秒,PG / SQL Server 秒);未知类型拒(不许静默无超时)", () => {
     const c = GLUE_DISCOVERY_CONNECT_TIMEOUT_S, s = GLUE_DISCOVERY_SOCKET_TIMEOUT_S;
     expect(jdbcTimeoutOptionsFor("mysql")).toEqual([["connectTimeout", String(c * 1000)], ["socketTimeout", String(s * 1000)]]);
@@ -27,7 +27,7 @@ describe("B-70 发现脚本的 JDBC 超时(同一个作业也是「检测」的�
   });
 });
 
-describe("B-70 发现 SQL(与 datasource-spi/jdbc/<type>.ts 的 introspect 同一口径)", () => {
+describe("发现 SQL(与 datasource-spi/jdbc/<type>.ts 的 introspect 同一口径)", () => {
   it("四种 JDBC 源各读自己的系统表,统一列别名;未知类型拒", () => {
     expect(discoverySqlFor("mysql")).toContain("INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = '__DB__'");
     expect(discoverySqlFor("postgresql")).toContain("information_schema.columns WHERE table_schema NOT IN ('pg_catalog','information_schema')");
@@ -42,7 +42,7 @@ describe("B-70 发现 SQL(与 datasource-spi/jdbc/<type>.ts 的 introspect 同�
   });
 });
 
-describe("B-70 发现脚本", () => {
+describe("发现脚本", () => {
   const script = buildDiscoveryScript({
     dbType: "mysql", jdbcUrl: "jdbc:mysql://db.example.internal:3306/gamedb", driverClass: "com.mysql.cj.jdbc.Driver",
     secretArn: "arn:aws:secretsmanager:ap-southeast-1:123456789012:secret:bgp-ds-x-AbCdEf", region: "ap-southeast-1",
@@ -72,8 +72,8 @@ describe("B-70 发现脚本", () => {
   });
 });
 
-describe("B-70 常量 / 说明", () => {
-  it("发现作业名 = bgp-ds-discover-<源 id 尾 12 位>(落在 TaskRole 的 job/bgp-* 授权面内);Glue 版本 = 平台缺省(序 53)", () => {
+describe("常量 / 说明", () => {
+  it("发现作业名 = bgp-ds-discover-<源 id 尾 12 位>(落在 TaskRole 的 job/bgp-* 授权面内);Glue 版本 = 平台缺省", () => {
     expect(discoveryJobName("01M4S8RA2ZS26FJCB8S5CFB184")).toBe("bgp-ds-discover-JCB8S5CFB184");
     expect(discoveryJobName("01M4S8RA2ZS26FJCB8S5CFB184")).toMatch(/^bgp-/);
     expect(GLUE_DISCOVERY_JOB.glueVersion).toBe(GLUE_VERSION_DEFAULT);

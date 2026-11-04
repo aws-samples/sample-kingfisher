@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 执行引擎(泛化补数 runner.ts 的幂等推进内核)。
+// Copilot 执行引擎(泛化补数 runner.ts 的幂等推进内核)。
 //
 // tick(projectId, planId) 一次推进(可被前端刷新/定时多次触发而不重复提交):
 //  1) reconcile:对 running 步骤读 bgp-task-runs 终态 → 回写 succeeded/failed(+超时兜底判 failed)

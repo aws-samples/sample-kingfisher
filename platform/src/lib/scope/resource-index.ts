@@ -1,21 +1,20 @@
-// @kf-batch 50-WP4-o1-scope
-// WP-4 O1 —— 「哪些资源可以按执行范围计数」的**单一登记表** + 计数用的行读取。
+// O1 —— 「哪些资源可以按执行范围计数」的**单一登记表** + 计数用的行读取。
 //
 // 合同:SPEC v3.34 §2.6.6(`GET /api/scope/counts`)。
 //
 // ── 为什么要有这张表 ──────────────────────────────────────────────────────────
 // 护栏 1(INTERACTION §9.3-1「永远不让用户丢东西」)要在 target 视角常驻一条
-// 「其他执行范围还有 N 条」。N 必须与 DDB 逐行核对得上(判据 E-151),所以「哪张表 /
+// 「其他执行范围还有 N 条」。N 必须与 DDB 逐行核对得上(判据),所以「哪张表 /
 // 有没有项目维 / 有没有环境维 / 归属怎么算」必须写成**数据**,不能散在各处 if。
 //
 // 🔴 **每一行都是从既有列表路由实测抄来的**,不是想当然(下面逐条标了来源 file:line);
 // `resource-index-parity` 单测会读那些路由的源码,断言 clause 仍然一致 ——
-// 施工序第 5 步逐页接入时,列表路由会改成直接调本文件,那份重复才真正消失。
+// 逐页接入时,列表路由会改成直接调本文件,那份重复才真正消失。
 
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { projectFilter, envFilter } from "@/lib/projects/guard";
-// @kf-batch 50-WP4bis-p1-scope —— 绑定字段名由补数模块自己导出(不在这里写字面量)
+// 绑定字段名由补数模块自己导出(不在这里写字面量)
 import { BACKFILL_PLAN_BINDING_ATTR } from "@/lib/backfill/types";
 import type { Env } from "@/lib/projects/constants";
 
@@ -35,9 +34,9 @@ export const COUNTABLE_KINDS = [
   "datasource",
   "model-table",
   "code-table",
-  // @kf-batch 50-WP4bis-p1-scope —— 补数计划(绑定字段名是 `execTargets`,见 KIND_INDEX)
+  // 补数计划(绑定字段名是 `execTargets`,见 KIND_INDEX)
   "backfill-plan",
-  // @kf-batch 50-WP4quater-reads(工单 SC-20)—— 运维知识库的故障类别主档。
+  // 运维知识库的故障类别主档。
   // 🔴 加进来的理由是护栏 1:单区视角下知识库常常是空的(那个区还没出过故障),
   // 而「空」与「这一页没接执行范围」在界面上长得一样 ⇒ 必须能说出「主控区有 N 条」。
   "incident",
@@ -70,7 +69,6 @@ interface KindSpec {
   /** `scalar` 用:属性名(与 `lib/exec-env/scope.ts` 的 `SCOPE_SCALAR_ATTR` 同源) */
   scalarKind?: "datasource";
   /**
-   * @kf-batch 50-WP4bis-p1-scope
    * `binding` 用:绑定列表的字段名。缺省 = `targets`。
    * 🔴 只有历史字段名不同的模块才填(实测仅补数计划 `execTargets`);填的值必须来自那个模块
    * 自己导出的常量,不许在这里写字面量(否则改名时这里悄悄漂),门禁 `scope-filter-guard` 钉住。
@@ -101,7 +99,7 @@ export const KIND_INDEX: Record<CountableKind, KindSpec> = {
   "model-table": { table: TABLES.MODEL_TABLES, read: "service-fn", hasProject: false, hasEnv: false, attribution: "binding", mirrorOf: "lib/modeling/dimensions.ts:listModelTables" },
   "code-table": { table: TABLES.CODE_TABLES, read: "service-fn", hasProject: false, hasEnv: false, attribution: "binding", mirrorOf: "lib/modeling/service.ts:listCodeTables" },
   "backfill-plan": { table: TABLES.BACKFILL_PLANS, read: "service-fn", hasProject: true, hasEnv: false, attribution: "binding", bindingAttr: BACKFILL_PLAN_BINDING_ATTR, mirrorOf: "lib/backfill/service.ts:listPlans" },
-  // @kf-batch 50-WP4quater-reads —— 🔴 `listMasters(projectId)` 是这张表的**唯一读法**
+  // 🔴 `listMasters(projectId)` 是这张表的**唯一读法**
   // (pk = `incident#<projectId>`,项目维在 pk 里)。另写 Scan 会数进别的项目的故障类别。
   incident: { table: TABLES.INCIDENTS, read: "service-fn", hasProject: true, hasEnv: false, attribution: "binding", mirrorOf: "lib/incidents/store.ts:listMasters" },
 };
@@ -149,7 +147,7 @@ export async function listRowsForCount(
     // 🔴 复用既有唯一读法。⚠️ 已知登记:这几个函数**自己不翻页**(单次 Query),
     // 所以本 kind 的计数与对应的列表页**同口径地**受同一个上限约束 —— 这是有意的:
     // 计数比列表多算出几条,在界面上表现为「提示条说还有 N 条,点进去只有 M 条」,更难排查。
-    // 真要修就得连列表一起修(登记在 WORK-PACKAGES ②c,归 WP-4 之外)。
+    // 真要修就得连列表一起修(登记在,之外)。
     if (kind === "model-table") {
       const { listModelTables } = await import("@/lib/modeling/dimensions");
       return (await listModelTables()) as unknown as Array<Record<string, unknown>>;
@@ -159,7 +157,7 @@ export async function listRowsForCount(
       return (await listMasters(opts.projectId)) as unknown as Array<Record<string, unknown>>;
     }
     if (kind === "backfill-plan") {
-      // @kf-batch 50-WP4bis-p1-scope —— 🔴 补数计划是 `Query pk=backfill#<projectId>`,不是 Scan:
+      // 🔴 补数计划是 `Query pk=backfill#<projectId>`,不是 Scan:
       // `listPlans` 已经是这张表的唯一读法(项目维就在 pk 里),另写一个 Scan 会多一份读法,
       // 而且 Scan 出来的是**全部项目**的计划 ⇒ 提示条会把别的项目的条数算进来。
       const { listPlans } = await import("@/lib/backfill/service");

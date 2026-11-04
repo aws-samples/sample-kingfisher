@@ -1,4 +1,4 @@
-// 模块 42 — MSK / Kafka provider(流范式 stream,P42.6a)。
+// MSK / Kafka provider(流范式 stream)。
 //
 // 【为什么】实时计算(Flink)要支持多数据源。MSK 是流范式第二个 provider,与 Kinesis 同范式(stream)
 // 但能力标相反的三处全数据驱动:isVpcBound=true(broker 在私有 VPC)、canProvision=false(不代劳建集群,
@@ -10,10 +10,10 @@
 // 两种认证:iam(仅 MSK 托管,端口 9098,无密钥)/ scram(SASL/SCRAM-SHA-512,端口 9096,账密存 secret)。
 //
 // 连接袋:{ mskFlavor, clusterArn?, bootstrapServers?, auth:"iam"|"scram", region }。
-// P42.6a 只做【读能力】(introspect/ping/testConnection/buildConnection);无 provision(不建集群)。
+// 只做【读能力】(introspect/ping/testConnection/buildConnection);无 provision(不建集群)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   KafkaClient,
@@ -29,7 +29,7 @@ import type {
   DataSourceCapabilities,
 } from "../types";
 
-// L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+// L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
 const REGION = homeRegion();
 
 // MSK 认证 → 端口 + Kafka 客户端属性(security.protocol / sasl.mechanism)。数据驱动,勿散落。

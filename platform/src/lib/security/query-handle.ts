@@ -46,8 +46,7 @@ export interface QueryHandle {
   /** epoch 秒。与 ttl 同值 —— ttl 交给 DDB 自动清理,expiresAt 供应用层判 410。 */
   expiresAt: number;
   ttl: number;
-  // @kf-batch 50-P50.3-mrquery
-  // ✅ **S0 当时留的两个字段,P50.3 W3-c1 起开始写**(表结构一次建全、写入分期填,SPEC §0)。
+  // ✅ **S0 当时留的两个字段,W3-c1 起开始写**(表结构一次建全、写入分期填,SPEC §0)。
   // 🔴 `targetId` 是**取结果侧解析 region 的权威**:Redshift Data API 的 statementId 是 region 内的,
   // 拿错 region 的客户端去 Describe 会永远查不到 ⇒ 前端卡在「执行中」。
   // 把它记在**句柄**里(而不是只靠客户端传 `?targetId=`)⇒ 取结果这条路径的 region **不可被客户端操纵**。
@@ -107,7 +106,7 @@ export async function issueHandle(args: {
   identity: Identity;
   projectId: string;
   engine: QueryEngine;
-  // @kf-batch 50-P50.3-mrquery —— 多 region 直查:这条语句提交在哪个 target / 哪个法域。
+  // 多 region 直查:这条语句提交在哪个 target / 哪个法域。
   // 可选是因为**存量提交点**(athena 等)本期还没接 target 维,缺省 = home 语义。
   targetId?: string;
   jurisdiction?: string;
@@ -139,7 +138,6 @@ export async function issueHandle(args: {
   }
 }
 
-// @kf-batch 50-P50.3-mrquery
 /**
  * 只从句柄里取 `targetId`,**用于选 region,不做任何授权判定**。
  *

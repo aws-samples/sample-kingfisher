@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4-o1-scope
-// WP-4 施工序第 2 步:`lib/scope/scope.ts` 的**穷举**单测(合同 SPEC §2.6.1)。
+// `lib/scope/scope.ts` 的**穷举**单测(合同 SPEC §2.6.1)。
 //
 // 🔴 这里刻意把「非法值」逐条列出来而不是抽样:文法是前后端共用的唯一权威,
 // 少测一类就等于给「静默回落」留一个入口(SPEC §2.6.5 禁止的三种回落之一)。
@@ -137,7 +136,7 @@ describe("serializeScope / toScopeParam", () => {
     expect(serializeScope({ kind: "compare", targetIds: [A, HOME] })).toBe(`cmp:${A},${HOME}`);
   });
 
-  it("🔴 global ⇒ toScopeParam 返回 null(URL 不带该参数 = 回滚点 E-158)", () => {
+  it("🔴 global ⇒ toScopeParam 返回 null(URL 不带该参数 = 回滚点)", () => {
     expect(toScopeParam({ kind: "global" })).toBeNull();
     expect(toScopeParam({ kind: "target", targetId: A })).toBe(A);
     expect(toScopeParam({ kind: "compare", targetIds: [A, HOME] })).toBe(`cmp:${A},${HOME}`);

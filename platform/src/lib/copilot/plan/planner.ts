@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 规划大脑(Planner)。用 Strands Agents 官方 TS SDK 实现。
+// Copilot 规划大脑(Planner)。用 Strands Agents 官方 TS SDK 实现。
 //
 // 职责(纯只读):用户一句话诉求 →【发现】并行调只读工具摸清现状 →【规划】推理出最小执行路径 →
 // 产出结构化 PlanSpec(Strands structuredOutputSchema + Zod 自动校验 + 失败重试)。
@@ -20,10 +20,10 @@ import { PlanSpecSchema } from "./plan-schema";
 import { allDialectRulesForPrompt } from "../recipes/registry";
 import type { CopilotCaller } from "../tools/types";
 import type { PlanSpec } from "./types";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:Strands 变体(SPEC §3.3 / §3.5 形态②):BedrockModel({modelId}) 在 runAgent 闭包内按
+// Strands 变体(SPEC §3.3 / §3.5 形态②):BedrockModel({modelId}) 在 runAgent 闭包内按
 // 候选层求值,整个 agent.invoke 作为可重试单元(planner 工具只读幂等);不再读模块加载期常量 COPILOT.modelId。
 import { invokeAgent } from "@/lib/ai/invoke";
-// @kf-batch 51-v2-multi-vendor —— Strands 变体没有 ConverseCommand 可整形,但 maxTokens 系数(Kimi K3 ×2)同样要吃;Claude 恒等
+// Strands 变体没有 ConverseCommand 可整形,但 maxTokens 系数(Kimi K3 ×2)同样要吃;Claude 恒等
 import { shapeInferenceConfig } from "@/lib/ai/core/converse-shape";
 import type { AiModelUse } from "@/lib/ai/meta";
 
@@ -43,7 +43,7 @@ export interface PlanResult {
   spec: PlanSpec;
   usage?: { inputTokens?: number; outputTokens?: number };
   degraded?: boolean; // true = 结构化产出失败已降级兜底(如超时/校验失败)
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:实际用的模型(落进 bgp-copilot-plan-tasks 任务项 usedModelId;SPEC §3.3a ⑧)
+  // 实际用的模型(落进 bgp-copilot-plan-tasks 任务项 usedModelId;SPEC §3.3a ⑧)
   model?: AiModelUse;
 }
 
@@ -114,7 +114,7 @@ export async function runPlanner(input: { prompt: string; caller: CopilotCaller;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), deadlineMs);
 
-  // @kf-batch 50-W5-seg2-WP8:agent 型 —— modelId 由 invokeAgent 按候选层给出,每次尝试新建 BedrockModel + Agent;
+  // agent 型 —— modelId 由 invokeAgent 按候选层给出,每次尝试新建 BedrockModel + Agent;
   // 限流(含 Strands ModelThrottledError)退避重试,仍限流/不可用则降级回落下一层模型。
   const runAgent = async (modelId: string) => {
     const model = new BedrockModel({

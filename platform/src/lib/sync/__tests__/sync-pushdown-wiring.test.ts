@@ -1,16 +1,15 @@
-// @kf-batch 50-WP7-sync-pushdown(施工序 3)
 // 同步执行逐区下推的**接线判据**(与 flink-place.test.ts 同款:钉源码接缝,防「写了没接上」)。
-// 🔴 如实声明边界:文本判据挡不住变异 —— 行为判据在段 `o4`(E-217..E-228,部署后无头真验);
+// 🔴 如实声明边界:文本判据挡不住变异 —— 行为判据在段 `o4`(..,部署后无头真验);
 // 这里只保证四条**结构性事实**在源码层不被悄悄退回:
 //   ① start 路由不再有钉死主控区的模块级客户端/env 落点;
-//   ② 两条 409(跨区取数 / 通道未逐区)接在执行入口上;SC-5 的旧码在本路由消失(改判的代码侧事实);
+//   ② 两条 409(跨区取数 / 通道未逐区)接在执行入口上;旧码在本路由消失(改判的代码侧事实);
 //   ③ run 章按真落点显式盖(resolveRunStamp 第二参),两处(建行 + 收口)都传;
 //   ④ OM 回填(启动推送 + 成功后 4 个 backfill)只在 home 调。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// @kf-batch 37-sync-backfill —— glue 通道启动核心已从路由原样搬到 lib/sync/start-run.ts(补数中心要复用)⇒
+// glue 通道启动核心已从路由原样搬到 lib/sync/start-run.ts(补数中心要复用)⇒
 //   本组判据看的「启动链」= 路由 + 启动核心两份源码合起来;另加一条:路由**在调用位置**接上了启动核心。
 const startRouteSrc = readFileSync(
   join(__dirname, "..", "..", "..", "app", "api", "sync", "[id]", "start", "route.ts"),
@@ -28,7 +27,7 @@ function codeOnly(src: string): string {
   return src.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*")).join("\n");
 }
 
-describe("WP-7 施工序3:start 路由下推接线", () => {
+describe("start 路由下推接线", () => {
   const code = codeOnly(startSrc);
 
   it("⓪ 路由在调用位置接上启动核心(剥掉 import 行再看),且只有一处", () => {
@@ -54,12 +53,12 @@ describe("WP-7 施工序3:start 路由下推接线", () => {
     expect(code).toContain("logsClientFor(landing.region)");
   });
 
-  it("② 两条 409 接在入口上;SC-5 的旧码从本路由消失(scq SC-5 改判的代码侧事实)", () => {
+  it("② 两条 409 接在入口上;旧码从本路由消失(scq 改判的代码侧事实)", () => {
     expect(code).toContain('"CROSS_REGION_SOURCE"');
     expect(code).toContain('"CHANNEL_NOT_PUSHED_DOWN"');
     expect(code).not.toContain("TARGET_PUSHDOWN_UNAVAILABLE");
     // 跨区判据的两个操作数都来自单一作者(源章字段常量 / 章归一口),不是手写字符串比较。
-    // @kf-batch 50-o4REG-sync-om-per-target —— 源章的读法收成单一作者(内部按 DATASOURCE_OWNER_TARGET_ATTR 读)
+    // 源章的读法收成单一作者(内部按 DATASOURCE_OWNER_TARGET_ATTR 读)
     expect(code).toContain("datasourceOwnerTarget(ds");
     expect(code).toContain("bindingTargets(task");
   });
@@ -74,7 +73,7 @@ describe("WP-7 施工序3:start 路由下推接线", () => {
     expect(code).toContain("targetId: tid");
   });
 
-  // @kf-batch 50-o4REG-sync-om-per-target —— 原判据「OM 回填只在 home 调」随登记 o4-REG 交付**改判**:
+  // 原判据「OM 回填只在 home 调」随登记 o4-REG 交付**改判**:
   //   坐标按落点由 om-sync-coords 一处算(主控区逐字节不变,其它区进 per-target service),路由不再判区。
   //   行为判据在 lib/openmetadata/__tests__/om-sync-per-target.test.ts(真跑推送,只 mock OM HTTP)。
   it("④ OM 启动推送与成功回填:每个区都推,落点 = 本次执行的 landing/rsb + 源章;路由里不再按 home 分叉", () => {
@@ -89,7 +88,7 @@ describe("WP-7 施工序3:start 路由下推接线", () => {
   });
 });
 
-describe("WP-7 施工序3:start-realtime(dms)通道卡", () => {
+describe("start-realtime(dms)通道卡", () => {
   it("非 home 章任务走 DMS ⇒ 409 CHANNEL_NOT_PUSHED_DOWN(fail-closed,不替它在主控区跑)", () => {
     const code = codeOnly(realtimeSrc);
     expect(code).toContain("boundToHomeOnly(task)");
@@ -97,7 +96,7 @@ describe("WP-7 施工序3:start-realtime(dms)通道卡", () => {
   });
 });
 
-// ── 施工序 4:对账 / 下线 / 4 个读路由按章取区 ─────────────────────────────────
+// ──:对账 / 下线 / 4 个读路由按章取区 ─────────────────────────────────
 // 现状(改前)是坏的:home 客户端查非 home 的 JobRun 必然查不到 ⇒ 对账让任务永卡 running、
 // 下线把「没找到」当「已停」(孤儿计费)、日志/状态/输出全空 —— 只是下推前建不出非 home 任务,没人撞上。
 const STEP4_FILES: Array<[string, string, string]> = [
@@ -110,7 +109,7 @@ const STEP4_FILES: Array<[string, string, string]> = [
   ["runs-logs", "app/api/sync/[id]/runs/[runId]/logs/route.ts", "resolveGlueBinding({ targetId:"],
 ];
 
-describe("WP-7 施工序4:对账/下线/读路由按章取区", () => {
+describe("对账/下线/读路由按章取区", () => {
   const srcRoot = join(__dirname, "..", "..", "..");
   for (const [name, rel, anchor] of STEP4_FILES) {
     it(`${name}:模块级 home 客户端绝迹,按章解析`, () => {
@@ -135,11 +134,11 @@ describe("WP-7 施工序4:对账/下线/读路由按章取区", () => {
   });
 });
 
-// @kf-batch 50-WP7-sync-pushdown(施工序 7 · 段 o4 E-218 抓到的真缺陷)
+// (段 o4 抓到的真缺陷)
 // 向导在**挂载时**用 initialValue 把 home 的落点值填回去(S3/Redshift 区块是选完 targetType
 // 才挂载,比「选源时清空」晚)⇒ 页面上非 home 任务照样显示主控区的桶名。根治 = 前端**一个落点
 // 默认值都不给**(留空 = 服务端按该章的描述符解析,唯一作者在 start 路由 / resolveRedshiftBinding)。
-describe("WP-7 施工序7:同步向导不持有 home 落点值(E-218 的代码侧棘轮)", () => {
+describe("同步向导不持有 home 落点值(代码侧棘轮)", () => {
   const srcRoot = join(__dirname, "..", "..", "..");
   const wizard = codeOnly(readFileSync(join(srcRoot, "app/sync/SyncTaskModal.tsx"), "utf8"));
 

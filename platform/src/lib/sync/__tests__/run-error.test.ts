@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 运行失败原话分类(唯一作者 lib/sync/run-error.ts)的判据:闭合清单、对象 id 提取、认不出原样保留、读侧呈现规则。
+// 运行失败原话分类(唯一作者 lib/sync/run-error.ts)的判据:闭合清单、对象 id 提取、认不出原样保留、读侧呈现规则。
 //
 // 【缺陷原形】2026-10-28 测试账号:平台安全组被平台外删除后,运行历史里每条失败只有 AWS 原话
 //   「… Security Group Not Found The security group 'sg-07f9a7c9ddd9cb680' does not exist …」,用户不知道是什么、下一步点哪里。

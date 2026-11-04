@@ -1,5 +1,4 @@
-// @kf-batch 50-B26-lake-place
-// 🔴🔴 B-26(2026-10-01 新账号无头实测):在 us-west-2 视角选「数据湖 (Athena)」问数 ⇒ **10 条 Athena 查询全部
+// 🔴🔴 (2026-10-01 新账号无头实测):在 us-west-2 视角选「数据湖 (Athena)」问数 ⇒ **10 条 Athena 查询全部
 //   打在主控区工作组 `bgp-athena`,us-west-2 工作组 `bgp-athena-tgt-usw2-a` 0 条**(那个工作组自建成以来一条都没跑过),
 //   页面横幅照样写「当前在 us-west-2 提问」,答案是主控区的数据。
 //
@@ -18,7 +17,7 @@ const h = vi.hoisted(() => {
   process.env.GENBI_POLL_MS = "1";
   return {
     sends: [] as { region: string; name: string; input: any }[],
-    // 序 43 B-91:打到联邦目录的查询前先 GetCatalog(区级资源)—— 记下 Glue 客户端的区,证明它也跟着落点走
+    // 打到联邦目录的查询前先 GetCatalog(区级资源)—— 记下 Glue 客户端的区,证明它也跟着落点走
     glue: [] as { region: string; name: string }[],
     converseInputs: [] as any[],
     turn: 0,
@@ -55,7 +54,7 @@ vi.mock("@aws-sdk/client-athena", async (orig) => {
   return { ...real, AthenaClient: FakeAthena };
 });
 
-// 序 43 B-91:Glue SDK 也是真外部 —— startQuery 对联邦目录查询先 GetCatalog(目录已在 ⇒ 不建)。只记区与命令名。
+// Glue SDK 也是真外部 —— startQuery 对联邦目录查询先 GetCatalog(目录已在 ⇒ 不建)。只记区与命令名。
 vi.mock("@aws-sdk/client-glue", async (orig) => {
   const real: any = await orig();
   class FakeGlue {
@@ -71,7 +70,7 @@ vi.mock("@aws-sdk/client-glue", async (orig) => {
   return { ...real, GlueClient: FakeGlue };
 });
 
-// 序 38 B-71:外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记任何外部桶,落点仍只有平台表桶
+// 外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记任何外部桶,落点仍只有平台表桶
 vi.mock("@/lib/lake/external-table-buckets", () => ({ listExternalTableBuckets: vi.fn(async () => []) }));
 
 vi.mock("@/lib/exec-env/registry", () => ({
@@ -131,7 +130,7 @@ describe("🔴🔴 装配层:问数主循环(数据湖)真把查询发到**该�
     expect(starts.map((s) => s.region)).toEqual(["us-west-2", "us-west-2"]);
     expect(starts.map((s) => s.input.WorkGroup)).toEqual(["bgp-athena-tgt-usw2-a", "bgp-athena-tgt-usw2-a"]);
     expect(h.sends.filter((s) => s.region === "us-east-1"), "主控区一条都不许有").toEqual([]);
-    // 序 43 B-91:联邦目录的 GetCatalog 也必须打到该区(目录是区级资源;打主控区 = 看错区的目录)。
+    // 联邦目录的 GetCatalog 也必须打到该区(目录是区级资源;打主控区 = 看错区的目录)。
     //   只有探表结构那条带目录上下文 ⇒ 1 次;取数那条是假模型写的 "x" 目录,不碰联邦目录 ⇒ 不问 Glue(别的 Athena 查询不碰 Glue 的负向对照)。
     expect(h.glue).toEqual([{ region: "us-west-2", name: "GetCatalogCommand" }]);
     expect(starts[0].input.QueryExecutionContext?.Catalog, "探表结构的目录必须是该区表桶").toBe(USW2_REF);
@@ -142,14 +141,14 @@ describe("🔴🔴 装配层:问数主循环(数据湖)真把查询发到**该�
     expect(out.ranIn).toEqual([{ engine: "athena", region: "us-west-2", workgroup: "bgp-athena-tgt-usw2-a" }]);
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 主控区也必须点名(原来 `targetId: undefined` = 主控区)
+  // 主控区也必须点名(原来 `targetId: undefined` = 主控区)
   it("负向对照(判别力):显式主控区 ⇒ 落在主控区 —— 证明上一条不是「怎么跑都是 us-west-2」", async () => {
     const out = await runGenBiAgent("有多少行", "", "showcase", [], "athena", { targetId: "tgt_home" });
     const starts = h.sends.filter((s) => s.name === "StartQueryExecutionCommand");
     expect(starts.length).toBe(2);
     expect(new Set(starts.map((s) => s.region))).toEqual(new Set(["us-east-1"]));
     expect(starts[0].input.QueryExecutionContext?.Catalog).toBe(HOME_REF);
-    expect(new Set(h.glue.map((g) => g.region)), "B-91 GetCatalog 跟着落点走:主控区查询 ⇒ 主控区目录").toEqual(new Set(["us-east-1"]));
+    expect(new Set(h.glue.map((g) => g.region)), "GetCatalog 跟着落点走:主控区查询 ⇒ 主控区目录").toEqual(new Set(["us-east-1"]));
     expect(out.ranIn).toEqual([{ engine: "athena", region: "us-east-1", workgroup: "bgp-athena" }]);
   });
 });
@@ -173,9 +172,9 @@ describe("🔴🔴 闭合式:数据湖层的落点**只有必填**这一种合�
       expect(m![1].replace(/\s+/g, "")).toBe(sig);
     });
   }
-  // @kf-batch 50-WP31-place-first-class —— 值也必填:`undefined` 仍是静默默认的一种写法(WP-31 §⑥ D3 的对照组)
+  // 值也必填:`undefined` 仍是静默默认的一种写法(§⑥ D3 的对照组)
   it("LakeTarget 是**必填键 + 必填值**(主控区也写 tgt_home)", () => {
-    // 序 38 B-71:多了可选的 catalogRef(目录同步逐桶扫时显式给);targetId 仍是必填键 + 必填值
+    // 多了可选的 catalogRef(目录同步逐桶扫时显式给);targetId 仍是必填键 + 必填值
     expect(code(read("lib/genbi/athena.ts"))).toMatch(/export type LakeTarget = \{ targetId: string; catalogRef\?: string \};/);
   });
 
@@ -187,7 +186,7 @@ describe("🔴🔴 闭合式:数据湖层的落点**只有必填**这一种合�
     }
     expect(hits.sort()).toEqual([
       "lib/openmetadata/om-push.ts:introspectS3Tables", // 主控区表桶 → OM 元数据(参数 bucket 本身就是主控区那只)
-      // (B-27 那一处已随同批修掉:AI 代码生成改按作业绑定的区,见 requirements/__tests__/codegen-target.test.ts)
+      // (那一处已随同批修掉:AI 代码生成改按作业绑定的区,见 requirements/__tests__/codegen-target.test.ts)
     ]);
   });
 });
@@ -197,7 +196,7 @@ describe("🔴 接线:问数两条后端都把落点带到执行处(调用位置
     const s = code(read("lib/genbi/agent.ts")).replace(/^import .*$/gm, "");
     expect(s).toMatch(/introspectS3Tables\(effectiveDb, \{ targetId \}\)/);
     expect(s).toMatch(/runSelectAthena\(sql, \{ targetId \}\)/);
-    // 序 38 B-71:目录引用按用户选的命名空间找所在表桶(平台表桶 / 已登记外部表桶),仍按同一个 targetId
+    // 目录引用按用户选的命名空间找所在表桶(平台表桶 / 已登记外部表桶),仍按同一个 targetId
     expect(s).toMatch(/resolveS3TablesPlaceForNamespace\(targetId, effectiveDb\)\)\.catalogRef/);
     expect(s).not.toMatch(/ATHENA_CATALOG_REF/);
     expect(s, "工具描述写死了主控区目录").not.toContain(HOME_REF + '"');
@@ -207,14 +206,14 @@ describe("🔴 接线:问数两条后端都把落点带到执行处(调用位置
   });
   it("AgentCore:落点按引擎解析(唯一作者 resolveGenBiPlace),execute 不再自己拼 Redshift 落点", () => {
     const s = code(read("lib/genbi/execute.ts")).replace(/^import .*$/gm, "");
-    // 序 38 B-71:第四参 = Athena 引擎用户选的命名空间(找所在表桶);Redshift 引擎传 undefined
+    // 第四参 = Athena 引擎用户选的命名空间(找所在表桶);Redshift 引擎传 undefined
     expect(s).toMatch(/resolveGenBiPlace\(engine, targetId, projectId, /);
     expect(s).not.toMatch(/resolveDirectQueryPlace/);
     expect(s).toMatch(/ranIn \}\);/);
   });
-  it("容器:Athena 落点经 PlaceWire 并进(序 4 合并成一个 place)、目录引用取数据湖腿的 catalogRef、唯一漏斗里收集 ranIn", () => {
+  it("容器:Athena 落点经 PlaceWire 并进(合并成一个 place)、目录引用取数据湖腿的 catalogRef、唯一漏斗里收集 ranIn", () => {
     const s = readFileSync(join(REPO, "infra/agent/genbi/agent.js"), "utf8");
-    // @kf-batch 50-WP31-place-first-class —— 序 4(L6):ath* 四样合并进 PlaceWire;目录引用从数据湖腿取,缺这条腿即拒(不回落 S3T_REF)
+    // ath* 四样合并进 PlaceWire;目录引用从数据湖腿取,缺这条腿即拒(不回落 S3T_REF)
     // 🔴 钉完整派生式(第一版只查子串 `input.place.catalogRef`,被变异 `catalogRefX` 放行 —— 子串判据的老坑)
     expect(s).toMatch(/const athenaRef = isAthena \? placeWireLeg\(placeWire, "athena"\)\.catalogRef : S3T_REF;/);
     expect(s).toMatch(/buildCatalogText\(catTables, db, \{ engine, athenaRef \}\)/);
@@ -263,7 +262,7 @@ describe("呈现:执行层回报 vs 视角(封闭三态)", () => {
     expect(ranInView(undefined, "us-west-2").kind).toBe("unreported");
   });
   it("一致 ⇒ match", () => { expect(ranInView([A], "us-west-2").kind).toBe("match"); });
-  it("🔴 B-26 原状:视角 us-west-2、实际主控区 ⇒ mismatch", () => {
+  it("🔴 原状:视角 us-west-2、实际主控区 ⇒ mismatch", () => {
     const v = ranInView([H], "us-west-2");
     expect(v.kind).toBe("mismatch");
     expect(v.kind === "mismatch" && v.regions).toEqual(["us-east-1"]);

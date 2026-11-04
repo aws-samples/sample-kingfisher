@@ -202,7 +202,7 @@ export function baselineProbes(engine: RoleEngine, ctx: BaselineCtx): { sid: str
  */
 export function baselineSummaryLines(engine: RoleEngine, ctx?: Partial<BaselineCtx>): string[] {
   const c: BaselineCtx = {
-    // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+    // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
     region: ctx?.region || homeRegion(),
     accountId: ctx?.accountId || process.env.AWS_ACCOUNT_ID || "<账号>",
     logBucket: ctx?.logBucket,

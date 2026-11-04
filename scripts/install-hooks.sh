@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 一键启用版本化 git hooks(模块 27 / 安全流程加固)。
+# 一键启用版本化 git hooks(安全流程加固)。
 # 克隆仓库后执行一次即可,使 .githooks/ 下的钩子(含 pre-commit 红线扫描)对本地提交生效。
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

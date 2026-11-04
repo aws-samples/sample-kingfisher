@@ -1,4 +1,4 @@
-// @kf-batch 37-recipes-atomic-overwrite —— 「S3 Tables 结果表先 drop 再建 / 写 = 非原子覆盖」方言规则的判据。
+// 「S3 Tables 结果表先 drop 再建 / 写 = 非原子覆盖」方言规则的判据。
 //
 // 三组:① 正例 = 系统配方自己的模板一个都不许命中(配方不能教自己禁的东西;老 EMR 配方那一行 DROP 就是这么溜进去的);
 //       ② 反例 = 老配方的写法与它的变体必须被抓到(变异:把规则从 emr.ts / glue.ts / s3tables.ts 摘掉 ⇒ 这里转红);

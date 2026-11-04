@@ -11,10 +11,10 @@ import { useSkin } from "@/lib/skins/ThemeProvider";
 import { useT } from "@/lib/i18n/useT";
 import LanguageSwitcher from "@/lib/i18n/LanguageSwitcher";
 import CopilotLauncher from "@/components/copilot/CopilotLauncher";
-// @kf-batch 53-guide-v1 —— 顶栏 ❓ 打开「操作指引」(本页怎么用 / 快速上手 / 多区域与合规)
+// 顶栏 ❓ 打开「操作指引」(本页怎么用 / 快速上手 / 多区域与合规)
 import { QuestionCircleOutlined } from "@ant-design/icons";
 import { useGuide } from "@/components/guide/GuideProvider";
-// @kf-batch 50-WP4-o1-scope —— 顶栏第三层「执行范围」(项目空间 → 环境 → 执行范围;50 INTERACTION §9.2)
+// 顶栏第三层「执行范围」(项目空间 → 环境 → 执行范围;50 INTERACTION §9.2)
 import ScopeSelect from "@/components/scope/ScopeSelect";
 import ChangePasswordModal from "@/components/layout/ChangePasswordModal";
 
@@ -27,7 +27,7 @@ interface ProjectOpt {
 }
 
 const roleColor: Record<string, string> = { owner: "red", editor: "blue", viewer: "default" };
-// @kf-batch 50-SEQ47a-promote-ux —— 颜色单一作者(lib/projects/constants.ts ENV_COLOR),资源 EnvTag 与各环境发布状态同一张表
+// 颜色单一作者(lib/projects/constants.ts ENV_COLOR),资源 EnvTag 与各环境发布状态同一张表
 const envColor: Record<string, string> = ENV_COLOR;
 const ENV_OPTS = [
   { value: "dev", label: "dev" },
@@ -150,7 +150,7 @@ export default function Header() {
           />
         </Tooltip>
         <Tag data-testid="header-env-tag" data-env={env} color={envColor[env] || "default"}>{env}</Tag>
-        {/* @kf-batch 50-WP4-o1-scope —— 第三层「执行范围」。🔴 刻意不叫 Region:选中值是 targetId
+        {/* 第三层「执行范围」。🔴 刻意不叫 Region:选中值是 targetId
             (同 region 可有多账号/多 cell,按 region 键会串身份)。切换**不重载**(与上面两个选择器不同,
             那两个是 window.location.reload;范围切换只改 URL、不离开当前页 —— 护栏 4)。 */}
         <span style={{ marginLeft: 16, color: "#90a4c0", fontSize: 13 }}>

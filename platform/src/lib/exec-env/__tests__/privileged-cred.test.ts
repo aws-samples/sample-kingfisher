@@ -1,4 +1,3 @@
-// @kf-batch 50-G2R
 // G2R —— 凭证工厂单测(50 SPEC §3.9 + §3.9b v3.3)。
 //
 // 【本文件的两条承重】
@@ -156,7 +155,7 @@ describe("🔴🔴 P0-3 回归:状态切换后旧 admin 必须切走(上一版�
     })) as ProjectContextCred;
     expect(first.degradedToLegacyAdmin, "第一次:过渡期应回落").toBe(true);
 
-    // P52.5a 完成:状态单调前进 + epoch++
+    // 完成:状态单调前进 + epoch++
     requireReadyTargetMock.mockResolvedValue(target({ credentialIsolationState: "isolated", credentialEpoch: 1 }));
     await expect(
       getPrivilegedCred("tgt_home", { purpose: "project-context", project: PID }),

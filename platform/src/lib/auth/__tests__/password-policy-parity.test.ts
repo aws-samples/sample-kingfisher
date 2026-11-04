@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 页面「修改密码」的前端预校验必须与用户池策略同口径:读 infra/lib/auth-stack.ts 的 passwordPolicy 逐项比。
 // 任何一侧改了另一侧没改 ⇒ 这里红(前端放行而 Cognito 拒 / 前端拒掉合法密码,两种都是用户可见的错)。
 import { describe, it, expect } from "vitest";

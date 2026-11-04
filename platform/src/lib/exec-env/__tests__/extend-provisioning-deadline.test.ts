@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// §3.9b 延期专用操作 `extendProvisioningDeadline`(WP-9 合同差分 ③-2;判据 HC-1 的本机版)。
+// §3.9b 延期专用操作 `extendProvisioningDeadline`(合同差分 ③-2;判据 HC-1 的本机版)。
 // 只 mock DDB(内存假表,真求值条件表达式)—— registry 真跑。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FakeDdb, DDB_SPECS } from "../../dataplane-jobs/__tests__/fake-ddb";

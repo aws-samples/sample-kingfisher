@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // 跨地域元数据镜像的门禁(50 SPEC §3.13 / INTERACTION §4quater)。
 //
 // 🔴 这一组防的**不是"算不出数"**,是三类"看起来正常":
@@ -21,7 +20,7 @@ const h = vi.hoisted(() => ({
   glueDatabases: [] as Array<{ Name: string }>,
   glueTables: {} as Record<string, Array<{ Name: string; StorageDescriptor?: { Columns?: Array<{ Name: string; Type: string }> } }>>,
   glueThrows: false,
-  /** B-42:这些库的 GetTables 抛错(LakeFormation 只授了部分库的形态) */
+  /** 这些库的 GetTables 抛错(LakeFormation 只授了部分库的形态) */
   glueTablesThrow: new Set<string>(),
 }));
 
@@ -96,7 +95,7 @@ vi.mock("@/lib/exec-env/target-clients", () => ({
   })),
 }));
 
-// B-42:OM 对账走真 om-client;只 mock 真外部(取 token 的 Secrets Manager + 下面按用例 stub 的 fetch)
+// OM 对账走真 om-client;只 mock 真外部(取 token 的 Secrets Manager + 下面按用例 stub 的 fetch)
 vi.mock("@aws-sdk/client-secrets-manager", () => ({
   SecretsManagerClient: class { send = async () => ({ SecretString: "bot-jwt" }); },
   GetSecretValueCommand: class { constructor(public input: unknown) {} },
@@ -435,8 +434,7 @@ describe("上限如实回报", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @kf-batch 50-B42-om-reconcile
-describe("🔴🔴 B-42:差集删除只在采集确知完整时做(镜像 + OM 对账)", () => {
+describe("🔴🔴 差集删除只在采集确知完整时做(镜像 + OM 对账)", () => {
   const seed = (fqn: string) =>
     h.store.set(key("mirror#tgt_home", `table#${fqn}`), {
       pk: "mirror#tgt_home", sk: `table#${fqn}`, kind: "table", fqn, payload: { name: fqn.split(".").pop() },

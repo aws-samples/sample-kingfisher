@@ -1,11 +1,11 @@
-// 模块 40 — 成本事件 signature 归一(FinOps 自带,不改 43-A signature.ts)。
+// 成本事件 signature 归一(FinOps 自带,不改 43-A signature.ts)。
 // 与 43-A 同一约定:signature = engine + "::" + key,key 为白名单常量(天生脱敏,
 // 不含任务名/表名/金额等可变 token)。成本事件按【任务+执行环境+引擎+异常类】归并:同一任务在同一个区
 // 反复成本突增 → 同一 signature 累加 occurrenceCount,复利沉淀。
 //
 // 纯函数、可单测。title(症状模板)同样只用白名单短语 + 倍数(数字非敏感)。
 //
-// @kf-batch 50-WP6-cost-by-region(WP-6 施工序 4,E-174)—— 🔴 签名加 **target 维**(服务级加 region 维)。
+// 🔴 签名加 **target 维**(服务级加 region 维)。
 // 不加的后果:同一任务在 A、B 两区的成本突增落进**同一个**知识库主档,occurrenceCount 混计,
 // 诊断 Agent 学到的「这个任务常常变贵」分不清是哪个区 —— 与基线池化是同一个病的另一半。
 // target 维不喂 targetId 原文(出口清单:会被大写化折叠),喂 `targetSignatureCode` 哈希短码。

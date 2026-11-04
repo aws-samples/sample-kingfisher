@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// @kf-batch 50-P50.1a-naming-ssot
 // 命名 SSOT 双侧 parity 门禁 —— `npm run test:naming-parity`(在 platform 下跑)。
 //
 // 【为什么必须真执行两侧,而不是"读源码断言长得像"】

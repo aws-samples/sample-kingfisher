@@ -1,4 +1,3 @@
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤
 // 执行环境部署用的 CodeBuild 项目名及其日志组名 —— **零 import 叶子**,两类消费方共用同一份字面:
 //   · 控制 / 预演 / 恢复侧(`deploy-control.ts` re-export,`region-org-block.ts`):调 CodeBuild API 要项目名;
 //   · 落点观测器(`lib/place/observer.ts`):读这个日志组 = 读平台**自己**的控制面产物(CodeBuild 在主控区跑,日志组也在主控区),

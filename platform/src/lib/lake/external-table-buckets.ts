@@ -1,4 +1,4 @@
-// 序 38 B-71 —— 每个执行环境可登记**外部 S3 Tables 表桶**(客户自有、不是平台部署的那一个),唯一作者。
+// 每个执行环境可登记**外部 S3 Tables 表桶**(客户自有、不是平台部署的那一个),唯一作者。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】直查表树 / 治理目录同步 / 问数都只认 `resolveS3TablesPlace(targetId)` 解析出的
 //   **平台表桶**(主控区 bgp-table-bucket / 非 home 描述符 tableBucket)。客户把同步目标写进自己的表桶 bigdata-test-sg-tables
@@ -7,7 +7,7 @@
 //   且不是该区的平台表桶);读侧 `resolveS3TablesPlaces(targetId)` = 平台表桶 + 已登记外部桶,三处消费面都改走它:
 //   直查表树(每个命名空间标明来自哪个桶)/ 治理目录同步(每个桶一个 database)/ 问数(按命名空间找到它所在的桶)。
 //   平台不主动写外部表桶(不建命名空间、不建表、不写数据);**只有把它选为 Table Bucket 的同步任务**才会在里面建命名空间 / 表。
-// 【B-127(2026-10-27)】登记表从此也是该执行环境**可写外部桶的唯一事实源**:非主控区执行环境的同步任务自带表桶,保存 / 启动都要求
+// 登记表从此也是该执行环境**可写外部桶的唯一事实源**:非主控区执行环境的同步任务自带表桶,保存 / 启动都要求
 //   它 ∈ {平台表桶} ∪ 本表(lib/sync/table-bucket.ts 唯一判定);主控区行为不变(历来允许任意自带桶)。
 import { PutCommand, DeleteCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { GetTableBucketCommand, S3TablesClient } from "@aws-sdk/client-s3tables";

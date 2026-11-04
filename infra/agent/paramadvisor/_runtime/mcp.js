@@ -1,7 +1,7 @@
 // 极简 MCP(Streamable HTTP)客户端 + SigV4(service=bedrock-agentcore)。
 // 用于 Agent(Runtime)→ Gateway(AWS_IAM 入站)调用 MCP 工具。
 //
-// 【模块47 L2 ②runtime 件】此文件是【平台级共享源】(infra/agent/_runtime),经 prebuild 分发进
+// 【runtime 件】此文件是【平台级共享源】(infra/agent/_runtime),经 prebuild 分发进
 // 各能力容器(genbi/paramadvisor/netadvisor/…),消灭原先每容器一份逐字节相同的 mcp.js。
 // 唯一原先的业务差异 = init 时 clientInfo.name,现由构造参数 clientName 传入(默认 bgp-agent)。
 import { SignatureV4 } from "@aws-sdk/signature-v4";

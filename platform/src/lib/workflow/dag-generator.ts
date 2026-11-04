@@ -1,5 +1,4 @@
 import type { Workflow } from "@/types/workflow";
-// @kf-batch 52-P52.2-W2a-run-stamp
 // 🔴 **对本文件"一行不动"冻结令的一次显式破例,理由与授权范围如下**:
 //  · 真环境实测 `WORKFLOW_DAG_ENGINE=legacy`(平台栈默认值,platform-stack.ts:850)
 //    ⇒ 本冻结引擎**就是现网 workflow 调度的生产路径**,它的 `put_item` 是一个**活的**建行点;
@@ -7,23 +6,22 @@ import type { Workflow } from "@/types/workflow";
 //  · 不盖 = 非默认项目的调度 run 落进"无 projectId"桶,被默认工作区的读侧兜底捞走(串视图);
 //  · 破例范围**仅限**在 run 记录 dict 里加两个归属字段(不碰节点语义、不碰那处裸 exec、
 //    不改任何执行逻辑)⇒ 不影响"新旧等价"对照(且仓内并无 golden-master 测试文件,已 grep 核实)。
-// @kf-batch 50-WP15-airflow-serverless(T-12)台账行键唯一作者
+// 台账行键唯一作者
 import { pyRunKeyFields } from "@/lib/monitor/run-key";
 import { pythonStampFields, resolveRunStamp } from "@/lib/monitor/run-records";
-// @kf-batch 50-P50.1-workgroup-ssot — 冻结破例第 ② 项:原来 Python 里**写死** `WorkgroupName="bgp-workgroup"`,
+// 冻结破例第 ② 项:原来 Python 里**写死** `WorkgroupName="bgp-workgroup"`,
 // 连 config 与 env 都不看 ⇒ REDSHIFT_WORKGROUP 一改,legacy 工作流的 SQL 节点会打到另一个数仓。
 import { homeWorkgroup, homeDatabase } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-WP4quinquies-pushdown —— 落点规则的单一作者(两个生成器共用)
+// 落点规则的单一作者(两个生成器共用)
 import { assertDagPlace, ctrlRegionOf, hasSqlNode, type WorkflowDagPlace } from "@/lib/workflow/dag-place";
 
-// ⚠️ 冻结引擎(Strangler Fig,模块 33-B / DESIGN-B-rich-nodes.md §8)。
+// ⚠️ 冻结引擎(Strangler Fig,/ DESIGN-B-rich-nodes.md §8)。
 // 这是 legacy DAG 生成器,只认 sync/sql/python 老三节点。**只出不进、一行不动**:
 //  · 新节点(branch/empty/join/foreach/setvar/external)一律走新引擎 dag-generator-v2.ts;
 //  · 它的产出是灰度对照组的 characterization golden master——改它会污染"新旧等价"对比;
 //  · 含裸 exec(:169) 的 RCE 面随本引擎一起冻结,删旧(WORKFLOW_DAG_ENGINE 默认切 runtime-lib
 //    并稳定 N 版后)时一并闭合。全平台 RCE 面仅此 1 处(§5.4 扫描坐实)。
 // 需求变更请改新引擎,不要动这里。
-// @kf-batch 50-WP4quinquies-pushdown
 // 🔴 **对"一行不动"冻结令的第 ③ 次显式破例,理由与授权范围**:
 //  · 真环境无头验收(段 `scq` A2-1)当场抓到:usw2 视角发布的工作流,DAG **文件写进了该区的桶、
 //    也真跑在该区的 Airflow**(A2-2 已绿),但**文件正文** `region = "us-east-1"`、
@@ -49,11 +47,11 @@ export function generateAirflowDag(
   assertDagPlace(workflow.workflowId, opts, hasSqlNode(nodes as Array<{ type?: string }>));
   const dagId = workflow.airflowDagId || `bgp_${workflow.workflowId}`;
   const schedule = workflow.cronExpression || "None";
-  // @kf-batch 50-WP17-serverless-workflow —— 章 = 这份 DAG 真正执行的 target(理由与 v2 生成器同一条,
+  // 章 = 这份 DAG 真正执行的 target(理由与 v2 生成器同一条,
   //   见 dag-generator-v2.ts 同名处;冻结破例第 ④ 项:只换章的取值来源,不改任何执行逻辑)。
   const wfStamp = resolveRunStamp(workflow, opts.targetId);
   const stampFields = pythonStampFields(wfStamp);
-  // @kf-batch 50-WP15-airflow-serverless(T-12)台账行键(唯一作者 lib/monitor/run-key.ts)
+  // 台账行键(唯一作者 lib/monitor/run-key.ts)
   const runKeyFields = pyRunKeyFields({ taskIdExpr: "WORKFLOW_ID", rawExpr: "run_id", targetId: wfStamp.targetId });
   // SQL 节点统一以 admin 密钥身份在 Redshift 执行（与平台 run-now / ETL 作业一致），
   // 避免 MWAA worker 联邦身份建表与平台 admin 身份互不可读的跨身份属主问题。
@@ -171,7 +169,7 @@ def _update_run_record(run_id, status, context=None):
             item["error"] = error_msg
         dynamodb.Table("bgp-task-runs").put_item(Item=item)
     except Exception as e:
-        # 🔴 T-12「写不成即拒」:见 lib/monitor/run-key.ts 文件头。on_success 是**任务**,抛出去让 run 显红。
+        # 🔴 「写不成即拒」:见 lib/monitor/run-key.ts 文件头。on_success 是**任务**,抛出去让 run 显红。
         print(f"Failed to update run record: {e}")
         raise
 

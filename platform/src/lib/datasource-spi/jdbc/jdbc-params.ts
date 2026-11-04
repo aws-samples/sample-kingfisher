@@ -1,4 +1,4 @@
-// @kf-batch 44-jdbc-params(用户 2026-10-15 反馈 ③「数据源缺少 JDBC 连接参数化配置」+ ①「同步遇到空时间戳脏数据报错」)
+// (用户 2026-10-15 反馈 ③「数据源缺少 JDBC 连接参数化配置」+ ①「同步遇到空时间戳脏数据报错」)
 // 🔴 「附加 JDBC 连接参数」的**唯一作者**:解析 / 校验 / 与方言默认参数合并 / 拼到 URL 上。
 //   前端表单(DataSourceModal)、建源 / 编辑路由、provider.buildConnection 都 import 这里,不许各自再写一份正则。
 //   纯模块:不引 Node / AWS 依赖,前端 bundle 可直接 import。

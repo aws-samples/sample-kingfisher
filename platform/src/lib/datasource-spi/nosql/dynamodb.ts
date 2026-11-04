@@ -1,4 +1,4 @@
-// 模块 42 — DynamoDB provider(NoSQL 范式 nosql,P42.5)。
+// DynamoDB provider(NoSQL 范式 nosql)。
 //
 // 【为什么】数据源 SPI 的第一个 NoSQL 范式 provider。DynamoDB 无固定 schema(每个 item 属性可不同),
 // 与 JDBC(INFORMATION_SCHEMA 有确定列)、stream(无 schema)都不同 → introspect 靠 DescribeTable 拿
@@ -11,7 +11,7 @@
 //   analysisChannels=[](一期不直查;DDB→Athena/Redshift federated 需额外 connector 配置,二期)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   DynamoDBClient,
@@ -31,7 +31,7 @@ import type {
   DataSourceCapabilities,
 } from "../types";
 
-// L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+// L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
 const REGION = homeRegion();
 
 // introspect 采样条数:DDB 无固定 schema,Scan 一批 item 求属性并集推断列。

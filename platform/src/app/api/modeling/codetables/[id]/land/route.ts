@@ -4,21 +4,20 @@ import { requestedSubset } from "@/lib/place/resolve";
 import { apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { getCorrelationId } from "@/lib/observability/logger";
-// 模块 55 / 序 50(B-111 根治):落地主体在 lib/modeling/long-ops.ts(modeling-land)。进程内等 45s 未终态 ⇒ 202(协议 long-op/1),
-//   客户端传输层(全局 fetch 拦截器)轮询 GET /api/long-ops/[taskId] 到终态再交回同形 200 —— 目标区数仓冷启动不再撞 60s 墙(B-111)。
+// (根治):落地主体在 lib/modeling/long-ops.ts(modeling-land)。进程内等 45s 未终态 ⇒ 202(协议 long-op/1),
+//   客户端传输层(全局 fetch 拦截器)轮询 GET /api/long-ops/[taskId] 到终态再交回同形 200 —— 目标区数仓冷启动不再撞 60s 墙。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 
-// 模块 35: 码表落地 Redshift(建物理码表 dim_code_<code> 并幂等灌入枚举值;仅平台管理员)。
+// 码表落地 Redshift(建物理码表 dim_code_<code> 并幂等灌入枚举值;仅平台管理员)。
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   if (!identity.isPlatformAdmin) return apiError("仅平台管理员可落地码表", 403);
-  // @kf-batch 50-P50.3-modeling
   // 逐 target 落地(轴A)。`targets` 缺省 = 定义自身绑定(再缺省 = home)⇒ **存量调用方行为不变**。
   // `probeOnly` = 只重新观测不动库(界面〔检测〕);`force` = 以平台定义**强制重建**(先 DROP,有损)。
   const body = await req.json().catch(() => ({}));
-  const targets = requestedSubset(body); // @kf-batch 50-WP31-place-first-class —— 不给 = 定义自己的全部绑定(唯一解析作者)
+  const targets = requestedSubset(body); // 不给 = 定义自己的全部绑定(唯一解析作者)
   const force = body?.force === true;
   const probeOnly = body?.probeOnly === true;
   // 🔴 强制重建是**有损**的(DROP 该 target 上的现有表)⇒ 必须带逐字确认串,

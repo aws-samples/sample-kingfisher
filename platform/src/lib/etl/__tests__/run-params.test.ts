@@ -86,7 +86,7 @@ describe("dateRange (backfill window)", () => {
   });
 });
 
-// @kf-batch 37-emr-run-date —— paramSet 扩成全平台一张表(15 个键):存量 6 个取值不变、新增只增不改、顺序即界面展示顺序
+// paramSet 扩成全平台一张表(15 个键):存量 6 个取值不变、新增只增不改、顺序即界面展示顺序
 import { RUN_PARAM_NAMES, RUN_PARAM_ARG_NAMES, runParamArguments, runParamArgv } from "../run-params";
 
 describe("paramSet:全平台一张表(15 键)", () => {

@@ -46,13 +46,13 @@ describe("Athena/Trino 方言规则", () => {
     expect(s.dialectRules.some((d) => d.rule.includes("双引号") || d.rule.includes("date_diff"))).toBe(true);
   });
 
-  // @kf-batch 50-B26-lake-place —— 多区避坑知识必须**真能被 AI 路径检索到**(写进 seed ≠ 接上了)
+  // 多区避坑知识必须**真能被 AI 路径检索到**(写进 seed ≠ 接上了)
   it("🔴 配方库不许出现两份同义的多区目录教法(单一作者 = 方言规则那一条)", () => {
     const src = readFileSync(resolve(__dirname, "../seed/athena.ts"), "utf8") + readFileSync(resolve(__dirname, "../seed/s3tables.ts"), "utf8");
     expect((src.match(/三样必须是同一个区/g) || []).length).toBe(1);
   });
 
-  it("🔴 B-26 多区避坑:Athena「三样同区」+ Flink「sink 表桶占位符」都注入 retrieve,且不拦合法 SQL", async () => {
+  it("🔴 多区避坑:Athena「三样同区」+ Flink「sink 表桶占位符」都注入 retrieve,且不拦合法 SQL", async () => {
     const a = await retrieve("athena", { topK: 5 });
     // retrieve 给模型的形状不带 id ⇒ 按标题认
     expect(a.dialectRules.map((d) => d.title)).toContain("多区:目录引用 / 工作组 / 客户端 region 三样必须是同一个区");

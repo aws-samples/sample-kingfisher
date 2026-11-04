@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 序 48 —— scripts/lib/execution-regions.sh(放行清单唯一作者)的离线真跑判据:用**假 aws** 驱动每个分支。
+# scripts/lib/execution-regions.sh(放行清单唯一作者)的离线真跑判据:用**假 aws** 驱动每个分支。
 #
 #     bash infra/test/execution-regions/test_lib.sh      # 退出码 0 = 全过
 #
@@ -35,7 +35,7 @@ case "$svc:$act" in
   ssm:put-parameter)       [ "${FAKE_SSM_PUT:-ok}" = "deny" ] && deny; echo '{"Version": 1}';;
   ssm:delete-parameter)    exit 0;;
   ec2:describe-regions)
-      # B-114:带 --all-regions 的那条查「未 opt-in」清单(FAKE_EC2_ALL=deny 拒;FAKE_NOT_OPTED_IN 给清单,可为空);不带的仍是「已启用」清单
+      # 带 --all-regions 的那条查「未 opt-in」清单(FAKE_EC2_ALL=deny 拒;FAKE_NOT_OPTED_IN 给清单,可为空);不带的仍是「已启用」清单
       case " $* " in
         *" --all-regions "*) [ "${FAKE_EC2_ALL:-ok}" = "deny" ] && deny; printf '%s\n' "${FAKE_NOT_OPTED_IN-af-south-1	me-south-1	eu-south-1}";;
         *)                   [ "${FAKE_EC2:-ok}" = "deny" ] && deny; printf '%s\n' "${FAKE_ENABLED:-ap-southeast-1	eu-central-1	us-east-1	us-west-2}";;
@@ -111,13 +111,13 @@ case "$r" in *"DIE: 读账号启用的 region 清单失败"*"rc=1"*) ok "⑯ des
 case "$r" in *"不在本账号已启用"*) bad "⑯b describe-regions 被拒后把错误文本当成了「已启用清单」继续校验";; *) ok "⑯b 读失败即停,不拿错误文本当清单";; esac
 if grep -q 'ssm put-parameter' "$FAKE_CALLS"; then bad "⑯c describe-regions 被拒却写了 SSM"; else ok "⑯c describe-regions 被拒 ⇒ 未写 SSM"; fi
 
-echo "== IAM 门探测区:必须不在放行清单里(B-114:账号未 opt-in 区优先、固定备选兜底、都挑不出 ⇒ 空串但调用方不 die)=="
-# 🔴 B-114(2026-10-22 测试账号 all-enabled 升级真撞):原来只有 7 个固定备选,all-enabled 把它们全放进清单 ⇒ 空串 ⇒ redeploy die exit 1,
+echo "== IAM 门探测区:必须不在放行清单里(账号未 opt-in 区优先、固定备选兜底、都挑不出 ⇒ 空串但调用方不 die)=="
+# 🔴 (2026-10-22 测试账号 all-enabled 升级真撞):原来只有 7 个固定备选,all-enabled 把它们全放进清单 ⇒ 空串 ⇒ redeploy die exit 1,
 #   而平台栈已经部署完。未 opt-in 的区按定义进不了放行清单(候选区必须已启用、注册表在用区都真部署过),IAM 模拟只拿区名当条件值 ⇒ 首选。
 ALL_FIXED='eu-central-1,eu-west-3,sa-east-1,ca-central-1,ap-south-1,eu-north-1,ap-northeast-3'
 # 假 aws 缺省给三个未 opt-in 区(af-south-1 / me-south-1 / eu-south-1,排序后 af-south-1 最前)
 chk "⑰ 账号有未 opt-in 区 ⇒ 优先挑它(固定备选有空的也不用)" "af-south-1" "$(exec_regions_pick_probe 'ap-southeast-1,us-west-2' 2>/dev/null)"
-chk "⑰b B-114 真撞复现:all-enabled 把 7 个固定备选全放进清单 ⇒ 仍挑出未 opt-in 区(修前回空)" "af-south-1" "$(exec_regions_pick_probe "ap-southeast-1,us-west-2,$ALL_FIXED" 2>/dev/null)"
+chk "⑰b 真撞复现:all-enabled 把 7 个固定备选全放进清单 ⇒ 仍挑出未 opt-in 区(修前回空)" "af-south-1" "$(exec_regions_pick_probe "ap-southeast-1,us-west-2,$ALL_FIXED" 2>/dev/null)"
 chk "⑰c 未 opt-in 区碰巧在清单里(注册表脏值)⇒ 跳过它挑下一个" "eu-south-1" "$(exec_regions_pick_probe 'ap-southeast-1,af-south-1,me-south-1' 2>/dev/null)"
 chk "⑱ 账号没有未 opt-in 区(全开了)⇒ 退回固定备选:清单不含 eu-central-1 ⇒ 挑 eu-central-1" "eu-central-1" "$(FAKE_NOT_OPTED_IN='' exec_regions_pick_probe 'ap-southeast-1,us-west-2' 2>/dev/null)"
 chk "⑱b 固定备选顺序:清单含 eu-central-1 ⇒ 挑 eu-west-3" "eu-west-3" "$(FAKE_NOT_OPTED_IN='' exec_regions_pick_probe 'ap-southeast-1,eu-central-1' 2>/dev/null)"
@@ -138,9 +138,9 @@ if grep -q 'ensure_s3tables_catalog' "$ROOT/scripts/redeploy-platform.sh" && gre
   ok "㉓ 3c 联邦目录只对 actual(home ∪ 在用区)开通,不含候选区"
 else bad "㉓ 3c 联邦目录循环的清单不是 actual"; fi
 if grep -q -- '--probe-region "$IAM_PROBE_REGION"' "$ROOT/scripts/redeploy-platform.sh"; then ok "㉔ IAM 门探测区由 pick_probe 挑(候选区多了不会撞进清单)"; else bad "㉔ IAM 门仍用写死的探测区"; fi
-# B-114 接线:挑不出探测区 ⇒ 交 none 给门(不 die);门认 none(any-region 轴只验 home、记未验、退 4)
+# 接线:挑不出探测区 ⇒ 交 none 给门(不 die);门认 none(any-region 轴只验 home、记未验、退 4)
 if grep -q '^  IAM_PROBE_REGION=none$' "$ROOT/scripts/redeploy-platform.sh" && ! grep -q 'die "放行清单覆盖' "$ROOT/scripts/redeploy-platform.sh"; then
-  ok "㉔b B-114:redeploy 挑不出探测区 ⇒ 把 none 交给门而不是 die(平台已部署完,不许报成升级失败)"
+  ok "㉔b redeploy 挑不出探测区 ⇒ 把 none 交给门而不是 die(平台已部署完,不许报成升级失败)"
 else bad "㉔b redeploy-platform 挑不出探测区仍 die / 没有 none 兜底"; fi
 if grep -q 'PROBE_NONE = "none"' "$ROOT/scripts/iam-simulate-gate.py" && grep -q 'sim_regions_for(axis, a.probe_region, a.home_region, regions)' "$ROOT/scripts/iam-simulate-gate.py" \
    && grep -q 'return verdict_code(bool(bad), bool(blocked), bool(any_region_unverified))' "$ROOT/scripts/iam-simulate-gate.py"; then

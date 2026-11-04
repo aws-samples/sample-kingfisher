@@ -1,4 +1,4 @@
-// 序 60 B-132 —— patchDataSourceRow 是数据源状态回写的唯一作者,调用方全是在途的 fire-and-forget 收口:
+// patchDataSourceRow 是数据源状态回写的唯一作者,调用方全是在途的 fire-and-forget 收口
 //   源在收口前被删 ⇒ DynamoDB UpdateItem 对不存在的键是 upsert ⇒ 原来凭空造出只有状态字段的幽灵行(2026-10-28 测试账号三条)。
 //   判据:① 每次写都带 attribute_exists(datasourceId) 条件;② 条件不满足(源已删)⇒ 回 gone、不抛、不写;③ 别的错误照抛;④ 空 patch 不写。
 //   只 mock 真外部(DDB docClient)。
@@ -14,7 +14,7 @@ import { patchDataSourceRow } from "@/lib/datasource/ds-patch";
 
 beforeEach(() => { h.sends.length = 0; h.failWith = null; });
 
-describe("🔴 B-132 patchDataSourceRow 条件写", () => {
+describe("🔴 patchDataSourceRow 条件写", () => {
   it("① 写带 attribute_exists(datasourceId),键 / SET / updatedAt 与改前同形 ⇒ patched", async () => {
     const r = await patchDataSourceRow("ds-1", { status: "unreachable", heartbeat: { at: "t" } });
     expect(r).toBe("patched");

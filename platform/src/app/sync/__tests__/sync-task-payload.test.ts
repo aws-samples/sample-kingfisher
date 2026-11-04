@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 同步向导「提交整形」判据。
+// 同步向导「提交整形」判据。
 //
 // ① 钉现状:LEGACY = 改动前 SyncTaskModal.handleSubmit 里那四行**逐字**搬来的参考实现;
 //    对存量形态的任务,新整形函数的输出必须与它逐键相同。
@@ -39,7 +39,7 @@ const MAP_ORDERS = [
 ];
 const MAP_ORDERS_INCLUDED = [MAP_ORDERS[0]];
 
-/** 存量任务(编辑回填后的表单值 = 原任务 + 挂载时 initialValue 补上的那几个) —— 都不带序 37 新字段。 */
+/** 存量任务(编辑回填后的表单值 = 原任务 + 挂载时 initialValue 补上的那几个) —— 都不带新字段。 */
 const OLD_TASKS: Array<{ what: string; task: Record<string, any> }> = [
   {
     what: "全量 + 覆盖 + S3 Tables",
@@ -300,7 +300,7 @@ describe("⑥ 新文案都有英文译文", () => {
   });
 });
 
-describe("⑦ 序 37 B-61:合并键只在 merge 时进请求体;原任务有的改回缺省要显式写回", () => {
+describe("⑦:合并键只在 merge 时进请求体;原任务有的改回缺省要显式写回", () => {
   const base = { name: "n", datasourceId: "ds1", syncMode: "full", targetType: "s3-tables" };
   const st = { selectedTables: ["orders"], fieldMappings: { orders: MAP_ORDERS } };
   it("merge + 有键 ⇒ 照写(去空白);过前端校验", () => {
@@ -342,7 +342,7 @@ describe("⑦ 序 37 B-61:合并键只在 merge 时进请求体;原任务有的�
   });
 });
 
-// @kf-batch 44-sync-switch-datasource —— 编辑时换源:表单预填的旧库名不带回去(服务端按新源重算);没换源逐键不变(① 组已钉)
+// 编辑时换源:表单预填的旧库名不带回去(服务端按新源重算);没换源逐键不变(① 组已钉)
 describe("④ 换数据源时丢掉表单预填的 sourceDatabase", () => {
   const task = { name: "t", datasourceId: "ds1", sourceDatabase: "ecommerce", sourceTables: ["orders"], syncMode: "full", writeMode: "append", targetType: "redshift" };
   it("datasourceId 与原任务不同 ⇒ 请求体没有 sourceDatabase;其余键照旧", () => {

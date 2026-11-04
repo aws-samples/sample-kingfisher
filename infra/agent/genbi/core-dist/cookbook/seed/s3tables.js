@@ -1,5 +1,5 @@
 "use strict";
-// 模块 44 — S3 Tables(托管 Iceberg)工程配方。用户明确要求沉淀"写 S3 table 的核心代码"。
+// S3 Tables(托管 Iceberg)工程配方。用户明确要求沉淀"写 S3 table 的核心代码"。
 // 基于平台验证过的范式(见记忆 [[emr-serverless-s3tables-recipe]] [[s3table-query-and-iam]]):
 //  · 计算引擎(EMR/Glue Spark)写 S3 Tables 必须用 S3TablesCatalog + runtime jar + 挂 VPC(NAT),
 //    【禁】用 GlueCatalog/glue.id 那套(那是普通 Glue 表,不是 S3 Tables 托管 Iceberg)。
@@ -7,11 +7,11 @@
 // 这些是平台踩坑验证过的核心代码,让规划大脑照抄,不再从零猜 Iceberg 配置。
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.S3TABLES_RECIPES = exports.S3TABLES_DIALECT_RULES = void 0;
-// @kf-batch 37-recipes-atomic-overwrite —— 原子覆盖的规则文本 / 反例判据唯一作者
+// 原子覆盖的规则文本 / 反例判据唯一作者
 const s3tables_overwrite_facts_1 = require("./s3tables-overwrite-facts");
 // S3 Tables 的"方言规则"更多是【配置约束】(用错 catalog 直接连不上/写不进)。
 exports.S3TABLES_DIALECT_RULES = [
-    // @kf-batch 37-recipes-atomic-overwrite —— 结果表先 drop 再建 / 写 = 非原子覆盖 ⇒ warn。
+    // 结果表先 drop 再建 / 写 = 非原子覆盖 ⇒ warn。
     //   挂在 s3tables 引擎下是为了让 codegen 对 Spark 目标额外注入的 s3tables 切片(requirements/codegen.ts)
     //   与 lookup_recipe engine=s3tables 都能看到它;运行前的检测走 emr / glue 两份实例。
     (0, s3tables_overwrite_facts_1.noDropBeforeS3TablesWriteRule)("s3tables"),
@@ -98,8 +98,7 @@ exports.S3TABLES_RECIPES = [
         engineVersion: "glue>=5.0",
     },
     {
-        // @kf-batch 37-recipes-atomic-overwrite
-        // 提炼自平台同步脚本生成器序 37 B-53 / ⑤ 的真跑范式(lib/sync/glue-script-generator.ts:整表 = 静态 INSERT OVERWRITE 一次提交;
+        // 提炼自平台同步脚本生成器/ ⑤ 的真跑范式(lib/sync/glue-script-generator.ts:整表 = 静态 INSERT OVERWRITE 一次提交;
         // 按分区 = 动态分区覆盖一次提交;读到 0 行默认拒绝清空;写后 COUNT 对数不一致即失败),非凭记忆。
         // ⚠️ 逐句与生成器同源,但本模板**作为独立脚本**尚未在真环境单独跑过 ⇒ 刻意不标 verifiedAt(入库纪律:标了就得真跑过)。
         // 老配方(emr.spark-dynamodb-to-s3tables 2026-07-29 版)教「先 drop 表再 createOrReplace」—— 那是非原子覆盖,已撤;

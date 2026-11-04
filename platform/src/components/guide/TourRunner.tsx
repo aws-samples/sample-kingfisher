@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 53-guide-tour
 // 新手引导的**导览运行器**:antd `Tour` 聚光灯高亮**真实控件** + 气泡 + 上一步/下一步/跳过 + 进度 + 跨页续跑。
 //
 // 🔴 三条护栏(都是「静默」类缺陷的正面反例):
@@ -75,7 +74,6 @@ export default function TourRunner({ journeyKey, index, onIndex, onFinish }: Tou
     }
   }, [cur, pathname, router]);
 
-  // @kf-batch 53-guide-tour-reach
   // 🔴 **用户照着做了就前进** —— nav 步说的是「点左侧菜单进入这一页」;用户真去点了(页面已经换了),
   //    气泡却还停在同一句上,导览就成了死循环般的复读机。这不是「替用户点」(§护栏③):
   //    动作是**用户自己**做的,这里只是回应它。
@@ -121,7 +119,7 @@ export default function TourRunner({ journeyKey, index, onIndex, onFinish }: Tou
   if (!cur) return null;
 
   if (status === "missing") {
-    // @kf-batch 50-WP23-guide-scope-gate —— 说什么由纯函数 `missingAnchorAdvice` 决定(离线可钉);
+    // 说什么由纯函数 `missingAnchorAdvice` 决定(离线可钉);
     //   这里只认「页面上有没有 ScopeGate 的空壳」这一个事实,以及把话显示出来。
     const advice = missingAnchorAdvice({
       index, total: steps.length, title: cur.title, testid: cur.testid,

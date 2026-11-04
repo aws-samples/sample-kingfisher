@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback(用户 2026-10-15:「任务配置失败了,点击『完成』按钮没反应,退出后需要重新从头配置,最好增加一个临时保存按钮,或者其他兜底策略」)
+// (用户 2026-10-15:「任务配置失败了,点击『完成』按钮没反应,退出后需要重新从头配置,最好增加一个临时保存按钮,或者其他兜底策略」)
 // 🔴 同步任务向导的**本地草稿**(单一作者):向导每一步的改动都落到浏览器 localStorage,保存成功才清;
 //   弹窗再打开时若有草稿就问「恢复 / 丢弃」。只存配置,不存密钥(向导里本来就没有密钥字段)。
 //   纯函数 + 可注入的 storage(单测不碰 window);键按「新建」/ 某个 taskId 分开,互不覆盖。
@@ -11,7 +11,7 @@ export interface SyncWizardDraft {
   selectedTables: string[];
   templateTables: string[];
   fieldMappings: Record<string, unknown[]>;
-  /** 序 56:带日期变量的源表名 → 样例表(旧草稿没有这个键 ⇒ 视为没选样例) */
+  /** 带日期变量的源表名 → 样例表(旧草稿没有这个键 ⇒ 视为没选样例) */
   templateSamples?: Record<string, string>;
 }
 

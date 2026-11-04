@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴 敏感扫描**按区**:summary 盖落点章;「最近一次扫描」只看本区(存量无章 = 主控区)。
 //   原来 summary 不带 targetId、getLatestScan 全表取最新 ⇒ 两个区各扫一次(定时扫描上线后是常态),
 //   A 区视角读到 B 区的结果 —— 治理健康分也吃这一份,于是分数串区。
@@ -51,7 +50,7 @@ beforeEach(() => {
   summaries = [];
 });
 
-describe("敏感扫描按区(WP-28 顺带修)", () => {
+describe("敏感扫描按区(顺带修)", () => {
   it("summary 盖落点章(就是扫的那个区)", async () => {
     const r = await runSensitiveScan({ scope: { targetId: "tgt_usw2_a", projectId: "proj-x" } });
     if ("capability" in r) throw new Error("不该降级");

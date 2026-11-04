@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-// 序 72 B-139(模块 56)—— 页面「检查权限」按钮:POST /api/exec-roles/preflight
+// 页面「检查权限」按钮:POST /api/exec-roles/preflight
 //   body { engine, targetId, roleArn, extraS3Uris?, scriptCode? } ⇒ PreflightResult(三态:齐 / 缺 N 条 / 量不了)。
 //   只是预览;保存 / 启动路径服务端自己还会再量一遍(不信客户端)。登录即可用;只读动作(GetRole / SimulatePrincipalPolicy)。
 

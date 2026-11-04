@@ -1,4 +1,4 @@
-// 模块 33-A — EMR 作业连接信息（VPC 网络接入）。
+// EMR 作业连接信息（VPC 网络接入）。
 // 拍板③：凡有连接信息必须「创建任务时」就填清 + 网络顾问前置校验（别乱丢垃圾）。
 // EMR Serverless application 的 networkConfiguration 需要 subnetIds + securityGroupIds
 //（私有子网，对齐 memory network-private-only）。

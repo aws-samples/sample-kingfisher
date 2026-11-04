@@ -1,7 +1,6 @@
-// @kf-batch 50-WP18d-unpublish-seam
 // 🔴🔴 「撤不下来就不许动记录」这条不变量,在**三条路**上各自失效过一次:
 //   ① `DELETE /api/etl-jobs/[id]`:注释写着「下线失败就不删行」,而 `offlineFanout` **从不抛**
-//      (它按 T-14 的教训把失败写成 `failed` 行并刻意保留台账)⇒ 那个 try/catch 一条都拦不住,
+//      (它的教训把失败写成 `failed` 行并刻意保留台账)⇒ 那个 try/catch 一条都拦不住,
 //      行照删 ⇒ 那个区的 workflow 继续按 cron 跑,而 workflowArn 随行消失,平台再也找不到它;
 //   ② `PUT /api/etl-jobs/[id]`(解绑):`offlineUnboundTargets` 把逐区结果**整个丢掉**只回名字
 //      ⇒ 「被摘掉的区其实没撤下来」和成功长得一样(界面上已不绑它,它还在往自己的数仓写数);
@@ -27,7 +26,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
   docClient: {
     send: vi.fn(async (cmd: any) => {
       h.ddb.push({ ctor: cmd.constructor.name, input: cmd.input });
-      // 序 50 / B-136:删引擎作业前先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空,不能把作业行当租约回去
+      // 删引擎作业前先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空,不能把作业行当租约回去
       if (cmd.input?.TableName === "bgp-long-ops") return {};
       return cmd.constructor.name === "GetCommand" ? { Item: h.job } : {};
     }),

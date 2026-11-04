@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP10a
-// 🔴 接线守卫(ACCEPTANCE E-200):白名单入口**全部**先同意前置再区域审计;定时路径观测后补写;前端弹窗接在每个入口上。
+// 🔴 接线守卫(ACCEPTANCE):白名单入口**全部**先同意前置再区域审计;定时路径观测后补写;前端弹窗接在每个入口上。
 // 为什么必须是静态守卫:审计完整性是「少接一处就漏一处」的性质 —— 单测跑不到那条路由就永远绿。
 // 变异 M-e:注释掉 execute 路由里的 requireResidencyAckForTargets 或 multi-region-query 里的 residencyAudit ⇒ 本文件红。
 import { describe, it, expect } from "vitest";
@@ -41,7 +40,7 @@ describe("🔴 白名单入口逐个点名(SPEC v3.23 §3.2)", () => {
     expect(mrq).toContain('entry: "execute"');
     expect(mrq).toContain("knownJurisdiction: binding.jurisdiction");
     expect(mrq).toContain("...(auditId ? { auditId } : {})");
-    // E-186 的 statement ↔ 审计关联:execute 审计在提交前写(行内无 statementId),靠 StatementName == auditId 反查
+    //  statement ↔ 审计关联:execute 审计在提交前写(行内无 statementId),靠 StatementName == auditId 反查
     expect(mrq).toContain("...(auditId ? { StatementName: auditId } : {})");
   });
   it("取结果:handle 校验之后、GetStatementResult 之前写区域审计,落点取 handle.targetId", () => {
@@ -51,7 +50,7 @@ describe("🔴 白名单入口逐个点名(SPEC v3.23 §3.2)", () => {
     expect(src).toContain("targetId: handleTarget");
     expect(src).toContain('entry: "result"');
   });
-  it("E-186 关联回查:admin 端点用 ListStatements(StatementName=auditId, RoleLevel) 在 target 所在 region 反查语句;只回 id / 状态 / 时间,不回 SQL", () => {
+  it("关联回查:admin 端点用 ListStatements(StatementName=auditId, RoleLevel) 在 target 所在 region 反查语句;只回 id / 状态 / 时间,不回 SQL", () => {
     // 🔴 Data API 的 ListStatements / DescribeStatement 按**调用者 IAM 身份**隔离(DescribeStatement 也不回 StatementName)⇒
     //    只有语句 owner(平台 TaskRole)能看到 StatementName == auditId 这层关联;没有这个端点,合同里的关联就是「谁也观测不到」的空话。
     const src = strip(read("app/api/admin/exec-envs/[targetId]/statements/route.ts"));
@@ -80,7 +79,7 @@ describe("🔴 白名单入口逐个点名(SPEC v3.23 §3.2)", () => {
       expect(src).toContain("if (!opts.probeOnly)");
       expect(src).toContain("auditActorOrService(opts.residencyActor)");
     }
-    // 模块 55 / 序 50:两条路由的主体搬进执行体(lib/modeling/long-ops.ts),用户 actor 由承载请求的身份派生;路由经 submitLongOp 提交自己的 kind
+    // 两条路由的主体搬进执行体(lib/modeling/long-ops.ts),用户 actor 由承载请求的身份派生;路由经 submitLongOp 提交自己的 kind
     const ex = strip(read("lib/modeling/long-ops.ts"));
     expect(ex.match(/residencyActor: userActor\(ctx\.identity\)/g)?.length, "落地 / 应用两个执行体都传用户 actor").toBe(2);
     expect(ex).toContain("residencyErrorResponse");
@@ -109,7 +108,7 @@ describe("🔴 白名单入口逐个点名(SPEC v3.23 §3.2)", () => {
     expect(emr).toContain("residencyAuditId");
   });
   it("六条运行路由:用户 actor 传下去 + 残留错误映射;run 路由先对全部 target 同意前置", () => {
-    // B-136:引擎运行的提交段在长操作执行体 lib/engines/long-ops.ts —— 路由仍做同意前置 + 残留错误映射;actor 由执行体从 ctx.identity 派生、auditUnavailable 分类也在执行体
+    // 引擎运行的提交段在长操作执行体 lib/engines/long-ops.ts —— 路由仍做同意前置 + 残留错误映射;actor 由执行体从 ctx.identity 派生、auditUnavailable 分类也在执行体
     const runRoutes = ["app/api/etl-jobs/[id]/run/route.ts"];
     const otherRoutes = [
       "app/api/etl-jobs/[id]/rerun/route.ts",

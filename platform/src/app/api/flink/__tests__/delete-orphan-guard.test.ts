@@ -1,9 +1,8 @@
-// @kf-batch 50-WP18d-unpublish-seam
 // 🔴🔴 删实时作业:**销毁 MSAF 应用失败就不许删记录**。
 // 改动前是 `deleteFlinkApp(...).catch(() => {})`(注释写着 best-effort)⇒ 销毁失败也照删行,
 // 而流式作业是「一区一个」:那个区的应用**继续在跑** —— 继续消费 CDC/Kafka、继续往数仓写数、
 // **继续计费**,平台再也看不到它(孤儿长在非 home 区更没人会去看)。
-// 与离线侧「撤不下来就不许动记录」(T-14)是同一条不变量,只有这条路一直是 best-effort。
+// 与离线侧「撤不下来就不许动记录」是同一条不变量,只有这条路一直是 best-effort。
 // 🔴 `deleteFlinkApp` 自己已把「应用本来就不存在」当成成功 ⇒ 它抛出来的就是真失败。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -26,7 +25,7 @@ vi.mock("@/lib/projects/guard", () => ({
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
 vi.mock("@/lib/cookbook", () => ({ guardCode: vi.fn(async () => ({ ok: true, findings: [] })) }));
 vi.mock("@/lib/realtime/flink-service", () => ({
-  // @kf-batch 50-B28b-flink-delete-async —— 路由只认唯一入口 requestFlinkDeletion 的三种结局;
+  // 路由只认唯一入口 requestFlinkDeletion 的三种结局;
   //   「停稳后真删行 / 后台做完 / 超时如实报」在 lib/realtime/__tests__/flink-delete-settling.test.ts 装配层里验。
   normalizeFlinkSql: vi.fn((x: string) => x),
   flinkJobTarget: vi.fn((j: { targetId?: string }) => j.targetId),
@@ -37,7 +36,7 @@ vi.mock("@/lib/realtime/flink-service", () => ({
   }),
 }));
 
-// 序 72:路由模块改为顶层导入 —— 原来在第一条用例体内懒加载,路由新接入执行角色预检后导入链变重,并行跑批下首条用例吃掉 5s 超时(量具侧,非产品)
+// 路由模块改为顶层导入 —— 原来在第一条用例体内懒加载,路由新接入执行角色预检后导入链变重,并行跑批下首条用例吃掉 5s 超时(量具侧,非产品)
 import { DELETE } from "@/app/api/flink/jobs/[id]/route";
 
 const del = async () => {
@@ -56,7 +55,7 @@ describe("删实时作业:孤儿应用守卫", () => {
     expect(h.sent.filter((x) => x === "DeleteCommand")).toHaveLength(0);
   });
 
-  it("🔴 B-28b:应用还在停止中 ⇒ **202 已受理**(不是 409「稍后再点」—— 用户点一次就该删掉),回显 deleting", async () => {
+  it("🔴 应用还在停止中 ⇒ **202 已受理**(不是 409「稍后再点」—— 用户点一次就该删掉),回显 deleting", async () => {
     h.settling = true;
     const r = await del();
     expect(r.status).toBe(202);

@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 动作守卫(闸2)单测:确保"可创建·禁执行"边界正确,且默认拒绝。
+// Copilot 动作守卫(闸2)单测:确保"可创建·禁执行"边界正确,且默认拒绝。
 import { describe, it, expect } from "vitest";
 import { guardCopilotAction, allowedCreateActions } from "../action-guard";
 

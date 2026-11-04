@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.1-D4
 // 🔴 **D4 门禁**:权限收紧的判据 + 落点覆盖 + 删项目前置校验的清单完整性。
 //
 // 【为什么"判据对"不等于"收紧了"】D4 的失效方式有三种,单测只覆盖第一种是不够的:
@@ -141,11 +140,11 @@ describe("🔴 D4 落点覆盖:每个配置管理路由都必须过收紧后的�
 describe("🔴 D4 删项目前置校验:资源清单不许悄悄变短", () => {
   it("清单覆盖 17 类项目级资源(加了新的项目级资源类型必须同步加行)", () => {
     // 与 `project-resources.ts` 的三张表一一对应。数字写死:漏一类 = 漏一类孤儿资源。
-    // @kf-batch 50-W5-seg2-WP1 — 2026-09-05 「数据服务」下线(50 SPEC §3.9c):`data-api` 一类随之去掉,12 → 11;
+    // 2026-09-05 「数据服务」下线(50 SPEC §3.9c):`data-api` 一类随之去掉,12 → 11;
     //   门禁 lib/__tests__/data-service-retired.test.ts 反向钉住它不许回来。
-    // @kf-batch 54-genbi-session-cards — 2026-09-13:问数会话卡片是**第 12 类**项目级资源。
+    // 2026-09-13:问数会话卡片是**第 12 类**项目级资源。
     //   🔴 它原来根本不在清单里 ⇒ 删项目会**悄悄留下**别人保存的卡片(判据 GC-15 要的就是这个)。
-    // @kf-batch 50-project-delete-orphans — 2026-10-11:12 → 16(真环境清理 128 个夹具项目时,删完项目仍留下的东西):
+    // 2026-10-11:12 → 16(真环境清理 128 个夹具项目时,删完项目仍留下的东西):
     //   · `copilot-plan`         —— 未收口的 Copilot 执行计划(还会被确认 / 被 L3 推进 / 还会建出作业);已收口的是历史,不数;
     //   · `governance-schedule`  —— 定时治理任务:载体在该区 MWAA Serverless 上**到点照样触发**(还在真跑的孤儿);
     //   · `seed-schedule`        —— 定时造数任务:同上;
@@ -191,7 +190,7 @@ describe("🔴 D4 删项目前置校验:资源清单不许悄悄变短", () => {
   });
 
   it("DELETE 路由经长操作 project-delete,执行体真的调了盘点、且**不做级联删除**", () => {
-    // 序 50 第二批:主体搬进 lib/projects/long-ops.ts(路由只留鉴权 + submitLongOp)
+    // 主体搬进 lib/projects/long-ops.ts(路由只留鉴权 + submitLongOp)
     const route = code("app/api/projects/[id]/route.ts");
     expect(route).toContain('kind: "project-delete"');
     expect(route).toMatch(/submitLongOp\(/);

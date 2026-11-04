@@ -1,7 +1,6 @@
-// @kf-batch 50-WP18d-unpublish-seam
 // 🔴🔴 **扇出把「有个区撤不下来」吃掉了** —— 两个路由的注释都写着「撤不下来就不许动记录,
-// 否则只剩一个谁也管不着的孤儿调度」(T-14 与段 `scq` A2-3 的学费),而那条不变量当时**靠的是
-// 异常会往上抛**。WP-18 把单区改成逐区扇出、把逐区异常收进 `perTarget` 之后:
+// 否则只剩一个谁也管不着的孤儿调度」(与段 `scq` A2-3 的学费),而那条不变量当时**靠的是
+// 异常会往上抛**。把单区改成逐区扇出、把逐区异常收进 `perTarget` 之后
 //   · `/unpublish` 照样把工作流改成 `draft`(而那个区的 workflow 还在按 cron 跑);
 //   · `DELETE` 照样删掉记录(落点章随记录消失 ⇒ 再也定位不到它在哪个区)。
 // 与「扇出把类型化拒因抹平 ⇒ 4xx 退化成 500」是同一族接缝缺陷:**改了扇出,就要把每一个
@@ -21,7 +20,7 @@ const WF = {
   deployments: { tgt_home: { workflowArn: "arn:home" }, tgt_usw2_a: { workflowArn: "arn:usw2" } },
 };
 
-// 序 50 第二批:下线 / 删除经 submitLongOp ⇒ 任务表 bgp-long-ops 的读写交给内存夹具(真求值条件写),工作流表的命令照旧记在 sends
+// 下线 / 删除经 submitLongOp ⇒ 任务表 bgp-long-ops 的读写交给内存夹具(真求值条件写),工作流表的命令照旧记在 sends
 vi.mock("@/lib/aws/dynamodb", async () => {
   const mem = await import("@/lib/long-ops/__tests__/fixtures/mem-long-ops");
   return {
@@ -74,7 +73,7 @@ vi.mock("@/lib/scheduler/mwaa-offline", () => ({ offlineDag: vi.fn(async () => (
 const reqOf = () => new Request("http://x/api/workflow/wf1/unpublish", { method: "POST" }) as never;
 const updates = () => sends.filter((x) => x.UpdateExpression);
 
-// 序 50 第二批:路由经 submitLongOp 带进整张执行体注册表 ⇒ 首次 import 要变换几百个模块(实测 > 5s),先暖一次,免得第一条用例被 5s 缺省超时误判
+// 路由经 submitLongOp 带进整张执行体注册表 ⇒ 首次 import 要变换几百个模块(实测 > 5s),先暖一次,免得第一条用例被 5s 缺省超时误判
 beforeAll(async () => { await import("../[id]/unpublish/route"); }, 60_000);
 beforeEach(() => { sends.length = 0; offlined.length = 0; failOn = null; notInstalledOn = null; vi.resetModules(); });
 

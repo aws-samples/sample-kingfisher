@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN §3.8)—— 离线作业节点的画布渲染:复用 RichNodes 的 Shell(同一外壳),
+// 离线作业节点的画布渲染:复用 RichNodes 的 Shell(同一外壳),
 // 显示作业名 · 引擎 Tag · 「未关联 / 作业不存在」。作业名 / 引擎是面板选中时随手存进 data 的展示副本
 // (`jobName` / `jobEngine`),权威引用只有 `data.jobRef`(kind + jobId);发布期 / 运行期只读 jobRef 与 jobSpec。
 import { memo } from "react";

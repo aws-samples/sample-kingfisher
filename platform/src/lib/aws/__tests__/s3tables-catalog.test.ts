@@ -1,4 +1,4 @@
-// @kf-batch 43-page-sweep(B-91)—— S3 Tables 联邦目录 s3tablescatalog:运行时唯一作者的行为 + 安装脚本入参逐字段相同 + 接缝调用点。
+// S3 Tables 联邦目录 s3tablescatalog:运行时唯一作者的行为 + 安装脚本入参逐字段相同 + 接缝调用点。
 // 「写了」≠「接上了」:同步启动 / 直查 / deploy-all / redeploy-platform / 真就位 / IAM 清单六处都要有**调用点**,不是只有 import。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -45,7 +45,7 @@ const alreadyExists = Object.assign(new Error("Catalog already exists"), { name:
 const denied = Object.assign(new Error("not authorized to perform: glue:CreateCatalog"), { name: "AccessDeniedException" });
 const WHERE = { region: "us-west-2", accountId: "1111222233ab" };
 
-describe("B-91 入参与判定", () => {
+describe("入参与判定", () => {
   it("开通入参逐字段(Identifier 按区 + 账号拼本区全部表桶;ConnectionName aws:s3tables;两组默认权限 IAM_ALLOWED_PRINCIPALS ALL)", () => {
     expect(s3TablesFederatedCatalogInput("us-west-2", "1111222233ab")).toStrictEqual(EXPECTED_INPUT);
   });
@@ -57,7 +57,7 @@ describe("B-91 入参与判定", () => {
   });
 });
 
-describe("B-91 ensureS3TablesFederatedCatalog(只 mock 真外部 Glue 客户端)", () => {
+describe("ensureS3TablesFederatedCatalog(只 mock 真外部 Glue 客户端)", () => {
   it("目录已在 ⇒ 只 GetCatalog 一次,不建 ⇒ existed", async () => {
     const { glue, sent } = fakeGlue({ get: "ok" });
     await expect(ensureS3TablesFederatedCatalog(glue, WHERE)).resolves.toBe("existed");
@@ -93,7 +93,7 @@ describe("B-91 ensureS3TablesFederatedCatalog(只 mock 真外部 Glue 客户端)
   });
 });
 
-describe("B-91 安装脚本与运行时入参逐字段相同(scripts/lib/s3tables-catalog.sh)", () => {
+describe("安装脚本与运行时入参逐字段相同(scripts/lib/s3tables-catalog.sh)", () => {
   const sh = read("scripts/lib/s3tables-catalog.sh");
   it("bash 的 --catalog-input JSON 代入 region / 账号后与 s3TablesFederatedCatalogInput 深等", () => {
     const m = sh.match(/input=\$\(printf '(\{.*\})' "\$region" "\$acct"\)/);
@@ -112,7 +112,7 @@ describe("B-91 安装脚本与运行时入参逐字段相同(scripts/lib/s3table
   });
 });
 
-describe("B-91 接缝:七处调用点都在(不是只有 import)", () => {
+describe("接缝:七处调用点都在(不是只有 import)", () => {
   it("同步启动 lib/sync/start-run.ts 调 ensureS3TablesFederatedCatalog(glue, 落点区, 表桶 ARN 里的账号),且不再自己拼 CreateCatalogCommand", () => {
     const src = strip(read("platform/src/lib/sync/start-run.ts"));
     expect(src).toMatch(/await ensureS3TablesFederatedCatalog\(glue, \{ region: landing\.region, accountId \}\);/);
@@ -136,15 +136,15 @@ describe("B-91 接缝:七处调用点都在(不是只有 import)", () => {
     expect(sh).toMatch(/s3tables_catalog_step\(\) \{ \( ensure_s3tables_catalog "\$REGION" \); \}/);
     expect(sh).toMatch(/run_step "6\.3\) S3 Tables 联邦目录 s3tablescatalog\(主控区\)" s3tables_catalog_step/);
   });
-  it("redeploy-platform.sh:source lib + 第 3c 步对主控区与每个**真有执行环境**的区 ensure(升级即补齐存量环境;序 48 起不含候选区)", () => {
+  it("redeploy-platform.sh:source lib + 第 3c 步对主控区与每个**真有执行环境**的区 ensure(升级即补齐存量环境;不含候选区)", () => {
     const sh = strip(read("scripts/redeploy-platform.sh"));
     expect(sh).toMatch(/source "\$HERE\/lib\/s3tables-catalog\.sh"/);
-    // 序 48:3c 的清单是 actual(home ∪ 注册表在用区),不是含候选区的放行清单 —— 候选区里还没有东西,不为「将来可能用」建对象
+    // 3c 的清单是 actual(home ∪ 注册表在用区),不是含候选区的放行清单 —— 候选区里还没有东西,不为「将来可能用」建对象
     expect(sh).toMatch(/EXEC_REGIONS_ACTUAL=\$\(exec_regions_actual\)/);
     expect(sh).toMatch(/for r in \$\{EXEC_REGIONS_ACTUAL\/\/,\/ \}; do ensure_s3tables_catalog "\$r"; done/);
     expect(sh).not.toMatch(/for r in \$\{EXEC_REGIONS\/\/,\/ \}; do ensure_s3tables_catalog/);
   });
-  // 序 48:候选区内在页面新建的执行区不再经 redeploy-platform 第 3c 步 ⇒ 「检测初始化」必须对该区幂等 ensure(作者仍是同一个函数)
+  // 候选区内在页面新建的执行区不再经 redeploy-platform 第 3c 步 ⇒ 「检测初始化」必须对该区幂等 ensure(作者仍是同一个函数)
   it("probe-runner.ts:core 探活含 lake:s3tablescatalog 一项,按目标区取 Glue 客户端调 ensureS3TablesFederatedCatalog(账号取描述符)", () => {
     const src = strip(read("platform/src/lib/exec-env/probe-runner.ts"));
     const iItem = src.indexOf('probeOne("lake:s3tablescatalog"');

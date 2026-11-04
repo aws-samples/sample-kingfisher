@@ -1,4 +1,3 @@
-// @kf-batch 50-WP13-mwaa-region
 // 执行环境 **mwaa 组件**栈(50 SPEC v3.26 §3.14「区域内调度」;§1.1 的 `mwaa` 资源袋:`dagBucket` / `mwaaEnvName`)。
 //
 // 【为什么每个 target 要有自己的 MWAA】用户拍板(2026-09-06,DESIGN §18 决策 6sexies):「每个区域的定时任务都是自己区域的
@@ -27,7 +26,7 @@ import { Construct } from "constructs";
 import { HOME_TARGET_ID, resourceName } from "../shared/naming";
 import { ExecEnvStack, type ExecEnvStackProps } from "./exec-env-stack";
 import { boundStatement, bucketArnPair, execRoleArnOf, REDSHIFT_DATA_ACTIONS } from "./exec-roles";
-// @kf-batch 50-WP16-zero-egress —— 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
+// 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
 import { execEnvPrivateSubnets } from "./private-subnets";
 
 export interface ExecEnvMwaaStackProps extends ExecEnvStackProps {

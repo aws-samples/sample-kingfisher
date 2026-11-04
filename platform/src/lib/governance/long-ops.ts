@@ -1,4 +1,4 @@
-// 模块 55 / 序 50 —— 数据目录三种 + 审批一种长操作的执行体:新建表 / 修改表结构 / 读真实列 / 审批通过后执行建表改表。
+// 数据目录三种 + 审批一种长操作的执行体:新建表 / 修改表结构 / 读真实列 / 审批通过后执行建表改表。
 //
 // 为什么它们进第一批(55 DESIGN §2.6):与建模四种共用 landing.ts 的 queryOnTarget / execOnBinding(readLiveColumns /
 // createRedshiftCatalogTable / alterModelTable 都调它们);那两个原语改经 awaitTerminal 后,**所有**请求路径调用方必须同批接入,
@@ -145,7 +145,7 @@ const approvalExecuteDdl: LongOpExecutor<"approval-execute-ddl"> = async (params
   }
 };
 
-// ── 第二批:治理目录「同步列信息」(原 app/api/governance/sync-redshift-schema POST;B-74) ──
+// ── 第二批:治理目录「同步列信息」(原 app/api/governance/sync-redshift-schema POST) ──
 // 原来的治理专用 202 协议(`{ runId, state:"running" }` + 页面轮询 GET)退役:并发由对象租约 `governance:schema-sync` 挡住(第二个人点 ⇒ 409
 // 「『同步列信息到数据目录』正在进行中」),超 45 秒由统一框架转 202;运行记录仍落 settings 表(GET 读「最近一次同步」不变)。
 // 成功 / 失败响应与接入前逐字一致:200 `{...result, runId, state:"succeeded", startedAt, finishedAt, message}` / 500「同步失败: …」带 runId。

@@ -6,7 +6,6 @@ import { isResourceType, loadResource, resourceLabel, ResourceType } from "@/lib
 import { isEnv, isProtectedEnv, DEFAULT_ENV, DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 import { executePromote } from "@/lib/env/promote-service";
 import { createApproval } from "@/lib/projects/project-service";
-// @kf-batch 50-WP4quater-reads(工单 SC-33)
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { recordAudit } from "@/lib/audit";
 
@@ -40,7 +39,7 @@ export async function POST(req: NextRequest) {
         projectId,
         type: "deploy",
         payload: { resourceType: type, resourceId: id, fromEnv, toEnv, name: source.name || "" },
-        // @kf-batch 50-WP4quater-reads(工单 SC-33)—— 🔴 从**被晋升的那个作业行**派生执行区:
+        // 🔴 从**被晋升的那个作业行**派生执行区
         // 「把一个只在 us-west-2 跑的作业晋升到 prod」这件事,审批人需要知道它落在哪个区。
         // 派生而不是让请求方传:传的话就能传错,而审批是权限边界动作,错了没人看得出来。
         targetIds: bindingTargets(source as { targets?: unknown; targetId?: unknown }),

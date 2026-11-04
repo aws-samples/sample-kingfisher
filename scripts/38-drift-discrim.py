@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-# @kf-batch 50-B09-carrier-drift
 # 🔴 **为什么入仓**:每次动 `buildCarrierArtifact` / 归一清单,都要重跑这条判别力验证 ——
 #   它回答的是「这条机制到底分不分得清 ok 与 stale」。放 /tmp 就等于下次换机器重新写一遍。
 #   (2026-09-22 用户:「你真是丢三落四,这个问题我提醒你 N 次了」)
-# 用法:python3 scripts/38-b09-drift-discrim.py   (只动验收残留,绝不碰 Showcase-*)
-"""B-09 的**判别力**验证:造一个「定义故意落后」的载体,看比对能不能判出 `stale`。
+# 用法:python3 scripts/38-drift-discrim.py   (只动验收残留,绝不碰 Showcase-*)
+"""该缺陷的**判别力**验证:造一个「定义故意落后」的载体,看比对能不能判出 `stale`。
 
 🔴 为什么非做不可:上一步真环境跑出来**全是 `ok`** —— 那既可能是「确实都最新」,
    也可能是「这条机制恒回 ok」。**分不清就等于没有判据。**
@@ -185,7 +184,7 @@ async def main():
         print(f"  {'✅' if ok else '🔴'} {what}")
     allok = all(ok for ok, _ in verdicts)
     print("─" * 72)
-    print("✅✅ **B-09 端到端判别力成立**:同一个对象,定义落后判 stale、还原后判 ok,且没被动的行不受影响"
+    print("✅✅ **载体落后判别力端到端成立**:同一个对象,定义落后判 stale、还原后判 ok,且没被动的行不受影响"
           if allok else
           "🔴🔴 判别力**未坐实** —— 上面任一条红就不许把这条机制说成「能用」")
     sys.exit(0 if allok else 1)

@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2f-iam-region-list
 // 平台运行时角色的 `aws:RequestedRegion` 条件 —— 从「单 region」到「region 列表」的唯一出口
 // (50 DESIGN §12.1;全仓 18 处 condition 全部经此,不许再散点写)。
 //
@@ -25,7 +24,7 @@ const REGION_RE = /^[a-z]{2}(-[a-z]+)+-\d$/;
  */
 export function requestedRegionCondition(scope: Construct): string | string[] {
   const homeRegion = cdk.Stack.of(scope).region;
-  // 序 48:两条输入通道,**同一处解析**(不是第二个作者)—— ① `-c execution-regions`(最高,平台栈显式传);
+  // 两条输入通道,**同一处解析**(不是第二个作者)—— ① `-c execution-regions`(最高,平台栈显式传);
   //   ② 进程变量 BGP_EXECUTION_REGIONS(部署脚本 deploy-all / redeploy-platform / redeploy-agents 算好同一份清单后导出,
   //   让同一次部署里**每一条** cdk deploy —— 三个智能体栈 / EMR 栈 / 连带部署的依赖栈 —— 看到同一个值;此前这些栈从没拿到过清单,
   //   网络 / 参数顾问的技能角色因此始终只放行主控区)。两通道同一套校验;都没有 ⇒ 只 home(缺省零行为变化)。
@@ -49,7 +48,6 @@ export function requestedRegionCondition(scope: Construct): string | string[] {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 52-P52.5a-supply
 // 🔴 **资源 ARN 的 region 段:唯一出口 + 显式轴声明**(50 DESIGN §12 bug #7/#8/#10 那一整类的根治)
 //
 // ── 要消掉的是哪一类 bug ────────────────────────────────────────────────────
@@ -72,8 +70,8 @@ export function requestedRegionCondition(scope: Construct): string | string[] {
 // 且由门禁断言它非空。这样"某处到底为什么还钉在 home"永远有据可查,不必再靠一轮真部署去发现。
 //
 // 🔴 **刻意不做的事:不顺手放开任何一条**。DESIGN §20 已定「现在给 = 授未用之权」——
-// 数据面(glue/airflow/…)在 P50.3 真下推之前保持 home 轴,轴声明里写明"随 P50.3 放"。
-// 本批只把 **P52.5a 真正被卡住的那一条**(per-project secret 的写)翻成 execution 轴。
+// 数据面(glue/airflow/…)在真下推之前保持 home 轴,轴声明里写明"放"。
+// 本批只把 **真正被卡住的那一条**(per-project secret 的写)翻成 execution 轴。
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**

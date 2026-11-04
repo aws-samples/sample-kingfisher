@@ -30,7 +30,7 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); }, []);
 
   const handleCreate = async () => {
-    const values = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const values = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!values) return;
     const res = await fetch("/api/admin/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
     const d = await res.json();
@@ -48,7 +48,7 @@ export default function UsersPage() {
   };
 
   const handleResetPassword = async () => {
-    const v = await resetForm.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const v = await resetForm.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!v) return;
     if (!resetUser) return;
     if (await handleAction(resetUser, "resetPassword", { password: v.newPassword })) {

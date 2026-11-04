@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 /**
  * 部署模式的**唯一作者**:`production` | `demo`。
  *

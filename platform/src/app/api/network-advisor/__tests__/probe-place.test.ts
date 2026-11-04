@@ -1,5 +1,4 @@
-// @kf-batch 41-B115-netadvisor-place
-// 🔴🔴 `POST /api/network-advisor/probe` 的 EC2 客户端必须按**请求点名的执行环境所在区**建(B-115)。
+// 🔴🔴 `POST /api/network-advisor/probe` 的 EC2 客户端必须按**请求点名的执行环境所在区**建。
 // 只 mock 真外部:注册表(DDB 读侧)、EC2 SDK(记下构造时的 region)。路由 → place → probeEnvironment → lib/aws/clients 唯一工厂真跑。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -51,7 +50,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("POST /api/network-advisor/probe:按落点 region 探测(B-115)", () => {
+describe("POST /api/network-advisor/probe:按落点 region 探测", () => {
   it("🔴 缺 targetId ⇒ 400 PLACE_UNDECIDABLE,一次 EC2 调用都不发(不默认主控区)", async () => {
     const r = await post({ computeKind: "glue", targets: [{ kind: "aws-service", service: "s3" }] });
     expect(r.status).toBe(400);

@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片编排层单测:测的是**顺序与分流**(落点解析用哪个入口、驻留门在第几步、失败怎么补偿),
 // 底层三件(指针+配额 / 区域正文 / 记忆回灌)各有自己的套件。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -142,7 +141,7 @@ describe("54 会话卡片 · 编排层", () => {
   // ── 🔴🔴 2026-09-13 真环境撞到:执行环境被删掉之后,那个区的卡片**永远删不掉** ──
   // 改动前:`getTargetRaw` 回 null ⇒ bodyCleaned=false ⇒ **保留** deleting 指针 ⇒ 那一行永久卡在
   // 用户的卡片集合里(额度早已释放,留着它对用户只有害处:既删不掉、也做不了任何事),
-  // 而「清理未完成 · 重试」这条提示重试一万次也不会成。序 15「删除执行环境」上线后这必然发生。
+  // 而「清理未完成 · 重试」这条提示重试一万次也不会成。「删除执行环境」上线后这必然发生。
   describe("🔴 执行环境已不在注册表 = **终态**,不是可重试", () => {
     it("指针必须被删掉(用户列表恢复诚实),并回 bodyOrphaned 交给能处置的人", async () => {
       h.pointer = pointerOf();
@@ -412,7 +411,6 @@ describe("54 会话卡片 · 编排层", () => {
   });
 });
 
-// @kf-batch 50-WP26b-region-derive
 // 🔴 **region 一律从活的 target 派生,存下来的那份只作回落。**
 //
 // 【怎么现形的】2026-09-20 一张截图:`读取 tgt_euw1_a(us-west-2)的卡片正文失败…`
@@ -423,7 +421,7 @@ describe("54 会话卡片 · 编排层", () => {
 //     `target.region ?? opened.pointer.region`(派生),只有报错这一句还在用快照。
 //   修它的理由是:一句会把「一个区的东西说成另一个区」的话,**不该有能力**说错
 //   (记忆 stale-response-race-shows-wrong-region:界面说错区这一族,本项目已经改过三刀)。
-describe("卡片的 region 只能从活的 target 派生(WP-26b)", () => {
+describe("卡片的 region 只能从活的 target 派生", () => {
   const src = readFileSync(resolve(__dirname, "../cards-service.ts"), "utf8");
 
   it("读正文失败那句话里的 region 取自 target,不是指针里的快照", () => {

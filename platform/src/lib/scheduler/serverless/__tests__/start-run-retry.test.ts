@@ -1,4 +1,3 @@
-// @kf-batch 50-fresh-account-serverless-trigger
 // `startWorkflowRun` 的**重试判据**:刚 CreateWorkflow 完就触发会撞 airflow-serverless 侧的角色传播窗口。
 //
 // 🔴 2026-09-19 全新账号首装真撞:角色信任策略完全正确(栈里写死 `airflow-serverless.amazonaws.com`
@@ -88,7 +87,7 @@ describe("startWorkflowRun:角色传播窗口可重试,其余一次都不重试"
     const { fileURLToPath } = await import("node:url");
     const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
     const callers = [
-      // 序 50 第二批:手动触发的 StartWorkflowRun 调用点在执行体(路由只 submitLongOp)
+      // 手动触发的 StartWorkflowRun 调用点在执行体(路由只 submitLongOp)
       "lib/workflow/long-ops.ts",
       "lib/scheduler/trigger.ts",
       "lib/scheduler/dependency.ts",

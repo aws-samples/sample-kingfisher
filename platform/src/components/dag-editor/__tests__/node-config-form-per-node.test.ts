@@ -1,5 +1,4 @@
-// @kf-batch 41-B122-node-form-per-node
-// 🔴🔴 编排编辑器「节点配置」抽屉:换节点必须换一份表单值仓(B-122)。
+// 🔴🔴 编排编辑器「节点配置」抽屉:换节点必须换一份表单值仓。
 //
 // 【缺陷原形(2026-10-24 页面驱动段 slsw SW-12,真 DOM 探针坐实)】两个 Python 节点逐个配置(每次都关抽屉)、保存后重开编辑器,
 //   第二个节点的脚本是**空的**;直接点第二个节点时抽屉里显示的是第一个节点的值。
@@ -28,9 +27,9 @@ function topLevelFunctionBody(src: string, declRe: RegExp): string {
   return rest.slice(0, next ? next.index : rest.length);
 }
 
-describe("NodeConfigPanel:一个节点一份表单值仓(B-122)", () => {
+describe("NodeConfigPanel:一个节点一份表单值仓", () => {
   const outer = topLevelFunctionBody(SRC, /export default function NodeConfigPanel\s*\(/);
-  // 序 73 模块 57:NodeConfigForm 改为具名导出(job-node-render 判据服务端真渲染它);值仓仍只在它里面
+  // NodeConfigForm 改为具名导出(job-node-render 判据服务端真渲染它);值仓仍只在它里面
   const inner = topLevelFunctionBody(SRC, /\n(?:export )?function NodeConfigForm\s*\(/);
 
   it("常驻的外层组件里**没有** Form.useForm —— 值仓一旦建在这里就会跨节点存活(缺陷原形)", () => {

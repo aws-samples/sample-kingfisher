@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// permission canary 探针对象的**名字**(唯一作者;WORK-PACKAGES WP-9 ④-3)。
+// permission canary 探针对象的**名字**(唯一作者;④-3)。
 //
 // 🔴 为什么单独一个零依赖文件:探针表由 admin 模板(`admin-ddl-templates.ts` 的 `create-canary-probes`)建,
 //    由 canary 判据(`permission-canary.ts`)读 —— 两边必须是**同一个名字**。放进任何一边都会成环

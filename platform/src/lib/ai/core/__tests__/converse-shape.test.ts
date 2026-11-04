@@ -1,4 +1,3 @@
-// @kf-batch 51-v2-multi-vendor
 // 请求整形单测(51 SPEC §7.2;DESIGN §12 D12)。夹具用 2026-10-14 Bedrock 真实原话。
 // 钉三件事:① Claude 系列恒等(一个字节都不动);② Kimi / GLM 按档案剥字段、Kimi maxTokens ×2;
 // ③ 运行期从 ValidationException 原话里学到字段后,后续整形会剥掉它(进程级,挂 globalThis)。

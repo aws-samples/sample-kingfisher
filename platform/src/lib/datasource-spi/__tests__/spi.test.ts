@@ -1,6 +1,6 @@
-// 模块 42 — 数据源 SPI 底座单测。
+// 数据源 SPI 底座单测。
 //
-// 锁三件事(P42.1「行为保持重构」的铁证):
+// 锁三件事(「行为保持重构」的铁证):
 //  ① registry 契约:四兄弟全在 + 类型守卫 + 目录派生。
 //  ② normalize 归一:旧扁平 host/port/database ↔ 新 connection 袋,兼容双向。
 //  ③ buildConnection 逐字一致:JDBC_URL/driver 与被收编的旧实现(datasource-service.ts:14 /
@@ -21,10 +21,10 @@ describe("registry 契约", () => {
   it("类型守卫正确区分已知/未知", () => {
     expect(isDataSourceType("mysql")).toBe(true);
     expect(isDataSourceType("postgresql")).toBe(true);
-    expect(isDataSourceType("kinesis")).toBe(true); // P42.7 已注册
-    expect(isDataSourceType("msk")).toBe(true); // P42.6 已注册(流范式第二个)
-    expect(isDataSourceType("dynamodb")).toBe(true); // P42.5 已注册(NoSQL 首个)
-    expect(isDataSourceType("s3")).toBe(true); // P42.4 已注册(对象存储首个)
+    expect(isDataSourceType("kinesis")).toBe(true); // 已注册
+    expect(isDataSourceType("msk")).toBe(true); // 已注册(流范式第二个)
+    expect(isDataSourceType("dynamodb")).toBe(true); // 已注册(NoSQL 首个)
+    expect(isDataSourceType("s3")).toBe(true); // 已注册(对象存储首个)
     expect(isDataSourceType("kafka")).toBe(false); // 注册名是 msk,非 kafka
     expect(isDataSourceType("mongodb")).toBe(false); // 未接
     expect(isDataSourceType(123)).toBe(false);
@@ -46,14 +46,14 @@ describe("registry 契约", () => {
   });
 });
 
-describe("kinesis provider(P42.7a 流范式首个)", () => {
+describe("kinesis provider(流范式首个)", () => {
   it("capabilities:stream 范式 + iam-role + 非VpcBound + 可 provision + flink-cdc 通道", () => {
     const cap = getProvider("kinesis").capabilities;
     expect(cap.paradigm).toBe("stream");
     expect(cap.credentialKind).toBe("iam-role");
     expect(cap.isVpcBound).toBe(false); // Kinesis 是 AWS 托管服务
     expect(cap.needsGlueConnection).toBe(false);
-    expect(cap.canProvision).toBe(true); // 可按需新建流(P42.7b)
+    expect(cap.canProvision).toBe(true); // 可按需新建流
     expect(cap.syncChannels).toEqual(["flink-cdc"]);
     expect(cap.analysisChannels).toEqual([]);
   });
@@ -76,7 +76,7 @@ describe("kinesis provider(P42.7a 流范式首个)", () => {
   it("iam-role 凭证:不实现 buildSecretPayload(无密钥可存)", () => {
     expect(getProvider("kinesis").buildSecretPayload).toBeUndefined();
   });
-  it("provision 存在且 canProvision=true(P42.7b 新建流能力)", () => {
+  it("provision 存在且 canProvision=true(新建流能力)", () => {
     expect(typeof getProvider("kinesis").provision).toBe("function");
     expect(getProvider("kinesis").capabilities.canProvision).toBe(true);
   });
@@ -92,7 +92,7 @@ describe("kinesis provider(P42.7a 流范式首个)", () => {
   });
 });
 
-describe("msk provider(P42.6 流范式第二个:MSK / Kafka)", () => {
+describe("msk provider(流范式第二个:MSK / Kafka)", () => {
   it("capabilities:stream 范式 + VpcBound + 不可 provision + sasl-scram(超集标) + flink-cdc 通道", () => {
     const cap = getProvider("msk").capabilities;
     expect(cap.paradigm).toBe("stream");
@@ -139,8 +139,8 @@ describe("msk provider(P42.6 流范式第二个:MSK / Kafka)", () => {
   });
 });
 
-// P42.4/P42.5:recommendChannel 改为读 capabilities.syncChannels(非 JDBC 范式);JDBC 四兄弟逐字零回归。
-describe("recommendChannel 数据驱动(P42.4/P42.5:读 capabilities,非硬编码)", () => {
+// recommendChannel 改为读 capabilities.syncChannels(非 JDBC 范式);JDBC 四兄弟逐字零回归。
+describe("recommendChannel 数据驱动(读 capabilities,非硬编码)", () => {
   it("DynamoDB → 只推荐 Glue(nosql 范式,DMS/Zero-ETL 不支持)", () => {
     const r = recommendChannel("dynamodb", "redshift", "full");
     expect(r.recommended).toBe("glue");
@@ -174,8 +174,8 @@ describe("recommendChannel 数据驱动(P42.4/P42.5:读 capabilities,非硬编�
   });
 });
 
-// P42.4:S3 外部表 DDL 生成(Athena 直查)。纯函数,锁定 CSV/Parquet/JSON 三 format + 标识符消毒。
-describe("S3 外部表 DDL 生成(P42.4 分析通道)", () => {
+// S3 外部表 DDL 生成(Athena 直查)。纯函数,锁定 CSV/Parquet/JSON 三 format + 标识符消毒。
+describe("S3 外部表 DDL 生成(分析通道)", () => {
   const cols = [{ name: "region", type: "string" }, { name: "amount", type: "bigint" }, { name: "rate", type: "double" }];
   it("CSV(有表头):TEXTFILE + 逗号分隔 + skip.header", () => {
     const ddl = buildExternalTableDDL("bgp_s3_ext", { table: "orders", location: "s3://lake/raw/orders/", format: "csv", hasHeader: true, columns: cols });
@@ -217,7 +217,7 @@ describe("S3 外部表 DDL 生成(P42.4 分析通道)", () => {
   });
 });
 
-describe("dynamodb provider(P42.5 NoSQL 范式首个)", () => {
+describe("dynamodb provider(NoSQL 范式首个)", () => {
   it("capabilities:nosql 范式 + iam-role + 非VpcBound + 不可 provision + glue 同步通道", () => {
     const cap = getProvider("dynamodb").capabilities;
     expect(cap.paradigm).toBe("nosql");
@@ -256,7 +256,7 @@ describe("dynamodb provider(P42.5 NoSQL 范式首个)", () => {
   });
 });
 
-describe("s3 provider(P42.4 对象存储范式首个)", () => {
+describe("s3 provider(对象存储范式首个)", () => {
   it("capabilities:object-store 范式 + iam-role + 非VpcBound + glue 同步 + athena 直查通道", () => {
     const cap = getProvider("s3").capabilities;
     expect(cap.paradigm).toBe("object-store");
@@ -332,12 +332,12 @@ describe("normalize 归一(向后兼容零迁移)", () => {
   });
 });
 
-describe("buildConnection 逐字一致(收编铁证:与旧 JDBC_URL/driver 一致;序 44 起 MySQL 多一个方言默认参数,见 jdbc-params.test.ts)", () => {
+describe("buildConnection 逐字一致(收编铁证:与旧 JDBC_URL/driver 一致;起 MySQL 多一个方言默认参数,见 jdbc-params.test.ts)", () => {
   const cases: Array<{ type: DataSourceType; host: string; port: number; db: string; url: string; driver: string }> = [
-    // @kf-batch 44-jdbc-params —— MySQL 默认带 zeroDateTimeBehavior=CONVERT_TO_NULL(B-86 零值时间戳不再让整个同步作业失败)
+    // MySQL 默认带 zeroDateTimeBehavior=CONVERT_TO_NULL(零值时间戳不再让整个同步作业失败)
     { type: "mysql", host: "h", port: 3306, db: "d", url: "jdbc:mysql://h:3306/d?zeroDateTimeBehavior=CONVERT_TO_NULL", driver: "com.mysql.cj.jdbc.Driver" },
     { type: "postgresql", host: "h", port: 5432, db: "d", url: "jdbc:postgresql://h:5432/d", driver: "org.postgresql.Driver" },
-    // P42.3 根治:Oracle 统一用 Service Name(EZConnect)格式 @//h:p/d,与 Node 侧 oracledb
+    // 根治:Oracle 统一用 Service Name(EZConnect)格式 @//h:p/d,与 Node 侧 oracledb
     // connectString "h:p/service" 语义一致(此前 SID 冒号格式 @h:p:d 与 connectString 打架)。
     { type: "oracle", host: "h", port: 1521, db: "d", url: "jdbc:oracle:thin:@//h:1521/d", driver: "oracle.jdbc.driver.OracleDriver" },
     { type: "sqlserver", host: "h", port: 1433, db: "d", url: "jdbc:sqlserver://h:1433;databaseName=d", driver: "com.microsoft.sqlserver.jdbc.SQLServerDriver" },
@@ -350,7 +350,7 @@ describe("buildConnection 逐字一致(收编铁证:与旧 JDBC_URL/driver 一�
       expect(cm.driverClass).toBe(c.driver);
     });
   }
-  it("MySQL 与被收编的 datasource-service.ts:15 JDBC_URL 模板逐字相同(主体部分;序 44 起尾随方言默认参数)", () => {
+  it("MySQL 与被收编的 datasource-service.ts:15 JDBC_URL 模板逐字相同(主体部分;尾随方言默认参数)", () => {
     // 旧: mysql: (h,p,d) => `jdbc:mysql://${h}:${p}/${d}`
     const cm = getProvider("mysql").buildConnection({ type: "mysql", connection: { host: "db-1", port: 3306, database: "ecommerce" } });
     expect(cm.jdbcUrl).toBe("jdbc:mysql://db-1:3306/ecommerce?zeroDateTimeBehavior=CONVERT_TO_NULL");
@@ -413,9 +413,9 @@ describe("buildSecretPayload(收编 datasource-service.ts:28 凭证形态)", () 
   });
 });
 
-// P42.3:Oracle/SQLServer → Redshift 类型映射(取代此前 postgresql?PG:MYSQL 二选一,让 Oracle/
+// Oracle/SQLServer → Redshift 类型映射(取代此前 postgresql?PG:MYSQL 二选一,让 Oracle/
 // SQLServer 特有类型不再全 fallback 到 VARCHAR(256))。向导「字段映射预览 / 生成建表 DDL」用它。
-describe("类型映射 mapColumnType(P42.3 补 Oracle/SQLServer 专属表)", () => {
+describe("类型映射 mapColumnType(补 Oracle/SQLServer 专属表)", () => {
   it("Oracle 特有类型正确映射(不再 fallback VARCHAR(256))", () => {
     expect(mapColumnType("oracle", "VARCHAR2").targetType).toBe("VARCHAR");
     expect(mapColumnType("oracle", "NUMBER").targetType).toBe("DECIMAL"); // 无精度 → 光秃 DECIMAL(同 MySQL/PG decimal 语义)

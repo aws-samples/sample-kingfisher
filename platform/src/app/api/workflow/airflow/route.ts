@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
 // GET /api/workflow/airflow —— 换取 MWAA Web 登录 token(52 SPEC §2 缺口B 第 4 面)。
 //
 // 🔴 **改动前的真实状态**(2026-09-03 逐行实测,台账 52 DESIGN §11.2 第 1 项):
@@ -15,13 +14,13 @@ export const dynamic = "force-dynamic";
 //
 // 🔴 审计只记 **who / 哪个环境 / 想看哪个 dag**,**绝不记 token 本身**
 //   (它是凭证;抄进审计表等于把凭证复制到第二个地方,而审计表的读者面更宽)。
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
-// @kf-batch 50-WP4quater-reads(工单 SC-3)—— 🔴 Airflow 控制台入口按区:每个区一套 Airflow
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
+// 🔴 Airflow 控制台入口按区:每个区一套 Airflow
 // (用户 2026-09-10 第三次强调),把主控区的登录入口给别的区看,点进去看到的是**别人的 DAG 列表**。
 import { schedulerEndpointFor, isServerlessEndpoint, mwaaClientFor, MwaaNotInstalled, mwaaErrorResponse } from "@/lib/scheduler/mwaa-endpoint";
 import { isValidTargetId, HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { NextRequest } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+// 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { CreateWebLoginTokenCommand, GetEnvironmentCommand } from "@aws-sdk/client-mwaa";

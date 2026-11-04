@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // **多节点编排**的 MWAA Serverless 定义生成器(合同 SPEC v3.43 §3.15 的 v3.43 段)。
 //
 // 【为什么这一份不是「再写一个 yaml-generator」】单作业(一个作业 = 一个 task)那份是 `yaml-generator.ts`,
@@ -85,7 +84,7 @@ export function assertServerlessExpressible(nodes: Array<{ type?: string }>): vo
  */
 export interface WorkflowRunEnv {
   workflow_id: string;
-  // 序 73 模块 57(R3):与 ledger_* 同一教训 —— 白名单没列的字段到不了运行期;名字进 env 才有「由工作流 X 触发」
+  // 与 ledger_* 同一教训 —— 白名单没列的字段到不了运行期;名字进 env 才有「由工作流 X 触发」
   workflow_name: string | null;
   dag_id: string;
   exec_region: string;
@@ -95,9 +94,8 @@ export interface WorkflowRunEnv {
   redshift_secret_arn: string | null;
   project_id: string;
   target_id: string;
-  // @kf-batch 50-WP26-sync-schedule-carrier
   // 🔴🔴 **台账归属必须跟着进 YAML** —— 这里是那个**接缝**。
-  //   WP-26 第一版把 `ledger_*` 加进了 `DagSpec`、也让运行期 python 去读,唯独**漏了这一层**:
+  //   第一版把 `ledger_*` 加进了 `DagSpec`、也让运行期 python 去读,唯独**漏了这一层**:
   //   `runEnvOf` 是一张**白名单**,没列的字段压根到不了运行期 ⇒ 运行期只能回落缺省。
   //   真环境代价(2026-09-20 当场坐实):同步任务的定时调度**真跑起来了**
   //   (`triggeredBy=schedule` 两条 run,一条 succeeded),但
@@ -180,7 +178,6 @@ function taskIdsOf(node: DagSpecNode): string[] {
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * foreach 展开后**这一项**的 data:`{{item}}` 在**生成期**就替换掉,`__item` 只留给 python 子任务当参数。
  *
  * 🔴🔴 为什么必须在生成期替换(2026-09-11 真环境抓到,段 slsw SW-8 首跑):
@@ -196,7 +193,7 @@ function foreachItemData(data: Record<string, unknown>, item: unknown): Record<s
   const subData = { ...(sub.data ?? {}) };
   for (const k of Object.keys(subData)) {
     if (typeof subData[k] === "string") subData[k] = (subData[k] as string).split(ITEM_PLACEHOLDER).join(lit);
-    // B-66:`sqls`(预切的多语句)是字符串数组 —— 同样在生成期替换掉,否则 `{{item}}` 留在 YAML 里会被 dag-factory 当 Jinja 解析
+    // `sqls`(预切的多语句)是字符串数组 —— 同样在生成期替换掉,否则 `{{item}}` 留在 YAML 里会被 dag-factory 当 Jinja 解析
     else if (Array.isArray(subData[k])) {
       subData[k] = (subData[k] as unknown[]).map((s) => (typeof s === "string" ? s.split(ITEM_PLACEHOLDER).join(lit) : s));
     }

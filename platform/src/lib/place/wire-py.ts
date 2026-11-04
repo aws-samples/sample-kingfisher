@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 4(L6)—— **PlaceWire v1 的 Python 读取函数**(形状见 platform/place-wire.schema.json)。
+// **PlaceWire v1 的 Python 读取函数**(形状见 platform/place-wire.schema.json)。
 //
 // 单一作者:这一段 Python 源被**原样**嵌进两个 Python 运行时 ——
 //   ④ MWAA Serverless 调度运行时(lib/scheduler/serverless/runtime-py.ts 的 bgp_runtime.py)
@@ -23,7 +22,7 @@ import {
 const py = (p: string) => `r"${p}"`;
 
 export const PLACE_WIRE_PY = `
-# ── PlaceWire v1 读取函数(WP-31 L6;单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
+# ── PlaceWire v1 读取函数(单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
 import json as _pw_json
 import re as _pw_re
 
@@ -117,5 +116,5 @@ def bgp_place_leg(place, leg):
 `;
 
 /** 契约测试从生成产物里抠函数时用的两条界线(产物里必须原样出现)。 */
-export const PLACE_WIRE_PY_BEGIN = "# ── PlaceWire v1 读取函数(WP-31 L6;";
+export const PLACE_WIRE_PY_BEGIN = "# ── PlaceWire v1 读取函数(单一作者";
 export const PLACE_WIRE_PY_END = "# ── PlaceWire v1 读取函数 结束";

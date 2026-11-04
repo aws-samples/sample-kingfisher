@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP10a
 // residency.ts —— 跨法域技术前置 / 项目白名单 / 法域格式(SPEC v3.22 §1.1 / §2.1 / §3.2 / §3.12;DESIGN §18 决策 6quinquies)。
 import { describe, it, expect } from "vitest";
 import {
@@ -35,7 +34,7 @@ describe("法域格式 JURISDICTION_RE(SPEC §1.1 v3.22)", () => {
 });
 
 describe("🔴 residencyPrerequisite:跨法域 target 的唯一技术前置(不设法务门)", () => {
-  it("home 法域 ⇒ null(与 WP-3 之前完全一样,不多判任何东西)", () => {
+  it("home 法域 ⇒ null(与此前完全一样,不多判任何东西)", () => {
     expect(residencyPrerequisite({ targetId: "tgt_usw2_a", jurisdiction: "home", components: ["core"], resources: {} })).toBeNull();
     expect(residencyPrerequisite({ targetId: "tgt_home", jurisdiction: "home", components: ["core"], resources: {} })).toBeNull();
   });
@@ -55,7 +54,7 @@ describe("🔴 residencyPrerequisite:跨法域 target 的唯一技术前置(不�
   it("跨法域 + 装了 residency-api + 角色齐 ⇒ null(与同法域同一条路,**没有**任何法务判定)", () => {
     expect(residencyPrerequisite({ targetId: T3, jurisdiction: "eu-sim", components: ["core", "redshift", "residency-api"], resources: fullRoles() })).toBeNull();
   });
-  it("🔴 拒因文本里不出现法务定性(拍板负向 E-199 的单测面)", () => {
+  it("🔴 拒因文本里不出现法务定性(拍板负向 单测面)", () => {
     for (const r of [
       residencyPrerequisite({ targetId: T3, jurisdiction: "eu-sim", components: ["core"], resources: {} }),
       residencyPrerequisite({ targetId: T3, jurisdiction: "eu-sim", components: ["core", "residency-api"], resources: {} }),

@@ -1,4 +1,4 @@
-// 模块 28 — 网络顾问多轮对话记忆（可切换记忆后端）。镜像 genbi/memory.ts 的双后端骨架。
+// 网络顾问多轮对话记忆（可切换记忆后端）。镜像 genbi/memory.ts 的双后端骨架。
 // NETADVISOR_MEMORY_BACKEND=selfmanaged(默认) | agentcore
 //  • selfmanaged：短期=DynamoDB bgp-network-advisor-turns(TTL~24h)。顾问对话通常较短，短期足够。
 //  • agentcore：AgentCore 托管 Memory。短期=会话事件(CreateEvent/ListEvents)；
@@ -8,7 +8,7 @@
 // 与 Runtime Memory namespace /netadvisor/{actorId} 对齐）。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { createHash } from "crypto";

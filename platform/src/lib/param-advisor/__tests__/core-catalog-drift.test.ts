@@ -1,4 +1,4 @@
-// 模块47 L2 — core 内联 AWS 常量的【漂移守卫】。
+// core 内联 AWS 常量的【漂移守卫】。
 //
 // core/catalog.ts 为脱离 @/ 编译成 CJS 给容器 import,内联了 worker/EMR 规格常量(AWS 客观事实)。
 // 内联换取"消灭容器 CATALOG_TEXT 6401 字手抄"(高危副本),但引入"AWS 事实常量在 core 有一份副本"(低危)。
@@ -22,7 +22,7 @@ import {
 } from "../core/catalog";
 // 平台真源(catalog.ts 抽 core 前从这里 import;现由本单测充当一致性锚)。
 import { GLUE_WORKER_VALUES, GLUE_MAX_WORKERS } from "@/lib/etl/worker-types";
-// 序 53:Glue 版本清单 / 缺省的真源(缺省最高、可降版)
+// Glue 版本清单 / 缺省的真源(缺省最高、可降版)
 import { GLUE_VERSIONS, GLUE_VERSION_DEFAULT } from "@/lib/sync/glue-version";
 import {
   EMR_RELEASE_LABELS,
@@ -43,7 +43,7 @@ describe("core 内联 AWS 常量 vs 平台真源(漂移守卫)", () => {
     });
   });
 
-  describe("Glue 版本清单与缺省(源 @/lib/sync/glue-version;序 53 缺省最高、可降版)", () => {
+  describe("Glue 版本清单与缺省(源 @/lib/sync/glue-version;缺省最高、可降版)", () => {
     it("版本清单逐项一致(含 6.0)", () => {
       expect(CORE_GLUE_VERSIONS).toEqual([...GLUE_VERSIONS]);
       expect(CORE_GLUE_VERSIONS).toContain("6.0");
@@ -54,7 +54,7 @@ describe("core 内联 AWS 常量 vs 平台真源(漂移守卫)", () => {
   });
 
   describe("EMR Serverless 规格(源 @/lib/engines/emr/spec)", () => {
-    it("release 版本列表逐项一致(含默认 emr-spark-8.0.0 与序 53 加的 emr-7.14.0,防容器旧手抄 emr-7.5.0 漂移复现)", () => {
+    it("release 版本列表逐项一致(含默认 emr-spark-8.0.0 与加的 emr-7.14.0,防容器旧手抄 emr-7.5.0 漂移复现)", () => {
       expect(CORE_EMR_RELEASE_LABELS).toEqual([...EMR_RELEASE_LABELS]);
       expect(CORE_EMR_RELEASE_LABELS).toContain("emr-7.14.0");
     });

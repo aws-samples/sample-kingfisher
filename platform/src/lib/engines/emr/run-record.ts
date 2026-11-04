@@ -1,11 +1,10 @@
-// 模块 33-A — EMR 运行记录写入器（写共享表 bgp-task-runs）。
+// EMR 运行记录写入器（写共享表 bgp-task-runs）。
 // 复刻 lib/etl/job-service.ts:54-106 的 createRunRecord/finishRunRecord/updateJobStatus，
 // 但作业表指向 bgp-engine-jobs（ENGINE_JOBS），taskType 固定 "emr-serverless"。
 // 保留字 status/duration/error 做 Update 必须 ExpressionAttributeNames 别名（否则整条写入失败）。
 
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// @kf-batch 52-P52.2-W2a-run-stamp
 // 两个 task-runs 写入点改走**唯一写通道**(50 SPEC §6 S10:禁裸 Put/Update 打 task-runs)。
 import { putRunRecord, updateRunRecord, resolveRunStamp, type RunOwner } from "@/lib/monitor/run-records";
 
@@ -19,11 +18,10 @@ export async function createRunRecord(
   runId: string,
   extra: Record<string, unknown>,
   triggeredBy = "manual",
-  // @kf-batch 50-P50.3-engines
   // 🔴 **这次真跑的那个 target**(不是作业绑定的第一个)。少了它,非 home 的 EMR run 会盖成 home 的章
   // ⇒ 监控页按区筛静默少报,而且对账/取日志会去 home 找 application(必然找不到)。
   targetId?: string,
-  // @kf-batch 50-W3f-T0-T3 —— 多区扇出的关联标识,只透传到写通道的一等参数。
+  // 多区扇出的关联标识,只透传到写通道的一等参数。
   runGroupId?: string
 ) {
   await putRunRecord({

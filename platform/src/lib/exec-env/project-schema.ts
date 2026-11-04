@@ -1,4 +1,3 @@
-// @kf-batch 50-G2R
 // G4(提前并入 G2R)—— 项目 schema / 项目 DB role / shared schema 的**唯一权威**命名。
 //
 // 设计合同:52 SPEC §3.0(权威 `projectSchema()`)、§1 数据面对象表。
@@ -16,10 +15,10 @@
 // **建表 / 写入 / 查询 / S3Tables namespace 四处共用**。
 //
 // 🔴 G2R 阶段本文件**没有生产调用方**(只被 admin-DDL 模板与单测使用)⇒ 现网行为变化为 0。
-// 收编现有三套散点是 **G0/P52.5a** 的事,不在本批。
+// 收编现有三套散点是 **G0** 的事,不在本批。
 
 import { createHash } from "node:crypto";
-// @kf-batch 52-P52.5a-supply — target 维一律取自 SSOT,不在本文件自己拼 slug。
+// target 维一律取自 SSOT,不在本文件自己拼 slug。
 import { assertTargetId, toTargetSlug } from "@/lib/exec-env/target-id";
 
 /** 全局知识类物理表所在 schema(52 SPEC §1:码表/一致性维度等"企业统一语言")。 */
@@ -85,7 +84,7 @@ export function projectLakeNamespace(projectId: string): string {
 /**
  * 平台生成的 projectId 形态:`proj-` + 26 位 **ULID**。
  *
- * 🔴🔴 **2026-09-03 真环境订正(P52.1-D4 施工时逮到)**:原来这里写的是
+ * 🔴🔴 **2026-09-03 真环境订正(施工时逮到)**:原来这里写的是
  * `^proj-[0-9a-hjkmnp-tv-z]{26}$`(**小写**),而平台真正的生成器 `project-service.createProject`
  * 用的是 `ulid()`,它按 ULID 规范返回 **大写** Crockford base32
  * ⇒ **每一个真实 projectId 都被这个校验拒掉**(真环境实测 `proj-01M1KP594D2E6DJQC8EZ8CRAES`)。
@@ -95,7 +94,7 @@ export function projectLakeNamespace(projectId: string): string {
  * 里"fixture 恰好同序"那一类)。而本文件在 G4 落地时**没有任何生产调用方**(文件头自陈),
  * D4 的删项目前置校验是它的**第一个生产调用方**,一接上就炸 ——
  * 症状:`projectSchema()` 抛错 → 盘点标为"无法核实" → fail-closed ⇒ **所有项目都删不掉**。
- * ⇒ 这条 bug 若不在这里逮住,会等到 P52.5a/5b 建 `proj_` schema 时才发作(那时更贵)。
+ * ⇒ 这条 bug 若不在这里逮住,会等到 5b 建 `proj_` schema 时才发作(那时更贵)。
  *
  * 🔴 **刻意只接受大写**(不加 `/i`):`sanitize()` 会全局小写化,若大小写两种形态都合法,
  * `proj-ABC…` 与 `proj-abc…` 会映到**同一个 schema** = 跨项目数据混淆。
@@ -125,7 +124,7 @@ export function assertProjectId(projectId: unknown): string {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 52-P52.5a-supply — per-project **凭证**相关的派生名(与 schema/role 同一作者)
+// per-project **凭证**相关的派生名(与 schema/role 同一作者)
 //
 // 🔴 **落点与 52 DESIGN §12 事实⑤ 的说法不同,理由如下(不是漏做)**:
 // §12⑤ 写「per-project secret 名要在**命名 SSOT(naming.json)** 新增一个 kind,双侧逐字节一致」。
@@ -144,7 +143,7 @@ export function assertProjectId(projectId: unknown): string {
  *
  * 形态:`bgp/project/<targetSlug>/<projectId>`
  * · 前缀 `bgp/` —— 平台 TaskRole 的 secret **写**语句只允许 `bgp/*` 与 `bgp-*` 两个自管前缀
- *   (infra `platform-stack.ts`;P52.5a 把该语句翻成 execution 轴,故非 home 也能建);
+ *   (infra `platform-stack.ts`;把该语句翻成 execution 轴,故非 home 也能建);
  * · `targetSlug` 走 `toTargetSlug()`(target 维的唯一权威,DNS 安全形态);
  * · 🔴 项目段用**原样 projectId**(不过 `sanitize`):`assertProjectId` 只接受大写 ULID 形态
  *   ⇒ 原样即**单射**;而 `sanitize` 会全局小写化,虽然在"只收大写"的前提下也是双射,

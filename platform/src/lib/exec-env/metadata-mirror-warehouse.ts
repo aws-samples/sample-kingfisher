@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // 元数据镜像的**数仓目录**采集(Redshift `SVV_ALL_TABLES`)—— 只在**有请求上下文**时跑。
 //
 // ── 🔴 为什么它必须是独立文件、并且由调用方"注入"进采集流程 ──────────────────
@@ -29,7 +28,7 @@ const MAX_PAGES = 20;
  * 条目 payload 仍然走 `sanitize*` 白名单重建(与 Glue 侧同一个作者)。
  */
 /**
- * 列数仓目录的那一条 SQL。🔴 B-42:LIMIT 必须是 **MAX+1** —— 只取 MAX 行时第 MAX+1 行永远读不到
+ * 列数仓目录的那一条 SQL。🔴 LIMIT 必须是 **MAX+1** —— 只取 MAX 行时第 MAX+1 行永远读不到
  * ⇒ 「超过上限」永远报不出来(截断判定 fail-open),而差集删除(镜像 + OM 对账)只在「不截断」时做。
  */
 export const WAREHOUSE_TABLES_SQL =

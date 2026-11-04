@@ -1,9 +1,8 @@
-// @kf-batch 50-P50.1-workgroup-ssot
-// 数仓落点(workgroup / database)的**唯一出口** —— P50.1「收编兜底字面量」。
+// 数仓落点(workgroup / database)的**唯一出口** ——「收编兜底字面量」。
 //
 // 合同:50 SPEC §1-B(`bgp-workgroup` 兜底字面量收编)· 命名 SSOT `platform/naming.json`
 //      的 `redshiftWorkgroup` kind 自己的 `$note` 就写着「这是 …`|| "bgp-workgroup"` 兜底字面量的
-//      **收编目标**(收编本身属 P50.1)」。
+//      **收编目标**(收编本身)」。
 //
 // ── 为什么必须收编(不是洁癖)────────────────────────────────────────────────
 // 实测全仓 `"bgp-workgroup"` 字面量 **49 处**,而它们的兜底层级**并不一致**:
@@ -18,7 +17,7 @@
 //    这正是 memory `root-fix-not-patch-mandate` 里那个元模式:
 //    「部署时快照 + 运行期增长」的配置必须单一真值源派生,不能散点硬编码。
 //
-// ── 缺省逐字节等价(P50.1 的硬要求)────────────────────────────────────────
+// ── 缺省逐字节等价(硬要求)────────────────────────────────────────
 // `homeWorkgroup()` = `process.env.REDSHIFT_WORKGROUP || resourceName("redshiftWorkgroup", home)`,
 // 而后者对 home 的模板就是字面量 `bgp-workgroup` ⇒ **与改动前完全同值**(有单测逐字节钉住)。
 // `resolveWorkgroup(configured)` 刻意写成 `configured || homeWorkgroup()`(**不 trim**),
@@ -28,7 +27,7 @@
 // 照 `getRedshiftSecretArn`(50 G6)立下的先例:非 home 的落点**不能从 env 猜**,
 // 必须来自该 target 描述符的 `resources` 袋(registry.ts:「运行时一律读描述符实名」)。
 // 猜错的后果不是报错,而是"看起来正常地连到了别的区域" —— 所以这里显式抛错。
-// per-target 下发随 **P50.3**;本批只把 `target?` 这个参数位开出来(缺省不变)。
+// per-target 下发;本批只把 `target?` 这个参数位开出来(缺省不变)。
 
 import { resourceName } from "@/lib/aws/naming";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
@@ -68,8 +67,8 @@ export interface WarehouseLocation {
 /**
  * 某个执行目标的数仓落点。
  *
- * 🔴 **本批(P50.1)只开参数位**:`targetId` 缺省 / 传 home ⇒ 与改动前逐字节等价;
- * 传非 home ⇒ **抛错**并指向描述符(P50.3 才有真实下发)。刻意不写 `?? home` 兜底 ——
+ * 🔴 **本批只开参数位**:`targetId` 缺省 / 传 home ⇒ 与改动前逐字节等价;
+ * 传非 home ⇒ **抛错**并指向描述符(才有真实下发)。刻意不写 `?? home` 兜底
  * 那是外部审核 P0-4 抓过的 fail-open 形状(要 A 给了 B 的连接信息)。
  */
 export function warehouseLocationSync(opts?: {
@@ -80,10 +79,10 @@ export function warehouseLocationSync(opts?: {
   const targetId = opts?.targetId ?? HOME_TARGET_ID;
   if (!isHome(targetId)) {
     // 🔴 这里刻意**不复用** `assertHomeOnly` 的通用文案:数仓落点的正确出处是
-    // 该 target 描述符的 `resources` 袋(不是"等 P50.3 给客户端"),报错要把人指到对的地方。
+    // 该 target 描述符的 `resources` 袋(不是"等给客户端"),报错要把人指到对的地方。
     throw new Error(
       `数仓落点只解析 home;target ${targetId} 的 workgroup/database 必须取自其描述符的 resources 袋` +
-        `(50 SPEC §1.1;per-target 下发随 P50.3)`
+        `(50 SPEC §1.1;per-target 下发)`
     );
   }
   return {
@@ -98,7 +97,7 @@ export function warehouseLocationSync(opts?: {
  *
  * 50 SPEC §3.4 要求 4 个原子函数(`runSelect` / `runSelectAthena` / `introspectSchema` /
  * `introspectS3Tables`)接受 `target?`,且**缺省逐字节等价**。真正的 per-target 解析
- * (客户端 region、per-target workgroup、per-target 凭证)在 **P50.3**。
+ * (客户端 region、per-target workgroup、per-target 凭证)在。
  *
  * 🔴 过渡期只有两种正确行为:缺省/home ⇒ 原样;非 home ⇒ **抛错**。
  * 绝不允许第三种"先按 home 跑着"—— 那会让"我明明选了欧洲区"变成一次静默的跨境查询。
@@ -109,7 +108,7 @@ export function assertHomeOnly(targetId: string | undefined, what: string): stri
   if (!isHome(tid)) {
     throw new Error(
       `${what}目前只支持 home 执行目标;target ${tid} 需要 per-target 客户端与凭证` +
-        `(50 SPEC §3.4;随 P50.3 下发)。这里刻意不回落 home —— 回落等于静默跨区执行。`
+        `(50 SPEC §3.4;随后下发)。这里刻意不回落 home —— 回落等于静默跨区执行。`
     );
   }
   return tid;

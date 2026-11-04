@@ -1,4 +1,4 @@
-// 模块 42 — 数据源凭证的 Secrets Manager 封装(独立底层,断循环依赖)。
+// 数据源凭证的 Secrets Manager 封装(独立底层,断循环依赖)。
 //
 // 【为什么独立】原实现挤在 lib/aws/datasource-service.ts,与 JDBC_URL 表同文件。但凭证读写
 // 与「数据源类型」无关(纯 Secrets Manager 操作),不该困在那里。抽出后:
@@ -9,7 +9,6 @@
 
 import { SecretsManagerClient, CreateSecretCommand, GetSecretValueCommand, UpdateSecretCommand, DeleteSecretCommand } from "@aws-sdk/client-secrets-manager";
 import { sdkClient } from "@/lib/aws/clients";
-// @kf-batch 50-WP4quater-reads(工单 SC-31)
 // 🔴 这里原来是一个**模块级主控区客户端**(`new SecretsManagerClient({ region: process.env.AWS_REGION })`),
 // 它是「非主控区的数据源全都用不了」的单一根因:凭证存在那个区,读却永远打主控区 ⇒
 // `getSecret` 抛 ResourceNotFoundException ⇒ 浏览表 / 测连接 / 同步一律失败,而错误文案是
@@ -19,7 +18,7 @@ import { sdkClient } from "@/lib/aws/clients";
 // 读 / 改 / 删一律从 ARN 派生,不需要调用方多传一个参数(多传一个参数就多一个传错的机会);
 // 只有**建**的时候 ARN 还不存在 ⇒ 由调用方给出落点 region(缺省主控区,与改动前逐字节等价)。
 import { secretsClientFor, homeRegion } from "@/lib/exec-env/target-clients";
-// @kf-batch 56-B128-channel-reconcile —— ARN 切段 + 形态校验的唯一作者(分区 / 服务名校验与迁移前的正则逐字等价)
+// ARN 切段 + 形态校验的唯一作者(分区 / 服务名校验与迁移前的正则逐字等价)
 import { regionOfArn } from "@/lib/aws/arn";
 
 /**
@@ -60,7 +59,6 @@ export async function createSecret(datasourceId: string, username: string, passw
 }
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-5)
  * 取 secret 的**原始 JSON**(region 同样从 ARN 派生)。
  *
  * 🔴 为什么不复用 `getSecret`:那个函数的返回类型是 `UserPassSecret`(只有 username / password),
@@ -85,7 +83,7 @@ export async function getSecret(secretArn: string): Promise<UserPassSecret> {
 }
 
 /**
- * 序 31 三刀 IAM 侧(2026-10-21):读**账号自有、不归平台管**的密钥 —— 目前唯一用途 = 「从 RDS 发现建源」时把实例的
+ * IAM 侧(2026-10-21):读**账号自有、不归平台管**的密钥 —— 目前唯一用途 = 「从 RDS 发现建源」时把实例的
  * 托管主密钥(`rds!db-…` 或 CDK 演示库 `BgpRdsStack…`)里的账密**复制**进平台自己的 `bgp/datasource/<id>`。
  *
  * 🔴 为什么走控制面轴而不是 `getSecret`:数据面角色的读语句只认平台实名密钥(`bgp/*` / `redshift!*`,SPEC L5 per-target 收窄),

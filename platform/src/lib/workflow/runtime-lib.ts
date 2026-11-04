@@ -1,4 +1,4 @@
-// 模块 33-B — 固定 runtime 库(新引擎 runtime-lib)。
+// 固定 runtime 库(新引擎 runtime-lib)。
 //
 // 为什么是 TS 字符串而非 .py 文件:平台在 Next `output:"standalone"` 下运行,
 // 约定"bundler 内联、零运行时文件读"(见 lib/ai/model.ts:7-9 的教训——__dirname/cwd 漂移)。
@@ -14,44 +14,42 @@
 // v2(2026-08-25):裂缝C残余根治——workflow SQL 节点加【跨执行体作业级运行锁】。
 // 升版本号=发新文件名 bgp_workflow_runtime_v2.py,存量 DAG 仍 import v1(零影响,天然灰度)。
 //
-// @kf-batch 52-P52.2-W2a-run-stamp
 // v3(2026-09-03):① run 记录盖章 `{projectId, targetId}`(52 SPEC §1 / 50 SPEC §1.2);
-// ② 数仓落点 `workgroup`/`database` 也从 spec 取(50 P50.1 收编兜底字面量)。
+// ② 数仓落点 `workgroup`/`database` 也从 spec 取(收编兜底字面量)。
 // 章从 **JSON spec** 取(`project_id`/`target_id`),不做任何 Python 字符串注入 ——
 // 与本引擎"注入面归零"的设计一致(DESIGN §10.1)。
 // 🔴 **已发布的存量 DAG 仍 import v2,写出的 run 无章**:必须**重新发布**才带章
 // (发布路径 = `publish-dag.ts`,监控页改调度也会走它)。这条已登记进 W2 上线序,不靠猜。
-// @kf-batch 50-P50.3-multibind
 // 🔴 **改 runtime-lib 必须升版本号**:模块名带版本(`bgp_workflow_runtime_v<N>`),
 // 存量已发布的 DAG 仍 `import` 旧文件名 ⇒ 不升号就等于"改了库但存量 DAG 用的还是旧的"。
 // v3 → **v4**:本批给节点锁属性加了 target 维(`_lock_attr_for`)。
-// v4 → **v5**(@kf-batch 50-WP15-airflow-serverless T-12):台账 runId 复合 `<raw>#<targetId>` + `taskTargetKey`,写失败改 raise。
-// v5 → **v6**(@kf-batch 50-WP4quinquies-pushdown):spec 的单一 `region` 拆成 `exec_region`(干活的区)
+// v4 → **v5**:台账 runId 复合 `<raw>#<targetId>` + `taskTargetKey`,写失败改 raise。
+// v5 → **v6**:spec 的单一 `region` 拆成 `exec_region`(干活的区)
 //   / `ctrl_region`(主控区台账)—— 真环境抓到「DAG 跑在 usw2 的 Airflow 而正文全是主控区资源」。
 // ⚠️ **如实登记**:v3 至今**没在真环境验过**(现网 `WORKFLOW_DAG_ENGINE=legacy`,v2 引擎既不生成
 // v3 spec 也不上传 v3 库文件)⇒ v4 同样只有单测覆盖,**不许当成已验**。关闭方式见 50 ROADMAP §2sexies.4。
-// v6 → **v7**(@kf-batch 50-WP17-serverless-workflow):**只搬不改** —— 把「不依赖 Airflow」的那一整块
+// v6 → **v7**:**只搬不改** —— 把「不依赖 Airflow」的那一整块
 //   (受限执行 / `_mk` / `_exec_sync` / 作业锁 / `_exec_sql`)抽成单一作者 `node-exec-py.ts`,
-//   经典这份与 serverless 代码包**拼同一份字节**(WP-17 要让同样的节点语义也跑在 serverless 上;
+//   经典这份与 serverless 代码包**拼同一份字节**(要让同样的节点语义也跑在 serverless 上;
 //   各写一份就是 Task#19 / 370cd0c 那类**不报错只悄悄分叉**的缺陷)。
 //   函数体逐字未动,由 characterization 判据(抽取前后每个 def 的函数体逐字节相同)钉住;
 //   模块名带版本 ⇒ 内容变了就必须升号,否则存量已发布的 DAG 仍 import 旧文件。
 import { NODE_EXEC_PY } from "@/lib/workflow/node-exec-py";
-// 序 73 模块 57 —— 作业族执行体(两载体同一份字节)与它依赖的两份 Python 片段(落点读取 / 业务日期参数),与 serverless 代码包同源
+// 作业族执行体(两载体同一份字节)与它依赖的两份 Python 片段(落点读取 / 业务日期参数),与 serverless 代码包同源
 import { JOB_EXEC_PY } from "@/lib/workflow/job-exec-py";
 import { PLACE_WIRE_PY } from "@/lib/place/wire-py";
 import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 
-// v7 → **v8**(@kf-batch 50-WP17-serverless-workflow):收尾 task 的 trigger_rule 改 `none_failed`
+// v7 → **v8**:收尾 task 的 trigger_rule 改 `none_failed`
 //   (上游全被 skip 时 v7 会连收尾一起 skip ⇒ 工作流永远停在「运行中」;真环境 slsw SW-7 抓到)。
-// v8 → **v9**(@kf-batch 50-WP28-platform-action-node):共享块 NODE_EXEC_PY 新增 `_exec_platform_action`
+// v8 → **v9**:共享块 NODE_EXEC_PY 新增 `_exec_platform_action`
 //   (平台动作节点:往主控区命令表投命令 + 轮询终态),`_make_operator` 加 `platform-action` 分支。
 //   模块名带版本 ⇒ 内容变了就必须升号(存量 DAG 仍 import v8,零影响)。
-// v9 → **v10**(@kf-batch 37-sync-capability,B-66):共享块 `_exec_sql` 收 `sqls`(发布时 splitSql 预切的多语句)
+// v9 → **v10**:共享块 `_exec_sql` 收 `sqls`(发布时 splitSql 预切的多语句)
 //   ⇒ batch_execute_statement 单事务;`_make_operator` 的 sql / foreach-sql 把 `data.sqls` 透传。单语句节点不变。
-// v10 → **v11**(序 73 模块 57,离线作业节点):库里拼入作业族共享块 `JOB_EXEC_PY`(与 serverless 代码包同一份字节)及其依赖的
+// v10 → **v11**(离线作业节点):库里拼入作业族共享块 `JOB_EXEC_PY`(与 serverless 代码包同一份字节)及其依赖的
 //   `PLACE_WIRE_PY` / `RUN_PARAMS_PY`;共享块 `NODE_EXEC_PY` 新增 `_exec_job`(作业节点)并让 `_exec_sync` 写同步任务自己的运行行
-//   (B-141 ②);`_make_operator` 加 `job` 分支、`sync` 分支改带节点 id 与工作流 run id(回链)。
+//   ;`_make_operator` 加 `job` 分支、`sync` 分支改带节点 id 与工作流 run id(回链)。
 //   模块名带版本 ⇒ 内容变了就必须升号(存量 DAG 仍 import v10,零影响;重发一次拿新库)。
 export const RUNTIME_LIB_VERSION = 11;
 export const RUNTIME_LIB_MODULE = `bgp_workflow_runtime_v${RUNTIME_LIB_VERSION}`;
@@ -113,9 +111,9 @@ def _update_run_record(env, run_id, status, context=None):
         if status == "failed" and context:
             error_msg = str(context.get("exception", ""))[:500] or None
         item = {
-            # 🔴 T-12:runId 带 target 段 + taskTargetKey(口径唯一作者 lib/monitor/run-key.ts);
+            # 🔴 runId 带 target 段 + taskTargetKey(口径唯一作者 lib/monitor/run-key.ts);
             #   否则同一定义绑两个 region 时两行同键、后写盖掉先写(真环境已在 serverless 路径坐实)。
-            # @kf-batch 50-WP26-sync-schedule-carrier —— 归属来自 spec(缺省 = 工作流自己)
+            # 归属来自 spec(缺省 = 工作流自己)
             "taskId": env.get("ledger_task_id") or env["workflow_id"],
             "runId": run_id + "#" + env["target_id"],
             "taskType": env.get("ledger_task_type") or "workflow",
@@ -128,7 +126,7 @@ def _update_run_record(env, run_id, status, context=None):
             item["error"] = error_msg
         env["ddb"].Table("bgp-task-runs").put_item(Item=item)
     except Exception as e:
-        # 🔴 T-12「写不成即拒」:台账是运行历史与成本归因的唯一真值源,吞掉 = 这次运行在看板上不存在。
+        # 🔴 「写不成即拒」:台账是运行历史与成本归因的唯一真值源,吞掉 = 这次运行在看板上不存在。
         print("Failed to update run record: %s" % e)
         raise
 
@@ -146,7 +144,7 @@ def _make_operator(env, node, tasks_meta):
     data = node.get("data", {})
 
     if ntype == "sync":
-        # 序 73 B-141 ②:同步节点带节点 id 与工作流 run id(经典 run_id + "#" + target,与 _update_run_record 的台账键同口径)
+        # 同步节点带节点 id 与工作流 run id(经典 run_id + "#" + target,与 _update_run_record 的台账键同口径)
         #   ⇒ 执行器把这次运行写进同步任务自己的运行历史并回链;scheduler=mwaa 如实记载体。
         def _sync(_env=env, _task_id=data.get("syncTaskId", ""), _node_id=node.get("id", task_id), **kw):
             dr = kw.get("dag_run")
@@ -154,7 +152,7 @@ def _make_operator(env, node, tasks_meta):
             return _exec_sync(_env, _task_id, node_id=_node_id, workflow_run_id=rid, scheduler="mwaa")
         return PythonOperator(task_id=task_id, python_callable=_sync)
     if ntype == "job":
-        # 序 73 模块 57:离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析);业务日期取 Airflow 的 ds;
+        # 离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析);业务日期取 Airflow 的 ds;
         #   工作流 run id = 经典 run_id + "#" + target(与 _update_run_record 的台账键同口径);scheduler=mwaa 如实记载体。
         def _job(_env=env, _node=node, ds=None, **kw):
             dr = kw.get("dag_run")
@@ -165,7 +163,7 @@ def _make_operator(env, node, tasks_meta):
         # 透传原始 node id(node["id"])做锁属性,与 backfill/execute.ts 补数锁字节对齐(不是 task_id!)。
         return PythonOperator(task_id=task_id, python_callable=_exec_sql,
                               op_kwargs={"env": env, "sql": data.get("sql", "SELECT 1"),
-                                         "sqls": data.get("sqls"),   # B-66:多语句 ⇒ 单事务;缺省 None = 老路
+                                         "sqls": data.get("sqls"),   # 多语句 ⇒ 单事务;缺省 None = 老路
                                          "node_id": node.get("id", task_id)})
     if ntype == "platform-action":
         # 传声筒(执行器在 NODE_EXEC_PY):runId 取经典 run_id + "#" + target(与 _update_run_record 的台账键同口径)
@@ -222,7 +220,7 @@ def _make_operator(env, node, tasks_meta):
             items = []  # XCom 动态列为二期,静态期空列表→无子任务(honest)
         if sub_type == "sql":
             _sql_tmpl = str(sub_data.get("sql", "SELECT 1"))   # 绑定本节点(防晚绑定)
-            _sqls_tmpl = list(sub_data.get("sqls") or [])      # B-66:多语句 ⇒ 单事务(与 sql 节点同口径)
+            _sqls_tmpl = list(sub_data.get("sqls") or [])      # 多语句 ⇒ 单事务(与 sql 节点同口径)
             def _foreach_sql(item, _env=env, _tmpl=_sql_tmpl, _tmpls=_sqls_tmpl, **kw):
                 _exec_sql(_env, _tmpl.replace("{{item}}", str(item)),
                           sqls=[str(s).replace("{{item}}", str(item)) for s in _tmpls] or None)
@@ -291,7 +289,7 @@ def build_dag(spec):
         # 叶子(无出边)→ 状态回调(复刻 legacy leaf >> _status_done)。sources/叶子均按 task_id。
         sources = set(e["source"] for e in spec.get("edges", []))
         leaves = [tasks[n["task_id"]] for n in spec["nodes"] if n["task_id"] not in sources]
-        # 🔴🔴 v8(@kf-batch 50-WP17-serverless-workflow;2026-09-12 真环境 slsw SW-7 抓到):
+        # 🔴🔴 v8(2026-09-12 真环境 slsw SW-7 抓到):
         #   规则从 none_failed_min_one_success 改成 **none_failed** —— 前者在「上游**全部**被 skip」时
         #   连自己一起被 skip(branch 把所有出口跳过 / 汇聚点被连带跳过)⇒ **状态回写压根不跑**、
         #   工作流永远停在「运行中」。none_failed = 「没有失败」即跑(全成功**或**被跳过都算),

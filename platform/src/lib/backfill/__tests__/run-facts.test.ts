@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101)补数实例可观测事实的判据。
+// 补数实例可观测事实的判据。
 // 钉**事实**:行数从哪个字段取、「不知道」≠ 0、「成功但 0 行」只在三个条件同时成立时成立、汇总不把未知混进总和、
 // BatchGet 按 (taskId, runId) 去重分批且 UnprocessedKeys 继续取、取不齐就抛。只 mock 真外部(DynamoDB 客户端)。
 import { describe, it, expect, vi, beforeEach } from "vitest";

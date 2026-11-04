@@ -1,11 +1,11 @@
-// 序 53 —— cookbook 内联的 Glue 版本事实 vs 平台真源(lib/sync/glue-version.ts)的漂移守卫。
+// cookbook 内联的 Glue 版本事实 vs 平台真源(lib/sync/glue-version.ts)的漂移守卫。
 //   cookbook 是「零 @/ alias」的 core 包(随 genbi 容器 core-dist 分发),不能 import 真源 ⇒ 内联一份;
 //   本单测同时 import 两边 toEqual 比对:真源加了新 Glue 版本 / 换了缺省,这里没跟就红(与 param-advisor core 的做法同一个范式)。
 import { describe, it, expect } from "vitest";
 import { COOKBOOK_GLUE_VERSIONS, COOKBOOK_GLUE_VERSION_DEFAULT, COOKBOOK_GLUE_DEFAULT_RUNTIME, GLUE_DIALECT_RULES, GLUE_RECIPES } from "../seed/glue";
 import { GLUE_VERSIONS, GLUE_VERSION_DEFAULT, GLUE_RUNTIME_FACTS } from "@/lib/sync/glue-version";
 
-describe("序 53 cookbook 内联 Glue 版本事实 vs 真源", () => {
+describe("cookbook 内联 Glue 版本事实 vs 真源", () => {
   it("清单逐项一致", () => {
     expect(COOKBOOK_GLUE_VERSIONS).toEqual([...GLUE_VERSIONS]);
   });

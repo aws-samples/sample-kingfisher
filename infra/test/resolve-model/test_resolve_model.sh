@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @kf-batch 50-PROD-A-launch-hardening(h)+ 51-v2-multi-vendor(序 40,2026-10-14)—— scripts/resolve-home-model.sh 离线判据
+# + 51-v2-multi-vendor—— scripts/resolve-home-model.sh 离线判据
 #   (假 aws,零凭证、零真调用)。真的执行脚本本体。
 #   ① 本区地理配置优先 ② 本区配置调不通 ⇒ 落到 global. ③ 全链调不通 ⇒ 非零退出、stdout 空、stderr 逐条列出
 #   ④ 别的模型 / INACTIVE 的配置不当候选 ⑤ 列配置被拒 ⇒ 仍按形态剥前缀试基础模型并把拒因带出来

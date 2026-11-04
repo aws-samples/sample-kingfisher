@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mrquery
 // 多 region 直查提交层的门禁 —— 🔴 **全部可执行**(真调 `submitToTargets`,打桩只到 AWS SDK 边界)。
 //
 // 用户 2026-09-04 定的两条约束就是这里最承重的不变量:
@@ -154,7 +153,7 @@ describe("🔴🔴 提交层:只提交、不等结果;逐 target 各自 try", ()
 });
 
 describe("🔴 错误归类:平台自家错误按 `reason` 判,不按文案判", () => {
-  it("TargetBindingRejected 的 reason 各自映到对的类(@kf-batch 50-W5-seg1-WP10a:原跨法域专用错误类已删,不设法务门)", () => {
+  it("TargetBindingRejected 的 reason 各自映到对的类(原跨法域专用错误类已删,不设法务门)", () => {
     expect(classifySubmitError(new TargetBindingRejected("missing-component", "x")).kind).toBe("target-not-ready");
     expect(classifySubmitError(new TargetBindingRejected("warehouse-conflict", "x")).kind).toBe("warehouse-conflict");
     expect(classifySubmitError(new TargetBindingRejected("no-credential", "x")).kind).toBe("credential-missing");
@@ -187,4 +186,4 @@ describe("🔴 错误归类:平台自家错误按 `reason` 判,不按文案判",
   });
 });
 
-// @kf-batch 50-W5-seg1-WP10a —— 原「跨法域:合并必须被禁」describe 整块**已删**(DESIGN §18 决策 6quinquies:不设法务门;合并对跨法域可用,查询已审计)。
+// 原「跨法域:合并必须被禁」describe 整块**已删**(DESIGN §18 决策 6quinquies:不设法务门;合并对跨法域可用,查询已审计)。

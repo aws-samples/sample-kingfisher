@@ -1,4 +1,4 @@
-// @kf-batch 44-jdbc-params —— 附加 JDBC 参数唯一作者的判据(用户 2026-10-15 反馈 ① 零值时间戳报错 / ③ 缺 JDBC 参数化配置)。
+// 附加 JDBC 参数唯一作者的判据(用户 2026-10-15 反馈 ① 零值时间戳报错 / ③ 缺 JDBC 参数化配置)。
 // 钉事实:解析 / 归一化 / 拒绝清单 / 与方言默认合并(用户覆盖)/ 两种拼接风格 / 四方言 buildConnection 的最终 URL。
 import { describe, it, expect } from "vitest";
 import { parseJdbcParams, mergeJdbcParams, appendJdbcParams, buildJdbcUrlWithParams, JDBC_PARAMS_MAX_PAIRS } from "../jdbc/jdbc-params";

@@ -1,9 +1,8 @@
 "use client";
-// @kf-batch 50-P50.3-modeling
 // **建模落地面板**(50 INTERACTION §4ter 场景五:建模逐 target 下推与 drift 呈现)。
 //
 // 复用既有三件范式、**不新造**:target 多选(§2.1)· 下发前看清(§2.2)· 观测态四色(§4ter)。
-// 新增的只是"落到哪个 schema / 观测态四色"的表达(原「被驻留门控」态已随不设法务门删除,WP-10a)。
+// 新增的只是"落到哪个 schema / 观测态四色"的表达(原「被驻留门控」态已随不设法务门删除)。
 //
 // 🔴 本面板最要紧的两条:
 //  ① **`drift` 绝不显示为 ✓**(原「⊘被驻留门控」态已删)。判态用**服务端同一份纯函数** `landedStateOf`
@@ -17,7 +16,7 @@ import { Alert, Button, Descriptions, Input, Modal, Popconfirm, Radio, Space, Ta
 import { DisconnectOutlined, ReloadOutlined, WarningOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { landedStateOf, diffSignatures, type LandedRecord, type LandedState } from "@/lib/modeling/landing-shared";
-// @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+// 免责告知弹窗(409 驱动,同意后重试)
 import { useResidencyAck } from "@/components/residency/useResidencyAck";
 import { fetchWithResidencyAck } from "@/lib/residency/client";
 
@@ -33,7 +32,7 @@ const STATE_UI: Record<LandedState, { text: string; color?: string; hint: string
     color: "error",
     hint: "该区已存在**结构不同**的同名表,平台**没有覆盖**它 —— 看差异后决定是否以平台定义强制重建",
   },
-  // @kf-batch 50-WP11b-shared-writer —— 🔴 写入通道已交付(SPEC §3.9d):非 home 落地不再产生这一态,
+  // 🔴 写入通道已交付(SPEC §3.9d):非 home 落地不再产生这一态,
   //   界面上只剩**交付之前留下的旧记录**(它们从没执行过任何语句,那个区没有这张表)。文案随合同更新
   //   (INTERACTION §4ter.a-1:不许让用户读到一句过期的「至今未交付」),并给出路:勾上重新落地即可。
   "credential-gap": {
@@ -65,14 +64,14 @@ export interface LandingPanelProps {
 
 export default function LandingPanel(p: LandingPanelProps) {
   const t = useT();
-  // @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+  // 免责告知弹窗(409 驱动,同意后重试)
   const { residencyModal, resolveAckRequired } = useResidencyAck();
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [diffOpen, setDiffOpen] = useState<string>("");
   const [forceOpen, setForceOpen] = useState<string>("");
   const [confirmText, setConfirmText] = useState("");
-  // @kf-batch 50-W5-seg1-WP11a —— 解绑弹窗(只解绑 / 解绑并清理;清理要逐字输入物理表名)
+  // 解绑弹窗(只解绑 / 解绑并清理;清理要逐字输入物理表名)
   const [unbindOpen, setUnbindOpen] = useState<string>("");
   const [unbindMode, setUnbindMode] = useState<"keep" | "cleanup">("keep");
   const [unbindConfirm, setUnbindConfirm] = useState("");
@@ -107,7 +106,7 @@ export default function LandingPanel(p: LandingPanelProps) {
   const call = async (body: Record<string, unknown>, okMsg: string) => {
     setBusy(true);
     try {
-      // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 首次落地 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
+      // 跨法域 target 首次落地 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
       const { res: r, body: d, cancelled } = await fetchWithResidencyAck(
         endpoint,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
@@ -149,7 +148,7 @@ export default function LandingPanel(p: LandingPanelProps) {
     }
   };
 
-  // @kf-batch 50-W5-seg1-WP11a —— 解绑(50 SPEC v3.20 §3.8 / INTERACTION v2.16 §4ter)
+  // 解绑(50 SPEC v3.20 §3.8 / INTERACTION v2.16 §4ter)
   const openUnbind = async (targetId: string) => {
     setUnbindOpen(targetId);
     setUnbindMode("keep");
@@ -240,7 +239,7 @@ export default function LandingPanel(p: LandingPanelProps) {
           <Descriptions.Item label={t("物理落点")}><code>{p.table}</code></Descriptions.Item>
           <Descriptions.Item label={t("定义哈希")}><code>{p.defHash}</code></Descriptions.Item>
         </Descriptions>
-        {/* 🔴 schema 口径**照实说**:现在落 `public`,收进项目 schema 属 P52.5b,不许在界面上美化成 shared/proj_* */}
+        {/* 🔴 schema 口径**照实说**:现在落 `public`,收进项目 schema ,不许在界面上美化成 shared/proj_* */}
         <Alert
           type="info"
           showIcon
@@ -257,7 +256,7 @@ export default function LandingPanel(p: LandingPanelProps) {
           rowSelection={{
             selectedRowKeys: picked,
             onChange: (k) => setPicked(k as string[]),
-            // @kf-batch 50-WP11b-shared-writer —— 原「缺写入通道的区不给勾」已放开(INTERACTION §4ter.a-1 勾选框一行):
+            // 原「缺写入通道的区不给勾」已放开(INTERACTION §4ter.a-1 勾选框一行):
             //   写入通道已交付,旧的 credential-gap 记录重新落地一次就会变成真实的四态之一。
             getCheckboxProps: () => ({ disabled: false }),
           }}
@@ -318,7 +317,7 @@ export default function LandingPanel(p: LandingPanelProps) {
                   {r.rec?.error ? (
                     <Tooltip title={r.rec.error}><Text type="danger" style={{ fontSize: 12 }}>{t("错误详情")}</Text></Tooltip>
                   ) : null}
-                  {/* @kf-batch 50-W5-seg1-WP11a —— 解绑是**显式动作**(此前绑定只能由落地增长,残留在真环境构造不出来) */}
+                  {/* 解绑是**显式动作**(此前绑定只能由落地增长,残留在真环境构造不出来) */}
                   {r.bound || r.rec ? (
                     <Button size="small" icon={<DisconnectOutlined />} loading={busy} onClick={() => openUnbind(r.targetId)}>
                       {t("解绑…")}
@@ -331,7 +330,7 @@ export default function LandingPanel(p: LandingPanelProps) {
         />
       </Modal>
 
-      {/* @kf-batch 50-W5-seg1-WP11a —— 解绑弹窗:只解绑(残留可见)/ 解绑并清理(DROP,机制 A 输入表名) */}
+      {/* 解绑弹窗:只解绑(残留可见)/ 解绑并清理(DROP,机制 A 输入表名) */}
       <Modal
         title={<Space><DisconnectOutlined />{t("从 {t} 解绑 · {n}", { t: unbindOpen, n: p.name })}</Space>}
         open={Boolean(unbindOpen)}

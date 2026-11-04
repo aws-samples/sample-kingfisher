@@ -7,7 +7,7 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as targets from "aws-cdk-lib/aws-events-targets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { Construct } from "constructs";
-// @kf-batch 52-P52.5a-supply — 资源 ARN 的 region 段唯一出口 + 显式轴声明。
+// 资源 ARN 的 region 段唯一出口 + 显式轴声明。
 import { regionalStatement } from "./shared/execution-regions";
 
 interface OmIngestionStackProps extends cdk.StackProps {

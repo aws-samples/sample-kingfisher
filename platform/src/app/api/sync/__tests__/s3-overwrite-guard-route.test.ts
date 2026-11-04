@@ -1,8 +1,8 @@
-// @kf-batch 37-sync-capability —— 序 37 B-60:建任务 / 改任务对「客户已有的 S3 Tables 表」的提前告知(路由层行为判据)。
+// 建任务 / 改任务对「客户已有的 S3 Tables 表」的提前告知(路由层行为判据)。
 //   mock 形态照抄 overwrite-guard-route.test.ts(只 mock 真外部:DDB、身份、注册表 / 落点解析、Redshift Data API、
 //   S3 Tables 控制面 + S3 对象读)。假 S3 Tables 按夹具 EXISTING 作答:GetTable 不存在 ⇒ NotFoundException;存在 ⇒
 //   metadataLocation,再由假 S3 回那张表的 Iceberg 元数据 JSON(properties 就是夹具里给的)。
-//   B-61:merge 任务的合并键校验(400)与「merge 不需要确认」。
+//   merge 任务的合并键校验(400)与「merge 不需要确认」。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -129,7 +129,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("🔴 B-60 建任务 POST /api/sync:S3 Tables 目标的提前告知", () => {
+describe("🔴 建任务 POST /api/sync:S3 Tables 目标的提前告知", () => {
   it("overwrite + 客户已有的同名 S3 表(没有平台标记)⇒ 409 DECISION_REQUIRED,清单是三段名,零落库", async () => {
     h.s3existing = { "gamedata.orders": { "format-version": "2" } };
     const r = await req("../route", { ...base, writeMode: "overwrite" });
@@ -194,7 +194,7 @@ describe("🔴 B-60 建任务 POST /api/sync:S3 Tables 目标的提前告知", (
   });
 });
 
-describe("🔴 B-61 建任务:merge 必须带合并键", () => {
+describe("🔴 建任务:merge 必须带合并键", () => {
   it("merge 没键 ⇒ 400(中文点名 mergeKeys),零落库;有键 ⇒ 201 且键随任务存下", async () => {
     const r = await req("../route", { ...base, writeMode: "merge" });
     expect(r.status).toBe(400);

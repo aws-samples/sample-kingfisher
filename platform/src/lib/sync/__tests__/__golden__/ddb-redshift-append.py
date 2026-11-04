@@ -14,11 +14,11 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args["JOB_NAME"], args)
 
-# 模块42 P42.4/P42.5:iam-role 类源(DynamoDB/S3)用 IAM 角色访问(无密钥),不读 Secrets Manager。
+# iam-role 类源(DynamoDB/S3)用 IAM 角色访问(无密钥),不读 Secrets Manager。
 DDB_TABLE = "bgp-orders"
 DDB_REGION = "us-east-1"
 tables = ["bgp-orders"]
-# @kf-batch 50-WP24b-vacuous-sync —— 🔴 零表就**响亮失败**(不许空转成功)。
+# 🔴 零表就**响亮失败**(不许空转成功)。
 # 真环境实测:表清单为空时本脚本一路跑到 "SYNC RESULTS: {}" 然后 SUCCEEDED,
 # 于是平台把任务标成 succeeded 而数仓里连表都没建 —— 看板全绿、什么都没发生。
 if not tables:
@@ -36,7 +36,7 @@ BT = chr(96)
 S3T_BUCKET = BT + S3T_BUCKET_RAW + BT
 S3T_NAMESPACE = "gamedb"
 
-# ── PlaceWire v1 读取函数(WP-31 L6;单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
+# ── PlaceWire v1 读取函数(单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
 import json as _pw_json
 import re as _pw_re
 
@@ -128,7 +128,7 @@ def bgp_place_leg(place, leg):
     return v
 # ── PlaceWire v1 读取函数 结束 ─────────────────────────────────────────────────────────
 
-# @kf-batch 50-WP31-place-first-class —— 序 4(L6):数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
+# 数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
 #   缺 / 不合法 / 没有数仓腿 ⇒ 当场抛,不会落到任何缺省区或工作组)。
 _BGP_PLACE = bgp_read_place("{\"v\":1,\"targetId\":\"tgt_home\",\"region\":\"us-east-1\",\"redshift\":{\"workgroup\":\"bgp-workgroup\",\"database\":\"dev\",\"secretArn\":\"arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift!bgp-namespace-admin-AbCdEf\"}}")
 _BGP_RS = bgp_place_leg(_BGP_PLACE, "redshift")
@@ -139,7 +139,7 @@ for table_name in tables:
     print(f"{'='*60}")
     # SYNC-07: resolve the target table name (defaults to the source name).
     target_name = target_names.get(table_name, table_name)
-    # 模块42 P42.4/P42.5: 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
+    # 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
     # (如 bgp-orders / my.table),但 Redshift/S3Tables 的 SQL 标识符不允许裸连字符 → 建表 DDL 语法错
     # (真 bug: "syntax error at or near '-' in context 'public.bgp-'")。JDBC 源表名本是 SQL 标识符不受影响。
     # 统一把非法字符(非字母/数字/下划线)→ 下划线,数字开头补 _。覆盖 Redshift + S3Tables 两个目标。
@@ -165,7 +165,7 @@ for table_name in tables:
         # 增量谓词:数字水位不加引号,非数字(时间戳/字符串)加引号并转义,避免 SQL 语法错。
         _pv = INC_VAL if INC_VAL.replace(".", "", 1).lstrip("-").isdigit() else "'" + INC_VAL.replace("'", "''") + "'"
         inc_where = f"{INC_COL} > {_pv}"
-    # 模块42 P42.5:DynamoDB 源经 Glue DynamoDB 连接器批读(ETL connector),整表 Scan → DataFrame。
+    # DynamoDB 源经 Glue DynamoDB 连接器批读(ETL connector),整表 Scan → DataFrame。
     # 无 SQL 下推(DDB 无 WHERE 谓词能力),一期全量读;dynamodb.throughput.read.percent 控制读容量占用防打满。
     # DDB item 属性异构 → Glue 推断出并集 schema;嵌套 Map/List 列在下游写 Redshift 时由类型映射兜底为 VARCHAR。
     _ddb_dyf = glueContext.create_dynamic_frame.from_options(
@@ -225,7 +225,7 @@ for table_name in tables:
     # 改用 **Redshift 托管 admin secret**(与 DMS 路径 execAdminSql 一致,有全权),所有 Data API 语句
     # 都带 SecretArn=admin 执行,从而能建 schema/表/授权。admin secret 名固定 redshift!bgp-namespace-admin。
     import time
-    # @kf-batch 50-WP7-sync-pushdown:数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
+    # 数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
     rs_client = boto3.client("redshift-data", region_name=_BGP_PLACE["region"])
     rs_workgroup = _BGP_RS["workgroup"]
     rs_database = _BGP_RS["database"]
@@ -235,7 +235,7 @@ for table_name in tables:
     RS_SORT_KEYS = []
     RS_DIST_KEY = ""
     RS_DIST_STYLE = ""
-    # 🔴 WP-7:执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
+    # 🔴 执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
     # 与旧运行期探名拿到的是同一把;非 home = 该 target 自己的凭证)。原先 Python 侧按 home 命名
     # 运行期探名的写法已退役 —— 那个名字是主控区的,非 home 区按它探,探到 = 连错身份,
     # 探不到 = 静默回 IAM,两头都是错。值为 None(无密钥裸环境)= 回退 IAM 身份(旧语义不变)。
@@ -301,7 +301,7 @@ for table_name in tables:
         # reach FINISHED raises immediately — never silently continue (root-caused two
         # bugs: a failed INSERT was swallowed so the job "succeeded" with 0 rows, and a
         # permission-denied INSERT was retried for every batch, burning minutes of compute).
-        # B-126(2026-10-26 测试账号真环境):Redshift Data API 对单条语句偶发回「An I/O error occurred while sending to the backend」
+        # (2026-10-26 测试账号真环境):Redshift Data API 对单条语句偶发回「An I/O error occurred while sending to the backend」
         #   这类**连接层瞬态错**;原来一次失败即抛 ⇒ CREATE 已成、COMMENT(平台标记)失败 ⇒ 留下一张**无标记的空表**,
         #   之后每次运行都被 SYNC_REFUSED_CLEAR_FOREIGN_TABLE 拒绝(守卫按设计,可那张表是平台自己建的,用户无路可走)。
         #   修两处:① run_stmt / run_batch / 探测只对连接层瞬态签名**有界重试**(3 次,2 / 4 秒;权限 / 语法 / 对象不存在等照旧
@@ -395,7 +395,7 @@ for table_name in tables:
         ensure_schema(f"CREATE SCHEMA IF NOT EXISTS {rs_schema}", "CREATE SCHEMA")
         # Create table if missing. 用 DELETE 而不是 TRUNCATE:①TRUNCATE 是 owner-only;
         # ②增量幂等路径要按 WHERE 精确删区间(见下方 inc_where),TRUNCATE 做不到。
-        # 🔴 L1(52 P52.1)后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
+        # 🔴 L1后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
         #    已改用同一个 admin secret ⇒ 两侧同 owner,不靠任何补授权。
         #    (本注释在 TS 模板串里,禁写反引号——它会当场截断模板字符串。)
         # SYNC-FIX(sortkey): 建表带上 DISTKEY/DISTSTYLE/SORTKEY(与预览 DDL 一致;此前执行脚本裸建表丢了它们)。
@@ -436,7 +436,7 @@ for table_name in tables:
             # 已存在(带标记,或用户已确认覆盖)⇒ 建表语句照旧单条跑(IF NOT EXISTS 下是 no-op),不碰标记。
             run_stmt(create_sql, "DDL")
         else:
-            # B-126:建表 + 打平台标记在**同一个事务**里 —— 标记打不上就连表也不留(否则下次运行会被守卫当成客户的表拒掉)。
+            # 建表 + 打平台标记在**同一个事务**里 —— 标记打不上就连表也不留(否则下次运行会被守卫当成客户的表拒掉)。
             run_batch([create_sql, f"COMMENT ON TABLE {rs_table} IS '{PLATFORM_TABLE_MARKER}'"], "DDL+COMMENT(platform marker)")
             print(f"SYNC_TABLE_MARKED table={_rs_fq}")
 

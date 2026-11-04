@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // lifecycle.ts 纯核心的单测 —— 这些断言**同时是本批的门禁**(转移表全覆盖 / 投影全函数且旧 10 态全可达 /
 // 收养自愈 / 单写通道条件写)。合同 SPEC §1.1 v3.15,台账 DESIGN §20.23。
 //
@@ -152,7 +151,7 @@ describe("serviceabilityReason(准入的正交部分,不含新鲜度)", () => {
 });
 
 describe("adoptLegacy(控制器收养存量,自愈)", () => {
-  it("🔴 真环境 tgt_usw2_a 卡死形态(initializing∧ready∧stored probe.ok)⇒ **保守不推 ready**(拒绝#12:不据 stored probe;E-99 只由本次 fresh probe 自愈,Steps 3-4)", () => {
+  it("🔴 真环境 tgt_usw2_a 卡死形态(initializing∧ready∧stored probe.ok)⇒ **保守不推 ready**(拒绝#12:不据 stored probe;只由本次 fresh probe 自愈,Steps 3-4)", () => {
     const legacy = {
       targetId: "tgt_usw2_a",
       status: "initializing" as TargetStatus,
@@ -333,7 +332,7 @@ describe("transitionPhase(唯一写通道 + 物化投影 + 受限自转 gate)", 
       post: { spec: serve, observed: greenObserved("ready") },
       expectedVersion: 7,
       legacyCompletionFence: stableFence,
-      reason: "收养存量(E-99 stable)",
+      reason: "收养存量(stable)",
     });
     const input = sendMock.mock.calls[0][0].input;
     expect(input.ConditionExpression).toContain("attribute_not_exists(#o)");

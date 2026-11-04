@@ -1,4 +1,4 @@
-// @kf-batch 44-jdbc-params —— 同步脚本是附加 JDBC 参数 / MySQL 方言默认参数的**消费者**:接缝判据(纯函数,零 mock)。
+// 同步脚本是附加 JDBC 参数 / MySQL 方言默认参数的**消费者**:接缝判据(纯函数,零 mock)。
 // 「写了」≠「接上了」:jdbcConnFor(ds) 经 toSourceRef → provider.buildConnection,参数必须真进 `jdbc_url = "…"` 那一行。
 import { describe, it, expect } from "vitest";
 import { generateGlueScript } from "@/lib/sync/glue-script-generator";
@@ -8,7 +8,7 @@ const shape = GOLDEN_SHAPES.find((s) => s.name === "jdbc-redshift-append")!;
 const urlLine = (script: string) => script.split("\n").find((l) => l.startsWith("jdbc_url = "));
 
 describe("Glue 同步脚本里的 jdbc_url", () => {
-  it("MySQL 存量行(没有 jdbcParams 键)⇒ 只带方言默认参数 zeroDateTimeBehavior=CONVERT_TO_NULL(B-86:零值日期按 NULL 读入)", () => {
+  it("MySQL 存量行(没有 jdbcParams 键)⇒ 只带方言默认参数 zeroDateTimeBehavior=CONVERT_TO_NULL(零值日期按 NULL 读入)", () => {
     const line = urlLine(generateGlueScript(shape.task, shape.ds, GOLDEN_BINDINGS));
     expect(line).toBe('jdbc_url = "jdbc:mysql://db.example.internal:3306/gamedb?zeroDateTimeBehavior=CONVERT_TO_NULL"');
   });

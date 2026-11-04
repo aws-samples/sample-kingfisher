@@ -1,4 +1,3 @@
-// @kf-batch 50-W3f-T0-T3
 // 门票 T2:多区扇出的 `runGroupId` —— 形态 / 分组规则 / **接线门禁**(两条运行路由 + 两个 provider)。
 //
 // 🔴 接线门禁为什么是文本断言:运行路由要 mock 掉 guard / DDB / 审计 一整串才能跑,mock 一多就在测 mock;
@@ -13,7 +12,6 @@ import {
   RUN_GROUP_ID_PATTERN,
   isRunGroupId,
   runGroupIdFor,
-  // @kf-batch 50-WP5-rungroup
   MANUAL_RUN_GROUP_PREFIX,
   SCHEDULED_RUN_GROUP_PREFIX,
   SCHEDULED_RUN_GROUP_ID_PATTERN,
@@ -52,7 +50,7 @@ describe("runGroupIdFor:多区才分组", () => {
 });
 
 describe("🔴 接线门禁:两条运行路由都「循环前算一次、每次提交都带上」", () => {
-  // B-136:引擎运行的扇出循环在长操作执行体(路由算 runGroupId 后经 submitLongOp 的 params 交给执行体)
+  // 引擎运行的扇出循环在长操作执行体(路由算 runGroupId 后经 submitLongOp 的 params 交给执行体)
   const ROUTES: Array<[string, string]> = [
     ["app/api/etl-jobs/[id]/run/route.ts", "app/api/etl-jobs/[id]/run/route.ts"],
     ["app/api/engines/[engine]/[id]/run/route.ts", "lib/engines/long-ops.ts"],
@@ -61,7 +59,7 @@ describe("🔴 接线门禁:两条运行路由都「循环前算一次、每次�
     it(`${rel}`, () => {
       const src = stripComments(read(rel));
       const loopSrc = stripComments(read(loopFile));
-      // @kf-batch 50-WP5-rungroup —— 允许第二个 opts 实参(`forceGroup` 给重试链用),但仍必须**恰好一次**
+      // 允许第二个 opts 实参(`forceGroup` 给重试链用),但仍必须**恰好一次**
       const calls = src.match(/runGroupIdFor\(\s*runTargets\s*[,)]/g) ?? [];
       expect(calls.length, "必须恰好调一次(0 = 没接线;>1 = 可能在循环里算,每条 run 各拿一个值等于没分组)").toBe(1);
       // 🔴 `forceGroup` 只许由重试链驱动 —— 写成常量 true 会让**每一次单区运行**都建一个只有一个区的组
@@ -69,7 +67,7 @@ describe("🔴 接线门禁:两条运行路由都「循环前算一次、每次�
       expect(forced.length, "forceGroup 必须出现且只出现一次").toBe(1);
       expect(forced[0], "forceGroup 只能由 retryOf 驱动,不许写死").toBe("forceGroup: !!retryOf");
       const at = src.indexOf("runGroupIdFor(");
-      // @kf-batch 50-WP31-place-first-class —— 扇出循环改为 forEachTargetPlace(runTargets, async (targetId) => …)(L10 唯一写法)
+      // 扇出循环改为 forEachTargetPlace(runTargets, async (targetId) => …)(L10 唯一写法)
       const loop = loopSrc.search(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>/);
       expect(loop, "找不到扇出循环 ⇒ 路由形状变了,请同步本门禁").toBeGreaterThan(0);
       if (loopFile === rel) expect(at, "runGroupIdFor 必须在扇出循环**之前**").toBeLessThan(loop);
@@ -101,7 +99,7 @@ describe("🔴 接线门禁:两条运行路由都「循环前算一次、每次�
 });
 
 
-// @kf-batch 50-WP5-rungroup —— O2:定时确定性键这一支的形态判别(50 SPEC §1.3a S7 / §3.17.2)
+// O2:定时确定性键这一支的形态判别(50 SPEC §1.3a S7 / §3.17.2)
 describe("🔴 两种组 id 形态:靠**末尾下划线**才互不混淆(判别一律走完整正则)", () => {
   const SCHED = "rgs_0123456789abcdef01234567"; // 24 hex
   const MANUAL = "rg_01J8Z6Q2M3N4P5R6S7T8V9W0XY".slice(0, 3) + "0123456789ABCDEFGHJKMNPQRS";
@@ -156,9 +154,9 @@ describe("🔴 两种组 id 形态:靠**末尾下划线**才互不混淆(判别�
   });
 });
 
-// @kf-batch 50-WP5-rungroup —— O2 步 3:两条运行路由的接线门禁
+// O2 步 3:两条运行路由的接线门禁
 describe("🔴 O2 接线:组行**先建**(严格) + 逐 target 记账(尽力),两条路由同一形状", () => {
-  // B-136:engine-job 的扇出循环 / 逐 target 记账在长操作执行体 lib/engines/long-ops.ts;建组行 / 定义版本仍在路由,经 submitLongOp 的 params 交给执行体
+  // engine-job 的扇出循环 / 逐 target 记账在长操作执行体 lib/engines/long-ops.ts;建组行 / 定义版本仍在路由,经 submitLongOp 的 params 交给执行体
   const ROUTES: Array<[string, string, string]> = [
     ["app/api/etl-jobs/[id]/run/route.ts", "etl-job", "app/api/etl-jobs/[id]/run/route.ts"],
     ["app/api/engines/[engine]/[id]/run/route.ts", "engine-job", "lib/engines/long-ops.ts"],
@@ -168,7 +166,7 @@ describe("🔴 O2 接线:组行**先建**(严格) + 逐 target 记账(尽力),�
       const src = stripComments(read(rel));
       const loopSrc = stripComments(read(loopFile));
       const sameFile = loopFile === rel;
-      // @kf-batch 50-WP31-place-first-class —— 扇出循环改为 forEachTargetPlace(runTargets, async (targetId) => …)(L10 唯一写法)
+      // 扇出循环改为 forEachTargetPlace(runTargets, async (targetId) => …)(L10 唯一写法)
       const loop = loopSrc.search(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>/);
       expect(loop, "找不到扇出循环 ⇒ 路由形状变了,请同步本门禁").toBeGreaterThan(0);
 
@@ -185,7 +183,7 @@ describe("🔴 O2 接线:组行**先建**(严格) + 逐 target 记账(尽力),�
       expect(openCall, "requestedTargets 必须是本次真正要跑的那批").toContain("requestedTargets: runTargets");
       expect(openCall, "归属必须走 resolveRunStamp 单一作者,不许自己 `job.projectId || …`").toContain("resolveRunStamp(job).projectId");
 
-      // ③ 🔴 写失败必须**返回错误响应**,不许 fail-open 继续往下跑(E-167)
+      // ③ 🔴 写失败必须**返回错误响应**,不许 fail-open 继续往下跑
       const afterOpen = sameFile ? src.slice(openAt, loop) : src.slice(openAt);
       expect(afterOpen, "组行写失败必须经单一作者映射成响应并 return").toContain("runGroupWriteErrorResponse(e)");
       expect(afterOpen).toMatch(/if \(r\) return r;/);
@@ -201,7 +199,7 @@ describe("🔴 O2 接线:组行**先建**(严格) + 逐 target 记账(尽力),�
       // ⑤ 记账没记上要如实回报,不许假装完整
       expect(loopSrc).toContain("...(ledgerWarnings.length ? { groupLedgerIncomplete: ledgerWarnings } : {})");
 
-      // ⑥ E-168:定义版本必须**循环之前**算一次并带给记账(放循环里会对同一定义连查 N 遍)
+      // ⑥:定义版本必须**循环之前**算一次并带给记账(放循环里会对同一定义连查 N 遍)
       const dv = src.indexOf("const defVersion =");
       expect(dv, "没算定义版本 ⇒ 组页面「定义版本」那一列永远是「-」(写了没接上)").toBeGreaterThan(-1);
       if (sameFile) expect(dv).toBeLessThan(loop);

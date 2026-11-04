@@ -1,5 +1,5 @@
 {
-  // @netadvisor/core 独立编译成 CJS 的配置(模块47 L3)。
+  // @netadvisor/core 独立编译成 CJS 的配置。
   // 与 tsconfig.core.json(@genbi/core)、tsconfig.paramadvisor-core.json 同构,只换 rootDir/include
   // 指向 network-advisor/core。
   // 【不 extends 主 tsconfig】:主 tsconfig 是 es5 + noEmit + module esnext + @/ paths,

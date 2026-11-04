@@ -1,4 +1,4 @@
-// 模块 43-B — 智能基线 / SLA 预测:类型定义(单一事实源)。
+// 智能基线 / SLA 预测:类型定义(单一事实源)。
 
 export interface DurationStats {
   p50: number;
@@ -11,7 +11,6 @@ export interface DurationStats {
 }
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-15)
  * **一个执行区的基线**。同一个任务在两个区的运行特征本来就不同(数仓规格、数据量、网络),
  * 把两个区的 run 混进一条基线,p90 是一个**两个分布的混合体** —— 用它做 SLA 预测,
  * 结果是「两个区都不准」,而界面上完全看不出为什么。用户 2026-09-10 的原话是
@@ -41,7 +40,7 @@ export interface BaselineRow {
   punctuality: { onTimeRate: number; samples: number };
   successRate: { value: number; samples: number };
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-15)—— 每个执行区一份。
+   * 每个执行区一份。
    * 🔴 为什么放进同一行而不是拆成「一行一区」:这张表的排序键就叫 `taskId`,要拆行只能把
    * `taskId#targetId` 塞进那个键 —— 本仓在复合键上踩过的坑(R10 审查「复合键必要不充分」)
    * 说明那会让「taskId」这个字段名开始说谎,而每一个按 taskId 取行的调用点都要跟着改。
@@ -81,7 +80,7 @@ export interface SlaPrediction {
 export interface SlaRow {
   pk: string; // "sla#<projectId>"
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-15)—— 这条 SLA 管的对象跑在哪些区。
+   * 这条 SLA 管的对象跑在哪些区。
    * 🔴 **从绑定对象(任务 / 工作流)的 `targets[]` 派生**,不让用户在 SLA 表单里另填一次:
    * 两处各填一次必然漂,而漂了的后果是「SLA 挂在一个那个区根本不跑的任务上」——
    * 永远不破线,于是看起来一切正常。
@@ -94,7 +93,7 @@ export interface SlaRow {
   version: number;
   target: SlaTarget;
   warnLeadMin: number; // 提前多少分钟预测破线即告警
-  channelIds: string[]; // 复用模块34通道
+  channelIds: string[]; // 复用通道
   lastPrediction?: SlaPrediction;
   createdAt: string;
   updatedAt: string;

@@ -1,4 +1,4 @@
-// 模块 44 — 数据同步工程配方(通道选型 + 目标矩阵)。
+// 数据同步工程配方(通道选型 + 目标矩阵)。
 // 平台同步通道见记忆 [[sync-channel-target-matrix]]:各通道支持的目标不同,选错跑不通。
 
 import type { DialectRule, Recipe } from "../types";
@@ -27,7 +27,7 @@ export const SYNC_RECIPES: Recipe[] = [
     tags: ["sync", "同步", "dms", "cdc", "全量", "增量", "channel", "通道"],
   },
   {
-    // 模块42 P42.1-P42.7:数据源 SPI 四范式的【连接方式】映射(建源填什么、凭证怎么给)。真跑通沉淀。
+    // 数据源 SPI 四范式的【连接方式】映射(建源填什么、凭证怎么给)。真跑通沉淀。
     id: "datasource.paradigm-connection",
     engine: "glue",
     capability: "datasource-connect",
@@ -54,7 +54,7 @@ export const SYNC_RECIPES: Recipe[] = [
     verifiedAt: "2026-07-29",
   },
   {
-    // 模块42:四范式的【抓取/实现方式】(数据怎么从源拉出来 → 入湖仓 / 就地查)。你反复强调要沉淀的核心。
+    // 四范式的【抓取/实现方式】(数据怎么从源拉出来 → 入湖仓 / 就地查)。你反复强调要沉淀的核心。
     id: "datasource.paradigm-ingestion",
     engine: "glue",
     capability: "datasource-ingest",

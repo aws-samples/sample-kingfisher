@@ -1,8 +1,8 @@
-// 序 49 ⑨ B-110 —— 页面拿到「不是 JSON 的 /api 响应」时的唯一作者(零服务端 import,浏览器与判据共用)。
+// 页面拿到「不是 JSON 的 /api 响应」时的唯一作者(零服务端 import,浏览器与判据共用)。
 //
-// 【缺陷原形(第四十三轮 c,…9435 18:07Z)】平台边缘访问频率规则把一批 `/api/*` 请求拦成 **HTML 403**,CloudFront / ALB 的
+// 【缺陷原形(…9435 18:07Z)】平台边缘访问频率规则把一批 `/api/*` 请求拦成 **HTML 403**,CloudFront / ALB 的
 //   502 / 504 也是 HTML 页;页面几乎每个调用点都是 `const d = await res.json()` ⇒ 抛 `Unexpected token '<'`,用户只在控制台
-//   看到天书、页面无任何可读提示。B-107 的 `aiFetchJson` 只给七条 AI 路由包过(`describeNonJson`),其余 ~300 个调用点裸奔。
+//   看到天书、页面无任何可读提示。该缺陷的 `aiFetchJson` 只给七条 AI 路由包过(`describeNonJson`),其余 ~300 个调用点裸奔。
 // 【根治】不逐个改调用点:`AuthProvider` 的全局 fetch 拦截器(所有 `/api/*` 请求的必经之路)在**状态 ≥ 400 且响应体不是 JSON**
 //   时把响应整形成标准错误信封 `{ success:false, error:{ message, code }, status, nonJson:true }`(同状态码、`content-type: application/json`),
 //   于是每个调用点原有的 `d?.error?.message || "…失败"` 分支就能把可读文案显示出来。2xx 一律不碰(文件下载 / 流式响应走 /api 也是 2xx)。

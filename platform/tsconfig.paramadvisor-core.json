@@ -1,5 +1,5 @@
 {
-  // @paramadvisor/core 独立编译成 CJS 的配置(模块47 L2)。
+  // @paramadvisor/core 独立编译成 CJS 的配置。
   // 与 tsconfig.core.json(@genbi/core)同构,只换 rootDir/include 指向 param-advisor/core。
   // 【不 extends 主 tsconfig】:主 tsconfig 是 es5 + noEmit + module esnext + @/ paths,
   // 不适合产出给容器 import 的 CJS。此处独立声明,保证 core 脱离 platform alias 也能编译

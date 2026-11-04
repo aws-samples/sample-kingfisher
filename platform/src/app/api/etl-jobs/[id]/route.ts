@@ -1,26 +1,24 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 改绑定的落点只认点名(空列表 ⇒ 400,不再静默改绑主控区)
+// 改绑定的落点只认点名(空列表 ⇒ 400,不再静默改绑主控区)
 import { hasTargetsPatch, requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { deleteGlueJobs } from "@/lib/etl/job-service";
 import { apiOk, apiError } from "@/lib/api-response";
-// @kf-batch 50-P50.3-dataplane
 import { assertBindableTargetsForEngine, TargetBindingRejected, bindingTargets } from "@/lib/exec-env/data-plane-target";
-// 序 72 B-139(模块 56):自定义执行角色保存期预检
+// 自定义执行角色保存期预检
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
 import { s3UrisFromGlueConfig } from "@/lib/execution-role/s3-uris";
-// @kf-batch 50-P50.3-fanout
 import { offlineUnboundTargets, offlineFanout, offlineFailures, offlineFailureMessage } from "@/lib/etl/dag-fanout";
 import type { EtlJob } from "@/types/etl-job";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { snapshotVersion } from "@/lib/versions/version-service";
 import { pushSqlLineageToOpenMetadata } from "@/lib/openmetadata/om-push";
 import { recordComputeLineage } from "@/lib/governance/lineage-service";
-// 序 73 模块 57(R7)—— 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
+// 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
 import { workflowsReferencingJob, hasJobReferences, jobInUseResponse } from "@/lib/workflow/job-references";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
 
@@ -47,20 +45,19 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   if (guard instanceof NextResponse) return guard;
 
   const body = await req.json();
-  // @kf-batch 50-P50.3-dataplane
   // 🔴 `targetId` 进白名单**必须连校验一起进**:改执行目标 = 改"SQL 打到哪个区域",
   // 与创建路径同一条判据(单一作者 `assertBindableTarget`),否则改的口子比建的口子还宽。
-  // @kf-batch 50-WP31-place-first-class —— 校验后的绑定放进局部变量,后面只读它(不再回头读 body)
+  // 校验后的绑定放进局部变量,后面只读它(不再回头读 body)
   let newTargets: string[] | undefined;
   if (hasTargetsPatch(body)) {
     try {
-      // @kf-batch 50-P50.3-fanout —— 判据按**引擎**分(Glue 本期只许 home,理由见该函数注释)。
+      // 判据按**引擎**分(Glue 本期只许 home,理由见该函数注释)。
       // 引擎取**存量行**的 `type`,不取 body:type 不在可改字段白名单里,信 body 等于给了个绕过口。
       newTargets = await assertBindableTargetsForEngine(
         String((current as { type?: string }).type || "redshift"),
         requestedTargets(body, "修改作业绑定"),
         "redshift",
-        { scope: "per-project", projectId: guard.projectId } // @kf-batch 50-W5-seg1-WP10a 项目白名单(WP-11b:scope 必填)
+        { scope: "per-project", projectId: guard.projectId } // 项目白名单(scope 必填)
       );
       body.targets = newTargets;
       delete body.targetId; // 只保留一个真值源
@@ -71,7 +68,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       return apiError((e as Error)?.message ?? String(e), 400, { code: "VALIDATION_FAILED" });
     }
   }
-  // 序 72 B-139:按「改完之后」的整条作业预检自定义执行角色(只在角色 / 依赖 / 脚本 / 绑定被动到时量;与新建同一作者),缺 ⇒ 400 不落库
+  // 按「改完之后」的整条作业预检自定义执行角色(只在角色 / 依赖 / 脚本 / 绑定被动到时量;与新建同一作者),缺 ⇒ 400 不落库
   if (String((current as { type?: unknown }).type || "") === "glue" && (body.glueConfig !== undefined || body.script !== undefined || newTargets !== undefined)) {
     const merged = { ...(current as Record<string, unknown>), ...body } as { glueConfig?: { executionRoleArn?: unknown; extraJars?: unknown; extraPyFiles?: unknown }; script?: unknown };
     const pfRes = await preflightCustomRoleForTargets({
@@ -107,7 +104,6 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const { Item } = await docClient.send(
       new GetCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: params.id } })
     );
-    // @kf-batch 50-P50.3-fanout
     // 🔴 **解绑 ≠ 下线**:把作业从 `[home, usw2]` 改成 `[home]` 之后,usw2 那份 DAG
     // 还在 MWAA 里按 cron 跑 —— 界面上它已经不绑那个区,那个区却仍在往自己的数仓写数
     // (跨法域下即数据出境)。所以绑定收缩时必须显式下线被摘掉的 target。
@@ -138,7 +134,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       }
     }
     await snapshotVersion("etl-job", params.id, Item as any, guard.identity.username, "保存").catch(() => {});
-    // 模块 17: re-parse SQL → lineage on save (best-effort).
+    // re-parse SQL → lineage on save (best-effort).
     const saved = Item as any;
     if (saved?.type === "redshift" && saved?.script) {
       pushSqlLineageToOpenMetadata({
@@ -168,11 +164,10 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   if (!Item) return apiError("作业不存在", 404);
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
-  // 序 73 模块 57(R7):仍被工作流的离线作业节点引用 ⇒ 409 逐条点名工作流,作业行 / Glue 作业 / 调度产物一个都不动(与 B-131 删源同口径)
+  // 仍被工作流的离线作业节点引用 ⇒ 409 逐条点名工作流,作业行 / Glue 作业 / 调度产物一个都不动(与删源同口径)
   //   §3.7 项目内:本项目的工作流逐条点名;其他项目的只给数量(名字不出项目),一样拒
   const jobRefs = await workflowsReferencingJob(params.id, resolveRunStamp(Item as { projectId?: string }).projectId);
   if (hasJobReferences(jobRefs)) return jobInUseResponse(jobRefs);
-  // @kf-batch 50-P50.3-fanout
   // 🔴 删作业**必须先把它的 DAG 全撤掉**。原来只删 DDB 行 ⇒ `dags/bgp_etl_<id>.py` 留在 S3 里,
   // MWAA 继续按 cron 触发一个"已经不存在"的作业(它会去读已删的行然后失败/或按旧脚本继续写数)。
   // 多绑之后这个洞被放大成 N 份产物,而且非 home 的那份在**另一个区域**里跑,更查不到。
@@ -204,7 +199,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
       { code: "UPSTREAM_ERROR" }
     );
   }
-  // @kf-batch 50-W5-seg1-WP10a —— Glue 作业定义**随删**(每个绑定 target 各一份;best-effort,详见 deleteGlueJobs)
+  // Glue 作业定义**随删**(每个绑定 target 各一份;best-effort,详见 deleteGlueJobs)
   const glueCleanup = del.type === "glue" ? await deleteGlueJobs(del).catch(() => [] as Array<{ targetId: string; name: string; ok: boolean }>) : [];
   await docClient.send(new DeleteCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: params.id } }));
   return apiOk({ deleted: true, glueJobsDeleted: glueCleanup });

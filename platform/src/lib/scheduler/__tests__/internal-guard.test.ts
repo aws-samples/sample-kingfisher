@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 内部端点守卫:无身份 / 错身份 ⇒ 401/403;经 CloudFront(公网)进来 ⇒ 403;没配密钥 ⇒ 503(fail-closed)。
 // 外加三条**接线**判据:中间件对 /api/internal/ 先挡 CloudFront;路由先过守卫再碰命令;请求体只认 commandId。
 import { describe, it, expect, beforeEach } from "vitest";
@@ -36,7 +35,7 @@ function h(over: Record<string, string | null> = {}): Headers {
 
 beforeEach(() => __resetInternalKeyCache());
 
-describe("内部端点守卫(WP-28 序 3/4)", () => {
+describe("内部端点守卫", () => {
   const load = async () => KEY;
 
   it("正确来源 + 正确密钥 ⇒ 放行,映射为系统主体且带 via=schedule", async () => {
@@ -114,13 +113,13 @@ describe("接线:中间件 / 路由", () => {
     expect(ad).toContain('eventName: lambda.FilterRule.isEqual("INSERT")');
     const ps = readFileSync(resolve(ROOT, "infra/lib/platform-stack.ts"), "utf8");
     expect(ps).toContain("ACTION_DISPATCH_SECRET_ARN: actionDispatch.secret.secretArn");
-    // 序 33 ③:调度对象表与命令表同在平台栈(只重部署平台栈的环境也建得出它)
+    // 调度对象表与命令表同在平台栈(只重部署平台栈的环境也建得出它)
     expect(ad).toContain('ACTION_SCHEDULES_TABLE_NAME = "bgp-action-schedules"');
     expect(ad).toMatch(/tableName: ACTION_SCHEDULES_TABLE_NAME,\s*partitionKey: \{ name: "userId"[^}]*\},\s*sortKey: \{ name: "taskId"/);
     expect(readFileSync(resolve(ROOT, "infra/lib/database-stack.ts"), "utf8")).not.toContain('{ name: "bgp-action-schedules"');
     // 平台读的就是这两个名字
     expect(code("lib/scheduler/internal-guard.ts")).toContain("process.env.ACTION_DISPATCH_SECRET_ARN");
-    // 序 31 第三刀 ①:这把钥匙是控制面的 ⇒ 两个读点都经 sdkClient("control-plane")(不注入数据面角色;observe 下不再每 5 分钟
+    // 这把钥匙是控制面的 ⇒ 两个读点都经 sdkClient("control-plane")(不注入数据面角色;observe 下不再每 5 分钟
     //   先被拒一次,enforce 下不会把泵 / 内部端点整条打断),且不许再回到数据面工厂 regionalClient("secrets")
     for (const rel of ["lib/scheduler/internal-guard.ts", "lib/dataplane-jobs/pump.ts"]) {
       const src = code(rel).replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
@@ -138,8 +137,8 @@ describe("接线:中间件 / 路由", () => {
   });
 });
 
-// @kf-batch 50-WP9a-durable-jobs —— 第二个登记来源 `dataplane-job-pump`(数据面长作业的推进泵,平台进程回环调用)
-describe("🔴 内部来源按端点精确判(WP-9 ④-2)", () => {
+// 第二个登记来源 `dataplane-job-pump`(数据面长作业的推进泵,平台进程回环调用)
+describe("🔴 内部来源按端点精确判(④-2)", () => {
   const load = async () => KEY;
   const PUMP = "dataplane-job-pump";
 

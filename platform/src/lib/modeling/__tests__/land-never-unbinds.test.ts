@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-matrix2
 // 🔴🔴 **落地一个子集不许把别的区静默解绑**(W3-d2 施工时逮到的第三个真 bug)。
 //
 // 起因:W3-d2 在版本一致性矩阵的每个格子上加了〔落地到此 region〕,它只带**那一个** target。
@@ -54,7 +53,7 @@ vi.mock("@/lib/modeling/landing", () => ({
 
 vi.mock("@/lib/openmetadata/om-glossary", () => ({ pushStandardGlossary: vi.fn(async () => {}) }));
 
-// @kf-batch 50-W5-seg2-WP10a:落地前的区域审计(residencyAudit)在本文件不是被测对象 —— 它要读注册表判法域,
+// 落地前的区域审计(residencyAudit)在本文件不是被测对象 —— 它要读注册表判法域,
 // 这里的 target 都是同法域 ⇒ 打桩成 null(与真实同法域行为一致);审计本身由 residency-audit.test.ts 覆盖。
 vi.mock("@/lib/exec-env/residency-audit", () => ({
   residencyAudit: vi.fn(async () => null),

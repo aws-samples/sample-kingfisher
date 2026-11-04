@@ -3,8 +3,8 @@
 // 【缺陷原形(2026-10-13 temp-account,s38 复跑 71d)】POST /api/governance/sync-redshift-schema 是同步长调用:
 //   Redshift 列回填 + 每个 S3 Tables 表桶(平台表桶 + 已登记外部桶)逐命名空间 Athena 列回填串行跑,
 //   ALB 空闲超时 60s ⇒ 这一次超了回 **504**,而工作在后台做完了(治理目录里已有那张表)⇒ 用户按一次看到「同步失败」。
-// 【序 38 的修法】这里自带一套「最多等 45s,没做完 202 带 runId,页面轮询 GET」的治理专用协议。
-// 【模块 55 第二批(2026-10-22)】专用协议退役:等待 / 转后台 / 并发互斥全部交给长操作统一框架(kind `governance-schema-sync`,
+// 【修法】这里自带一套「最多等 45s,没做完 202 带 runId,页面轮询 GET」的治理专用协议。
+// 专用协议退役:等待 / 转后台 / 并发互斥全部交给长操作统一框架(kind `governance-schema-sync`,
 //   租约 `governance:schema-sync`)—— 本文件只剩**运行记录**这一件事:
 //   · 运行记录仍落 bgp-settings(pk system / sk governance#schema-sync):**跨 ECS task 可见**,GET 读「最近一次同步」不变;
 //   · `runSchemaSyncRecorded`:落 running → 跑 work → 落终态,把终态记录原样回给执行体;

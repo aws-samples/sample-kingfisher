@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 50-WP5-rungroup
 // POST /api/run-groups/[id]/cancel —— 取消这一组里**还没终态**的子 run(50 SPEC v3.44 §2.7)。
 //
-// 🔴 **已终态的一个都不许动**(E-163 的负向半边):把 succeeded 改成 stopped = 伪造历史。
+// 🔴 **已终态的一个都不许动**(负向半边):把 succeeded 改成 stopped = 伪造历史。
 // 🔴 逐 run 独立结果、整体 200:一个区停不下来不该让另一个区的成功取消变成「失败」。
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";

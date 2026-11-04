@@ -10,7 +10,6 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { RUNTIME_LIB_SOURCE, RUNTIME_LIB_VERSION } from "@/lib/workflow/runtime-lib";
-// @kf-batch 50-P50.3-multibind
 import { lockAttrFor } from "@/lib/etl/run-lock";
 import { generateEtlJobDag } from "@/lib/etl/dag-generator";
 import type { EtlJob } from "@/types/etl-job";
@@ -39,8 +38,7 @@ describe("裂缝C残余:跨执行体锁属性对齐(防漂移=防白改)", () =>
     expect(RUNTIME_LIB_VERSION).toBeGreaterThanOrEqual(2);
   });
 
-  // @kf-batch 50-P50.3-multibind
-  // 🔴 本条原来钉的是**内联公式**(`runLock_${...replace(...)}`)。P50.3 给锁加了 target 维之后,
+  // 🔴 本条原来钉的是**内联公式**(`runLock_${...replace(...)}`)。给锁加了 target 维之后,
   // 内联公式就是"第二处实现" —— 所以判据改成**更强**的形式:必须走唯一作者 `lockAttrFor`,
   // 且必须把 targetId 与**原始 nodeId** 都传进去(少传 targetId ⇒ 两个区域的同节点串成一条队;
   // 传 task_id 而不是 node.id ⇒ 与 python 侧不一致,370cd0c 教训)。
@@ -53,7 +51,6 @@ describe("裂缝C残余:跨执行体锁属性对齐(防漂移=防白改)", () =>
     expect(exec, "内联拼法残留 ⇒ 唯一作者名不副实").not.toMatch(/["'`]runLock_?["'`]?\s*\+/);
   });
 
-  // @kf-batch 50-P50.3-multibind
   it("🔴🔴 Python 侧的镜像实现 `_lock_attr_for` 与 TS 侧 `lockAttrFor` 对**同一输入逐字节相同**", () => {
     const py = RUNTIME_LIB_SOURCE;
     // 文本锚点:python 侧确实有那个镜像函数,而且调用点用它(不是自己再拼一遍)。
@@ -106,7 +103,7 @@ describe("裂缝C残余:跨执行体锁属性对齐(防漂移=防白改)", () =>
     expect(py).toMatch(/"node_id":\s*node\.get\("id",\s*task_id\)/);
   });
 
-  // @kf-batch 50-P50.3-multibind —— 属性名改由 TS 侧注入 ⇒ 判据从"源码里有那个字面量"
+  // 属性名改由 TS 侧注入 ⇒ 判据从"源码里有那个字面量"
   // 升级为"**生成出来的 DAG** 里 home 逐字节同名、非 home 真带 target"(打到产物上,更强)。
   it("etl DAG 的锁属性:home 逐字节 runLockToken / 非 home 带 target,且与唯一作者一致", () => {
     const home = generateEtlJobDag(ETL_JOB_FIXTURE);

@@ -6,19 +6,18 @@ import { omRequest, isOmConfigured } from "@/lib/openmetadata/om-client";
 import { parseSqlLineage, tableFqn } from "@/lib/lineage/sql-lineage";
 import { apiOk, apiError } from "@/lib/api-response";
 import { omServiceBase } from "@/lib/openmetadata/om-service";
-// @kf-batch 50-WP4quater-reads(工单 SC-8)
 import { readScope, filterRowsByScope } from "@/lib/exec-env/scope";
 import { requireAuth } from "@/lib/auth/verify-token";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 模块 17 (v1.8.0) 影响分析：给定一张表 FQN，沿 OpenMetadata 的 *下游* 血缘回答
+// 影响分析：给定一张表 FQN，沿 OpenMetadata 的 *下游* 血缘回答
 //   ① 会影响哪些下游数据资产（含层级 depth）
 //   ② 哪些 ETL/Redshift SQL 作业会受影响（reads = 直接消费被改表；writes = 产出受影响的下游表）
 // 读 OM 为系统事实来源；作业富集 = 扫描 bgp-etl-jobs(redshift)+bgp-redshift-tasks 并现解析其 SQL。
 // ─────────────────────────────────────────────────────────────────────────────
 
 function svcType(fqn?: string): string {
-  // @kf-batch 50-o4REG-sync-om-per-target —— per-target service 按基名出图标(单一作者 omServiceBase)
+  // per-target service 按基名出图标(单一作者 omServiceBase)
   const svc = omServiceBase((fqn || "").split(".")[0]);
   switch (svc) {
     case "bgp-redshift": return "redshift";
@@ -86,7 +85,7 @@ function bfsDepth(center: string, edges: { source: string; target: string }[]): 
   return depthMap;
 }
 
-interface JobSql { id: string; name: string; resourceType: "etl-job" | "redshift-task"; sql: string; database?: string   // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 章必须带出来:不带的话下面按范围过滤
+interface JobSql { id: string; name: string; resourceType: "etl-job" | "redshift-task"; sql: string; database?: string   // 🔴 章必须带出来:不带的话下面按范围过滤
   // 会对每一行都返回 true(`bindingTargets` 读不到就回落主控区)⇒ 过滤恒等于不过滤,
   // 而判据看起来是绿的 —— 那正是「没有判别力的判据 = 空断言」。
   targets?: unknown;
@@ -139,7 +138,7 @@ export async function GET(req: NextRequest) {
 
     // Affected jobs/tasks: parse each SQL resource's lineage and match against center / impacted set.
     const impactedSet = new Set(impacted.map((i) => i.fqn));
-    // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 「受影响的作业」按执行范围筛:
+    // 🔴 「受影响的作业」按执行范围筛
     // 改一张 us-west-2 的表,列出主控区的作业没有意义(它们读的是主控区那张同名表)。
     // 图本身(节点 / 边)的区维在 OM fqn 自带的 service 名里(用户 2026-09-10 拍板
     // 「一个 OpenMetadata,哪个区 = service 维度」)⇒ 这里只筛作业那一半。

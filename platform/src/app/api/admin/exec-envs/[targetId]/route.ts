@@ -1,12 +1,10 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.2c-control-api
 // GET /api/admin/exec-envs/[targetId] —— 单 target 详情(管理面 raw 口径,SPEC:241)。
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireExecEnvAdmin } from "@/lib/exec-env/admin-guard";
 import { getTargetRaw, describeServiceability } from "@/lib/exec-env/registry";
 import { isValidTargetId } from "@/lib/exec-env/target-id";
-// @kf-batch 50-init-region-enablement
 import { isControlPlaneRegionEnabled } from "@/lib/exec-env/control-plane-regions";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ targetId: string }> }) {
@@ -27,7 +25,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ targetId:
     return apiOk({
       ...target,
       serviceability: describeServiceability(target, params.targetId),
-      // @kf-batch 50-init-region-enablement —— 抽屉据此明示「控制面尚未放行该 region」+ 运维命令(init 段 I-4)
+      // 抽屉据此明示「控制面尚未放行该 region」+ 运维命令(init 段 I-4)
       controlPlaneRegionEnabled: isControlPlaneRegionEnabled(target.region),
     });
   } catch (e: unknown) {

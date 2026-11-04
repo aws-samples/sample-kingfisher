@@ -1,4 +1,3 @@
-// @kf-batch 50-CAPSEED-seed-dispatch
 // 手动造数那条 run 的日志(任务监控「日志」按钮):**去这条 run 实际执行的那个区**取 Glue 的 error / output 两个流。
 // 🔴 不回落主控区:区从 run 行上的章(`targetId`)解析;解析不到就如实说,绝不拿主控区的空日志冒充「作业没输出」。
 // 形状与离线作业的读取器(`app/api/etl-jobs/[id]/logs`)同口径:日志组 `/aws-glue/jobs/{error,output}`,流 = JobRunId。

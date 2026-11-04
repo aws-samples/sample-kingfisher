@@ -1,4 +1,4 @@
-// 模块 34 — 告警事件流(bgp-alert-events)。pk=ruleId(天然分散),sk=dedupeKey(**即去重键**)。
+// 告警事件流(bgp-alert-events)。pk=ruleId(天然分散),sk=dedupeKey(**即去重键**)。
 // 幂等铁律:命中时 putEventIfNew 用条件写 attribute_not_exists(ruleId),同一 run/窗口只产生一条
 // 事件,连点评估/多次触发都不重复告警。事件 TTL ~90 天自动过期。
 
@@ -30,7 +30,7 @@ export async function putEventIfNew(
     ...(ev.msgKey ? { msgKey: ev.msgKey } : {}),
     ...(ev.msgParams ? { msgParams: ev.msgParams } : {}),
     trigger: ev.trigger,
-    // @kf-batch 50-WP4ter-coverage(工单 SC-10)—— 事件行盖区章:告警中心要能按区筛
+    // 事件行盖区章:告警中心要能按区筛
     // 「这个区有哪些告警」。真值取 `trigger.targetId`(评估时算出来的那个区),**不另猜**;
     // 池化评估(evaluation:"pooled")的事件天然没有区 ⇒ 不盖章,读侧按主控区回落显示。
     ...(typeof (ev.trigger as { targetId?: unknown })?.targetId === "string"

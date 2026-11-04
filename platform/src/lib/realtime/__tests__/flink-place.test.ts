@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-5)
 /**
  * 钉住实时计算的**执行下推**。用户 2026-09-10:
  * 「一定要加这个维度,不然白干了,所有任务都在自己的区域跑,不然没有意义。」
@@ -41,7 +40,7 @@ describe("落点事实进 SQL 与产物路径", () => {
     });
     expect(at).toContain("us-west-2");
     expect(at).toContain("s3://ob-usw2/flink-out/job1/");
-    // @kf-batch 50-WP31-place-first-class —— 落点必填:不再有「不传 ⇒ 主控区常量」这条路(类型层面就写不出来)
+    // 落点必填:不再有「不传 ⇒ 主控区常量」这条路(类型层面就写不出来)
   });
   it("产物桶与源流 ARN 都能按区给出", () => {
     expect(outputPath("j", "b2")).toBe("s3://b2/flink-out/j/");
@@ -85,10 +84,10 @@ describe("🔴 结构性:模块级主控区客户端不许复活", () => {
 
   it("新建作业要盖章,并且**当场真解析一遍**(不许先存下来等启动才炸)", () => {
     const route = strip(read("app/api/flink/jobs/route.ts"));
-    // @kf-batch 50-WP18-flink-multi-region —— 一次提交可以给**多个区**(流式作业天生一区一个应用 ⇒
+    // 一次提交可以给**多个区**(流式作业天生一区一个应用 ⇒
     //   语义是「每区各建一个作业」)。判据钉事实:逐区盖章 + 逐区真解析 + 落点不裸抄。
     expect(route, "每个作业各盖自己那一个区的章").toContain("targets: [t]");
-    // @kf-batch 50-WP31-place-first-class —— 新建与启动同一个作者(主控区也不跳过)
+    // 新建与启动同一个作者(主控区也不跳过)
     expect(route).toContain("resolveFlinkPlace(t)");
     expect(route, "主控区不许跳过真解析").not.toMatch(/if \(t === HOME_TARGET_ID\) continue/);
     expect(route, "落点不许从 ...body 裸抄").toContain("isValidTargetId");
@@ -132,7 +131,7 @@ describe("🔴 结构性:模块级主控区客户端不许复活", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class —— 序 3 收尾:Flink 主控区分支改走描述符的**防回退**判据。
+// 收尾:Flink 主控区分支改走描述符的**防回退**判据。
 // 行为侧(主控区值全部来自描述符 / 缺组件缺桶 ⇒ 409 不回落)在 `flink-place-decision.test.ts`;本段钉写法:
 // 一旦有人把「主控区 ⇒ FLINK 常量」或「不给落点 ⇒ 主控区」加回来,这里当场红。
 describe("🔴🔴 Flink 落点:主控区不再有常量分支,落点参数不再可选", () => {

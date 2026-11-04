@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-p0e-preview-flake
 // P0-E 预演(changeset dry-run)的**结果判定** —— 纯函数,零 AWS 调用,可离线真跑。
 //
 // 🔴 为什么把它抽出来(2026-09-15 真环境事故):给 `tgt_usw2_a` 补装 `dms` 时,build 挂在

@@ -66,7 +66,7 @@ export function sanitizeSelect(raw: string, maxRows: number): GuardResult {
   return { ok: true, sql: capped };
 }
 
-// ── Athena / Trino 方言只读守卫（模块24）──
+// ── Athena / Trino 方言只读守卫（）──
 // 与 Redshift 版 sanitizeSelect 的区别：Athena 额外放行 SHOW / DESCRIBE / DESC / EXPLAIN
 // 这类元数据/解释语句（无法被子查询包裹，原样放行）；FORBIDDEN 词表按 Trino 方言调整
 // （+optimize/msck/load/deallocate，-lock/execute/copy 等 Redshift 专有）。SELECT/WITH

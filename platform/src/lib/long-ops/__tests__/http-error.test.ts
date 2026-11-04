@@ -1,4 +1,4 @@
-// 模块 55 — 映射器吸收判据:路由既有「错误 ⇒ Response」映射器的产物变成 LongOpHttpError(状态 + 原信封),不认领 ⇒ 原样重抛。
+// 映射器吸收判据:路由既有「错误 ⇒ Response」映射器的产物变成 LongOpHttpError(状态 + 原信封),不认领 ⇒ 原样重抛。
 import { describe, it, expect } from "vitest";
 import { apiError } from "@/lib/api-response";
 import { httpErrorFromMappers, rethrowAsHttpError } from "../http-error";
@@ -7,7 +7,7 @@ import { LongOpHttpError } from "../store";
 class TargetCold extends Error {}
 const coldMapper = (e: unknown) => (e instanceof TargetCold ? apiError(`执行环境 tgt_x 现在不能承接:${e.message}`, 409, { code: "CONFLICT", detail: { reason: "target-not-ready", targetId: "tgt_x" } }) : null);
 
-describe("模块 55 http-error", () => {
+describe("http-error", () => {
   it("认领 ⇒ LongOpHttpError(status / message / code / detail / body = 映射器的原信封;cause = 原错误)", async () => {
     const cause = new TargetCold("冷启动中");
     const err = (await httpErrorFromMappers(cause, [coldMapper]))!;

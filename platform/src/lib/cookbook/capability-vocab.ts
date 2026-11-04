@@ -1,4 +1,4 @@
-// 模块 45 — capability 受控词表 + 别名归一(修复设计审核 🟠E:检索命中不稳)。
+// capability 受控词表 + 别名归一(修复设计审核 🟠E:检索命中不稳)。
 //
 // 问题:capability/tags 是自由字符串,大模型/管理员可能写 "rollup"/"聚合"/"agg" 表达同一意图,
 // retrieve 打分时命不中 → 相关配方沉底。
@@ -27,7 +27,7 @@ const CANONICAL: Record<string, string[]> = {
   "etl-skeleton": ["etl-skeleton", "etl", "pyspark", "spark", "骨架", "skeleton", "batch", "批处理"],
   "s3table-write": ["s3table-write", "s3table", "s3tables", "iceberg", "写湖", "lake-write", "spark-s3tables"],
   "s3table-merge": ["s3table-merge", "merge", "iceberg-merge", "湖增量", "分区", "partition", "幂等写入", "format-version"],
-  // @kf-batch 37-recipes-atomic-overwrite —— 全量 / 按分区原子覆盖(s3tables.atomic-overwrite)
+  // 全量 / 按分区原子覆盖(s3tables.atomic-overwrite)
   "s3table-overwrite": ["s3table-overwrite", "overwrite", "覆盖", "全量覆盖", "按分区覆盖", "整表覆盖", "原子覆盖", "insert-overwrite", "overwritepartitions", "回刷"],
   "athena-query": ["athena-query", "athena", "trino", "湖查询", "lake-query"],
   // Flink / Sync

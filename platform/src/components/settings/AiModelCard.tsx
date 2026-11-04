@@ -1,6 +1,5 @@
 "use client";
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — /settings「AI 模型」卡(51 INTERACTION §2 场景一 / 二 / 四 + §3 各态 + §5 F 系列)。
+// /settings「AI 模型」卡(51 INTERACTION §2 场景一 / 二 / 四 + §3 各态 + §5 F 系列)。
 //
 //   · 常驻:当前生效模型 + 来源层标签(运行时配置 / 部署 env / 出厂默认 / 配置面陈旧)+ 最近探测态徽标(统一色板)
 //   · 场景一:「更换全局默认」Modal —— 两系列目录下拉(默认停在当前生效模型,A2/F3)→「测试该模型」(POST /probe,必须通过)
@@ -24,7 +23,7 @@ import { useT } from "@/lib/i18n/useT";
 const { Text } = Typography;
 
 type SourceLayer = "runtime" | "runtime-stale" | "env" | "ssot";
-// @kf-batch 51-v3-probe-budget:ProbeError 的唯一作者是 lib/ai/capabilities.ts(零依赖叶子,import type 不拖任何运行时);
+// ProbeError 的唯一作者是 lib/ai/capabilities.ts(零依赖叶子,import type 不拖任何运行时);
 //   原来这里手抄一份,服务端加一类(Timeout)页面就漂(tsc 当场抓到)—— 单一作者。
 import type { ProbeError } from "@/lib/ai/capabilities";
 
@@ -55,7 +54,7 @@ interface ProbeResult {
   probedAt?: number;
 }
 /**
- * @kf-batch 51-v2-multi-vendor —— 目录响应的 `families[]`(51 SPEC §7.5;唯一作者 lib/ai/core/vendors.ts):
+ * 目录响应的 `families[]`(51 SPEC §7.5;唯一作者 lib/ai/core/vendors.ts):
  * 下拉分组标题 / 该系列保存前要不要 tool-use 二探 / 是否恒带推理块。前端不再硬编码「两系列」。
  */
 interface FamilySummary {
@@ -85,7 +84,7 @@ const PROBE_ERROR_TEXT: Record<ProbeError, string> = {
   MarketplaceSCP: "此模型需在 AWS Marketplace 订阅,但你的账号策略(SCP)禁止订阅第三方模型。请改用 Anthropic 一方模型,或联系账号管理员放开订阅。",
   Throttle: "探测被限流,请稍候重试。",
   NotAvailableForAccount: "此模型对本账号未开放(Bedrock 返回「not available for this account」,是账号级限制,与 region / 权限 / Marketplace 无关)。请联系 AWS 账号团队开通,或改选同系列其它版本 / 其它厂商。",
-  // @kf-batch 51-v3-probe-budget(序 46 / B-106):超时不再冒充限流 —— 推理模型(Kimi K3)首字延迟可达数十秒,处方是再试一次 / 换推理配置
+  // 超时不再冒充限流 —— 推理模型(Kimi K3)首字延迟可达数十秒,处方是再试一次 / 换推理配置
   Timeout: "探测超时:模型在本系列的预算时间内没有响应(推理模型首字延迟可达数十秒,与限流无关)。请稍候再测一次;反复超时可换 global. 推理配置,或联系 AWS 账号团队。",
 };
 
@@ -111,8 +110,8 @@ export interface AiModelCardProps {
 }
 
 export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
-  // @kf-batch 50-WP4quater-reads(工单 SC-25 读侧)—— 当前视角那个区(用于目录与可用性显示)。
-  // 🔴 per-region 的**默认模型覆盖**属 51 WP-8 / P51.3,这一刀不替它拍板 —— 只把「这个区能用哪些模型」读对。
+  // (读侧)—— 当前视角那个区(用于目录与可用性显示)。
+  // 🔴 per-region 的**默认模型覆盖**,这一刀不替它拍板 —— 只把「这个区能用哪些模型」读对。
   const { scope, targets: modelScopeTargets } = useScope();
   const modelTargetId = scope.kind === "target" ? scope.targetId : undefined;
   const modelRegion = modelTargetId ? modelScopeTargets?.find((x) => x.targetId === modelTargetId)?.region || modelTargetId : "";
@@ -162,10 +161,10 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
     setCatalogLoading(true);
     setCatalogError(null);
     try {
-      // @kf-batch 50-WP4quater-reads(工单 SC-25 读侧)—— 🔴 目录按当前视角那个区取:
+      // (读侧)—— 🔴 目录按当前视角那个区取
       // `us.` 前缀的跨区推理配置在非美国区调不通,拿主控区的清单给别的区看,
       // 用户选一个保存后一调就炸,而报错指向模型而不是区。
-      // @kf-batch 50-WP31-place-first-class —— 恒带落点(全部 / 对比 = 主控区,显式;后端缺 ⇒ 400)
+      // 恒带落点(全部 / 对比 = 主控区,显式;后端缺 ⇒ 400)
       const res = await fetch(`/api/admin/model-config/catalog?targetId=${encodeURIComponent(landingOfScope(scope))}`);
       const d = await readJson(res);
       if (!res.ok || !d?.success) throw new Error(d?.message || d?.error?.message || `HTTP ${res.status}`);
@@ -198,7 +197,7 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
     return seen.map((f) => ({ family: f, label: f, toolUse: "probe" as const, reasoningBlocks: false }));
   }, [families, catalog]);
   const selectedFamily = useMemo(() => familyGroups.find((f) => f.family === selectedEntry?.family), [familyGroups, selectedEntry]);
-  // 序 49 ⑧ UX ④:友好名只来自目录(displayName);目录没加载 / 找不到就不显示,绝不编造
+  // UX ④:友好名只来自目录(displayName);目录没加载 / 找不到就不显示,绝不编造
   const friendlyName = (modelId?: string | null): React.ReactNode => {
     const entry = modelId ? catalog?.find((m) => m.modelId === modelId) : undefined;
     return entry?.displayName && entry.displayName !== modelId
@@ -460,9 +459,9 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
               action={<Button size="small" onClick={loadCatalog}>{t("重试")}</Button>} />
           )}
           {catalogError && <Text type="secondary" style={{ fontSize: 12 }}>{t("当前生效模型不受影响,仍在运行。")}</Text>}
-          {/* @kf-batch 50-WP4quater-reads(工单 SC-25 读侧)—— 护栏 2:这份清单是**哪个区**能用的。
+          {/* (读侧)—— 护栏 2:这份清单是**哪个区**能用的。
               模型可用性真按区(`us.` 跨区推理配置在非美国区调不通)⇒ 不标区的下拉是个陷阱。
-              🔴 「默认模型能不能按区各设一份」属 51 WP-8 / P51.3,这里不越权替它拍板,
+              🔴 「默认模型能不能按区各设一份」,这里不越权替它拍板,
               但**这个区能用哪些**必须读对,并说清当前保存的是**全平台默认**。 */}
           <Space size={6} style={{ marginBottom: 6 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>{t("可用模型清单来自")}</Text>
@@ -471,7 +470,7 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
             </Tag>
             {modelRegion && (
               <Text type="warning" style={{ fontSize: 12 }} data-testid="ai-model-global-default-note">
-                {t("保存后是**全平台默认**(按区分别设默认模型见工单 SC-25 / 51 WP-8)")}
+                {t("保存后是**全平台默认**(暂不支持按区分别设默认模型)")}
               </Text>
             )}
           </Space>
@@ -483,11 +482,11 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
             placeholder={t("选择模型(按厂商系列分组:{s})", { s: familyGroups.map((f) => t(f.label)).join(" / ") })}
             value={selected}
             onChange={(v) => { setSelected(v); setProbe(null); }}
-            // 序 49 ⑧ UX ④:选项 label 是节点(友好名 + 次要 id),搜索按 searchText(友好名 + 完整 id,小写)匹配
+            // UX ④:选项 label 是节点(友好名 + 次要 id),搜索按 searchText(友好名 + 完整 id,小写)匹配
             filterOption={(input, opt) => String((opt as { searchText?: string } | undefined)?.searchText || "").includes(input.trim().toLowerCase())}
             optionLabelProp="label"
-            // @kf-batch 51-v2-multi-vendor —— 分组由服务端 families[] 驱动(51 SPEC §7.5);GPT 系仍按传输门控禁用(D9 门恒关)
-            // 序 49 ⑧ UX ④(用户 10-20 拍板「显示系列 + 友好名」):系列 = 分组标题;每一项友好名在前(目录 displayName =
+            // 分组由服务端 families[] 驱动(51 SPEC §7.5);GPT 系仍按传输门控禁用(D9 门恒关)
+            // UX ④(用户 10-20 拍板「显示系列 + 友好名」):系列 = 分组标题;每一项友好名在前(目录 displayName =
             //   Bedrock modelName / inferenceProfileName),完整 id 退成次要小字仍可见、仍可搜(判据与老用户都按 id 找)。
             options={familyGroups.map((f) => {
               const gated = f.family === "openai" && !gptReady;
@@ -533,7 +532,7 @@ export default function AiModelCard({ readonlyModel }: AiModelCardProps) {
             {probe && probe.modelId === selected && (
               probe.result.ok ? (
                 <Text type="success" data-testid="ai-model-probe-result">{t("探测通过({ms}s)", { ms: (probe.ms / 1000).toFixed(1) })}{probe.result.toolUseOk === false
-                  // @kf-batch 51-v3-probe-budget:二探超时 ≠ 模型不支持工具 —— 文案分开,用户知道该再测一次而不是换模型
+                  // 二探超时 ≠ 模型不支持工具 —— 文案分开,用户知道该再测一次而不是换模型
                   ? ` · ${(probe.result as { toolUseError?: string }).toolUseError === "Timeout" ? t("tool-use 探测超时,请再测一次") : t("tool-use 不可用")}` : ""}</Text>
               ) : (
                 <Text type="danger" data-testid="ai-model-probe-result">{t("探测失败")}:{probe.result.error}</Text>

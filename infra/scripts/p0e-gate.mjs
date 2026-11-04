@@ -26,7 +26,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { classifyDeployImpact, normalizeDescribeChangeSet, IMPACT_MARKER } from "./deploy-impact.mjs";
-// @kf-batch 50-WP23-p0e-preview-flake —— 预演结果判定抽成纯函数(可离线真跑;理由见该文件头)
+// 预演结果判定抽成纯函数(可离线真跑;理由见该文件头)
 import { parseCdkStackFailures, classifyChangeSet, previewVerdict } from "./preview-outcome.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,14 +36,14 @@ export const PREVIEW_CHANGE_SET_NAME = "bgp-p0e-preview";
 
 const TARGET = req("EXEC_ENV_TARGET");
 const REGION = req("EXEC_ENV_REGION");
-// @kf-batch 50-PROD-B-seq33 ②:不再缺省成 core(精简形态的入口)—— broker 恒传完整组件集,缺即抛
+// ②:不再缺省成 core(精简形态的入口)—— broker 恒传完整组件集,缺即抛
 const COMPONENTS = req("EXEC_ENV_COMPONENTS").split(",").map((s) => s.trim()).filter(Boolean);
 const MODE = process.env.EXEC_ENV_MODE || "deploy";
 const APPROVED = process.env.EXEC_ENV_APPROVED_PLAN_HASH || "";
 const DECLARED = process.env.EXEC_ENV_DECLARED_DISRUPTIVE || "";
-// @kf-batch 50-WP23-xregion-peering:broker 从描述符透传;home 可以为空
+// broker 从描述符透传;home 可以为空
 const VPC_CIDR = process.env.EXEC_ENV_VPC_CIDR || "";
-// @kf-batch 50-WP23-xregion-peering:主控区那一侧的三件事实(buildspec 从 BgpVpcStack 的 Outputs 读出后 export);
+// 主控区那一侧的三件事实(buildspec 从 BgpVpcStack 的 Outputs 读出后 export);
 //   与主控区同区 / home 时为空 —— 那时压根不建 peering。三个要么都有要么都没有(context.ts 那侧 fail-closed)。
 const HOME_LINK = [
   ["exec-env-home-vpc-id", process.env.EXEC_ENV_HOME_VPC_ID || ""],
@@ -184,7 +184,7 @@ function baselineRefs() {
   };
 }
 
-// @kf-batch 50-WP13-mwaa-region —— CodeBuild 自带 AWS_REGION(项目建在控制面 region);本地跑门禁时缺省 us-east-1
+// CodeBuild 自带 AWS_REGION(项目建在控制面 region);本地跑门禁时缺省 us-east-1
 const HOME_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "";
 
 function main() {
@@ -212,15 +212,15 @@ function main() {
         "-c", `exec-env-region=${REGION}`,
         "-c", `exec-env-account=${req("EXEC_ENV_ACCOUNT")}`,
         "-c", `exec-env-components=${COMPONENTS.join(",")}`,
-        // @kf-batch 50-WP4sexies-home-region —— 🔴 AZ 入参必须与 buildspec 的 cdk deploy **逐字一致**:
+        // 🔴 AZ 入参必须与 buildspec 的 cdk deploy **逐字一致**:
         //   base 栈的私有子网就是按它建的,两侧不同 ⇒ synth 出的子网不同 ⇒ 计划指纹必失配
         //   (与上面 K-5 的 NAT 数注释同一个道理)。值由 pre_build 的第二层 AZ preflight 选定并落文件,
         //   buildspec 在跑本脚本前 export EXEC_ENV_AZS;读不到就**停**,绝不各自默认。
         "-c", `exec-env-azs=${req("EXEC_ENV_AZS")}`,
-        // @kf-batch 50-WP15-airflow-serverless(K-5):与 buildspec 的 cdk deploy 同一口径,否则预演与部署 synth 出的 base 栈 NAT 数不同 ⇒ 计划指纹必失配
-        // @kf-batch 50-WP13-mwaa-region:控制面 region = 本 build 所在 region(与 buildspec 的 cdk deploy 同一口径;mwaa 组件回写 home 台账要它)
+        // 与 buildspec 的 cdk deploy 同一口径,否则预演与部署 synth 出的 base 栈 NAT 数不同 ⇒ 计划指纹必失配
+        // 控制面 region = 本 build 所在 region(与 buildspec 的 cdk deploy 同一口径;mwaa 组件回写 home 台账要它)
         ...(HOME_REGION ? ["-c", `exec-env-home-region=${HOME_REGION}`] : []),
-        // @kf-batch 50-WP23-xregion-peering —— 🔴 VPC 地址段同样必须与 buildspec 的 cdk deploy **逐字一致**:
+        // 🔴 VPC 地址段同样必须与 buildspec 的 cdk deploy **逐字一致**:
         //   它决定 VPC 与所有子网的 CidrBlock,两侧不同 ⇒ 预演与真部署 synth 出的 base 栈不同 ⇒ 计划指纹必失配。
         //   空值只在 home 合法(栈组对 home 沿用存量段);非 home 空值会在 synth 当场抛。
         ...(VPC_CIDR ? ["-c", `exec-env-vpc-cidr=${VPC_CIDR}`] : []),

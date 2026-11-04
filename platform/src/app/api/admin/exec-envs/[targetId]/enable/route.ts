@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // POST /api/admin/exec-envs/[targetId]/enable —— 启用(SPEC:37 状态机 verifying→ready;INTERACTION §1.3「全绿 → 启用」)。
 //
 // 🔴 v3.15(§21.4.1):**同一次 POST 内**真探 → 写 raw probe(不涨 version)→ 强读校验未变 → 构造

@@ -4,7 +4,7 @@ import { parseSqlLineage } from "@/lib/lineage/sql-lineage";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/verify-token";
 
-// 模块 17: parse-only preview. Parses Redshift SQL into table-level lineage WITHOUT touching
+// parse-only preview. Parses Redshift SQL into table-level lineage WITHOUT touching
 // OpenMetadata or any store — used by the 作业开发 page's「解析血缘」button.
 export async function POST(req: NextRequest) {
   const auth = await requireAuth(req);

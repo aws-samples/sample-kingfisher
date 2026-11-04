@@ -11,7 +11,7 @@
 // Converse 失败 → llmAvailable:false + 确定性文本(推荐值本就来自引擎,解释降级不影响正确性)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { recommend } from "./heuristics";
@@ -19,7 +19,7 @@ import { probeHistory } from "./history-probe";
 import { systemPrompt } from "./prompt";
 import { isAgentCoreConfigured, invokeParamAdvisorAgent } from "./agentcore-client";
 import { runtimeSessionId } from "./memory";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:删掉模块加载期顶层常量 MODEL_ID = resolveModelId()(DESIGN §1.2 #7「最易漏」);
+// 删掉模块加载期顶层常量 MODEL_ID = resolveModelId()(DESIGN §1.2 #7「最易漏」);
 // Converse 的 modelId 改为调用时经 invokeConverse 求值(能力 key param-advisor),退避/降级,实际用的模型随结果回显。
 import { invokeConverse } from "@/lib/ai/invoke";
 import type { AiModelUse } from "@/lib/ai/meta";
@@ -35,7 +35,7 @@ const bedrock = sdkClient("model", BedrockRuntimeClient, { region: REGION });
 
 export interface ParamAdviseResult extends ParamAdvice {
   backend: "agentcore" | "inprocess"; // 真翻转铁证:如实反映实际走的后端。
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:实际用的模型(inprocess 由 Converse 返回;agentcore 由容器回执;Converse 降级无值)。
+  // 实际用的模型(inprocess 由 Converse 返回;agentcore 由容器回执;Converse 降级无值)。
   model?: AiModelUse;
 }
 
@@ -83,7 +83,7 @@ export async function advise(
         model: out.model,
       };
     } catch (e) {
-      // @kf-batch 50-W5-seg2-WP8:模型回执不匹配 = 接线故障,fail-closed 上抛(路由 503),不回落假装成功。
+      // 模型回执不匹配 = 接线故障,fail-closed 上抛(路由 503),不回落假装成功。
       if (e instanceof AgentCoreModelMismatch) throw e;
       // Runtime 故障(冷启动/限流/Gateway/MCP)不应让本可用功能失败:自动回落进程内。
       console.warn(`[paramadvisor] AgentCore 调用失败,回退 inprocess: ${e instanceof Error ? e.message : String(e)}`);
@@ -108,7 +108,7 @@ async function adviseInprocess(
   let usage = { inputTokens: 0, outputTokens: 0 };
   let model: AiModelUse | undefined;
   try {
-    // @kf-batch 50-W5-seg2-WP8:modelId 每次调用求值(param-advisor),经 invokeConverse 退避/降级。
+    // modelId 每次调用求值(param-advisor),经 invokeConverse 退避/降级。
     const inv = await invokeConverse("param-advisor", undefined, bedrock, (modelId) => new ConverseCommand({
       modelId,
       system: [{ text: systemPrompt(req.channel) }],

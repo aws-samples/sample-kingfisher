@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47c-catalog-ddl —— 序 47c:图形化改表的**编排作者**(计划 → 确认 → 审计 → 执行 → 回写台账 → 再观测)。
+// 图形化改表的**编排作者**(计划 → 确认 → 审计 → 执行 → 回写台账 → 再观测)。
 //
 // 两条执行路:home = 现网绑定(admin secret)直接跑 `lib/modeling/alter.ts` 生成的语句(与建表 `landOne` 同一条 `execOnBinding`);
 // 非主控区 = 先把计划写进台账行 `pendingAlter`,再调 admin 受控执行器 `alter-model-table`(模板从台账读计划,语句同一个作者),

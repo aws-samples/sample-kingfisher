@@ -1,7 +1,6 @@
-// @kf-batch 50-WP7-sync-pushdown
-// 门禁:**客户端不许拿 home 的落点常量 / 字面量当默认值**(WP-7 施工序 7 的 E-218 同族,归零棘轮)。
+// 门禁:**客户端不许拿 home 的落点常量 / 字面量当默认值**(同族,归零棘轮)。
 //
-// 起因:段 `o4` 的页面级判据 E-218 在向导上抓到「非 home 源建任务,Table Bucket 仍回显主控区的
+// 起因:段 `o4` 的页面级判据在向导上抓到「非 home 源建任务,Table Bucket 仍回显主控区的
 // `bgp-table-bucket`」。修完向导后一查,同一形状还散在四页:athena 编辑器预填主控区表桶的示例 SQL、
 // 横幅写死 `bgp-table-bucket`;genbi / redshift 的工作组下拉以 `HOME_WORKGROUP` 打底、清单为空时用它充数;
 // etl-jobs 的 Redshift 落点编辑框以 `HOME_WORKGROUP / HOME_DATABASE` 打底。
@@ -91,10 +90,10 @@ describe("🔴 客户端不许拿 home 的落点常量 / 字面量当默认值(�
     expect(athena).not.toMatch(/useState\('SELECT \* FROM/);
   });
 
-  // @kf-batch 50-WP7-sync-pushdown —— 真环境截图坐实的缺陷:切区后跨区 ListWorkgroups 在飞的几十秒里,
+  // 真环境截图坐实的缺陷:切区后跨区 ListWorkgroups 在飞的几十秒里,
   // 页面**继续显示上一个区**的工作组与 Endpoint(顶栏写 us-west-2、值却是主控区的 `bgp-workgroup` /
   // `…us-east-1…`)。这是 `/settings` 那次「硬撒谎」同一类。⇒ 取清单前必须先清空。
-  // 🔴 这条是**接线断言**(文本层),真正的行为判据是段 `o4` 的 E-218b(真页面整页扫 + 落定判据);
+  // 🔴 这条是**接线断言**(文本层),真正的行为判据是段 `o4` 的(真页面整页扫 + 落定判据);
   //    两层都要有:文本层防它被改回去,行为层证明它在真环境成立。
   it("切执行目标时先清空工作组清单与选中项(不许继续显示上一个区的值)", () => {
     for (const rel of ["app/redshift/page.tsx", "app/genbi/page.tsx"]) {

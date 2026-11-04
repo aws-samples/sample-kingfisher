@@ -32,7 +32,7 @@ describe("registry (SPI 表驱动)", () => {
   });
 });
 
-describe("序 53 EMR release 清单与缺省(用户 2026-10-26 拍板:缺省最高、清单允许降版)", () => {
+describe("EMR release 清单与缺省(用户 2026-10-26 拍板:缺省最高、清单允许降版)", () => {
   it("清单含 emr-7.14.0(2026-09 发布的 7.x 最高)且缺省 = 清单第一项 = emr-spark-8.0.0(最高)", () => {
     expect(EMR_RELEASE_LABELS).toContain("emr-7.14.0");
     expect(EMR_RELEASE_LABELS[0]).toBe(EMR_DEFAULT_RELEASE);

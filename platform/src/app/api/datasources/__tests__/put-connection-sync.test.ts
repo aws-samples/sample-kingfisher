@@ -1,4 +1,4 @@
-// @kf-batch 42-B83-ds-edit-sync —— `PUT /api/datasources/[id]`:改连接要素 / 登录名 / 口令必须先同步到该源所在区的 Glue 连接与 secret,再落库(台账 B-83)。
+// `PUT /api/datasources/[id]`:改连接要素 / 登录名 / 口令必须先同步到该源所在区的 Glue 连接与 secret,再落库(台账)。
 //
 // 🔴 为什么必须可执行:修前改 host 只落库,Glue 连接(同步作业 / 发现作业 / 探测都走它)仍指旧库,页面却说「已更新」;只改登录名连 secret 都不动。
 //   判据钉**调用参数与顺序**:① 改 host ⇒ Glue 连接按该源落点的区更新、带新 host、secret 不动、落库含 host;② 只改登录名 ⇒ 读旧口令 → Glue 带 username/password → secret 用旧口令 + 新登录名;
@@ -20,7 +20,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { DATASOURCES: "bgp-datasources", LONG_OPS: "bgp-long-ops" },
   docClient: {
     send: vi.fn(async (cmd: { constructor: { name: string }; input?: Record<string, unknown> }) => {
-      // 序 50 第二批:PUT 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
+      // PUT 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
       if (cmd.input?.TableName === "bgp-long-ops") return {};
       sent.push({ name: cmd.constructor.name, input: (cmd.input ?? {}) as Record<string, any> });
       if (cmd.constructor.name === "GetCommand") return { Item: { ...CURRENT } };
@@ -47,7 +47,7 @@ vi.mock("@/lib/aws/datasource-service", () => ({
   }),
 }));
 const placeCalls: unknown[] = [];
-// 序 31 二刀 ⑤:路由另 import 了同模块的 `noteDatasourceRowPlace`(纯记账,请求外 no-op)⇒ 部分 mock 要 importOriginal 展开,只替换 resolveDsPlace
+// 路由另 import 了同模块的 `noteDatasourceRowPlace`(纯记账,请求外 no-op)⇒ 部分 mock 要 importOriginal 展开,只替换 resolveDsPlace
 vi.mock("@/lib/datasource/ds-place", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/datasource/ds-place")>()),
   resolveDsPlace: vi.fn(async (t: unknown) => { placeCalls.push(t); return { region: "us-west-2", targetId: "tgt_usw2_a" }; }),
@@ -145,8 +145,8 @@ describe("⑥ 对象存储范式(没有 Glue 连接 / secret)", () => {
   });
 });
 
-// @kf-batch 44-jdbc-params —— 附加 JDBC 参数:与改 host 同列(Glue 连接的 URL 要跟着变);不合法 ⇒ 400 记录不改;空串 = 清空。
-describe("⑦ 附加 JDBC 参数(序 44 B-88)", () => {
+// 附加 JDBC 参数:与改 host 同列(Glue 连接的 URL 要跟着变);不合法 ⇒ 400 记录不改;空串 = 清空。
+describe("⑦ 附加 JDBC 参数", () => {
   it("只改 jdbcParams ⇒ Glue 连接更新且拿到归一化后的参数;secret 不动;落库 SET 含 jdbcParams(归一化形态)", async () => {
     const res = await put({ jdbcParams: " useSSL=false; serverTimezone=Asia/Shanghai " });
     expect(res.status, JSON.stringify(res.body)).toBe(200);

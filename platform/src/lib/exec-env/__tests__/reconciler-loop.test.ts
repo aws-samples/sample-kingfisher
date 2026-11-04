@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2a-reconciler
 // reconciler-loop 的 tick 逻辑:选主门 + 遍历 listTargetsRaw + 逐 target reconcileOneTarget(隔离)。
 // 🔴 三个依赖顶层 vi.mock:leader-lease(选主)/ registry.listTargetsRaw(列全表)/ reconcile.reconcileOneTarget(SSOT)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -67,8 +66,8 @@ describe("runReconcileTick", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class —— 序 31 第二刀 ②:请求外的循环自己建显式落点上下文(context.ts 文件头 ①)。
-//   第四十三轮 observe:未归因榜 13 类里 11 类「(请求外)」全出自这两个 tick(探活 ec2 / s3 / cloudformation / s3tables /
+// 请求外的循环自己建显式落点上下文(context.ts 文件头 ①)。
+//   未归因榜 13 类里 11 类「(请求外)」全出自这两个 tick(探活 ec2 / s3 / cloudformation / s3tables /
 //   glue / redshift-serverless / dms / athena;镜像 glue.GetDatabases / GetTables)。
 describe("🔴 两个 tick 都在该 target 的显式落点上下文里跑(观测器据此归因;enforce 下控制面客户端不挂守卫,不会自拦)", () => {
   it("reconcile tick:每个 target 的 reconcileOneTarget 看到的 currentPlace 就是它自己(targetId + region 来自描述符)", async () => {

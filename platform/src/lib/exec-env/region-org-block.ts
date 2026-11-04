@@ -1,5 +1,4 @@
-// @kf-batch 50-B40-candidate-blocked
-// 新建执行环境的候选区:哪些区被**组织策略(SCP)**拦住了部署必需的动作(BUG-LEDGER B-40)。
+// 新建执行环境的候选区:哪些区被**组织策略(SCP)**拦住了部署必需的动作(BUG-LEDGER)。
 //
 // 【为什么要有】候选区原来 = `ec2:DescribeRegions(AllRegions=false)` ∖ 已占区。「已启用」是必要不充分 ——
 //   账号所在组织的 SCP 拦住的区照样出现在可选里 ⇒ 用户选它、点部署,几分钟后 CodeBuild PRE_BUILD 被显式拒
@@ -99,10 +98,9 @@ export function isIamThrottle(e: unknown): boolean {
 }
 
 /**
- * @kf-batch 50-B46-org-probe-throttle
- * 🔴 B-46(第二十四轮补跑实测):每区一次模拟、4 路并发、零重试 ⇒ 一被 IAM 限流就把那个区记成「未能核实」。
+ * 🔴 (第二十四轮补跑实测):每区一次模拟、4 路并发、零重试 ⇒ 一被 IAM 限流就把那个区记成「未能核实」。
  *   连调三次候选区接口,每次 6 个左右的区随机落进 unverified(「Rate exceeded」),**被拦的区在向导里时而可选时而不可选**
- *   —— 用户点进一个其实被组织 SCP 拦死的区、部署几分钟后才在 PRE_BUILD 失败,正是 B-40 要消灭的那条路。
+ *   用户点进一个其实被组织 SCP 拦死的区、部署几分钟后才在 PRE_BUILD 失败,正是要消灭的那条路。
  *   ⇒ 只对限流做**有界** full-jitter 重试(`random() * min(cap, base·2^n)`,同一批并发不会齐步重撞;见记忆 bounded-retry-needs-full-jitter),
  *   预算由最坏并发推:3 路并发 × 每区 ≤ 6 次 ⇒ 十几个区总时长仍在十秒量级;用完预算仍限流 ⇒ 照实 unverified(不装作量过)。
  *   并发 4 → 3。不加服务端缓存:向导的契约是「打开 / 刷新都真查一次账号」。
@@ -136,7 +134,7 @@ export async function classifyRegionsByOrgPolicy(
   const sleep = clients.sleep ?? realSleep;
   const checkedAt = new Date().toISOString();
   // 两者都是主控区发起的**控制面**调用(部署项目在主控区;IAM 是全局服务,从主控区端点发)
-  // 🔴 B-47:不许走数据面工厂 —— 那会让 observe 先用数据面角色试一次(被拒再重发 = IAM 请求量翻倍 ⇒ 限流)
+  // 🔴 不许走数据面工厂 —— 那会让 observe 先用数据面角色试一次(被拒再重发 = IAM 请求量翻倍 ⇒ 限流)
   const cb = clients.codebuild ?? sdkClient("control-plane", CodeBuildClient, { region: homeRegion() });
   const iam = clients.iam ?? sdkClient("control-plane", IAMClient, { region: homeRegion() });
   let principal: string;
@@ -172,8 +170,7 @@ export async function classifyRegionsByOrgPolicy(
     }
   };
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, regions.length) }, worker));
-  // @kf-batch 50-B50-org-probe-second-pass
-  // 🔴 B-50(序 36 第二十六轮真环境):第一遍预算用完仍被限流的区(实测独占跑也会剩 1 个,sa-east-1)——
+  // 🔴 第一遍预算用完仍被限流的区(实测独占跑也会剩 1 个,sa-east-1)——
   //   用户 10/09 定的契约是「每次刷新都真查」⇒ 不许用缓存糊过去。并发池安静下来后**冷却一个上限时长**,
   //   再**逐个串行**补查一遍(新的一份有界预算;串行 ⇒ 不再与自己的并发互相抢令牌)。补查仍失败 ⇒ 照实 unverified。
   if (throttled.length > 0) {

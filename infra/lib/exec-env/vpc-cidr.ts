@@ -1,13 +1,12 @@
-// @kf-batch 50-WP23-xregion-peering
 // 执行环境 VPC 的 **CIDR 唯一作者**(50 SPEC §3.14ter)。
 //
-// 【为什么这个文件必须存在 —— 2026-09-14 开 WP-23 步 2 时勘定出来的硬阻断】
+// 【为什么这个文件必须存在 —— 2026-09-14 开步 2 时勘定出来的硬阻断】
 //   跨区私网通路定案成 **peering + home 侧同区接口端点 + 非 home 侧 PHZ**,而
 //   **VPC peering 硬性要求两侧 CIDR 不重叠**。真环境实测:
 //     · home VPC(`BgpVpcStack/BgpVpc`)= `10.0.0.0/16`(`vpc-stack.ts` 没给 `ipAddresses` ⇒ CDK 默认值);
 //     · 执行环境 VPC(`base-stack.ts`)**也没给** ⇒ 同一个默认值 `10.0.0.0/16`。
 //   ⇒ 两侧逐位相同,peering **物理上建不出来**。这条事实 2026-09-08 就写在 base-stack 的注释里
-//     (WP-16 ②b S-1「peering 那条路建不出来」),而我 2026-09-14 换选型时**只重勘了 SCP、没重勘 CIDR**,
+//     (「peering 那条路建不出来」),而我 2026-09-14 换选型时**只重勘了 SCP、没重勘 CIDR**,
 //     一次性 probe 用的是 `10.90.0.0/16` / `10.91.0.0/16` 两个 throwaway VPC ⇒ 前提被悄悄换掉了。
 //   🔴 教训(与 [[stale-blockers-must-be-reprobed]] 互为反面):**旧结论会过期,旧结论的「前提」也会**。
 //     probe 坐实的是「这条路通」,不是「我们的底座能走这条路」—— 两者之间隔着一个 CIDR。

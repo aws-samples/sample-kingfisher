@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4bis-p1-scope
 // `GET /api/datasources` 的执行范围过滤 —— **A 类(标量章 `ownerTargetId`)下推 DDB**。
 //
 // 🔴 为什么必须可执行:A 类最容易出的错不是「忘了加」,而是
@@ -47,7 +46,7 @@ import { GET } from "../route";
 const req = (qs = "") => new NextRequest(`https://x.test/api/datasources${qs}`);
 beforeEach(() => { scans.length = 0; });
 
-describe("缺省(不带 scope)= 现状(回滚点 E-158)", () => {
+describe("缺省(不带 scope)= 现状(回滚点)", () => {
   it("表达式里没有任何 target 维,占位符也没有 scope 前缀的", async () => {
     const res = await GET(req());
     expect(res.status).toBe(200);

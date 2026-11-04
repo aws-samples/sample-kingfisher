@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN §4)—— workflow-tasks-yaml:job 节点 ⇒ 恰好一个 task,op_kwargs.node.data.jobSpec 齐(字段集合闭合),
+// workflow-tasks-yaml:job 节点 ⇒ 恰好一个 task,op_kwargs.node.data.jobSpec 齐(字段集合闭合),
 // python_callable = bgp_runtime.run_node(语义由 _exec_job 承担);没有 jobSpec 的 job 节点照样生成(运行期如实拒并指路重新发布),jobRef 保留。
 import { describe, it, expect } from "vitest";
 import { buildWorkflowTasksYaml, START_TASK_ID, FINISH_TASK_ID } from "@/lib/scheduler/serverless/workflow-yaml";

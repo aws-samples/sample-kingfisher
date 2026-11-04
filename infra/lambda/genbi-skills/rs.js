@@ -1,4 +1,4 @@
-// 模块 26 — GenBI on AgentCore：Gateway 技能(skills) Lambda。
+// GenBI on AgentCore：Gateway 技能(skills) Lambda。
 // 作为 AgentCore Gateway 的 Lambda target，把"执行只读 SQL / 探查 schema"暴露为 MCP 工具。
 // 工具名由 Gateway 经 context.clientContext.Custom.bedrockAgentCoreToolName 传入
 //（形如 "<targetName>___<toolName>"）；event 即工具入参(对应 ToolDefinition.InputSchema)。
@@ -15,18 +15,18 @@ const { SecretsManagerClient, DescribeSecretCommand } = require("@aws-sdk/client
 // 阶段2:SQL 守卫 sanitizeSelect 与 introspect 用的 SCHEMA_SQL 收敛于 core,消灭本地逐字副本。
 const { sanitizeSelect } = require("./core-dist/sql-guard");
 const { SCHEMA_SQL } = require("./core-dist/catalog");
-// @kf-batch 50-WP31-place-first-class —— 序 4(L6):PlaceWire 读取函数(与平台 / 容器同源)
+// PlaceWire 读取函数(与平台 / 容器同源)
 const { readPlaceWire, placeWireLeg } = require("./core-dist/place-wire");
 
 const REGION = process.env.AWS_REGION || "us-east-1";
 const RS_SECRET_NAME = process.env.REDSHIFT_SECRET_NAME || "redshift!bgp-namespace-admin";
-// @kf-batch 50-WP31-place-first-class —— 序 4(L6):原来这里还有 REDSHIFT_WORKGROUP / REDSHIFT_DATABASE / ATHENA_WORKGROUP /
+// 原来这里还有 REDSHIFT_WORKGROUP / REDSHIFT_DATABASE / ATHENA_WORKGROUP /
 //   S3TABLES_CATALOG / S3TABLES_BUCKET 五个主控区缺省值(落点入参缺失时的回落)—— 落点改为必填后它们没有读者了,删掉,
 //   免得以后有人又拿它们当「没给就用这个」。
 const S3T_NAMESPACE = process.env.S3TABLES_NAMESPACE || "ecommerce";
 const MAX_ROWS = parseInt(process.env.GENBI_MAX_ROWS || "200", 10);
 
-// @kf-batch 50-B26-lake-place —— Athena 客户端也按区缓存(原来是一个模块级主控区客户端 ⇒ 别的区问数据湖全落回主控区)。
+// Athena 客户端也按区缓存(原来是一个模块级主控区客户端 ⇒ 别的区问数据湖全落回主控区)。
 // 🔴 本文件对 `new AthenaClient` 只此一处(工厂);调用方一律经 `athenaClientFor(place.region)`。
 const _athenaClients = new Map();
 function athenaClientFor(region) {
@@ -38,13 +38,12 @@ function athenaClientFor(region) {
 const sm = new SecretsManagerClient({ region: REGION });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// @kf-batch 50-WP2-one-agentcore-one-om
 // 🔴🔴 **用户 2026-09-10 拍板:「不管你怎么设计,我的要求是:都走同一个 AgentCore 即可。」**
 //
 // 于是这个技能 Lambda 必须能在**任意执行环境的数仓**上取数,而不是只会用自己 env 里的那一套
 // (`AWS_REGION` / `REDSHIFT_WORKGROUP` / 托管 admin 密钥名 —— 那三样全是主控区的)。
 // 做法:**落点由调用方逐次传进来**(平台解析好 → 容器**确定性地**注入每次工具调用,不由模型决定),
-// (@kf-batch 50-WP31-place-first-class 序 4:原来「缺省回落 env = 主控区」已删 —— 落点必填,见下方 wireOf。)
+// (原来「缺省回落 env = 主控区」已删 —— 落点必填,见下方 wireOf。)
 //
 // 🔴 为什么落点必须由平台算、而不是这里现算:「哪个 target 用哪个 workgroup / 哪把密钥」的唯一权威是
 // 注册表描述符 + `resolveRedshiftBinding`(50 SPEC §3.1a/§3.9)。在 Lambda 里再实现一遍 = 第二份落点逻辑,
@@ -60,10 +59,10 @@ function rsClientFor(region) {
   return c;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 序 4(L6):🔴🔴 落点从**一个** `place` 入参读(PlaceWire v1 的 JSON 文本),
+// 🔴🔴 落点从**一个** `place` 入参读(PlaceWire v1 的 JSON 文本),
 //   原来的 rs* / ath* 八个平面字段合并于此;读取函数与平台、AgentCore 容器**同一份源**(core-dist/place-wire.js)。
 //   🔴 **没有缺省值**:原来「入参里没有 ⇒ 回落 env(AWS_REGION / REDSHIFT_WORKGROUP / ATHENA_WORKGROUP = 主控区)」——
-//   Gateway 按 InputSchema 过滤掉入参、或容器漏注入时,取数就静默打回主控区(B-26 / 2026-09-10 两次真环境坐实)。
+//   Gateway 按 InputSchema 过滤掉入参、或容器漏注入时,取数就静默打回主控区(2026-09-10 两次真环境坐实)。
 //   现在缺 / 不合法 / 缺这条腿 ⇒ 抛 PlaceWireInvalid,工具返回错误,模型与页面都看得见。
 function wireOf(args) {
   const a = (args && typeof args === "object") ? args : {};
@@ -104,7 +103,7 @@ async function runRedshiftSql(sql, args) {
   const g = sanitizeSelect(sql, MAX_ROWS);
   if (!g.ok) return { success: false, error: g.error };
   const place = placeOf(args);
-  // @kf-batch 50-WP4ter-coverage —— 🔴 **落点可观测**(2026-09-10 真环境教训):
+  // 🔴 **落点可观测**(2026-09-10 真环境教训):
   // 落点丢了不会报错,只会在**另一个区**跑完并把结果当成对的;上一次排查花了很久才定位,
   // 就因为这一层完全没有痕迹。⇒ 每次执行都打一行「用的是哪个区/工作组、落点是不是从入参来的」。
   // 只打身份形态,不打 secret 值(与错误脱敏同一条纪律)。
@@ -116,7 +115,7 @@ async function runRedshiftSql(sql, args) {
     }));
   } catch (_) { /* 日志绝不影响执行 */ }
   const client = rsClientFor(place.region);
-  // @kf-batch 50-B26-lake-place —— 回报真落点(容器汇总成 `_meta.ranIn`,页面据此说「这次在哪执行」)
+  // 回报真落点(容器汇总成 `_meta.ranIn`,页面据此说「这次在哪执行」)
   const ranIn = { engine: "redshift", region: place.region, workgroup: place.workgroup };
   const SecretArn = place.secretArn || (await getSecretArn());
   const { Id } = await client.send(new ExecuteStatementCommand({

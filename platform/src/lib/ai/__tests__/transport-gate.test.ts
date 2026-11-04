@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // GPT 传输门控单测(51 SPEC §3.4 补强①–④;ACCEPTANCE M13 / M13a 的单测面)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

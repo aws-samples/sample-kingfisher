@@ -23,7 +23,7 @@ exports.renderCatalogForPrompt = renderCatalogForPrompt;
 exports.CORE_GLUE_WORKER_VALUES = ["G.1X", "G.2X", "G.4X", "G.8X", "G.12X", "G.16X", "R.1X", "R.2X", "R.4X", "R.8X"];
 // Worker 数量上限(AWS 账号级 DPU 配额默认 1000)。
 exports.CORE_GLUE_MAX_WORKERS = 1000;
-// ── 内联:Glue 版本清单与缺省(源 @/lib/sync/glue-version;序 53:缺省取最高、清单允许降版,用户 2026-10-26 拍板) ──
+// ── 内联:Glue 版本清单与缺省(源 @/lib/sync/glue-version;:缺省取最高、清单允许降版,用户 2026-10-26 拍板) ──
 // 【导出仅供漂移守卫单测】真源加了新版本这里没跟即红灯。
 exports.CORE_GLUE_VERSIONS = ["4.0", "5.0", "5.1", "6.0"];
 exports.CORE_GLUE_VERSION_DEFAULT = "6.0";
@@ -68,7 +68,7 @@ const GLUE_ETL = [
     },
     {
         key: "glueConfig.glueVersion", label: "Glue 版本", consoleRef: "Glue Job > Glue version",
-        type: "enum", options: exports.CORE_GLUE_VERSIONS, platformDefault: exports.CORE_GLUE_VERSION_DEFAULT, // 序 53:缺省最高、可降版(内联,见文件头)
+        type: "enum", options: exports.CORE_GLUE_VERSIONS, platformDefault: exports.CORE_GLUE_VERSION_DEFAULT, // 缺省最高、可降版(内联,见文件头)
     },
     {
         key: "glueConfig.timeoutMinutes", label: "作业超时", consoleRef: "Glue Job > Job timeout",
@@ -210,7 +210,7 @@ const DMS = [
         type: "enum", options: ["dms.t3.small", "dms.t3.medium", "dms.t3.large", "dms.c5.large", "dms.c5.xlarge"], platformDefault: "dms.t3.small",
     },
 ];
-// ── 离线多引擎 EMR Serverless(模块 33-A;提交 Spark 作业。规格常量内联自 lib/engines/emr/spec.ts)──
+// ── 离线多引擎 EMR Serverless(提交 Spark 作业。规格常量内联自 lib/engines/emr/spec.ts)──
 // key 用点路径对齐 ParamPrefill<emr>.spec 形态;platformDefault 全部取自 EMR_SPEC_DEFAULT(内联真源)。
 const EMR = [
     {

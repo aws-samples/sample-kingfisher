@@ -1,4 +1,4 @@
-// @kf-batch 39-release-visibility —— 运行中的平台到底是哪一版(序 39 第二刀)。
+// 运行中的平台到底是哪一版。
 //
 // **唯一作者**:读 Dockerfile 注入的构建信息环境变量。键名与 `infra/lib/shared/build-info.ts#BUILD_ARG_KEYS` 逐字相同
 // (跨包无法 import,由 `lib/__tests__/build-info.test.ts` 守卫钉两侧 + Dockerfile 的 ARG / ENV)。

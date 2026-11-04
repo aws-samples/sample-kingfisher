@@ -38,7 +38,7 @@ const ENGINE_TO_COOKBOOK: Record<string, CookbookEngine | ""> = {
 };
 
 export async function adviseRole(input: AdviseInput): Promise<AdviseResult> {
-  // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+  // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
   const region = input.region || homeRegion();
   const accountId = input.accountId || "";
   const base = buildRoleAdvice({ ...input, region, accountId: accountId || undefined });

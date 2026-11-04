@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // 探测器单测(51 SPEC §3.2;INTERACTION 场景二四类;零真 invoke —— deps.send 全是假客户端)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -17,11 +16,11 @@ const err = (name: string, message: string, status?: number) => Object.assign(ne
 
 beforeEach(() => mem.db.reset());
 
-// @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = process.env.AWS_REGION + tgt_home)
+// 落点必填(原来缺省 = process.env.AWS_REGION + tgt_home)
 const HOME_PLACE = { targetId: "tgt_home", region: "us-east-1" };
 
 describe("classifyProbeError:五类且顺序正确", () => {
-  // @kf-batch 51-v2-multi-vendor —— 2026-10-14 临时账号真实原话(zai.glm-5.3,三种 id 形态同报;本体是 AccessDeniedException 且含 "not available")
+  // 2026-10-14 临时账号真实原话(zai.glm-5.3,三种 id 形态同报;本体是 AccessDeniedException 且含 "not available")
   it("🔴 NotAvailableForAccount 先于 AccessDenied / NotFound(账号级未开放,处方不同)", () => {
     expect(classifyProbeError(err("AccessDeniedException", "zai.glm-5.3 is not available for this account. Contact AWS Sales for access."))).toBe("NotAvailableForAccount");
     expect(classifyProbeError(err("SomeError", "Model is not available for this account"))).toBe("NotAvailableForAccount");
@@ -42,7 +41,7 @@ describe("classifyProbeError:五类且顺序正确", () => {
     expect(classifyProbeError(err("ServiceUnavailableException", "x"))).toBe("Throttle");
     expect(classifyProbeError(err("X", "y", 429))).toBe("Throttle");
   });
-  // @kf-batch 51-v3-probe-budget(序 46 / B-106):预算内没等到 = Timeout,处方「稍候再测 / 换推理配置」,不是限流
+  // 预算内没等到 = Timeout,处方「稍候再测 / 换推理配置」,不是限流
   it("🔴 Timeout 单列:AbortSignal.timeout 的 TimeoutError / AbortError、SDK 的 timed out 都归 Timeout,先于 Throttle", () => {
     expect(classifyProbeError(err("TimeoutError", "The operation was aborted due to timeout"))).toBe("Timeout");
     expect(classifyProbeError(err("AbortError", "This operation was aborted"))).toBe("Timeout");
@@ -90,7 +89,7 @@ describe("probeModel", () => {
     expect(r2.toolUseOk).toBe(false);
   });
 
-  // @kf-batch 51-v2-multi-vendor —— D11:二探看厂商档案 toolUse:"probe",不再只盯 openai
+  // D11:二探看厂商档案 toolUse:"probe",不再只盯 openai
   it("zai / moonshotai 系列也二探 tool-use;Kimi 的 ping 请求经整形(只有 maxTokens 且按系数 ×2)", async () => {
     const sent: any[] = [];
     const sendOk = vi.fn(async (cmd: any) => {
@@ -142,7 +141,7 @@ describe("probeModel", () => {
   });
 });
 
-// @kf-batch 51-v3-probe-budget(序 46 / B-106,2026-10-20 临时账号真测:Kimi K3 tiny / tool-use 探测 8 次采样 3.0–39.4s,10s 预算 5 次超时)
+// (2026-10-20 临时账号真测:Kimi K3 tiny / tool-use 探测 8 次采样 3.0–39.4s,10s 预算 5 次超时)
 describe("探测预算按系列 + 两探并行 + 二探失败分类 + 保存认新鲜缓存", () => {
   it("probeTimeoutMsFor:Kimi K3 用档案的 45s,Claude 10s,无档案 id 用保底 PROBE_TIMEOUT_MS", () => {
     expect(probeTimeoutMsFor("us.moonshotai.kimi-k3")).toBe(VENDORS.moonshotai.probeTimeoutMs);

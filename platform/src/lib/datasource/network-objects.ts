@@ -1,9 +1,9 @@
-// 序 61 B-133 —— 系统设置「数据源网络对象」清单与孤儿清理(唯一作者;路由只做鉴权与整形)。
+// 系统设置「数据源网络对象」清单与孤儿清理(唯一作者;路由只做鉴权与整形)。
 //
 // 【为什么要有】平台为数据源自建的安全组 `bgp-ds-*` 只在 Glue 作业跑时才挂网卡,其余时间零网卡;账号里任何按「无网卡即孤儿」清理的人或工具
 //   都会把它删掉(2026-10-28 测试账号真撞)。产品里原来既看不到「哪些组是平台的、归谁、在不在用」,也没有清理真孤儿的入口 ⇒
-//   人只能靠猜(猜错就是 B-133 的事故)。这里把事实摆出来:每个区所有平台组(组名 bgp-ds-* ∪ 带 bgp:managed 标签)× 归属源 × 在用 / 孤儿 /
-//   待清理 × 网卡数;孤儿一键清理走 B-130 的持久清理作业(按网卡事实收口),**不在请求里直接 DeleteSecurityGroup**。
+//   人只能靠猜(猜错就是该缺陷的事故)。这里把事实摆出来:每个区所有平台组(组名 bgp-ds-* ∪ 带 bgp:managed 标签)× 归属源 × 在用 / 孤儿 /
+//   待清理 × 网卡数;孤儿一键清理走该缺陷的持久清理作业(按网卡事实收口),**不在请求里直接 DeleteSecurityGroup**。
 // 【归属判定】源行 networkConfig 的 securityGroupId / securityGroupIds[] / platformSecurityGroupId 引用到 ⇒ 在用(谁引用都算,包括用户指定路径);
 //   标签 bgp:datasourceId 只作展示与清理作业的 datasourceId,不作在用判定(标签可被改,源行才是事实)。
 // 【只读 / 写】清单是只读(Describe + 一次 Scan);清理 = 服务端**重新**核三条件(平台组 + 无源行引用 + 网卡 0)后入队,审计由路由写。
@@ -143,7 +143,7 @@ export async function listDatasourceNetworkObjects(): Promise<DatasourceNetworkO
 }
 
 /**
- * 请求清理一个孤儿平台组:服务端**重新**核三条件(是平台组 / 没有任何源行引用 / 网卡为 0),过了才入 B-130 的持久清理作业。
+ * 请求清理一个孤儿平台组:服务端**重新**核三条件(是平台组 / 没有任何源行引用 / 网卡为 0),过了才入该缺陷的持久清理作业。
  * 🔴 不在这里 DeleteSecurityGroup:删除只由清理作业按网卡事实做(请求与删除之间网卡可能又挂上)。
  */
 export async function requestOrphanSgCleanup(args: { sgId: string; region: string; targetId: string; createdBy: string }): Promise<{ jobId: string; created: boolean; phase: string; datasourceId: string }> {
@@ -155,7 +155,7 @@ export async function requestOrphanSgCleanup(args: { sgId: string; region: strin
   if (!isPlatformOwnedSg(fact)) throw new NetworkObjectError(409, `安全组 ${sgId}(${fact.groupName})不是平台为数据源建的组(组名不以 ${PLATFORM_DS_SG_PREFIX} 开头且无 ${PLATFORM_DS_MANAGED_TAG_KEY} 标签)⇒ 平台不清理用户的组`);
   const refs = await scanDatasourceSgRefs();
   const owner = refs.get(sgId);
-  if (owner) throw new NetworkObjectError(409, `安全组 ${sgId} 仍被数据源「${owner.name}」引用,不是孤儿 ⇒ 不清理(删它会让该源的同步失败,正是 B-133 的事故形态)`);
+  if (owner) throw new NetworkObjectError(409, `安全组 ${sgId} 仍被数据源「${owner.name}」引用,不是孤儿 ⇒ 不清理(删它会让该源的同步失败,正是该缺陷的事故形态)`);
   const eniCount = await countNetworkInterfacesInSecurityGroup(sgId, region);
   if (eniCount > 0) throw new NetworkObjectError(409, `安全组 ${sgId} 仍被 ${eniCount} 张网卡引用 ⇒ 现在不能清理;等网卡释放后再试`);
   // 清理作业按「组名 == bgp-ds-<datasourceId 末 8 位>」判归属:有标签取标签里的源 id;存量无标签的组用组名后缀构造一个占位 id(末 8 位相同即可)

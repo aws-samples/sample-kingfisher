@@ -1,7 +1,6 @@
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // 🔴 `reconcileOneTarget`(人点「检测初始化」与周期 reconciler 的 SSOT)的**两条对称承重**:
 //
-// ① **E-111 成功路回归钉**:有在途 operation ∧ 其 exact build 已 SUCCEEDED ⇒ **自动 finalize**
+// ① **成功路回归钉**:有在途 operation ∧ 其 exact build 已 SUCCEEDED ⇒ **自动 finalize**
 //    (= 崩在 build 成功之后不需要人点;这是 2a 抽 SSOT 时顺带拿到的红利,必须钉住不被重构掉)。
 // ② **失败路只读禁令**(审核 §19.8 第 5 条):build 已失败终止 / attach 丢响应 / startUncertain,
 //    reconciler **只分类不落锤** —— 绝不清 operation、绝不清顶层锁。清锁只能走恢复端点 + 管理员确认。
@@ -48,7 +47,7 @@ vi.mock("@/lib/exec-env/deploy-control", () => ({
     const earliest = Date.parse(startedAt) + 2 * 60 * 60 * 1000 + 5 * 60 * 1000;
     return { earliestRecoverAt: new Date(earliest).toISOString(), recoverable: now >= earliest };
   },
-  // @kf-batch 50-WP15-airflow-serverless:第二证据(CodeBuild 列表无该 operation 的 build)—— 本文件不测它,缺省「查不到证据」
+  // 第二证据(CodeBuild 列表无该 operation 的 build)—— 本文件不测它,缺省「查不到证据」
   START_ABSENCE_MIN_AGE_MS: 5 * 60 * 1000,
   verifyNoBuildForOperation: async () => ({ absent: false, verifiedAt: Date.now() }),
 }));
@@ -59,7 +58,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
 }));
 
 import { reconcileOneTarget, RECONCILE_PLACE_VIA } from "@/lib/exec-env/reconcile";
-// 序 31 二刀 ⑤:完成序在第一个 AWS 调用之前记落点决策(真账本,不 mock)
+// 完成序在第一个 AWS 调用之前记落点决策(真账本,不 mock)
 import { __setRequestStoreProvider, decisionsOfCurrentRequest } from "@/lib/place/context";
 
 const CANON = "2026-09-01T00:00:00.000Z";
@@ -123,7 +122,7 @@ beforeEach(() => {
   finalizeMock.mockResolvedValue(undefined);
 });
 
-describe("🔴 ① E-111:build SUCCEEDED ⇒ reconciler 自动 finalize(不需人点)", () => {
+describe("🔴 ①:build SUCCEEDED ⇒ reconciler 自动 finalize(不需人点)", () => {
   it("携 exact fence(operation 自己的 buildId/epoch/hash/startedAt)调 finalizeTargetResources", async () => {
     getTargetRawMock.mockResolvedValue(item());
     readBuildStatusMock.mockResolvedValue({ phase: "SUCCEEDED", stacks: [], logsTail: "", observedVersion: null });
@@ -258,10 +257,10 @@ describe("🔴 ② 失败路:只分类,绝不落锤", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤(2026-10-23 …9435 observe 复验抓到):已启用环境点「检测初始化」走的是
+// (2026-10-23 …9435 observe 复验抓到):已启用环境点「检测初始化」走的是
 //   「不需 finalize」路 ⇒ 此前唯一的记账点 readBuildStatus 根本不会被调 ⇒ 整条完成序零决策,目标区探活全记未归因。
 //   修 = reconcileOneTarget 开头就记(不依赖偶然路径);本判据钉「runProbe 被调那一刻账本里已有决策」+「readBuildStatus 确实一次没调」。
-describe("🔴 序 31 二刀 ⑤:已启用环境(不需 finalize)也在 runProbe 之前记落点决策", () => {
+describe("🔴 已启用环境(不需 finalize)也在 runProbe 之前记落点决策", () => {
   it("runProbe 被调时 decisions[0] = {tgt_usw2_a, reconcileOneTarget};readBuildStatus 零调用(坐实这条路此前零决策)", async () => {
     const store = {};
     __setRequestStoreProvider(() => store);

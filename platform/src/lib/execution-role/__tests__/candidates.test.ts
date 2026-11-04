@@ -1,4 +1,4 @@
-// 序 72 B-139 —— 下拉候选:ListRoles 分页全量 → 信任该引擎服务主体者入选 → 三组;平台内部角色不列;平台默认恒在。
+// 下拉候选:ListRoles 分页全量 → 信任该引擎服务主体者入选 → 三组;平台内部角色不列;平台默认恒在。
 // 只 mock 真外部(IAM 客户端)与落点解析器(它读注册表 / env);信任解析是本目录的纯函数,不 mock。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

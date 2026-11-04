@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 50-WP5-rungroup
 // POST /api/run-groups/[id]/retry-failed —— **权威地**算出「这一组里哪些区失败了」(50 SPEC v3.44 §2.7)。
 //
 // 🔴 它**刻意不自己扇出**:运行路由里有驻留同意前置 / 绑定校验 / 逐 target 审计 / 运行锁四段逻辑,

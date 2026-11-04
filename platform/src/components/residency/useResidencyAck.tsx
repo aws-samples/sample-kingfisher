@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-W5-seg2-WP10a
 // 「409 residency-ack-required ⇒ 弹窗 ⇒ 同意留存 ⇒ 重试」的可复用 hook(直查 / 建模落地 / 作业运行 / 历史原文 都用它,只此一份)。
 //
 //   const { residencyModal, resolveAckRequired } = useResidencyAck();

@@ -1,4 +1,4 @@
-// 模块 55 — 对象租约判据(55 DESIGN §2.8):占 / 冲突 409 / 回滚 / 死租约自愈(holder 终态 · 超天花板 · 建行宽限)/ 终态释放(三条终态写)/
+// 对象租约判据(55 DESIGN §2.8):占 / 冲突 409 / 回滚 / 死租约自愈(holder 终态 · 超天花板 · 建行宽限)/ 终态释放(三条终态写)/
 // 路由守卫 resourceBusyResponse / 驱动器两条路径先占租约。只 mock 真外部 DynamoDB(内存夹具按真条件表达式求值,Put / Delete 条件也真判)。
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest } from "next/server";
@@ -33,7 +33,7 @@ async function expect409(promise: Promise<unknown>): Promise<LongOpHttpError> {
 
 beforeEach(() => resetMemLongOps());
 
-describe("模块 55 租约 store:占 / 冲突 / 回滚", () => {
+describe("租约 store:占 / 冲突 / 回滚", () => {
   it("占到 ⇒ lease#<资源> 行(holder / kind / acquiredAt);同对象第二个 holder ⇒ 409 LONG_OP_IN_PROGRESS,文案带标签与「正在进行中」,detail 指回占住者", async () => {
     await createLongOp({ taskId: "t1", kind: "modeling-land", params: { codeTableId: "ct1", force: false, probeOnly: false }, userId: "u1" });
     await acquireLeases("t1", "modeling-land", [CT]);
@@ -66,7 +66,7 @@ describe("模块 55 租约 store:占 / 冲突 / 回滚", () => {
   });
 });
 
-describe("模块 55 租约 store:死租约自愈(不靠时钟,靠 holder 的真状态)", () => {
+describe("租约 store:死租约自愈(不靠时钟,靠 holder 的真状态)", () => {
   it("holder 已终态 ⇒ 视为已释放:新 holder 占到并覆盖", async () => {
     rows.set("t-old", { taskId: "t-old", kind: "modeling-land", status: "succeeded", createdAt: isoAgo(5_000), startedAt: isoAgo(5_000), finishedAt: isoAgo(1_000) });
     rows.set(LEASE_PK_PREFIX + CT, { taskId: LEASE_PK_PREFIX + CT, resource: CT, holder: "t-old", kind: "modeling-land", acquiredAt: isoAgo(5_000), ttl: 0 });
@@ -96,7 +96,7 @@ describe("模块 55 租约 store:死租约自愈(不靠时钟,靠 holder 的真�
   });
 });
 
-describe("模块 55 租约 store:终态释放(三条终态写都释放;条件写失败不释放别人的)", () => {
+describe("租约 store:终态释放(三条终态写都释放;条件写失败不释放别人的)", () => {
   async function held(taskId: string) {
     await acquireLeases(taskId, "modeling-land", [CT]);
     await createLongOp({ taskId, leases: [CT], kind: "modeling-land", params: { codeTableId: "ct1", force: false, probeOnly: false }, userId: "u1" });
@@ -123,7 +123,7 @@ describe("模块 55 租约 store:终态释放(三条终态写都释放;条件写
   });
 });
 
-describe("模块 55 租约:路由守卫 assertResourcesFree / resourceBusyResponse", () => {
+describe("租约:路由守卫 assertResourcesFree / resourceBusyResponse", () => {
   it("没人占 ⇒ 过;占着 ⇒ 409 响应(信封 code LONG_OP_IN_PROGRESS);死租约 ⇒ 顺手清掉并放行", async () => {
     expect(await resourceBusyResponse([CT])).toBeNull();
     await createLongOp({ taskId: "t1", kind: "modeling-land", params: { codeTableId: "ct1", force: false, probeOnly: false }, userId: "u1" });
@@ -150,7 +150,7 @@ function ctxOf(): LongOpExecContext {
 }
 const LAND = { kind: "modeling-land" as const, params: { codeTableId: "ct1", targets: ["tgt_usw2_a"], force: false, probeOnly: false } };
 
-describe("模块 55 租约:驱动器 submitLongOp 先占租约", () => {
+describe("租约:驱动器 submitLongOp 先占租约", () => {
   it("同一码表并发两次落地:第一次 202 执行中;第二次**同步** 409(不建第二行);解绑预览(无租约)照常;第一次终态后租约放开、第三次成功", async () => {
     const reg = registry(async () => { await sleep(150); return { data: { landed: true } }; });
     const ctx = ctxOf();

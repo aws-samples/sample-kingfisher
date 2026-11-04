@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— 多页签批量关闭规则(用户 2026-10-15:「多 tab 需要增加选项,关闭其它 tab」)。
+// 多页签批量关闭规则(用户 2026-10-15:「多 tab 需要增加选项,关闭其它 tab」)。
 // 钉 `closeTabsBy` 的闭合规则:关闭其它 / 关闭右侧 / 关闭全部;页签永不为空;跳转只在当前页被关掉时发生。
 import { describe, it, expect } from "vitest";
 import { closeTabsBy, HOME_TAB_PATH } from "../multitabs-close";

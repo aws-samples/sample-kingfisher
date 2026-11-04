@@ -1,10 +1,10 @@
-// 模块 34 — 邮件通道(SES v2)。SendEmail 纯文本。
+// 邮件通道(SES v2)。SendEmail 纯文本。
 // ⚠️ SES sandbox 限制:发件人/收件人须先在 SES 验证身份,否则 SendEmail 抛异常——notify 会把该
 // 异常如实记入 channelResults.error(诚实行为,非假成功)。演示主推 webhook 通道;邮件需账号侧验证后启用。
 // IAM:ses:SendEmail 由独立 ManagedPolicy 授予(见 platform-stack,禁 TaskRole.addToPolicy)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import type { AlertChannel } from "../types";

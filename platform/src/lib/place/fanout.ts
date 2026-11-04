@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 3 收尾 —— **按 targetId 扇出**的唯一写法(L10 的入口形态)。
+// 收尾 —— **按 targetId 扇出**的唯一写法(L10 的入口形态)。
 //
 // `forEachPlace(places, fn)`(context.ts)要的是**已解析**的 Place;而平台的扇出点手里拿的是一串 targetId
 // (作业绑定 / 请求点名 / 列表里各行的章),每个分支在各自的执行体里还有一套自己的准入与报错(typed rejection:

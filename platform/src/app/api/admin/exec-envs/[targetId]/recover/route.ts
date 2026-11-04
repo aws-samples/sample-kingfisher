@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // GET/POST /api/admin/exec-envs/[targetId]/recover —— 失败会话的**管理员恢复入口**
 // (SPEC §3.5b;外部审核 §19.8 = 发布阻断项)。
 //

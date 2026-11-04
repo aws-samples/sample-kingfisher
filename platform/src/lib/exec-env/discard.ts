@@ -1,7 +1,6 @@
-// @kf-batch 50-WP30-discard
-// WP-30 路 A「弃置」:把一个**从没装出来**的执行环境退役(→ gone,tombstone 保留审计),释放该区「一区一套」名额。
+// 「弃置」:把一个**从没装出来**的执行环境退役(→ gone,tombstone 保留审计),释放该区「一区一套」名额。
 //
-// 🔴 为什么要有它(2026-10-01 新账号第一章 `w5a` 真撞):在 ap-northeast-1 注册一次性 T3 ⇒ 部署失败(B-29)⇒
+// 🔴 为什么要有它(2026-10-01 新账号第一章 `w5a` 真撞):在 ap-northeast-1 注册一次性 T3 ⇒ 部署失败⇒
 //   描述符卡在 provisioning(+ 一个已终态失败、没人收口的部署会话),目标区**没有任何资源** ⇒ 平台里没有任何合法出口
 //   把它清掉;判据只能直改 DDB(绕过产品守卫 —— 用户明令禁止)。
 // 🔴 判据按**事实**分流,不按状态名:「从没 ready ∧ 无资源袋 ∧ 目标区无本 slug 栈」才是弃置的前提;
@@ -93,7 +92,7 @@ export async function discardTarget(targetId: string, actor: { username: string;
     expectedVersion: Number(t.version),
     post: { spec: { ...spec, intent: "delete" }, observed: { ...observedNoOp, phase: "gone" } },
     discardFence: { expectedVersion: Number(t.version), fromPhase: from, noStacksVerifiedAt: disp.checkedAt },
-    reason: `discard by ${actor.username}(WP-30 路 A:从没装出来、目标区无本环境的栈)`,
+    reason: `discard by ${actor.username}(路 A:从没装出来、目标区无本环境的栈)`,
   });
   return { targetId, region: t.region, before, recoveredOperationId, noStacksVerifiedAt: disp.checkedAt };
 }

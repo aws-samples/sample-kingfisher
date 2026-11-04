@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 治理)
+// (治理)
 // GET    /api/governance/schedules/[taskId]   取一个定时治理任务
 // PATCH  /api/governance/schedules/[taskId]   改草稿(名称 / 参数 / cron;**启用中不许改**:先停用再改)
 // DELETE /api/governance/schedules/[taskId]   删除(先把每个有产物的区真撤下来;撤不下来 ⇒ 502,行不删)

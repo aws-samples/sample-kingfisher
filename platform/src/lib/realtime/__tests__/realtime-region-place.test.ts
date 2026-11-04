@@ -1,5 +1,4 @@
-// @kf-batch 50-WP27-9cap-matrix
-// 🔴🔴 **实时计算的「哪个区」必须处处由章派生** —— WP-27 把实时计算纳入能力矩阵后当场抓到的三处缺陷。
+// 🔴🔴 **实时计算的「哪个区」必须处处由章派生** —— 把实时计算纳入能力矩阵后当场抓到的三处缺陷。
 //
 // 三处同一个病灶(记忆 `fanout-wrapper-erases-typed-rejection` / `unwired-code-is-unverified` 的形态:
 // 「写了」≠「每条兄弟路径都接上了」):
@@ -34,7 +33,7 @@ function code(rel: string): string {
     .join("\n");
 }
 
-describe("实时计算:区必须由章派生(WP-27 抓到的三处)", () => {
+describe("实时计算:区必须由章派生(抓到的三处)", () => {
   const produce = code("app/api/flink/jobs/[id]/produce/route.ts");
   const dsRoute = code("app/api/datasources/route.ts");
   const clients = code("lib/exec-env/target-clients.ts");
@@ -206,7 +205,7 @@ describe("实时计算:区必须由章派生(WP-27 抓到的三处)", () => {
   });
 
   it("客户端工厂:kinesisClientFor 按 region 缓存,且进了 __resetTargetClients(免得单测互相串状态)", () => {
-    // @kf-batch 50-WP31-place-first-class —— 构造与缓存收到唯一工厂 lib/aws/clients.ts(按「服务|区」缓存、
+    // 构造与缓存收到唯一工厂 lib/aws/clients.ts(按「服务|区」缓存、
     //   一处 clear);kinesisClientFor 只是薄委托。判据随之钉:委托到 kinesis 这一项 + 工厂里有它的装载 + reset 委托到工厂。
     expect(clients).toContain("export async function kinesisClientFor(region: string)");
     expect(clients).toMatch(/kinesisClientFor\(region: string\): Promise<\w+> \{\s*return regionalClient\("kinesis", region\);/);
@@ -220,10 +219,9 @@ describe("实时计算:区必须由章派生(WP-27 抓到的三处)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP27-9cap-matrix
 // 🔴 **「源流」这一列必须是它真正消费的那条流** —— 又一处「部署期快照 vs 运行期解析」。
 //
-// 真环境实测(2026-09-19,WP-27 把实时计算纳入矩阵后看见的):示范作业消费的是
+// 真环境实测(2026-09-19,把实时计算纳入矩阵后看见的):示范作业消费的是
 // `bgp-showcase-home-rt`,而实时计算页的「源流」列写着 `bgp-flink-source` ——
 // 那是建作业时存下来的 `process.env.FLINK_SOURCE_STREAM || "bgp-flink-source"`,
 // 而平台**刻意不建固定流**(2026-07-26 拍板:流由数据源 provision 按需新建)⇒

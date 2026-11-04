@@ -1,4 +1,4 @@
-// @kf-batch 39-release-visibility —— 发版号进镜像(序 39 第二刀;两轮冷启动演练都把「现网发版号不可读」列为新手第一缺口)
+// 发版号进镜像(两轮冷启动演练都把「现网发版号不可读」列为新手第一缺口)
 //
 // **唯一作者**:平台镜像 docker build-arg 的键名与取值。容器里是同名环境变量(Dockerfile runner 段 ARG → ENV),
 // 平台运行时由 `platform/src/lib/build-info.ts#BUILD_INFO_ENV_KEYS` 读回 —— 两侧键名必须逐字相同,跨包无法 import,

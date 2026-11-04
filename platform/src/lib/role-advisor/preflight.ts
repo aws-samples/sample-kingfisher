@@ -17,7 +17,7 @@
 //   🔴 为什么 `unverifiable` 不阻断:那会让「预检自己坏了」变成「整个平台跑不了作业」——
 //     比原来的缺陷更坏。但它**绝不许静默当成通过**:调用方必须把这句话带给用户。
 //
-// 【序 72 B-139(模块 56)扩展,2026-11-03】客户现网把 `--extra-py-files` 换到自己的桶 ⇒ 角色读不到 ⇒ Glue 启动期 403,
+// 【扩展,2026-11-03】客户现网把 `--extra-py-files` 换到自己的桶 ⇒ 角色读不到 ⇒ Glue 启动期 403,
 //   而预检只量引擎基线(日志组 / 脚本桶 / 数据湖桶),对作业**实际引用**的外部桶一个字不量 ⇒ 保存成功、运行才炸。三项追加:
 //   · `requireTrustService`:GetRole 之后看信任策略 —— 自建角色不信任 glue.amazonaws.com 时当场指路(否则到 assume-role 才失败);
 //   · `extraS3Uris`:每个作业引用的 S3 URI 追加 `s3:GetObject` 对象 + `s3:ListBucket` 桶两条探针(sid JobDependencyRead);
@@ -26,13 +26,13 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { IAMClient, GetRoleCommand, SimulatePrincipalPolicyCommand } from "@aws-sdk/client-iam";
 import { engineBaseline, type BaselineCtx } from "./engine-baseline";
 import type { RoleEngine } from "./types";
 import { ROLE_APPLY_HOW_TO } from "./labels";
-// 序 72 B-139:ARN 形态 / 角色名解析的唯一作者(此处原有一份同样的正则,已收口)
+// ARN 形态 / 角色名解析的唯一作者(此处原有一份同样的正则,已收口)
 import { rolePathAndNameOfArn, roleNameOfArn } from "@/lib/execution-role/resolve";
 import { parseS3Uri } from "@/lib/execution-role/s3-uris";
 import { trustsService } from "@/lib/execution-role/trust";
@@ -58,11 +58,11 @@ export interface PreflightResult {
   unverifiable?: string;
   /** 给用户的一段话(已包含出路)。调用方直接展示/抛出即可,不要自己另写一份。 */
   message?: string;
-  /** 序 72:信任策略是否含要求的服务主体(没要求 ⇒ 不出现)。 */
+  /** 信任策略是否含要求的服务主体(没要求 ⇒ 不出现)。 */
   trusted?: boolean;
 }
 
-/** 序 72:作业依赖 / 脚本引用的 S3 URI ⇒ 两条探针(对象读 + 桶列),与引擎基线同形。 */
+/** 作业依赖 / 脚本引用的 S3 URI ⇒ 两条探针(对象读 + 桶列),与引擎基线同形。 */
 export const JOB_DEPENDENCY_SID = "JobDependencyRead";
 const JOB_DEPENDENCY_WHY = "作业依赖库 / 脚本引用到的对象,引擎启动期用执行角色下载;读不到就是 LAUNCH ERROR 403(客户现网 2026-11-03 真撞)";
 
@@ -92,11 +92,11 @@ export async function preflightRole(opts: {
   accountId: string;
   logBucket?: string;
   scriptBucket?: string;
-  /** 序 72:要求信任策略含这个服务主体(如 glue.amazonaws.com);不给 ⇒ 不核。 */
+  /** 要求信任策略含这个服务主体(如 glue.amazonaws.com);不给 ⇒ 不核。 */
   requireTrustService?: string;
-  /** 序 72:作业实际引用的 S3 URI(逐个追加对象读 + 桶列探针)。 */
+  /** 作业实际引用的 S3 URI(逐个追加对象读 + 桶列探针)。 */
   extraS3Uris?: string[];
-  /** 序 72:模拟上下文 aws:RequestedRegion(落点区)。 */
+  /** 模拟上下文 aws:RequestedRegion(落点区)。 */
   requestedRegion?: string;
 }): Promise<PreflightResult> {
   const { engine, roleArn } = opts;
@@ -135,7 +135,7 @@ export async function preflightRole(opts: {
     };
   }
 
-  // ── ①b 序 72:信任策略必须让该引擎的服务承担它(否则 PassRole 过了、服务起步 assume-role 就失败,报错离根因很远)──
+  // ── ①b:信任策略必须让该引擎的服务承担它(否则 PassRole 过了、服务起步 assume-role 就失败,报错离根因很远)──
   let trusted: boolean | undefined;
   if (opts.requireTrustService) {
     trusted = trustsService(assumeDoc, opts.requireTrustService);

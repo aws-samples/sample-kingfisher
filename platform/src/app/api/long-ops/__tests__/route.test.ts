@@ -1,4 +1,4 @@
-// 模块 55 — GET /api/long-ops/[taskId] 判据(= 序 46 B-107 ai/tasks route.test 泛化):鉴权 / 归属 / 抢占驱动 / 重认领 / 天花板强制 timeout /
+// GET /api/long-ops/[taskId] 判据(= ai/tasks route.test 泛化):鉴权 / 归属 / 抢占驱动 / 重认领 / 天花板强制 timeout /
 // 终态字段(result · resultStatus · errorStatus · errorBody · label)/ 终态顶层 `_meta` / 别名路由同一 handler。
 // 只 mock 真外部:DynamoDB(内存夹具,条件写按真表达式求值)、身份、执行体注册表(业务侧)。表服务层与驱动器用真代码。
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -80,7 +80,7 @@ describe("GET /api/long-ops/[taskId]", () => {
     expect(done._meta).toMatchObject({ modelId: "us.moonshotai.kimi-k3", modelSource: "runtime", correlationId: "corr-post-9" });
   });
 
-  it("终态 succeeded 且行 resultRaw(序 50 第二批,编排四条)⇒ 回显 resultRaw: true(客户端据此不包信封);不标的行不回显", async () => {
+  it("终态 succeeded 且行 resultRaw(编排四条)⇒ 回显 resultRaw: true(客户端据此不包信封);不标的行不回显", async () => {
     const row = await createLongOp({ kind: "workflow-publish", params: { workflowId: "wf1" }, userId: "u1", correlationId: "corr-post-raw" });
     const token = (await claimForRun(row.taskId))!;
     await markSucceeded(row.taskId, token, { success: true, dagId: "bgp_wf1" }, { resultRaw: true });
@@ -129,7 +129,7 @@ describe("GET /api/long-ops/[taskId]", () => {
     expect(h.execCalls).toBe(0);
   });
 
-  it("别名 GET /api/ai/tasks/[taskId] 是同一个 handler(B-107 过渡,下一发版删)", async () => {
+  it("别名 GET /api/ai/tasks/[taskId] 是同一个 handler(过渡,下一发版删)", async () => {
     expect(ALIAS_GET).toBe(GET);
   });
 });

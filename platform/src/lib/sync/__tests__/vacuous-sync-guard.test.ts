@@ -1,4 +1,3 @@
-// @kf-batch 50-WP24b-vacuous-sync
 // 🔴🔴 **空转成功**:同步任务的表清单为空时,Glue 作业一张表都不处理(日志 `SYNC RESULTS: {}`)、
 // 作业自身 SUCCEEDED、平台把任务标成 **succeeded** —— 而数仓里连表都没建。
 // 真环境实测(2026-09-17):建任务时把表清单写进了 `tables`(契约是 `sourceTables`),
@@ -46,10 +45,9 @@ describe("同步任务「有没有活可干」的单一作者", () => {
   });
 });
 
-// @kf-batch 41-B123-sync-source-locator-by-paradigm
-// 🔴 B-123(2026-10-25 页面驱动段 scq A1-2 真撞):S3 对象存储源经向导建任务 ⇒ 400「缺少源库名」——
+// 🔴 (2026-10-25 页面驱动段 scq A1-2 真撞):S3 对象存储源经向导建任务 ⇒ 400「缺少源库名」——
 //   「从哪读」原来只认 JDBC 的源库名;S3 / DynamoDB 源没有库名概念,定位在数据源连接袋里。
-describe("B-123「从哪读」按数据源范式判(S3 / DynamoDB 源没有库名)", () => {
+describe("「从哪读」按数据源范式判(S3 / DynamoDB 源没有库名)", () => {
   const tables = { sourceTables: ["ad_campaigns"] };
 
   it("S3 对象存储源:连接袋有 bucket ⇒ 放行(不再要「源库名」)", () => {

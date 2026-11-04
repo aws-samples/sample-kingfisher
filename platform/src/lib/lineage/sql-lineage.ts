@@ -1,4 +1,4 @@
-// 模块 17 — SQL 血缘自动解析 (v1.8.0)
+// SQL 血缘自动解析 (v1.8.0)
 //
 // Heuristic, table-level SQL lineage extractor for Redshift SQL (作业开发 Redshift 作业 +
 // Redshift 保存任务). Pure functions, no external deps, never throws (best-effort: on any
@@ -277,11 +277,11 @@ export function parseSqlLineage(sql: string, defaults: ParseDefaults = {}): SqlL
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 结果列 → 物理列(模块 18 B-119,2026-10-23)
+// 结果列 → 物理列
 //
 // 为什么:字段脱敏按「结果列名」去对分级,而问数模型生成的 SQL 几乎总给中文别名(`country AS 地区`),
 //   直查 / BI 里 `AS` 改名也是家常便饭 ⇒ 分级落在物理列 `country` 上、结果列却叫「地区」⇒ 永远对不上
-//   ⇒ L3 字段明文给非授权用户(设计稿 18 §9 第 1 条自 v1.9.0 起一直「记入局限」;序 41 页面驱动验收 gbc GC-11
+//   ⇒ L3 字段明文给非授权用户(设计稿 18 §9 第 1 条自 v1.9.0 起一直「记入局限」;页面驱动验收 gbc GC-11
 //   用模型真回的 SQL 当场撞到)。这里把每个结果列解析成「它引用了哪些物理列」(别名链 / 表达式 / CTE 与子查询
 //   逐层展开),脱敏按物理列对分级。
 // 口径:保守 —— 表达式引用了敏感列(`upper(email)`、`count(distinct phone)`)也算引用,按最强策略脱敏;
@@ -445,7 +445,7 @@ function expandAliases(refs: string[], aliasSources: Map<string, string[]>): str
 
 /**
  * 解析 SQL 的结果列:最外层 select 每一列叫什么、引用了哪些物理列(别名链 / 子查询 / CTE 逐层展开)。
- * 脱敏(模块 18)据此把「结果列」对回「分级落在的物理列」。best-effort:解析失败回空(调用方回落到按结果列名匹配)。
+ * 脱敏据此把「结果列」对回「分级落在的物理列」。best-effort:解析失败回空(调用方回落到按结果列名匹配)。
  */
 export function parseSelectOutputs(sql: string): SelectOutputs {
   const out: SelectOutputs = { top: [], aliasSources: new Map() };

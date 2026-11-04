@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3a-add-components
 // **"哪些组件的栈已经真的实现了"** —— 平台侧的单一事实源(SSOT)。
 //
 // 【为什么必须单独一个模块】这条知识本批有 4 个消费者:组件栈 Outputs 读取(stack-outputs)、
@@ -10,16 +9,16 @@
 //   · `TARGET_COMPONENTS`(registry.ts)= SPEC §1.1 的**合法组件全集**(注册表能存什么);
 //   · 本文件 = 全集里**栈组已实现**的子集(部署得出来的是哪些);
 //   · `infra/lambda/exec-env-broker/validate.mjs` 的 `COMPONENTS` **不再是副本**:部署期由 deploy-stack.ts 从 context.ts 的
-//     EXEC_ENV_COMPONENTS 注入 env EXEC_ENV_COMPONENT_ENUM 派生(WP-15 真环境撞过副本漂移:broker 拒 airflow-serverless「未知组件」)
+//     EXEC_ENV_COMPONENTS 注入 env EXEC_ENV_COMPONENT_ENUM 派生(真环境撞过副本漂移:broker 拒 airflow-serverless「未知组件」)
 //     (那道边界无法共享常量,靠测试锚点钉;本文件不去 import 它)。
 // 所以"合法但未实现"是一个**真实存在的状态**:注册表允许存 `mwaa`,而栈组会显式报错 ——
 // 本文件就是把这条差异写成代码,让界面与 API 都按同一份判断说话。
 
-// @kf-batch 50-PROD-B-seq33 ②:target-id.ts 同样零依赖(客户端可 import),不破坏本文件「零依赖」的承诺
+// ②:target-id.ts 同样零依赖(客户端可 import),不破坏本文件「零依赖」的承诺
 import { isHome } from "./target-id";
 
-/** 栈组已实现的组件(含恒装的 core)。P50.3a:core/redshift/dms/flink;WP-10a:residency-api;WP-13:mwaa。 */
-// @kf-batch 50-WP13-mwaa-region:mwaa 落地(每个 target 自己的 Airflow;SPEC v3.26 §3.14)
+/** 栈组已实现的组件(含恒装的 core)。:core/redshift/dms/flink;:residency-api;:mwaa。 */
+// mwaa 落地(每个 target 自己的 Airflow;SPEC v3.26 §3.14)
 export const IMPLEMENTED_COMPONENTS = ["core", "redshift", "dms", "flink", "residency-api", "mwaa", "airflow-serverless"] as const;
 export type ImplementedComponent = (typeof IMPLEMENTED_COMPONENTS)[number];
 
@@ -30,7 +29,6 @@ export type ImplementedComponent = (typeof IMPLEMENTED_COMPONENTS)[number];
 export const OPTIONAL_IMPLEMENTED_COMPONENTS = ["redshift", "dms", "flink", "residency-api", "mwaa", "airflow-serverless"] as const;
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 🔴🔴 **已停止提供**的组件(用户 2026-09-11 拍板:「后面也不部署普通版本的 mwaa 了。」)。
  *
  * 与 `PENDING_COMPONENTS`(还没实现)是**两回事**,别混:
@@ -60,7 +58,6 @@ export function retiredComponentMessage(components: readonly string[]): string {
 export const OFFERED_OPTIONAL_COMPONENTS = OPTIONAL_IMPLEMENTED_COMPONENTS.filter((c) => !isComponentRetired(c));
 
 /**
- * @kf-batch 50-WP22-external-components
  * 🔴🔴 **由平台自己的栈部署**的组件 —— 描述符可以如实声称它,但它**不属于 exec-env 栈组的部署面**。
  *
  * 为什么必须把这一维显式化(2026-09-14 真环境撞到):`components` 一直被当成**两件事**用 ——
@@ -101,12 +98,12 @@ export function externalComponentMessage(components: readonly string[]): string 
  * 合法但**栈组尚未实现**的组件(勾了会被栈组显式报错 —— 那是刻意的 fail-closed,不是 bug)。
  * 🔴 这份名单只许**缩短**(实现一个就从这里搬去上面),不许悄悄变长。
  */
-// @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 已落地(区域审计 / 结果存储),从待办移到已实现
-// @kf-batch 50-WP13-mwaa-region:mwaa 已实现,从待办移出
-// @kf-batch 50-WP22-external-components:🔴 agentcore **不是「待后续批次」** —— 它已经装了(由
+// residency-api 片 1 已落地(区域审计 / 结果存储),从待办移到已实现
+// mwaa 已实现,从待办移出
+// 🔴 agentcore **不是「待后续批次」** —— 它已经装了(由
 //   `BgpAgentCoreStack` 部署),只是不由 exec-env 栈组建 ⇒ 归 `EXTERNAL_COMPONENTS`。
 //   挂在这里的后果:装了它的 home **永远补装不了任何组件**,且拒因说「待后续批次」= 让人等一个
-//   永远不会来的批次(WP-22)。
+//   永远不会来的批次。
 export const PENDING_COMPONENTS = ["kafka"] as const;
 
 export function isComponentImplemented(component: string): component is ImplementedComponent {
@@ -148,14 +145,13 @@ export type ComponentPlan =
  * 判定顺序即优先级:形状 → 必含 core → 只许已实现 → 只增不减 → 必须真有新增。
  */
 /**
- * @kf-batch 50-W5-seg1-WP3
  * `allowNoAddition`:**升级预演**(SPEC §2.1 v3.21)—— 已启用 target 传「与已装相同的全集」= 只想看这次源包对既有栈会改什么。
  * 🔴 只有 `preview` 传它;`add-components` 照旧要求真有新增(它的语义就是加组件),`deploy` 不经本函数。
  */
 export function planComponentAddition(
   installed: readonly unknown[],
   rawWanted: unknown,
-  // @kf-batch 50-PROD-B-seq33 ② —— 必填(不给默认):判「补齐到完整集」必须知道它是谁(主控区?哪个法域?)
+  // ② —— 必填(不给默认):判「补齐到完整集」必须知道它是谁(主控区?哪个法域?)
   //   路由直接传描述符(含 targetId);单测可直接给 { isHome, jurisdiction }。
   subject: RequiredComponentsSubject | { targetId: string; jurisdiction?: unknown },
   opts: { allowNoAddition?: boolean } = {}
@@ -168,9 +164,8 @@ export function planComponentAddition(
     return { ok: false, message: "components 必须含 core(core 恒装;全集语义下不许省略它)" };
   }
   const cur = installed.filter((c): c is string => typeof c === "string");
-  // @kf-batch 50-WP22-external-components
   // 🔴 external 组件(由平台自己的栈部署)**已装**的:既不算「尚未实现」也不算「被减掉」——
-  //    它必须能跟着全集一路带过去,否则装了 agentcore 的 home 连补装别的组件都做不到(WP-22 的病根)。
+  //    它必须能跟着全集一路带过去,否则装了 agentcore 的 home 连补装别的组件都做不到(病根)。
   //    **没装**的 external 组件仍要拒:它不能靠执行环境的补充部署装出来,且拒因要说清出路。
   const newExternal = wanted.filter((c) => isComponentExternal(c) && !cur.includes(c));
   if (newExternal.length > 0) {
@@ -187,7 +182,7 @@ export function planComponentAddition(
         `待后续批次:${PENDING_COMPONENTS.join(", ")})—— 这里如实拒绝,而不是让栈组在部署中途报错`,
     };
   }
-  // @kf-batch 50-WP17-serverless-workflow —— 停供组件:**只有已装的才允许出现在全集里**。
+  // 停供组件:**只有已装的才允许出现在全集里**。
   // 🔴 这里的 `wanted` 是**全集**语义、且下面明令「不许减组件」⇒ 存量装了 mwaa 的环境**必须**继续带着它,
   //   否则它连「补装别的组件」都做不了。所以判据不能是「全集里不许有 mwaa」,而是
   //   「**不在已装里**却出现 ⇒ 那就是新装 ⇒ 拒」。两者差一个字,行为差很远。
@@ -204,7 +199,7 @@ export function planComponentAddition(
         `(drain → 审批 → 销毁,§4.6),不能靠少传一个组件顺手发生`,
     };
   }
-  // @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):
+  // ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):
   //   ① 下发后的全集必须**装齐**要求集(补一半 = 仍是精简形态;升级预演也一样 —— 不完整的环境先补齐再升级);
   //   ② 新增项只许是要求集里**缺的**那些(补装 = 补齐,不是挑一个额外的装)。
   const required = "targetId" in subject ? requiredComponentsForTarget(subject) : requiredComponentsFor(subject);
@@ -232,7 +227,7 @@ export function planComponentAddition(
 }
 
 // ——————————————————————————————————————————————————————————————
-// @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 **执行环境的完整组件集**(用户 2026-10-10 拍板,不许精简)
+// ② —— 🔴🔴 **执行环境的完整组件集**(用户 2026-10-10 拍板,不许精简)
 //
 // 用户原话:「一个区域只有一个执行环境,而且,不做精简区域,所有区域都必须要完整,不允许做这类的
 // 功能设计,一定要完整功能和服务」。⇒ 组件不再是「可选」:每个执行环境的组件集由**它是谁**

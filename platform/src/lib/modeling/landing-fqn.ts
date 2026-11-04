@@ -1,5 +1,4 @@
-// @kf-batch 50-WP11b-shared-writer
-// **建模产物物理落点 + 窄权写者身份**的唯一作者(50 SPEC v3.48–v3.51 §3.9d;WORK-PACKAGES WP-11b A 段步 1)。
+// **建模产物物理落点 + 窄权写者身份**的唯一作者(50 SPEC v3.48–v3.51 §3.9d;A 段步 1)。
 //
 // 🔴 为什么这四个函数必须住在同一个地方、而且只能住这里:
 //   · 码表物理落点原来有**两个作者**各写一个名字(现网落地 `public.dim_code_<code>` vs admin 模板
@@ -44,7 +43,7 @@ export interface LandingFqn {
  * 码表的物理落点(§3.9d.3)。
  *
  * 🔴 **过渡期(A 段)返回值 = 现网形态 `public.dim_code_<code>`,逐字节不变** —— home 行为零变化,
- *    通道先通(E-229/E-230/E-231 不依赖改名)。收敛到 `shared.code_<id>` 是 B 段(E-232),
+ *    通道先通(不依赖改名)。收敛到 `shared.code_<id>` 是 B 段,
  *    必须连 home 存量一起迁移(矩阵 `physical` 是单值),**不许**只改非 home。
  */
 export function codeTableLandingFqn(ct: { code: string }): LandingFqn {

@@ -1,4 +1,3 @@
-// @kf-batch 50-init-region-enablement
 // 控制面**已放行**的执行 region 清单(运行时只读视图)。
 //
 // 【为什么需要它(2026-09-06 新账号真撞,init 段 I-4)】平台 TaskRole 的 `aws:RequestedRegion` 条件在 **synth 期**烘入
@@ -17,7 +16,7 @@ const REGION_RE = /^[a-z]{2}(-[a-z]+)+-\d$/;
 
 /** 已放行 region 全集(含 home;去重排序)。 */
 export function controlPlaneRegions(env: NodeJS.ProcessEnv = process.env): string[] {
-  const home = homeRegionOf(env).trim(); // WP-31 L4:读区只经唯一作者 lib/place/home-region
+  const home = homeRegionOf(env).trim(); // L4:读区只经唯一作者 lib/place/home-region
   const raw = (env.EXECUTION_REGIONS || "").trim();
   const extra = raw ? raw.split(",").map((s) => s.trim()).filter((s) => REGION_RE.test(s)) : [];
   return Array.from(new Set([home, ...extra])).sort();
@@ -33,6 +32,6 @@ export function regionNotEnabledHint(region: string, env: NodeJS.ProcessEnv = pr
     `控制面尚未放行 region ${region}(当前只放行:${controlPlaneRegions(env).join(", ")})。` +
     `该 region 的栈可以建成,但平台在「检测初始化」时会被自己的 IAM 区域条件拒绝。` +
     `运维:bash scripts/redeploy-platform.sh <profile> <home-region>(§1b 自动从执行环境注册表推导放行清单并重部署控制面;控制面 ECS 会滚动一次),完成后再点「检测初始化」。` +
-    `以后不想每加一区都跑一次:同一命令前加 EXEC_REGION_CANDIDATES=<区1,区2,…>(或 all-enabled)一次性预授权候选区,候选区内新建的执行区在页面即可完成(序 48)。`
+    `以后不想每加一区都跑一次:同一命令前加 EXEC_REGION_CANDIDATES=<区1,区2,…>(或 all-enabled)一次性预授权候选区,候选区内新建的执行区在页面即可完成。`
   );
 }

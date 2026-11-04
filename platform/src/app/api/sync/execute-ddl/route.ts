@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-L1-grant-public
 // 🔴 **L1 的消根因那一刀**(52 DESIGN §11.6 定案;SPEC §3.5 的"6 处 TO PUBLIC 全撤"靠这一刀才成立)。
 //
 // 【为什么本文件是根因】改动前这里 `ExecuteStatementCommand` **不带 SecretArn** ⇒ 以调用方的
@@ -16,14 +15,14 @@ export const dynamic = "force-dynamic";
 // 【定案】本文件也用 **同一个 admin secret** 执行 DDL ⇒ 平台建的表与 Glue 建的表同 owner ⇒
 // 身份错配从此不存在 ⇒ `TO PUBLIC` 可以**真删**(不是换个窄一点的授权对象)。
 // 🔴 这是**收窄而不是提权**:平台早已在 16 处消费这同一个 secret,execute-ddl 不用它才是那个例外;
-//    本笔只是把例外拉回既有形态,因此 L3(P52.5a/5b)把那 16 处换成 per-project 凭证时
+//    本笔只是把例外拉回既有形态,因此 L3(5b)把那 16 处换成 per-project 凭证时
 //    **一次收窄就全覆盖,不会留下这个尾巴**。
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
-// @kf-batch 50-WP7-sync-pushdown(施工序 5)—— home-only 合同退役:向导预建表按 body 的 targetId(前端从 ds.ownerTargetId 派生)
+// home-only 合同退役:向导预建表按 body 的 targetId(前端从 ds.ownerTargetId 派生)
 // 在执行体里走 resolveRedshiftBinding,区/workgroup/库/凭证四样一起来(home 逐字节等价)。
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { buildTargetDdl } from "@/lib/sync/target-ddl";
@@ -35,7 +34,7 @@ import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-op
 //   向导唯一的用途是「按预览建目标表」⇒ 现在只收建表参数(与 generate-ddl 同一份),服务端用唯一作者
 //   `buildTargetDdl` 现生成那一条 CREATE TABLE IF NOT EXISTS 并执行,建成后打平台标记
 //   (同步覆盖守卫据此认出「这是平台建的表」,见 lib/sync/target-table-guard.ts)。
-// 模块 55 / 序 50 第二批:建表主体(解析绑定 → 探测 → 建表 → 打标记,经 awaitTerminal 等终态)在 lib/sync/long-ops.ts(sync-execute-ddl)。
+// 建表主体(解析绑定 → 探测 → 建表 → 打标记,经 awaitTerminal 等终态)在 lib/sync/long-ops.ts(sync-execute-ddl)。
 //   原来这里的 waitStatement 只等 15 秒就回 504「未打平台标记」;现在建表语句等到 120 秒,超 45 秒由统一框架转 202,
 //   页面右下「正在后台执行:按预览建目标表」。对象租约 `table:<区>:<schema.table>`:同一张表同时建两次 ⇒ 第二次 409。
 export async function POST(req: NextRequest) {

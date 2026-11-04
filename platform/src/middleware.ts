@@ -4,7 +4,7 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { CORRELATION_HEADER, newCorrelationId } from "@/lib/observability/logger";
 import { OBSERVE_URL_HEADER } from "@/lib/place/observe-header";
 import { authMode, cognitoPoolId, cognitoClientId, AUTH_UNCONFIGURED_MESSAGE } from "@/lib/auth/auth-mode";
-// @kf-batch 50-WP28-platform-action-node —— 内部端点的头部判定(纯函数,零 node 内置,edge 安全)
+// 内部端点的头部判定(纯函数,零 node 内置,edge 安全)
 import { INTERNAL_API_PREFIX, internalSourceVerdict } from "@/lib/scheduler/internal-source";
 
 // Platform-wide API auth gate. Every /api/* route requires a valid Cognito ID token,
@@ -38,7 +38,7 @@ function withCid(res: NextResponse, cid: string): NextResponse {
 function proceed(req: NextRequest, cid: string): NextResponse {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set(CORRELATION_HEADER, cid);
-  // @kf-batch 50-WP31-place-first-class —— 落点观测器要知道「这次调用来自哪个请求、哪个视角」。
+  // 落点观测器要知道「这次调用来自哪个请求、哪个视角」。
   // 🔴 永远覆盖入站同名头(浏览器伪造不了观测输入);它**只是观测输入**,不是落点来源。
   requestHeaders.set(OBSERVE_URL_HEADER, `${req.nextUrl.pathname}${req.nextUrl.search}`);
   return withCid(NextResponse.next({ request: { headers: requestHeaders } }), cid);
@@ -90,7 +90,6 @@ export async function middleware(req: NextRequest) {
   const cid = req.headers.get(CORRELATION_HEADER) || newCorrelationId();
 
   if (pathname.startsWith("/api/public/")) return proceed(req, cid); // bootstrap endpoints
-  // @kf-batch 50-WP28-platform-action-node
   // 🔴 `/api/internal/**` 没有 Cognito 身份(调用方是主控区的分发 Lambda),鉴权由路由内的内部守卫做
   //    (共享密钥 + 来源)。这里先挡掉**一切经 CloudFront 进来的**请求(公网入口必带 X-Amz-Cf-Id)——
   //    公网上的人连密钥比对那一步都走不到。其余放行给路由守卫(纵深防御:路由会把这两道再判一遍)。

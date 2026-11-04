@@ -23,7 +23,7 @@ else
   echo "  already exists (ok)."
 fi
 
-# 模块 25 (故障诊断 / AWS DevOps Agent): 首次 CreateChat/SendMessage 需 SLR
+# (故障诊断 / AWS DevOps Agent): 首次 CreateChat/SendMessage 需 SLR
 # AWSServiceRoleForAIDevOps 存在。虽然 TaskRole 有 iam:CreateServiceLinkedRole,但同请求内
 # 现建现用有 IAM 最终一致性竞态(实测诊断一直 failed)。故账号级预建,确保已传播。
 echo "[prereqs] ensuring service-linked role for aidevops.amazonaws.com (DevOps Agent) ..."
@@ -34,10 +34,10 @@ else
   echo "  already exists (ok)."
 fi
 
-# 模块 31 (实时 CDC): DMS 账号级固定名角色。必须【先于】部署 BgpRealtimeStack 存在并传播,
+# (实时 CDC): DMS 账号级固定名角色。必须【先于】部署 BgpRealtimeStack 存在并传播,
 # 否则建 DMS 子网组报 "dms-vpc-role is not configured properly"(IAM 最终一致性竞态:同栈内
 # 现建现用会失败)。故作为账号级前置幂等创建,栈部署带 -c skip-dms-roles=1 跳过。
-# 模块 31 (DMS Serverless): 需 SLR AWSServiceRoleForDMSServerless(dms.amazonaws.com)。
+# (DMS Serverless): 需 SLR AWSServiceRoleForDMSServerless(dms.amazonaws.com)。
 # 首次 CreateReplicationConfig 时 AWS 建它,但 TaskRole 无 iam:CreateServiceLinkedRole 会失败。账号级预建。
 echo "[prereqs] ensuring service-linked role for dms.amazonaws.com (DMS Serverless) ..."
 if aws iam create-service-linked-role --aws-service-name dms.amazonaws.com \

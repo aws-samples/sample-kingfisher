@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.2c-control-api
 // GET /api/admin/exec-envs/[targetId]/build-status —— 部署进度回读(SPEC §2.1:156 / DESIGN §12.4)。
 //
 // 数据源分工(§12.4 定案):

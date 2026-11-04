@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-3-p0e-baseline
 // 🔴 P0-E 部署影响分类 —— **build 侧的那一份**(零依赖纯 ESM,给 buildspec 在 CodeBuild 里跑)。
 //
 // 【为什么会有两份】判据要同时服务两侧:

@@ -1,4 +1,4 @@
-// 模块 26 — 业务知识 / 口径 / 规则库服务。
+// 业务知识 / 口径 / 规则库服务。
 // 供智能问数(GenBI Agent)与代码生成查阅:业务术语的特定叫法、口径定义、注意事项/规则等。
 // pk = projectId（"global" 为跨项目通用), sk = entryId(ULID)。按 项目 + global 合并返回。
 import { PutCommand, QueryCommand, DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
@@ -42,7 +42,6 @@ export async function listContext(projectId: string): Promise<ContextEntry[]> {
 }
 
 /**
- * @kf-batch 50-WP23-project-delete-own-only
  * 🔴🔴 **只数本项目自己的条目**(不合并 `global`)。2026-09-15 真环境(段 `gbc` GC-15)抓到:
  * 删项目的守卫复用了上面那个 `listContext`,而它为了 grounding **刻意合并 `global` 作用域** ⇒
  * 一个**刚建出来、什么都没有**的项目会被报「问数业务口径 13 个,请先迁移或删除」——
@@ -53,7 +52,7 @@ export async function listContext(projectId: string): Promise<ContextEntry[]> {
  * 而删除守卫要的是「这个项目**拥有**什么」(只有项目自己)。两种语义必须有两个作者。
  */
 export async function listContextOwnedByProject(projectId: string): Promise<ContextEntry[]> {
-  // @kf-batch 50-project-delete-orphans —— 🔴 原来这里 `try { … } catch { return []; }` 且只读第一页:
+  // 🔴 原来这里 `try { … } catch { return []; }` 且只读第一页
   //   删项目守卫靠它数「问数业务口径」,读失败 / 第二页 ⇒ 数成 0 ⇒ **放行删除**(fail-open,正好是最坏方向)。
   //   这个函数的唯一调用方就是删除守卫 ⇒ 读不到必须**抛**(守卫变 count:null ⇒ 阻断),且翻页到底。
   //   (合并版 `listContext` 给问数 grounding 用,读失败降级成空是它自己的取舍,不动。)

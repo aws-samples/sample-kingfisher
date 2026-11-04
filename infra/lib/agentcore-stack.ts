@@ -1,4 +1,4 @@
-// 模块 26 — GenBI on AgentCore 基建栈。
+// GenBI on AgentCore 基建栈。
 // 用 CDK CfnResource 逃生舱创建 AWS::BedrockAgentCore::{Gateway,GatewayTarget,Runtime,RuntimeEndpoint}
 //（本账号 us-east-1 实测 LIVE）。技能用 Lambda 实现并经 Gateway 暴露为 MCP 工具；Agent 跑在 Runtime。
 //
@@ -13,17 +13,17 @@ import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as path from "path";
 import { Construct } from "constructs";
-import { resolveModelId } from "./shared/model"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
+import { resolveModelId } from "./shared/model"; // 模型 ID 收敛 SSOT(ai-model.json)
 import { buildAgentCoreResources } from "./shared/agentcore-base";
-// @kf-batch 50-P50.1-workgroup-ssot — home 的 workgroup 名取自命名 SSOT(部署侧出口)。
+// home 的 workgroup 名取自命名 SSOT(部署侧出口)。
 import { resourceName, HOME_TARGET_ID } from "./shared/naming";
-// @kf-batch 52-P52.5a-supply — 资源 ARN 的 region 段唯一出口 + 显式轴声明。
-import { regionalStatement } from "./shared/execution-regions"; // 模块47 L1:协议层共享基类
+// 资源 ARN 的 region 段唯一出口 + 显式轴声明。
+import { regionalStatement } from "./shared/execution-regions"; // 协议层共享基类
 
 export interface AgentCoreStackProps extends cdk.StackProps {
   modelId?: string;
-  dataKey?: kms.IKey; // 模块 27 (WS1) — 技能 Lambda 读 bgp-genbi-* 加密表需解密权限
-  openMetadataUrl?: string; // 模块46 阶段3 — 技能 Lambda 的 fetch_om_descriptions 工具读 OM 表描述(供容器 retrieval)
+  dataKey?: kms.IKey; // 技能 Lambda 读 bgp-genbi-* 加密表需解密权限
+  openMetadataUrl?: string; //当前阶段3 — 技能 Lambda 的 fetch_om_descriptions 工具读 OM 表描述(供容器 retrieval)
 }
 
 export class AgentCoreStack extends cdk.Stack {
@@ -31,7 +31,7 @@ export class AgentCoreStack extends cdk.Stack {
     super(scope, id, props);
     const region = cdk.Stack.of(this).region;
     const account = cdk.Stack.of(this).account;
-    // 模块47 L0:默认模型走全平台 SSOT(ai-model.json,经 ./shared/model)。当前 sonnet-4-5——
+    // 默认模型走全平台 SSOT(ai-model.json,经 ./shared/model)。当前 sonnet-4-5——
     // 真实 converse 探测在多数账号开箱可用;sonnet-4-6/opus-4-x 多数账号需 Marketplace 订阅或未授权。
     // 优先级:props.modelId > env BEDROCK_MODEL_ID > SSOT 默认。
     const modelId = resolveModelId(props.modelId);
@@ -66,7 +66,7 @@ export class AgentCoreStack extends cdk.Stack {
         GENBI_SKILLS_TABLE: "bgp-genbi-skills",
         // v1.29.0 — HTTP/外部 API 技能出站域名白名单（逗号分隔；空=不限定域名，仍受内网 IP 守卫约束）。
         GENBI_HTTP_ALLOWLIST: (this.node.tryGetContext("genbi-http-allowlist") as string) || "",
-        // 模块46 阶段3 路线B:fetch_om_descriptions 工具读 OM 表描述(容器 retrieval 语义检索用)。
+        //当前阶段3 路线B:fetch_om_descriptions 工具读 OM 表描述(容器 retrieval 语义检索用)。
         // 空则该工具返回空 map,retrieval 回退全表 grounding(不阻断问数)。
         OPENMETADATA_URL: props.openMetadataUrl || "",
       },
@@ -98,7 +98,7 @@ export class AgentCoreStack extends cdk.Stack {
         `arn:aws:dynamodb:${r}:${account}:table/bgp-genbi-skills/index/*`,
       ],
     }));
-    // 模块 27 (WS1): 上述两表用数据域 CMK 加密,技能 Lambda 读取需用该 key 解密。
+    // 上述两表用数据域 CMK 加密,技能 Lambda 读取需用该 key 解密。
     props.dataKey?.grant(skillFn, "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey");
 
     // ── Gateway 出站角色（被 bedrock-agentcore 服务 assume，去调用 target Lambda）──
@@ -138,7 +138,6 @@ export class AgentCoreStack extends cdk.Stack {
     region: string; account: string; modelId: string;
   }) {
     // 工具 InputSchema 构造器(GenBI 特有:SQL 工具/无参工具的 schema 模板)。
-    // @kf-batch 50-WP4ter-coverage
     // 🔴🔴 **落点入参必须在这里声明**(真环境 2026-09-10 抓到的静默跨区执行):
     // 容器在唯一漏斗里给每次工具调用并进 `rsRegion/rsWorkgroup/rsDatabase/rsSecretArn`,
     // 但 **AgentCore Gateway 会按 InputSchema 的 Properties 过滤入参** —— 没声明的直接被丢掉。
@@ -147,9 +146,9 @@ export class AgentCoreStack extends cdk.Stack {
     // Lambda 回落到它自己的 env(主控区)执行 ⇒ 模型看到的是那个区的表、查的却是主控区,
     // 报「relation does not exist」**看起来像数据问题**,没有任何一处报「跨区」。
     // ⇒ 凡是会执行 SQL 的工具,都必须声明这四个可选入参;门禁 `agentcore-place-schema` 钉住两侧一致。
-    // @kf-batch 50-WP31-place-first-class —— 序 4(L6):🔴 rs* / ath* 八个平面字段**合并**成一个 `place`(PlaceWire v1 的 JSON 文本,
+    // 🔴 rs* / ath* 八个平面字段**合并**成一个 `place`(PlaceWire v1 的 JSON 文本,
     //   形状见 platform/place-wire.schema.json)。Gateway 过滤入参的规矩不变 ⇒ 仍必须在每个会执行 SQL 的工具里声明它;
-    //   一个字段比八个更不容易漏(原来 Athena 那四个就漏过一次,B-26)。容器 / 技能 Lambda 用同一份读取函数,缺即拒。
+    //   一个字段比八个更不容易漏(原来 Athena 那四个就漏过一次)。容器 / 技能 Lambda 用同一份读取函数,缺即拒。
     const PLACE_PROPS = {
       place: { Type: "string", Description: "执行落点(PlaceWire v1 JSON;平台注入,模型不要填)" },
     } as const;
@@ -166,7 +165,7 @@ export class AgentCoreStack extends cdk.Stack {
       InputSchema: { Type: "object", Properties: {}, Required: [] },
     });
 
-    // 模块47 L1:协议层走共享基类。id 原样传入 → 逻辑 ID 逐字节一致(synth diff 已验 0,零重建;
+    // 协议层走共享基类。id 原样传入 → 逻辑 ID 逐字节一致(synth diff 已验 0,零重建;
     // GenBI 是镜像红线相关能力,synth 0 差异是"不触发 Runtime/Memory 重建"的机器证明)。
     buildAgentCoreResources({
       stack: this,
@@ -189,7 +188,7 @@ export class AgentCoreStack extends cdk.Stack {
           InputSchema: { Type: "object", Properties: { projectId: { Type: "string", Description: "项目ID(用于范围)" }, keywords: { Type: "string", Description: "可选关键词，用问题文本粗筛相关口径/规则" } }, Required: [] },
         },
         {
-          // 模块46 阶段3 路线B:容器 retrieval 经此取 OM 表描述(容器非 VPC/无 secretsmanager,
+          //当前阶段3 路线B:容器 retrieval 经此取 OM 表描述(容器非 VPC/无 secretsmanager,
           // 由本 Lambda 代读)。返回 { tableName: description }。best-effort,失败返回空。
           Name: "fetch_om_descriptions",
           Description: "获取 OpenMetadata 中各表的业务描述(表名→描述映射),供语义表检索时理解表用途。无需参数。",
@@ -203,7 +202,7 @@ export class AgentCoreStack extends cdk.Stack {
         {
           Name: "run_registered_skill",
           Description: "按名执行一个已注册的业务技能(参数化只读查询),返回列名与数据行。技能与参数来自 list_registered_skills。优先用匹配的注册技能以保证口径一致。",
-          // @kf-batch 50-WP4ter-coverage —— 注册技能也是**执行 SQL** 的工具 ⇒ 同样必须声明落点入参,
+          // 注册技能也是**执行 SQL** 的工具 ⇒ 同样必须声明落点入参,
           // 否则「问数按区」在技能路径上照样静默落回主控区(与 run_redshift_sql 同一个坑)。
           InputSchema: { Type: "object", Properties: { skill: { Type: "string", Description: "技能名(来自 list_registered_skills)" }, params: { Type: "object", Description: "参数键值对" }, projectId: { Type: "string", Description: "项目ID" }, ...PLACE_PROPS }, Required: ["skill"] },
         },

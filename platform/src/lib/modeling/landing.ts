@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-modeling
 // **建模落地的逐 target 物化 + drift 观测**(50 SPEC §3.8 轴A / INTERACTION §4ter)—— 唯一作者。
 //
 // ── 合同原文(§1.3 轴A)────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ import {
   type RedshiftBinding,
 } from "@/lib/exec-env/data-plane-target";
 import { requireReadyTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-WP31-place-first-class(序 31 第二刀 ③)—— 非 home 落地 / 清理的落点决策记账(观测输入,不是决策来源)
+// 非 home 落地 / 清理的落点决策记账(观测输入,不是决策来源)
 import { notePlaceDecision } from "@/lib/place/context";
 import { awaitTerminal } from "@/lib/long-ops/await-terminal";
 import { withSchemaCreateRetry } from "@/lib/redshift/concurrent-schema";
@@ -45,7 +44,7 @@ import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 import type { AuthenticatedActor } from "@/lib/exec-env/admin-ddl-executor";
 import type { AdminDdlRequest, ModelingObjectKind } from "@/lib/exec-env/admin-ddl-request";
 import { columnSignature, normalizeTypeName, type LandedRecord } from "./landing-shared";
-// @kf-batch 50-WP11b-shared-writer —— 落点守卫(门②)+ 窄权写者 secret 名的唯一作者
+// 落点守卫(门②)+ 窄权写者 secret 名的唯一作者
 import { assertPlatformGlobalSchema, sharedWriterSecretName } from "./landing-fqn";
 
 // 服务端调用方从本文件一处拿全(不必记住哪些在 shared)
@@ -75,7 +74,7 @@ export async function queryOnTarget(b: ExecPlace, sql: string): Promise<string[]
       ...(b.secretArn ? { SecretArn: b.secretArn } : {}),
     })
   );
-  // 模块 55:等待外部终态只许经 awaitTerminal(没有长操作 / 后台等待者上下文即抛 —— 请求路径不许同步等终态;B-111 根治)。
+  // 等待外部终态只许经 awaitTerminal(没有长操作 / 后台等待者上下文即抛 —— 请求路径不许同步等终态;根治)。
   // 退避口径不变:150ms 起 ×1.6 上限 1s、60 轮(与 `execOnTarget` 同一条口径 —— 固定 1s 起步会撞 ALB 504)。
   return awaitTerminal<string[][]>({
     what: "观测语句",
@@ -96,7 +95,7 @@ export async function queryOnTarget(b: ExecPlace, sql: string): Promise<string[]
 export async function execOnBinding(b: RedshiftBinding, statements: string[]): Promise<void> {
   const client = redshiftDataClientFor(b.region);
   for (const sql of statements) {
-    // @kf-batch 50-WP11b-shared-writer —— 🔴 `CREATE SCHEMA IF NOT EXISTS` 在 Redshift **不是原子的**
+    // 🔴 `CREATE SCHEMA IF NOT EXISTS` 在 Redshift **不是原子的**
     //   (lib/redshift/concurrent-schema.ts):两个维度表同时落进同一个新 schema 会有一个撞
     //   `pg_namespace_nspname_index`。原来的加固写在 `modeling/redshift.ts` 的 `execStatements` 里,
     //   而那个函数**零生产调用方**(落地早已改走这里)⇒ 真正执行的这条路从来没有加固过。包装器只对
@@ -110,7 +109,7 @@ export async function execOnBinding(b: RedshiftBinding, statements: string[]): P
           ...(b.secretArn ? { SecretArn: b.secretArn } : {}),
         })
       );
-      // 模块 55:同上,80 轮
+      // 同上,80 轮
       await awaitTerminal<void>({
         what: "Redshift 语句执行",
         maxPolls: 80,
@@ -149,7 +148,7 @@ export async function observeColumns(b: ExecPlace, schema: string, table: string
 
 export interface LandArgs {
   targets: string[];
-  // @kf-batch 50-WP11b-shared-writer —— 原 `projectId?` 已删:建模**没有项目维**(SPEC §3.9d.8),
+  // 原 `projectId?` 已删:建模**没有项目维**(SPEC §3.9d.8),
   //   那个可选字段在所有生产调用点都是 undefined;留着只会诱导后人「补一个 projectId 让它过白名单」。
   /** 🔴 建模对象类型 + 台账 id:非 home 的 admin 模板只收 id、服务端读台账(成员资格守卫,§3.9d.7(a)) */
   kind: ModelingObjectKind;
@@ -205,7 +204,7 @@ async function landOne(targetId: string, args: LandArgs): Promise<LandedRecord> 
   const qualified = `${args.schema}.${args.table}`;
   const base = { defHash: args.defHash, table: qualified, at: nowIso, expectedColumns: args.expectedColumns };
   try {
-    // @kf-batch 50-WP11b-shared-writer —— 原「非 home 一律判 `credential-gap`、一条语句都不执行」**已删**
+    // 原「非 home 一律判 `credential-gap`、一条语句都不执行」**已删**
     //   (那段 error 文本说「窄权通道至今未交付」,本批交付后它就是一句过期的话)。非 home 走独立分支:
     //   见 `landOneNonHome`。跨法域与同法域**同一条路**(DESIGN §18 决策 6quinquies,不设法务门)。
     if (!isHome(targetId)) return await landOneNonHome(targetId, args, base, nowIso);
@@ -256,12 +255,12 @@ async function landOne(targetId: string, args: LandArgs): Promise<LandedRecord> 
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP11b-shared-writer —— 非 home 的建模落地(50 SPEC §3.9d;关闭第五态「⊘ 缺写入通道」)
+// 非 home 的建模落地(50 SPEC §3.9d;关闭第五态「⊘ 缺写入通道」)
 // ══════════════════════════════════════════════════════════════════════════════
 //
 // 四道门全过才放行(§3.9d.8),绝不 fail-open:
 //   ① 准入:`assertBindableTarget(…, {scope:"platform-global"})` —— 存在 / ready / 装了 redshift / 跨法域技术前置;
-//      🔴 **只跳过**项目白名单(建模没有项目维,白名单对它是 dead-closed,台账 B-17);
+//      🔴 **只跳过**项目白名单(建模没有项目维,白名单对它是 dead-closed,台账);
 //   ② 落点:`assertPlatformGlobalSchema` —— 不许落进任何 `proj_<…>`;
 //   ③ 成员资格:admin 执行器第 2 步按 id 读码表 / 模型表台账,查不到即拒;
 //   ④ 可审计:`modeling-land` 区域审计(调用方在落地前写)+ admin 执行器自己的意图 / 结果审计。
@@ -276,7 +275,7 @@ async function landOne(targetId: string, args: LandArgs): Promise<LandedRecord> 
 
 /**
  * 解绑 / 行数预览两处共用的分流口:home ⇒ 现网绑定(逐字节不变);非 home ⇒ `null`(走窄权通道)。
- * 🔴 收成一处:主控区分支是 WP-31 落点棘轮 L2 计数的对象,不许每个函数各写一遍。
+ * 🔴 收成一处:主控区分支是落点棘轮 L2 计数的对象,不许每个函数各写一遍。
  */
 async function homeBindingOrNull(targetId: string): Promise<RedshiftBinding | null> {
   return isHome(targetId) ? resolveRedshiftBinding({ targetId }) : null;
@@ -356,8 +355,8 @@ async function landOneNonHome(
   await assertBindableTarget(targetId, "redshift", { scope: "platform-global" });
   assertPlatformGlobalSchema(args.schema);
   const wh = resolveTargetWarehouse(await requireReadyTarget(targetId));
-  // @kf-batch 50-WP31-place-first-class(序 31 第二刀 ③)—— 拿到该区仓位即记落点决策:下面窄权写者 secret 的按名现查
-  //   与窄权观测都发生在进 admin 执行器(它自己记 B-98 那笔)**之前**,没有这一笔它们在观测账本上无从归因
+  // 拿到该区仓位即记落点决策:下面窄权写者 secret 的按名现查
+  //   与窄权观测都发生在进 admin 执行器(它自己记那笔)**之前**,没有这一笔它们在观测账本上无从归因
   //   (…7237 第四十三轮窗口 unattributedTop 仅剩的 1 类 = 本路径的 secretsmanager.DescribeSecret)。
   //   准入 / 落点被拒走不到这里 ⇒ 被拒的请求不会被归到某个区(与执行器同一条纪律)。
   notePlaceDecision({ targetId, via: LANDING_PLACE_VIA });
@@ -433,7 +432,7 @@ async function landOneNonHome(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-W5-seg1-WP11a —— 解绑并清理:把某区的落地产物 DROP 掉(50 SPEC v3.20 §3.8)
+// 解绑并清理:把某区的落地产物 DROP 掉(50 SPEC v3.20 §3.8)
 // ══════════════════════════════════════════════════════════════════════════════
 
 export interface UnlandResult {
@@ -445,7 +444,7 @@ export interface UnlandResult {
 
 /**
  * 在某 target 上清理这张落地表。与落地**同一条执行通道**,不另开凭证路径:home = `resolveRedshiftBinding` +
- * `execOnBinding`;非 home = 窄权写者观测 + admin 模板 `drop-landed-table`(@kf-batch 50-WP11b-shared-writer)。
+ * `execOnBinding`;非 home = 窄权写者观测 + admin 模板 `drop-landed-table`。
  *
  * 🔴 三条:
  *  ① **先观测**:表不存在 ⇒ 不执行任何语句(连 `IF EXISTS` 也不跑 —— 零副作用,也不留「执行过 DROP」的审计噪声);
@@ -470,16 +469,16 @@ export async function unlandFromTarget(
     }
     return { dropped: true, observedBefore: before };
   }
-  // @kf-batch 50-WP11b-shared-writer —— 非 home:原来这里同样走 `resolveRedshiftBinding`,而建模没有 projectId
+  // 非 home:原来这里同样走 `resolveRedshiftBinding`,而建模没有 projectId
   //   ⇒ 恒抛「必须带 projectId」(勘定实测;合同漏了这一处)。现在:观测用窄权写者、DROP 走 admin 模板
-  //   `drop-landed-table`(窄权写者**刻意**没有 DROP 权,E-230 ②)。
+  //   `drop-landed-table`(窄权写者**刻意**没有 DROP 权,②)。
   assertPlatformGlobalSchema(args.schema);
   if (!args.actor) {
     throw new Error(`非主控区的清理要经 admin 受控通道,必须带具名操作者 —— ${targetId} 上的 ${qualified} 未清理,记录保留`);
   }
   const actor = args.actor;
   const wh = resolveTargetWarehouse(await requireReadyTarget(targetId));
-  notePlaceDecision({ targetId, via: LANDING_PLACE_VIA }); // 序 31 第二刀 ③:与落地同一条纪律 —— 先记决策,再按名查 secret / 观测
+  notePlaceDecision({ targetId, via: LANDING_PLACE_VIA }); // 与落地同一条纪律 —— 先记决策,再按名查 secret / 观测
   const arn = await describeSecretArnByName(wh.region, sharedWriterSecretName(targetId));
   if (!arn) {
     throw new Error(
@@ -504,11 +503,11 @@ export async function unlandFromTarget(
 export async function estimateRows(targetId: string, args: { schema: string; table: string }): Promise<number | null> {
   const homeBinding = await homeBindingOrNull(targetId);
   if (!homeBinding) {
-    // @kf-batch 50-WP11b-shared-writer —— 非 home:原来同样恒抛「必须带 projectId」。改用窄权写者
+    // 非 home:原来同样恒抛「必须带 projectId」。改用窄权写者
     //   (它对每张平台落过的表都有 SELECT)数精确行数;`svv_table_info` 的可见性随权限变,不拿它赌。
     assertPlatformGlobalSchema(args.schema);
     const wh = resolveTargetWarehouse(await requireReadyTarget(targetId));
-    // 序 31 二刀 ④(2026-10-21,…7237 升级后 observe 实测):解绑预览走到这里的 DescribeSecret + ExecuteStatement / DescribeStatement /
+    // (2026-10-21,…7237 升级后 observe 实测):解绑预览走到这里的 DescribeSecret + ExecuteStatement / DescribeStatement /
     //   GetStatementResult 都没有落点决策 ⇒ unattributedTop 里 `…/unbind-preview` 一类 16 项。与落地 / 清理同一条纪律:拿到该区仓位就记决策。
     notePlaceDecision({ targetId, via: LANDING_PLACE_VIA });
     const arn = await describeSecretArnByName(wh.region, sharedWriterSecretName(targetId));

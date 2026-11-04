@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // MWAA Serverless 的 **运行时模块**(代码包 = 这一个 .py 文件;SPEC v3.27 §3.15)。
 //
 // 【与经典 DAG 的关系】经典 MWAA 的 DAG 把 run_job / _acquire_run_lock / _record 内联在每份 DAG 文件里(lib/etl/dag-generator.ts、
@@ -9,17 +8,17 @@
 // 【为什么 spec 经 op_kwargs 传】serverless 不支持 on_*_callback / trigger_rule;台账写在任务体内;per-job 值不能像经典那样烙成模块常量。
 // 【60 min 上限】服务单任务最长 60 min;轮询超过 SOFT_LIMIT 记 timeout-pending 后抛,让人看见「提交了但没等到」而不是被服务无声杀掉。
 import { createHash } from "node:crypto";
-// @kf-batch 50-WP17-serverless-workflow —— 🔴 节点语义的**单一作者**(经典 runtime-lib 拼的是同一份字节)
+// 🔴 节点语义的**单一作者**(经典 runtime-lib 拼的是同一份字节)
 import { NODE_EXEC_PY } from "@/lib/workflow/node-exec-py";
-// 序 73 模块 57 —— 🔴 作业族执行体(_record / 作业锁 / 软限 / 落点 / 三引擎)的**单一作者**(经典 runtime-lib 拼的是同一份字节);
+// 🔴 作业族执行体(_record / 作业锁 / 软限 / 落点 / 三引擎)的**单一作者**(经典 runtime-lib 拼的是同一份字节);
 //   `run_job`(单作业载体)与下面的多节点编排(离线作业节点 ⇒ `_exec_job`)调的都是这同一族。
 import { JOB_EXEC_PY } from "@/lib/workflow/job-exec-py";
-// @kf-batch 50-WP5-rungroup —— O2:定时确定性组键与建组行的 Python 孪生(两者各自的单一作者)
+// O2:定时确定性组键与建组行的 Python 孪生(两者各自的单一作者)
 import { pythonScheduledRunGroupSource } from "@/lib/monitor/scheduled-run-group";
 import { pythonRunGroupOpenSource } from "@/lib/monitor/run-groups";
-// @kf-batch 50-WP31-place-first-class —— 序 4(L6):PlaceWire 的 Python 读取函数(单一作者,Spark 脚本嵌的是同一段)
+// PlaceWire 的 Python 读取函数(单一作者,Spark 脚本嵌的是同一段)
 import { PLACE_WIRE_PY } from "@/lib/place/wire-py";
-// @kf-batch 37-emr-run-date —— 业务日期参数(Glue Arguments / EMR entryPointArguments)按同一张表算(单一作者,与经典 DAG / 手动提交同源)
+// 业务日期参数(Glue Arguments / EMR entryPointArguments)按同一张表算(单一作者,与经典 DAG / 手动提交同源)
 import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 
 export const BGP_RUNTIME_MODULE = "bgp_runtime";
@@ -60,7 +59,7 @@ def _ledger_run_id_for(target, ctx):
 
 
 def _ledger_run_id(spec, ctx):
-    """台账 runId = 服务侧 per-run 唯一 id + "#" + targetId(T-12;口径单一作者 = lib/monitor/run-key.ts)。
+    """台账 runId = 服务侧 per-run 唯一 id + "#" + targetId(口径单一作者 = lib/monitor/run-key.ts)。
 
     🔴 为什么不用 Airflow run_id:MWAA Serverless 下它**退化成常量**(实测两次不同 run 都是
     scheduled__2026-09-07T00:00:00+00:00),直接当键会让「多次 cron」和「两个 region」互相覆盖
@@ -74,14 +73,14 @@ def run_job(**ctx):
     spec = ctx["spec"]
     dag_run = ctx.get("dag_run")
     airflow_run_id = str(ctx.get("run_id") or (getattr(dag_run, "run_id", "") if dag_run is not None else "") or "manual")
-    # 🔴 T-12:台账键用服务侧 per-run 唯一 id + targetId;Airflow run_id 只作为排障字段留档。
-    # 🔴 T-13:**不再猜 runType** —— 实测 cron 与手动 StartWorkflowRun 在 worker 侧完全同形
+    # 🔴 台账键用服务侧 per-run 唯一 id + targetId;Airflow run_id 只作为排障字段留档。
+    # 🔴 **不再猜 runType** —— 实测 cron 与手动 StartWorkflowRun 在 worker 侧完全同形
     #   (run_id 同为常量、run_type 同为 DagRunType.SCHEDULED、conf 空、OverrideParameters 不进环境变量),
     #   猜只会写出「cron 触发却记成 ON_DEMAND」这种假事实。真值只在服务侧 GetWorkflowRun.RunType,由平台读取时呈现。
     run_id, _target = _ledger_run_id(spec, ctx)
     ds = ctx.get("ds") or datetime.utcnow().strftime("%Y-%m-%d")
     token = uuid.uuid4().hex
-    # @kf-batch 50-WP5-rungroup —— 🔴 **在抢锁之前**算确定性组键:抢锁最多等 300s,
+    # 🔴 **在抢锁之前**算确定性组键:抢锁最多等 300s,
     #   等过了一个 cron 槽位边界再算就会与另一个区分叉(而症状只是「没归成一组」,不会报错)。
     run_group_id = _scheduled_group_id(spec, time.time())
     _ensure_run_group(spec, run_group_id)
@@ -110,7 +109,7 @@ def run_job(**ctx):
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 多节点编排(WP-17,SPEC v3.43 §3.15)—— 台账三写点 + 分支 gate
+# 多节点编排(SPEC v3.43 §3.15)—— 台账三写点 + 分支 gate
 # 【为什么是三个写点】服务侧**禁 callback**(经典靠 on_failure_callback / _status_done 收口):
 #   __start 建行 running · 失败的那个节点**自己**写 failed · __finish 写 succeeded。
 #   一次 run 恰好一行:三点算出的 runId 必然相同(同一个 AIRFLOW_CTX_DAG_ID,实测)。
@@ -126,7 +125,7 @@ def _wf_ledger_close(e, run_id, status, error=None):
        (经典侧就是这个毛病,这里刻意做得比经典严)。
     """
     tbl = e["ddb"].Table("bgp-task-runs")
-    # @kf-batch 50-WP26-sync-schedule-carrier —— 归属来自 spec(缺省 = 工作流自己)
+    # 归属来自 spec(缺省 = 工作流自己)
     key = {"taskId": e.get("ledger_task_id") or e["workflow_id"], "runId": run_id}
     item = tbl.get_item(Key=key).get("Item") or {}
     if not item:
@@ -162,7 +161,7 @@ def start_workflow(env=None, **ctx):
     run_id = _ledger_run_id_for(e["target_id"], ctx)
     now = datetime.utcnow().isoformat() + "Z"
     e["ddb"].Table("bgp-task-runs").put_item(Item={
-        # @kf-batch 50-WP26-sync-schedule-carrier —— 归属来自 spec(缺省 = 工作流自己)
+        # 归属来自 spec(缺省 = 工作流自己)
         "taskId": e.get("ledger_task_id") or e["workflow_id"], "runId": run_id,
         "taskType": e.get("ledger_task_type") or "workflow",
         "taskTargetKey": (e.get("ledger_task_id") or e["workflow_id"]) + "#" + e["target_id"],
@@ -180,19 +179,19 @@ def _run_node_body(e, node, ti, ds=None):
     ntype = node.get("type")
     data = node.get("data") or {}
     if ntype == "sql":
-        # B-66:data.sqls(发布时预切的多语句)⇒ 执行器走单事务;没有就是单语句老路
+        # data.sqls(发布时预切的多语句)⇒ 执行器走单事务;没有就是单语句老路
         _exec_sql(e, data.get("sql", "SELECT 1"), node_id=node.get("id"), sqls=data.get("sqls"))
         return "ok"
     if ntype == "sync":
-        # 序 73 B-141 ②:带节点 id 与这次工作流 run 的台账键 ⇒ 执行器写同步任务自己的运行行并回链
+        # 带节点 id 与这次工作流 run 的台账键 ⇒ 执行器写同步任务自己的运行行并回链
         _exec_sync(e, data.get("syncTaskId", ""), node_id=node.get("id"), workflow_run_id=e.get("ledger_run_id"))
         return "ok"
     if ntype == "job":
-        # 序 73 模块 57:离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析)。
+        # 离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析)。
         #   serverless 的 run 没有逻辑日期 ⇒ ds 取 ctx 里的(有就用),没有则执行器按单作业载体同口径取 today。
         return _exec_job(e, node, ds=ds, workflow_run_id=e.get("ledger_run_id"))
     if ntype == "platform-action":
-        # @kf-batch 50-WP28-platform-action-node —— 传声筒:投命令到主控区命令表 + 轮询终态(失败即 raise)
+        # 传声筒:投命令到主控区命令表 + 轮询终态(失败即 raise)
         return _exec_platform_action(e, data.get("action", ""), data.get("params") or {}, run_id=e.get("ledger_run_id"))
     if ntype == "python":
         return _exec_python_safe(data.get("script", ""))
@@ -243,7 +242,7 @@ def run_node(env=None, node=None, gates=None, **ctx):
         if picked != g.get("expect"):
             from airflow.exceptions import AirflowSkipException
             raise AirflowSkipException("branch %s picked %r, not me (%r)" % (g.get("branch_task"), picked, g.get("expect")))
-    # @kf-batch 50-WP28-platform-action-node —— 平台动作命令要能回指到这次 run(台账键同一个作者算)
+    # 平台动作命令要能回指到这次 run(台账键同一个作者算)
     e["ledger_run_id"] = run_id
     try:
         return _run_node_body(e, node or {}, ti, ds=ctx.get("ds"))
@@ -281,6 +280,6 @@ def finish_workflow(env=None, **ctx):
 
 /** 代码包版本 = 内容哈希前 12 位(S3 key 带它 ⇒ 改运行时 = 新对象,旧 workflow 版本仍指旧对象)。 */
 export const BGP_RUNTIME_VERSION = createHash("sha256").update(BGP_RUNTIME_PY).digest("hex").slice(0, 12);
-// @kf-batch 50-WP15-airflow-serverless(T-11):Code 包的 **key 与字节**都搬到 `code-package.ts`(zip,模块在根)。
+// Code 包的 **key 与字节**都搬到 `code-package.ts`(zip,模块在根)。
 //   这里刻意**不再导出** `BGP_RUNTIME_S3_KEY` —— 留着它就等于留着「裸 .py 也能发」那条已经被真环境证伪的路
 //   (裸 .py:CreateWorkflow 成功、workflow READY、cron 照触发,每个 run 死于 ModuleNotFoundError)。

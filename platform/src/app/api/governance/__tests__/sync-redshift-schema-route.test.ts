@@ -1,6 +1,6 @@
-// 序 38 → 序 50 第二批 —— /api/governance/sync-redshift-schema 装配层判据:200(做完)/ 202(统一长操作协议 + GET /api/long-ops 轮询)/ 并发 409 / 500 / 403。
+// → —— /api/governance/sync-redshift-schema 装配层判据:200(做完)/ 202(统一长操作协议 + GET /api/long-ops 轮询)/ 并发 409 / 500 / 403。
 // 【缺陷原形】s38 复跑 71d:同步长调用超 ALB 60s 墙 ⇒ 504,而治理目录里表已经有了 ⇒ 用户按一次看到「同步失败」。
-// 【序 50 第二批】治理专用的 202 `{ runId, state:"running", joined }` 协议退役:POST 经 submitLongOp(kind governance-schema-sync),
+// 治理专用的 202 `{ runId, state:"running", joined }` 协议退役:POST 经 submitLongOp(kind governance-schema-sync),
 //   45s 内做完 ⇒ 200 逐字同旧契约;没做完 ⇒ 202 `protocol:"long-op/1"`,页面拦截器轮询 GET /api/long-ops/[taskId];
 //   第二个人同时点 ⇒ 对象租约 governance:schema-sync 挡成 409 LONG_OP_IN_PROGRESS(不再「并入」);GET 读「最近一次同步」的运行记录不变。
 // 【只 mock 真外部】DDB(settings 表自己假、bgp-long-ops 交给内存夹具真求值条件写)、身份、OpenMetadata 推送(om-push)、血缘重推(lineage-service)。
@@ -62,7 +62,7 @@ const tick = (ms = 10) => new Promise((r) => setTimeout(r, ms));
 
 beforeEach(() => { h.rows.clear(); h.admin = true; h.rs = null; h.s3 = null; h.lineage = 0; vi.resetModules(); });
 
-describe("🔴 sync-redshift-schema 路由(序 50 第二批:经统一长操作框架)", () => {
+describe("🔴 sync-redshift-schema 路由(经统一长操作框架)", () => {
   const post = async () => { const m: any = await import("@/app/api/governance/sync-redshift-schema/route"); return m.POST(req("POST")); };
   const get = async () => { const m: any = await import("@/app/api/governance/sync-redshift-schema/route"); return m.GET(req("GET")); };
   const poll = async (taskId: string) => {

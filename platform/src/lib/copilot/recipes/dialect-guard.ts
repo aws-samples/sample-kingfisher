@@ -1,4 +1,4 @@
-// 模块 44 → 45 迁移兼容层。方言校验已提升为平台级 lib/cookbook/guard(词法安全 + fixpoint + 违规阻断)。
+// → 45 迁移兼容层。方言校验已提升为平台级 lib/cookbook/guard(词法安全 + fixpoint + 违规阻断)。
 // 保留旧 guardScript(engine, script) 签名:step-handlers 继续调用,行为等价(纠正后脚本一致)。
 // 新代码请直接用 @/lib/cookbook 的 guard(engine, code)(拿完整 {code,fixed,violations,blocked} 报告)。
 

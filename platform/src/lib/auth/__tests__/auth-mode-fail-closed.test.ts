@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 🔴 「没配 Cognito」不再等于「全站放开 + 人人是管理员」(规则见 lib/auth/auth-mode.ts)。
 //   vitest 全局显式设了 BGP_AUTH_DISABLED=1(既有单测的演示身份语义)⇒ 这里逐条**删掉它**再验。
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

@@ -1,4 +1,4 @@
-// 序 72 B-139(模块 56)—— 执行角色解析的单一作者 + 棘轮:
+// 执行角色解析的单一作者 + 棘轮
 //   ① `iam::\d{12}:role` 这条正则在产品源码里只许出现在 lib/execution-role/resolve.ts(改动前四入口 + 两条 Flink 路由 +
 //      role-advisor/preflight + exec-env/exec-roles + aws/dataplane-creds 各一份,改一处漏七处);
 //   ② 四个作业入口与两条 Flink 路由 / 两条 ETL 路由必须真 import 单一作者(「写了」≠「接上了」:判据钉调用点字面,不只钉 import)。
@@ -21,7 +21,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-describe("序 72 B-139 执行角色 ARN:单一作者", () => {
+describe("执行角色 ARN:单一作者", () => {
   it("形态:合法 / 分区后缀 / 带路径都认;非法逐字原话拒", () => {
     expect(isRoleArn("arn:aws:iam::123456789012:role/customer-glue-role")).toBe(true);
     expect(isRoleArn("arn:aws-cn:iam::123456789012:role/svc/customer-glue-role")).toBe(true);
@@ -78,7 +78,7 @@ describe("序 72 B-139 执行角色 ARN:单一作者", () => {
     expect(put.indexOf("preflightCustomRoleForTargets({")).toBeLessThan(put.indexOf("new UpdateCommand("));
   });
 
-  it("B-140:依赖上传按作业绑定的每个落点各传一份(resolveGlueBinding + s3ClientFor),不再读 GLUE_SCRIPTS_BUCKET;提交侧按区换桶", () => {
+  it("依赖上传按作业绑定的每个落点各传一份(resolveGlueBinding + s3ClientFor),不再读 GLUE_SCRIPTS_BUCKET;提交侧按区换桶", () => {
     const deps = read("app/api/etl-jobs/[id]/deps/route.ts");
     expect(deps).not.toContain("GLUE_SCRIPTS_BUCKET");
     expect(deps).toMatch(/for \(const targetId of targets\)/);

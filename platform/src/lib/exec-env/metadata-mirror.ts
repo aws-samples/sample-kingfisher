@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // 跨地域**只读元数据镜像**的服务端(50 SPEC §3.13 / §1.1 新表 / INTERACTION §4quater)。
 //
 // ── 这一刀在做什么 ──────────────────────────────────────────────────────────
@@ -173,7 +172,7 @@ async function pullGlueCatalog(region: string): Promise<MirrorPullOutcome> {
         if (page === MAX_PAGES - 1) truncated = true;
       }
     } catch (e) {
-      // 单库失败:记录到日志,继续下一个库;🔴 并**如实报出**(B-42):不报 = 这个库被当成「本轮没有表」
+      // 单库失败:记录到日志,继续下一个库;🔴 并**如实报出**:不报 = 这个库被当成「本轮没有表」
       //   ⇒ 镜像差集与 OM 对账会把它整库删掉。
       console.warn("[mirror] GetTables(%s/%s) 失败:%s", region, db, String((e as Error)?.message ?? e));
       unreadDatabases.push(db);
@@ -204,7 +203,7 @@ export interface MirrorPullOutcome {
   columns: number;
   truncated: boolean;
   /**
-   * 🔴 @kf-batch 50-B42-om-reconcile:本轮**读失败**的库(如 LakeFormation 只授了部分库)。
+   * 🔴 本轮**读失败**的库(如 LakeFormation 只授了部分库)。
    * 必填、不给默认值 —— 采集器漏报 = 那个库被当成「一张表都没有」⇒ 镜像差集与 OM 对账会把它整库删掉。
    */
   unreadDatabases: string[];
@@ -269,7 +268,6 @@ async function listExistingSks(targetId: string): Promise<string[]> {
 
 export interface MirrorRunResult {
   /**
-   * @kf-batch 50-WP2-one-agentcore-one-om
    * 本轮推进 OpenMetadata 的结果(目录页只读 OM ⇒ 推不进去就等于那个区的目录停更,必须能看见)。
    * `errors: -1` = 整体推送抛异常(见 `error`)。
    */
@@ -279,7 +277,7 @@ export interface MirrorRunResult {
     truncated: boolean;
     errors: number;
     error?: string;
-    /** 🔴 B-42:本轮对 OM 的对账(每个采成功的来源一份;`skipped` 有值 = 这一轮没删并说明为什么) */
+    /** 🔴 本轮对 OM 的对账(每个采成功的来源一份;`skipped` 有值 = 这一轮没删并说明为什么) */
     reconcile?: OmReconcileResult[];
   };
   targetId: string;
@@ -322,7 +320,7 @@ export async function mirrorMetadata(
   const reports: MirrorSourceReport[] = [];
   const pulled: PulledEntry[] = [];
   let truncated = false;
-  // 🔴 B-42:每个来源本轮的完整性 —— 差集删除(镜像 + OM)只许在**确知完整**时做
+  // 🔴 每个来源本轮的完整性 —— 差集删除(镜像 + OM)只许在**确知完整**时做
   const pullFacts = new Map<MirrorSource, { truncated: boolean; unread: Set<string> }>();
 
   for (const source of sources) {
@@ -383,7 +381,7 @@ export async function mirrorMetadata(
       const src = sourceOfFqn(parsed.fqn);
       // 🔴 只删**本轮采成功的来源**的条目(见文件头 ④)
       if (src === null || !okSources.has(src) || seen.has(sk)) return false;
-      // 🔴 B-42:被截断的来源不删(截断外的条目本轮没看见 ≠ 不存在);读失败的库里一条都不删
+      // 🔴 被截断的来源不删(截断外的条目本轮没看见 ≠ 不存在);读失败的库里一条都不删
       const facts = pullFacts.get(src);
       if (!facts || facts.truncated) return false;
       return !facts.unread.has(parsed.fqn.split(".")[1] ?? "");
@@ -406,7 +404,6 @@ export async function mirrorMetadata(
     ]);
   }
 
-  // @kf-batch 50-WP2-one-agentcore-one-om
   // 🔴🔴 **用户 2026-09-10 拍板「治理目录必须走同一个 OpenMetaData」** ⇒ 采到的东西**顺手推进 OM**,
   //    目录页因此只读 OM 一条路(「哪个区」= OM 里的 per-target service,见 `om-service.ts`)。
   // 🔴 放在这里(镜像写完之后)而不是各来源里:一轮采集**一次推送**,而且推的正是「本轮真看见的」——
@@ -418,7 +415,7 @@ export async function mirrorMetadata(
     const { pushMirrorToOpenMetadata } = await import("@/lib/openmetadata/om-mirror-push");
     const r = await pushMirrorToOpenMetadata({ targetId, entries: pulled });
     om = { tables: r.tables, services: r.services, truncated: r.truncated, errors: r.errors.length };
-    // 🔴🔴 B-42 根治:推完再对账 —— OM 里本轮完整采集没看见的表 ⇒ 软删(护栏见 om-reconcile.ts 文件头)。
+    // 🔴🔴 根治:推完再对账 —— OM 里本轮完整采集没看见的表 ⇒ 软删(护栏见 om-reconcile.ts 文件头)。
     //   只对**本轮采成功**的来源做;每个来源一份结果,`skipped` 说明为什么这一轮没删。
     const { reconcileOmTables } = await import("@/lib/openmetadata/om-reconcile");
     om.reconcile = [];

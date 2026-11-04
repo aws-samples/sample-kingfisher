@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN §3.3)—— **作业族执行体的单一作者**(两份运行时产物拼同一份字节)。
+// **作业族执行体的单一作者**(两份运行时产物拼同一份字节)。
 //
 // 【为什么必须只有一份】`_record / _acquire_run_lock / _release_run_lock / _check_soft_limit / _exec_place / _run_redshift /
 //   _run_glue / _run_emr`(单作业「立即运行 / 定时」在调度器里的那套执行体)原来只存在于 MWAA Serverless 的 `runtime-py.ts`。
@@ -48,7 +48,7 @@ def _record(spec, run_id, status, started_at=None, extra=None, run_group_id=None
         "triggeredBy": "schedule", "airflowDagId": spec["dagId"], "scheduler": "serverless",
     }
     if run_group_id:
-        # @kf-batch 50-WP5-rungroup —— 同一个 cron 槽位的 N 个区落**同一个** runGroupId(各区各自算)
+        # 同一个 cron 槽位的 N 个区落**同一个** runGroupId(各区各自算)
         item["runGroupId"] = run_group_id
     wf_arn = os.environ.get("OVERDRIVE__CMK__WORKFLOW_ARN")
     if wf_arn:
@@ -114,7 +114,7 @@ def _check_soft_limit(spec, run_id, started):
 
 
 def _exec_place(spec):
-    """本作业的执行落点(PlaceWire v1,WP-31 L6;读取函数与平台 / 容器 / 技能 Lambda / Spark 脚本同夹具同结果)。
+    """本作业的执行落点(PlaceWire v1;读取函数与平台 / 容器 / 技能 Lambda / Spark 脚本同夹具同结果)。
 
     🔴 没有缺省值:spec 里没有 place / 形态不对 ⇒ 拒(原来是 spec 的 execRegion / workgroup / database 四个平面字段)。
     🔴 落点的 targetId 必须等于章的 targetId:不等 = 生成侧把别的区的落点接进了这份产物,跑下去就是「章说 A 区、活在 B 区」。
@@ -173,7 +173,7 @@ def _run_glue(spec, run_id, started, ds):
 
 def _run_emr(spec, run_id, started, ds):
     emr = boto3.client("emr-serverless", region_name=_exec_place(spec)["region"])
-    # B-56:业务日期参数**追加**在用户入参之后(与平台「立即运行」provider.ts 同一张表、同一顺序);spec 里的入参不烙日期
+    # 业务日期参数**追加**在用户入参之后(与平台「立即运行」provider.ts 同一张表、同一顺序);spec 里的入参不烙日期
     entry_args = list(spec.get("entryPointArguments") or []) + bgp_run_param_argv(ds)
     app = spec["applicationId"]
     st = emr.get_application(applicationId=app)["application"]["state"]

@@ -35,7 +35,7 @@ interface AdviceRow {
 const SEV_COLOR: Record<string, string> = { info: "blue", warn: "orange", high: "red" };
 
 export default function BudgetTab() {
-  // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 预算与建议都按执行范围。
+  // 预算与建议都按执行范围。
   // 🔴 只有 `region` 作用域的预算会被范围筛掉;账号 / 服务 / 项目作用域横切所有区,
   // 在单区视角下也必须一直看得见(那条账号总预算恰恰最该看得见)。
   const { scope, targets: scopeTargetList } = useScope();
@@ -217,7 +217,7 @@ export default function BudgetTab() {
               options={[
                 { value: "account", label: t("整个账号") },
                 { value: "service", label: t("单个 AWS 服务") },
-                // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 🔴 给**单个执行区**设预算。
+                // 🔴 给**单个执行区**设预算。
                 // 用户 2026-09-10 点名「预算护栏仍是全平台合计」;没有这一项就只能设账号总额。
                 { value: "region", label: t("单个执行区(如 us-west-2)") },
               ]}

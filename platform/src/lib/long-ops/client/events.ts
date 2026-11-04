@@ -1,4 +1,4 @@
-// 模块 55 长操作统一框架 —— 浏览器侧事件(事件名唯一作者;零服务端 import)。
+// 长操作统一框架 —— 浏览器侧事件(事件名唯一作者;零服务端 import)。
 //
 // 全局 fetch 拦截器(lib/auth/AuthProvider.tsx)是非 React 模块,不直接碰 antd;它只在接管 / 轮询 / 整形三个时刻发 DOM 事件,
 // 壳层组件 components/long-ops/LongOpIndicator.tsx 监听并显示「正在后台执行:<label>(已 n 秒)」,终态自动消。

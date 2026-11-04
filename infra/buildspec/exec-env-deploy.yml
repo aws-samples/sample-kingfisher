@@ -1,4 +1,3 @@
-# @kf-batch 50-P50.2b-deploy-isolation
 # 执行环境部署 buildspec(50 DESIGN §12.3 / §12.5)。
 #
 # 【为什么 buildspec 在这里、而不是运行时可改的地方】§12.0 的"同级保护"要求:
@@ -23,9 +22,9 @@ env:
     EXEC_ENV_COMPONENTS: ""
     EXEC_ENV_OPERATION_ID: ""
     EXEC_ENV_LOCK_EPOCH: "0"
-    # @kf-batch 50-WP23-xregion-peering:本环境 VPC 的地址段(broker 从描述符透传;home 为空 ⇒ 栈组沿用存量段)
+    # 本环境 VPC 的地址段(broker 从描述符透传;home 为空 ⇒ 栈组沿用存量段)
     EXEC_ENV_VPC_CIDR: ""
-    # @kf-batch 50-WP15-airflow-serverless(K-5):NAT 数量(= EIP 数)由 broker 从注册表 networkProfile 派生;缺省 2 与旧行为逐字节相同
+    # NAT 数量(= EIP 数)由 broker 从注册表 networkProfile 派生;缺省 2 与旧行为逐字节相同
     # 🔴 P0-E ④(SPEC §3.5c v3.6):基线/波次三件套。
     #    · EXEC_ENV_SOURCE_REF 由**项目定义**注入(deploy-stack.ts 的 environment.environmentVariables),
     #      这里只写占位声明;它是"本次 build 实际用的源包哈希",不接受 broker override 之外的任何来源。
@@ -35,7 +34,7 @@ env:
     EXEC_ENV_SOURCE_REF: ""
     EXEC_ENV_BASELINE_REF: ""
     EXEC_ENV_DESIRED_TEMPLATE_VERSION: ""
-    # @kf-batch 50-WP30-decommission:下线销毁(EXEC_ENV_MODE=destroy)时的最终快照名(broker 只从注册表的删除计划读)
+    # 下线销毁(EXEC_ENV_MODE=destroy)时的最终快照名(broker 只从注册表的删除计划读)
     EXEC_ENV_FINAL_SNAPSHOT: ""
 
 phases:
@@ -48,13 +47,13 @@ phases:
           if [ -z "${!v:-}" ]; then echo "❌ 缺环境变量 $v —— 只能由 broker 注入,不接受默认值"; exit 1; fi
         done
         echo "target=$EXEC_ENV_TARGET region=$EXEC_ENV_REGION components=$EXEC_ENV_COMPONENTS op=$EXEC_ENV_OPERATION_ID epoch=$EXEC_ENV_LOCK_EPOCH vpc_cidr=${EXEC_ENV_VPC_CIDR:-<home 沿用存量>}"
-        # @kf-batch 50-WP30-decommission:destroy 分支的入参(home 永不可删 / 最终快照名必须由 broker 从删除计划给)
+        # destroy 分支的入参(home 永不可删 / 最终快照名必须由 broker 从删除计划给)
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
           if [ "$EXEC_ENV_TARGET" = "tgt_home" ]; then echo "❌ 主控区执行环境永不可删(mode=destroy 拒 tgt_home)"; exit 1; fi
           if [ -z "${EXEC_ENV_FINAL_SNAPSHOT:-}" ]; then echo "❌ mode=destroy 缺 EXEC_ENV_FINAL_SNAPSHOT —— 最终快照名只能由 broker 从删除计划注入"; exit 1; fi
         fi
-        # @kf-batch 50-WP23-xregion-peering:非 home 缺地址段 ⇒ 立刻停(broker 也拦了一道;这里是「不信上游结论」的那一层)
-        # @kf-batch 50-WP30-decommission:只拦**部署**——缺段的存量环境部署不出来,但必须删得掉
+        # 非 home 缺地址段 ⇒ 立刻停(broker 也拦了一道;这里是「不信上游结论」的那一层)
+        # 只拦**部署**——缺段的存量环境部署不出来,但必须删得掉
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
           echo "mode=destroy ⇒ 不要求 EXEC_ENV_VPC_CIDR(销毁按 CFN 删栈,不 synth)"
         elif [ "$EXEC_ENV_TARGET" != "tgt_home" ] && [ -z "${EXEC_ENV_VPC_CIDR:-}" ]; then
@@ -85,8 +84,7 @@ phases:
                  --query 'AvailabilityZones[].ZoneName' --output text | tr '[:space:]' ' ' || true)"
         if [ -z "$AZS" ]; then echo "❌ 无法列出 $EXEC_ENV_REGION 的可用 AZ(权限或 region 不可用)"; exit 1; fi
         echo "该 region 可用 AZ:$AZS"
-        # @kf-batch 50-B29-az-auto
-        # 🔴🔴 B-29(2026-10-01 新账号硬门 w5a 真撞):这里原来**要求 `<region>a` 与 `<region>b` 都存在** ——
+        # 🔴🔴 2026-10-01 新账号硬门真撞:这里原来**要求 `<region>a` 与 `<region>b` 都存在** ——
         #   那是第 1d 层(端点服务 × AZ 交集,自动挑 AZ)出现之前的旧守卫。ap-northeast-1 在本账号只有 1a/1c/1d,
         #   没有 1b ⇒ 部署当场失败,而 1d 层本来会挑出 1a/1c。⇒ 本层只判**真约束**「可用 AZ ≥ 2」,
         #   挑哪两个交给 1d(多区域自动:不许假设任何区一定有 a/b)。
@@ -95,7 +93,7 @@ phases:
           echo "❌ $EXEC_ENV_REGION 在本账号可用的 AZ 不足 2 个(可用:$AZS)—— 私有子网必须跨 AZ,该 region 装不了执行环境"; exit 1
         fi
 
-      # ── 1b. 🔴 上次失败留下的**空表桶**清理(P50.2g bug #6;用户 2026-09-01 拍板)──────
+      # ── 1b. 🔴 上次失败留下的**空表桶**清理(bug #6;用户 2026-09-01 拍板)──────
       # 【为什么需要】数据类资源刻意 RETAIN(§12 P0-A:删环境不许删客户数据)⇒ core 栈一旦 ROLLBACK,
       #   S3Tables 表桶留在原地,下一次重建必撞 409 AlreadyExists ⇒ **首次失败毒化所有重试**
       #   (实测:人工删桶 + 等删除传播,才能继续)。
@@ -112,7 +110,7 @@ phases:
         # 桶名从命名 SSOT 现算(naming.json 随源包在;绝不在 buildspec 里写第二处字面量)
         TABLE_BUCKET="$(node -e 'const n=require("./platform/naming.json");const r=n.kinds.tableBucket;if(!r)throw new Error("naming.json 无 tableBucket kind");process.stdout.write(r.target.split("{slug}").join(process.argv[1]))' "$SLUG")"
         echo "orphan-preflight: target=$EXEC_ENV_TARGET slug=$SLUG core_stack=$CORE_STACK table_bucket=$TABLE_BUCKET"
-        # @kf-batch 50-WP30-decommission —— 🔴 销毁重试时 core 栈已经删了、空表桶正好满足下面「孤儿」三条件 ⇒
+        # 🔴 销毁重试时 core 栈已经删了、空表桶正好满足下面「孤儿」三条件 ⇒
         #   不在这里拦,重试销毁就会把**要保留**的表桶顺手删掉。destroy 模式一律不做这段清理。
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
           echo "orphan-preflight: mode=destroy ⇒ 跳过(表桶是要保留的数据资源,销毁不碰)"
@@ -165,7 +163,7 @@ phases:
       - |
         set -euo pipefail
         cd "$CODEBUILD_SRC_DIR/infra"
-        # @kf-batch 50-WP30-decommission:destroy 不 synth、不建端点 ⇒ 这一层与它无关(端点服务查询失败不许挡住销毁)
+        # destroy 不 synth、不建端点 ⇒ 这一层与它无关(端点服务查询失败不许挡住销毁)
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
         echo "az-preflight-2: mode=destroy ⇒ 跳过(销毁按 CFN 删栈,不需要选 AZ)"
         printf '%s' "destroy" > "$CODEBUILD_SRC_DIR/.exec-env-azs"
@@ -212,7 +210,7 @@ phases:
                      --query 'Subnets[].AvailabilityZone' --output text | tr '[:space:]' ' ' | tr ' ' '\n' | sort -u | tr '\n' ' ')"
             CUR="$(printf '%s' "$CUR" | tr -s ' ' | sed 's/^ //;s/ $//')"
             echo "存量 VPC $VPC_ID 当前 AZ:[$CUR] ⇒ 沿用(不许换,换了会替换子网)"
-            # @kf-batch 50-WP23-xregion-peering —— 🔴 存量 VPC 的 **CIDR 同样不许换**:
+            # 🔴 存量 VPC 的 **CIDR 同样不许换**:
             #   换 CIDR ⇒ 所有子网 CidrBlock 变化 ⇒ **子网被替换**(N0-10 明令禁止的破坏性路径),
             #   连带 Redshift 子网组 / EMR 网络配置 / 端点全部重建。描述符与现网不一致就**停**,交人工决策。
             CUR_CIDR="$(aws ec2 describe-vpcs --region "$EXEC_ENV_REGION" --vpc-ids "$VPC_ID" \
@@ -247,7 +245,7 @@ phases:
         printf '%s' "$CHOSEN" > "$CODEBUILD_SRC_DIR/.exec-env-azs"
         fi
 
-      # ── 1e. 🔴🔴 @kf-batch 50-WP23-xregion-peering:主控区那一侧的三件事实 ──────────────
+      # ── 1e. 🔴🔴 主控区那一侧的三件事实 ──────────────
       # 非 home 执行环境要建**跨区私网通路**(peering + 主控区同区端点 + 本区私有托管域,SPEC §3.14ter),
       # 需要:① 主控区 VPC id(peering 对端)② 主控区网段(本区路由目的地)③ 主控区那个 DynamoDB 接口端点 id。
       # 🔴 只能从**它们的作者** `BgpVpcStack` 的 Outputs 读 —— 跨 region 用不了 CFN Export/ImportValue,
@@ -261,7 +259,7 @@ phases:
         # 🔴 主控区 region 只认 CodeBuild 注入的 AWS_REGION(项目建在 home);缺了就停,不猜
         [ -n "${AWS_REGION:-}" ] || { echo "❌ 缺 AWS_REGION —— 主控区 region 无从得知(它决定 peering 的对端与私有托管域的域名)"; exit 1; }
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
-          # @kf-batch 50-WP30-decommission:销毁不 synth;对端路由由 base 栈自己的自定义资源在删栈时撤掉
+          # 销毁不 synth;对端路由由 base 栈自己的自定义资源在删栈时撤掉
           echo "homelink: mode=destroy ⇒ 跳过"
         elif [ "$EXEC_ENV_TARGET" = "tgt_home" ]; then
           echo "homelink: target 是 home ⇒ 不建跨区通路,跳过"
@@ -295,11 +293,11 @@ phases:
       - |
         set -euo pipefail
         cd "$CODEBUILD_SRC_DIR/infra"
-        # @kf-batch 50-WP30-decommission:destroy 不 synth / 不 deploy ⇒ 不 bootstrap(不在要拆的区里再动 CDKToolkit)
+        # destroy 不 synth / 不 deploy ⇒ 不 bootstrap(不在要拆的区里再动 CDKToolkit)
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
           echo "bootstrap: mode=destroy ⇒ 跳过"
         else
-          # 🔴 B-134(2026-10-29 客户现网真撞,B-103 复发):CDK CLI(2.11xx)在**显式给了环境**的 `cdk bootstrap` 下仍会执行 cdk.json 的 app,
+          # 🔴 2026-10-29 客户现网真撞(早先同类缺陷复发):CDK CLI(2.11xx)在**显式给了环境**的 `cdk bootstrap` 下仍会执行 cdk.json 的 app,
           #   而这一行没带 -c exec-env-target ⇒ app 走控制面分支 ⇒ 「默认大模型地理守卫」在非美主控区必抛(CodeBuild 里没有 BEDROCK_MODEL_ID)
           #   ⇒ 页面「新建 / 重新部署执行环境」在 bootstrap 一步就炸。bootstrap 根本不需要 app(环境已显式给出)⇒ `--app ''` 让 CLI 不执行
           #   任何应用代码,与两道控制面守卫彻底无关。离线判据 scripts/exec-env-synth-gate.mjs §1d **真跑这一行**(非美主控区 + 零凭证):
@@ -316,7 +314,7 @@ phases:
       - |
         set -euo pipefail
         cd "$CODEBUILD_SRC_DIR/infra"
-        # @kf-batch 50-WP30-decommission:destroy 的授权是**删除审批单**(平台写进注册表、broker 校验),不是 changeset 指纹
+        # destroy 的授权是**删除审批单**(平台写进注册表、broker 校验),不是 changeset 指纹
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
         echo "p0e-gate: mode=destroy ⇒ 跳过(销毁不建 change set)"
         else
@@ -325,13 +323,13 @@ phases:
         EXEC_ENV_AZS="$(cat "$CODEBUILD_SRC_DIR/.exec-env-azs")"
         [ -n "$EXEC_ENV_AZS" ] || { echo "❌ 读不到 pre_build 选定的 AZ(.exec-env-azs 为空)"; exit 1; }
         export EXEC_ENV_AZS
-        # @kf-batch 50-WP23-xregion-peering:预演与真部署必须同口径(这三个值决定 peering / 路由 / 私有托管域三个资源)
+        # 预演与真部署必须同口径(这三个值决定 peering / 路由 / 私有托管域三个资源)
         read -r HL_VPC HL_CIDR HL_EP < "$CODEBUILD_SRC_DIR/.exec-env-homelink" || true
         export EXEC_ENV_HOME_VPC_ID="${HL_VPC:-}" EXEC_ENV_HOME_VPC_CIDR="${HL_CIDR:-}" EXEC_ENV_HOME_DDB_ENDPOINT_ID="${HL_EP:-}"
         node scripts/p0e-gate.mjs
         fi
 
-      # ── 3.9 @kf-batch 50-WP30-decommission —— 🔴 **下线销毁**(EXEC_ENV_MODE=destroy;WP-30 路 B 施工序 4)──────
+      # ── 3.9 🔴 **下线销毁**(EXEC_ENV_MODE=destroy)──────
       # 顺序:托管服务先走(Flink / MWAA Serverless / Glue / EMR Serverless / DMS / 经典 MWAA / Redshift 工作组 →
       #   命名空间带最终快照)→ 组件栈反依赖序 → core → base → 收尾探测 + 列出保留的数据资源。全部在 scripts/exec-env-destroy.sh。
       # 🔴 删栈顺序的唯一作者是 lib/exec-env/destroy-order.ts(synth-gate 拿真 manifest 依赖图核对它);这里只把它算出来传进去。
@@ -359,13 +357,13 @@ phases:
           echo "mode=preview ⇒ 跳过真部署(裁决已由 p0e-gate 打印)"
           exit 0
         fi
-        # @kf-batch 50-WP30-decommission:destroy 已在上一步跑完(失败会在那一步就把 build 判红)
+        # destroy 已在上一步跑完(失败会在那一步就把 build 判红)
         if [ "${EXEC_ENV_MODE:-deploy}" = "destroy" ]; then
           echo "mode=destroy ⇒ 跳过部署(销毁已在 3.9 完成)"
           exit 0
         fi
         SLUG="$(printf '%s' "$EXEC_ENV_TARGET" | tr '_' '-')"
-        # @kf-batch 50-WP23-xregion-peering:两组可选 `-c` 入参用**数组**拼(不用 ${VAR:+...} 那种嵌套引号写法:
+        # 两组可选 `-c` 入参用**数组**拼(不用 ${VAR:+...} 那种嵌套引号写法:
         #   一眼看不出会展开成几个词,而 CDK 收到半个入参时的报错离根因很远)。
         #   🔴 空数组 + `set -u` 要用 `${arr[@]+"${arr[@]}"}` 展开,直接 "${arr[@]}" 在老 bash 上是 unbound variable。
         CTX_ARGS=()
@@ -383,7 +381,7 @@ phases:
           CTX_ARGS+=(-c "exec-env-home-vpc-id=$HL_VPC" -c "exec-env-home-vpc-cidr=$HL_CIDR" -c "exec-env-home-ddb-endpoint-id=$HL_EP")
         fi
         echo "附加 context 入参:${CTX_ARGS[*]-<无>}"
-        # @kf-batch 50-WP13-mwaa-region:控制面 region = CodeBuild 自己所在 region(项目建在 home;不另开入参,broker 白名单不动)。
+        # 控制面 region = CodeBuild 自己所在 region(项目建在 home;不另开入参,broker 白名单不动)。
         #   只有 mwaa 组件用它(该区 MWAA 回写 home 的运行台账,SPEC §3.14);其余组件忽略。
         npx cdk deploy "BgpExecEnv-$SLUG-*" \
           --require-approval never \
@@ -408,7 +406,7 @@ phases:
         set -euo pipefail
         echo "===== CFN Outputs(供切片 e 的回写器消费)====="
         cat "$CODEBUILD_SRC_DIR/exec-env-outputs.json" 2>/dev/null || echo "(无 outputs 文件)"
-        echo "⬜ 描述符回写未实现(归 P50.2 切片 e);本次 build 只保证资源已建、Outputs 已产出。"
+        echo "⬜ 描述符回写未实现;本次 build 只保证资源已建、Outputs 已产出。"
 
 artifacts:
   files:

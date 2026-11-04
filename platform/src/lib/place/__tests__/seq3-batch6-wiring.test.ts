@@ -1,10 +1,9 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 3 第六批:指标计算 / 治理写入 / 数仓直查页 / 问数卡片 —— 「没给 = 主控区」整类拆掉之后的接线判据。
+// 指标计算 / 治理写入 / 数仓直查页 / 问数卡片 —— 「没给 = 主控区」整类拆掉之后的接线判据。
 //
 // 🔴 只查**调用位置**(剥掉 import 与注释再查):token 出现在 import 行不算接上(记忆 wiring-criteria-must-check-call-site)。
 // 行为侧(缺 / 非法 ⇒ 拒、不回落主控区)由 `redshift/__tests__/direct-query.test.ts` 的 resolver 判据承担;
 // 本文件钉「每个入口都经点名作者 + 每个页面都把落点带上」,两半缺一半都会让漏传重新静默落主控区。
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:写治理元数据 / 直查任务 / 直查历史 / 列库这五处改用 `requestedRegisteredPlace`
+// 后一半:写治理元数据 / 直查任务 / 直查历史 / 列库这五处改用 `requestedRegisteredPlace`
 //   (点名 + 已注册且装好;不存在 ⇒ 409,原来只验格式 ⇒ 写下 `tgt_nope_zz` 的孤儿记录 / 回主控区默认库名 `dev`)。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

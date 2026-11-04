@@ -1,9 +1,8 @@
-// @kf-batch 50-WP4-o1-scope
 // 服务端 `lib/exec-env/scope.ts` 的可执行门禁(合同 SPEC v3.34 §2.6.2 / §2.6.4 / §2.6.5)。
 //
 // 🔴 最要紧的三条:
-//   ① `readScope` **只认 URL** —— 带上 `x-bgp-target-id` 必须毫无影响(判据 E-156)。
-//   ② 四种拒因**一律不回落** —— 不许悄悄变成 home 或 global(判据 E-154)。
+//   ① `readScope` **只认 URL** —— 带上 `x-bgp-target-id` 必须毫无影响(判据)。
+//   ② 四种拒因**一律不回落** —— 不许悄悄变成 home 或 global(判据)。
 //   ③ `scopeFilter` 生成的 DDB 表达式与内存侧 `scalarTargetOf` 是**同一条规则** ——
 //      用一个小型求值器逐格比对(parity,同 deploy-impact-parity 的做法)。
 
@@ -60,7 +59,7 @@ describe("readScope —— 来源只有 URL", () => {
     expect(readScope(reqOf("/api/x?scope=cmp:tgt_home"))).toBeNull();
   });
 
-  it("🔴 E-156:带 x-bgp-target-id 请求头**毫无影响**", () => {
+  it("🔴 带 x-bgp-target-id 请求头**毫无影响**", () => {
     // 头指向 usw2、URL 什么都不带 ⇒ 必须还是 global
     expect(readScope(reqOf("/api/x", { "x-bgp-target-id": "tgt_usw2_a" }))).toEqual({ kind: "global" });
     // 头与 URL 冲突 ⇒ 必须听 URL
@@ -242,7 +241,6 @@ describe("scopeFilter(A 类标量章)", () => {
 
 // ── §2.6.4 B 类:绑定列表 ───────────────────────────────────────────────────────
 
-// @kf-batch 50-WP4bis-p1-scope
 describe("B 类换字段名读(bindingAttr)", () => {
   const rows = [
     { id: "p1", execTargets: ["tgt_home"] },

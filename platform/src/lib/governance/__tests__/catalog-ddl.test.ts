@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录建表入参闭合校验 / Iceberg 类型映射 / 预览产物(纯部分;落地走建模通道由 modeling 侧判据覆盖)。
+// 数据目录建表入参闭合校验 / Iceberg 类型映射 / 预览产物(纯部分;落地走建模通道由 modeling 侧判据覆盖)。
 import { describe, it, expect } from "vitest";
 import { validateCreateSpec, icebergTypeOf, icebergFieldsOf, previewCreate, CatalogDdlInvalid, isDdlApprovalPayload, CATALOG_TABLE_KINDS, DDL_APPROVAL_TYPE } from "../catalog-ddl";
 

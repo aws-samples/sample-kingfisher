@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47a-promote-ux —— 发布(晋升)服务的装配层判据:只 mock 真外部(DynamoDB 文档客户端),
+// 发布(晋升)服务的装配层判据:只 mock 真外部(DynamoDB 文档客户端),
 //   版本服务 / 审批服务 / 发布服务之间**不 mock**,钉的是落库事实:
 //   ① 首次发布在目标环境新建一份并写下发布痕迹(promotedFrom / promotedAt / promotedBy / sourceId / sourceVersion),源行得到 lineageId;
 //   ② 再发一次是更新同一份(幂等),痕迹刷新;

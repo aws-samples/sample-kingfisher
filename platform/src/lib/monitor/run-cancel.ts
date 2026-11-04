@@ -1,4 +1,3 @@
-// @kf-batch 50-WP5-rungroup
 // 「取消**一条** run,在它自己那个执行目标上」—— 单一作者(50 SPEC v3.44 §2.7 cancel 行)。
 //
 // 🔴 为什么必须单一作者:平台此前只有三个**各自独立**的停止入口(引擎 SPI `stop` / 同步任务的
@@ -39,7 +38,7 @@ const CANCELLABLE_STATUS = "running";
 /**
  * 取消一条 run。
  *
- * · 已终态 ⇒ `{cancelled:false, reason:"已终态…"}`,**绝不动它**(E-163 的负向半边)。
+ * · 已终态 ⇒ `{cancelled:false, reason:"已终态…"}`,**绝不动它**(负向半边)。
  * · 平台不认识这个 `taskType` ⇒ 如实说「不知道怎么取消」,**不静默当成功**
  *   (静默成功会让页面显示「已取消」而后端还在烧钱)。
  * · 引擎 SPI 那一支由 provider 自己收口 `stopped`(它已经这么做了);

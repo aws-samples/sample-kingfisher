@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
 // /api/admin/exec-envs/[targetId]/jobs/[jobId]
 //   GET  —— 一条作业的 DTO
 //   POST —— 「立即推进」:与内部端点**同一份** `runJobStep`(同一套租约 + CAS),只是跳过退避等待

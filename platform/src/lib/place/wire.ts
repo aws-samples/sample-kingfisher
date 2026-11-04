@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 4(L6)—— 平台侧的 PlaceWire **生产者**(读取函数本体在 lib/genbi/core/place-wire.ts,三个 JS 运行时同源)。
+// 平台侧的 PlaceWire **生产者**(读取函数本体在 lib/genbi/core/place-wire.ts,三个 JS 运行时同源)。
 //
 // 规矩:落点要跨运行时传递(AgentCore payload / 调度 spec / 生成的 Spark 脚本),**只许**经这里产出 PlaceWire;
 // 产出时就用读取函数**自校验一遍** —— 生产者写出读取方不认的东西,在平台这一侧当场报错,而不是到了容器 / Lambda /

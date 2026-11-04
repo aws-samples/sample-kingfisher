@@ -1,4 +1,4 @@
-// 模块 35 P1 — D4 指标体系安全 SQL 构造(纯函数,便于单测,不触达 Redshift)。
+// D4 指标体系安全 SQL 构造(纯函数,便于单测,不触达 Redshift)。
 //
 // 安全核心(零注入面):
 //  - 聚合:agg 走白名单关键字;measureColumn/列标识符走 safeIdent;
@@ -24,7 +24,7 @@ export function isTimeWindow(v: unknown): v is TimeWindow {
   return typeof v === "string" && (TIME_WINDOWS as string[]).includes(v);
 }
 
-// 取 FQN 最后两段为 schema.table,各过 safeIdent 白名单(同模块20 quoteTable)。
+// 取 FQN 最后两段为 schema.table,各过 safeIdent 白名单(同quoteTable)。
 export function quoteTable(fqn: string): string {
   const parts = (fqn || "").split(".").filter(Boolean);
   if (parts.length < 2) throw new Error(`无法解析表名: ${JSON.stringify(fqn)}`);

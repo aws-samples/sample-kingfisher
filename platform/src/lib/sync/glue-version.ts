@@ -1,6 +1,6 @@
-// 序 38 B-69 / 序 53 —— 平台 Glue 版本的唯一作者。
-//   取用方:同步向导选项与缺省 / 新建与保存校验 / 启动核心 fail-closed(序 38)、离线计算表单与作业定义、数据源发现作业、
-//   参数顾问推荐值、需求代码生成提示词、运行诊断证据、配方文案(序 53)。
+// 平台 Glue 版本的唯一作者。
+//   取用方:同步向导选项与缺省 / 新建与保存校验 / 启动核心 fail-closed、离线计算表单与作业定义、数据源发现作业、
+//   参数顾问推荐值、需求代码生成提示词、运行诊断证据、配方文案。
 //   🔴 两个「零 @/ alias」的 core 包(param-advisor/core、cookbook)不能 import 本文件 ⇒ 各自内联一份,由单测与本文件 toEqual 比对
 //   (core-catalog-drift.test.ts / cookbook glue-version-drift.test.ts),真源变了内联没跟就红。
 //
@@ -10,7 +10,7 @@
 //   而 glueConfig.glueVersion 是「有静默合法默认值的参数」—— 向导给 4.0 / 5.0 / 5.1 三个值随便选,后端一律放过。
 // 【规则】目标写 S3 Tables(targetType = s3-tables / both,glue 通道)⇒ glueVersion 必须 ≥ 5.1;
 //   不带 glueVersion ⇒ 取缺省(与 start-run 的缺省同一个常量);只写 Redshift 的任务不限(4.0 / 5.0 仍合法)。
-// 【序 53(用户 2026-10-26 拍板)】缺省 = 清单里的**最高版本**;用户可在同步向导 / 离线计算表单里自己选更低版本;
+// 【(用户 2026-10-26 拍板)】缺省 = 清单里的**最高版本**;用户可在同步向导 / 离线计算表单里自己选更低版本;
 //   存量任务 / 作业各自存着的版本**不被动改**(升级平台不改任何已有作业的 Glue 版本)。新 Glue 版本发布时只改本文件的
 //   GLUE_VERSIONS + GLUE_RUNTIME_FACTS 两处(以及两个 core 内联,单测会逼着改)。
 //   AWS 事实(docs.aws.amazon.com/glue/latest/dg/migrating-version-60.html,2026-10-26 读):Glue 6.0 = Spark 4.1.1 / Python 3.13 /
@@ -23,7 +23,7 @@
 /** 可选的 Glue 版本(闭合清单,按版本升序;不在清单里的值一律拒,不猜)。 */
 export const GLUE_VERSIONS = ["4.0", "5.0", "5.1", "6.0"] as const;
 export type GlueVersion = (typeof GLUE_VERSIONS)[number];
-/** 缺省 = 清单里的最高版本(序 53;单测钉「缺省 == 最高」)。 */
+/** 缺省 = 清单里的最高版本(单测钉「缺省 == 最高」)。 */
 export const GLUE_VERSION_DEFAULT: GlueVersion = "6.0";
 /** 写 S3 Tables 的最低 Glue 版本。 */
 export const S3_TABLES_MIN_GLUE_VERSION = "5.1";

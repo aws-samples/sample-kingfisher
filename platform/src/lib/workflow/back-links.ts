@@ -1,12 +1,12 @@
-// 序 73 模块 57(57 DESIGN R3 / R8 ③)—— 「双写回链」在页面上的**两个方向的链接地址,唯一作者**(纯函数,浏览器可 import)。
+// 「双写回链」在页面上的**两个方向的链接地址,唯一作者**(纯函数,浏览器可 import)。
 //
 //   · 作业 / 同步任务的运行历史行(`triggeredBy === "workflow"`,行上带 workflowId / workflowRunId / workflowName)
 //     → 点回**工作流实例**:`/workflow/<workflowId>?run=<workflowRunId>`(工作流详情页读 `?run=` 自动打开那次运行的「节点详情」)。
 //   · 工作流实例的「节点详情」里每个作业 / 同步节点 → 点回**作业自己的运行历史**:
 //       ETL / EMR 作业都在离线计算页:`/etl-jobs?jobId=<jobId>&tab=runs`(页面读这两个参数选中作业并切到「运行历史」);
 //       同步任务:`/sync/<taskId>`(详情页的运行历史页签)。
-// 🔴 runId 形如 `<raw>#<targetId>`(T-12 复合键):`#` 在 URL 里是 fragment 起点 ⇒ 必须 encodeURIComponent,否则工作流页只收到前半段。
-// 🔴 这里只拼地址、不读任何浏览器状态;两边页面读参数一律在挂载后的 effect 里做(B-138 水合纪律)。
+// 🔴 runId 形如 `<raw>#<targetId>`(复合键):`#` 在 URL 里是 fragment 起点 ⇒ 必须 encodeURIComponent,否则工作流页只收到前半段。
+// 🔴 这里只拼地址、不读任何浏览器状态;两边页面读参数一律在挂载后的 effect 里做(水合纪律)。
 import { jobRefOf, type WorkflowNodeLike } from "./job-ref";
 import type { JobNodeRef } from "@/types/workflow";
 

@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP3
 // exec-roles.ts —— 执行角色键三规则的单测(SPEC v3.21 §3.1a「执行角色键」)。
 // 🔴 期望值**从命名 SSOT 派生**(resourceName),不手抄字面名:手抄一份 = 第二处定义,naming.json 一改这里就假绿/假红。
 import { describe, it, expect } from "vitest";
@@ -56,7 +55,7 @@ describe("规则 ①:数据面解析 —— 非 home 必须是本 target 自己�
     expect(execRoleVerdict(t, "glueRoleArn")).toEqual({ ok: true, arn: per("glueRoleArn") });
     expect(assertPerTargetExecRole(t, "glueRoleArn")).toBe(per("glueRoleArn"));
   });
-  it("🔴 home 名(P50.2 存量形态)⇒ not-per-target 且拒因**指路**「重新部署」", () => {
+  it("🔴 home 名(存量形态)⇒ not-per-target 且拒因**指路**「重新部署」", () => {
     const t = { targetId: USW2, resources: { glueRoleArn: home("glueRoleArn") } };
     const v = execRoleVerdict(t, "glueRoleArn");
     expect(v.ok).toBe(false);
@@ -104,7 +103,7 @@ describe("规则 ②:补充部署窄通道的唯一例外 —— 新增 / home �
   });
 });
 
-describe("规则 ③ 的判据:missingPerTargetExecRoles / hasPerTargetExecRoles(WP-10a 接进准入)", () => {
+describe("规则 ③ 的判据:missingPerTargetExecRoles / hasPerTargetExecRoles(接进准入)", () => {
   it("要哪些键随组件:core 两键恒需;redshift / dms 各加一键", () => {
     expect(requiredExecRoleKeys(["core"])).toEqual(["glueRoleArn", "emrExecutionRoleArn"]);
     expect(requiredExecRoleKeys(["core", "redshift"])).toEqual(["glueRoleArn", "emrExecutionRoleArn", "redshiftCopyRoleArn"]);

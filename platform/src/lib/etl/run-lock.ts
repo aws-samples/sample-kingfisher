@@ -1,4 +1,4 @@
-// 模块 16/33（根治·裂缝C）— 作业级运行锁(job-level run serialization)。
+// （根治·裂缝C）— 作业级运行锁(job-level run serialization)。
 //
 // 【为什么存在】同一作业的多个 run 会在后端【并发执行 DROP+CTAS 同一张目标表】→ Redshift 报
 // `could not open relation with OID <n>`(见 cookbook redshift.ctas-oid-concurrency)、后续 CTAS ABORTED。
@@ -21,7 +21,6 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
-// @kf-batch 50-P50.3-multibind
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 
 // lease 时长:覆盖最长离线作业(Glue poll 160×15s≈40min,Redshift 120×2s=4min,EMR 240×15s=60min)。
@@ -35,7 +34,6 @@ const nowMs = () => Date.now();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
- * @kf-batch 50-WP4bis-p1-scope
  * **抢不到运行锁**的类型化错误(= 上一次运行还在跑)。
  *
  * 🔴 为什么必须是一个**类型**而不是 `new Error(文案)`:运行路由按「用户可修 vs 平台故障」
@@ -62,7 +60,6 @@ export interface RunLock {
   token: string;
 }
 
-// @kf-batch 50-P50.3-multibind
 // ══════════════════════════════════════════════════════════════════════════════
 // 🔴🔴 **锁属性名的唯一作者**(50 SPEC §3.6「运行锁身份含 target」)。
 //
@@ -268,7 +265,7 @@ export async function acquireJobRunLock(
   table: string,
   jobId: string,
   waitMs = 0,
-  // @kf-batch 50-P50.3-multibind —— 缺省/home 时属性名与存量逐字节相同。
+  // 缺省/home 时属性名与存量逐字节相同。
   targetId?: string | null
 ): Promise<RunLock | null> {
   return acquireRunLock(table, { userId: USER_ID, jobId }, waitMs, lockAttrFor({ targetId }));

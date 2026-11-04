@@ -1,7 +1,6 @@
-// 模块 33-A — EMR PySpark 脚本落 S3。
+// EMR PySpark 脚本落 S3。
 // 复刻 lib/etl/job-service.ts 的 S3 上传范式;前缀 emr-scripts/<jobId>.py(与 Glue 的 glue-scripts/etl/ 隔离)。
 //
-// @kf-batch 50-P50.3-engines
 // 🔴 **桶与客户端都按 target 来**(W3-g:EMR 作业可以在非 home 跑了)。
 // 原来是模块级 home 客户端 + `EMR_CODE_BUCKET` ⇒ 非 home 的 job-run 会去**home 的桶**找 entryPoint,
 // 而 application 在另一个区 ⇒ 要么拉不到脚本(AccessDenied/NoSuchKey),要么更糟:
@@ -38,7 +37,7 @@ export async function uploadScript(
 ): Promise<string> {
   const Bucket = codeBucketFor(landing);
   const Key = scriptKeyFor(jobId);
-  // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+  // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
   const s3 = await s3ClientFor(landing?.region || homeRegion());
   await s3.send(new PutObjectCommand({ Bucket, Key, Body: script, ContentType: "text/x-python" }));
   return `s3://${Bucket}/${Key}`;
@@ -53,7 +52,7 @@ export async function uploadScript(
  * 做法 = **幂等的服务端 CopyObject**(HeadObject 命中就复用),不是每次上传。
  */
 /**
- * 序 73 模块 57 —— 该 target 上 S3 Tables runtime jar **会在哪个 URI**(纯函数,不碰 S3)。
+ * 该 target 上 S3 Tables runtime jar **会在哪个 URI**(纯函数,不碰 S3)。
  * 与 `ensureS3TablesJar` 的返回值逐字同值(它只是把对象真复制过去再回这个 URI);工作流离线作业节点在发布期只读解析 spec 时用它,
  * 真复制留在发布的写阶段(job-node-prepare.ts)。home 逐字节不变;URI 形态不对即抛(与 ensure 同口径)。
  */

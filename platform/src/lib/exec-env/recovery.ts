@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // 失败会话恢复的【判定与执行】—— SPEC §3.5b / 外部审核 §19.8(发布阻断项)。
 //
 // 【为什么逻辑在 lib 而不在 route】仓内不单测 Next route(见 add-components route 注释),
@@ -246,7 +245,7 @@ export async function assessRecovery(
         buildStatus = build.phase;
         kind = "attach-ambiguous";
       } else {
-        // @kf-batch 50-WP15-airflow-serverless —— 第二条证据:CodeBuild 项目里有没有这次 operation 的 build(会话 ≥ 5min 后才查,防与 broker StartBuild 竞态)。
+        // 第二条证据:CodeBuild 项目里有没有这次 operation 的 build(会话 ≥ 5min 后才查,防与 broker StartBuild 竞态)。
         //   有 ⇒ 那就是 attach 丢响应的候选,按其真实终态定性;没有 ⇒ 不必等 2h15m 结构窗(真环境:broker open 后 post-image 不匹配即停,根本没起 build)。
         const startedMs = Date.parse(operation.startedAt);
         const evidence =

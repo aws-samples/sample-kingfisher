@@ -1,5 +1,5 @@
 "use strict";
-// 模块 45 — SQL 词法遮蔽(guard 安全匹配的前提)。修复设计审核 🔴A 高危:
+// SQL 词法遮蔽(guard 安全匹配的前提)。修复设计审核 🔴A 高危
 //
 // 问题:guard 的 antiPattern 正则若直接打在【原始 SQL 文本】上,会误伤【字符串字面量/注释】里
 // 恰好出现的 anti-pattern。例如合法 SQL:

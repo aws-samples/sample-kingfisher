@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# @kf-batch 50-WP20-retire-classic-mwaa
 # 前置检查:**经典 MWAA 栈还在的时候,不许更新平台栈**。
 #
 # 🔴 为什么必须机械化(2026-09-14 真环境撞过一次,15 分钟白等):
-#   WP-20 之后 `BgpMwaaStack` 不再被 CDK 实例化 ⇒ CDK 认为平台栈那个导出
+#此后 `BgpMwaaStack` 不再被 CDK 实例化 ⇒ CDK 认为平台栈那个导出
 #   (`BgpService/LB SecurityGroup GroupId`)**没有消费者了** ⇒ 新模板把导出删掉;
 #   而现网那个 MWAA 栈**还在**(哪怕正在 DELETE_IN_PROGRESS)仍然引用它 ⇒ CFN 拒绝:
 #     Cannot delete export …LBSecurityGroup…GroupId as it is in use by BgpMwaaStack
@@ -104,7 +103,7 @@ esac
 
 printf "\033[1;31m✗ 经典 MWAA 栈还在(BgpMwaaStack = %s)\033[0m\n" "$ST"
 cat <<'MSG'
-  WP-20 之后平台栈的模板不再导出 ALB 安全组给它,而它仍在引用那个导出
+  平台栈的模板已不再导出 ALB 安全组给它,而它仍在引用那个导出
   ⇒ **现在更新平台栈必定 UPDATE_ROLLBACK**(CFN:Cannot delete export … as it is in use by BgpMwaaStack)。
 
   先做完这一步再来:

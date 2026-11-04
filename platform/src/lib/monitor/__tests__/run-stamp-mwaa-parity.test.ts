@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
 // **MWAA 旁路**那 4 处建行点的盖章门禁 + 两侧 parity(照 `runtime-lib-lock-parity.test.ts` 的先例)。
 //
 // 为什么单独一个文件:这 4 处的代码在 **MWAA 里**执行,平台的写通道管不到它们
@@ -6,7 +5,7 @@
 // 所以门禁必须**真的调生成器、在产物里找章**,而不是在源码里 grep 一个 `projectId` 字样。
 //
 // 🔴 强断言纪律:一律用一个**非默认**的真实形态 projectId 去断言 —— 若只断言"产物里有 projectId
-// 这个词",那么把章写死成 `proj-default` 的实现也能全绿(P52.1 验收踩过的同款弱断言)。
+// 这个词",那么把章写死成 `proj-default` 的实现也能全绿(验收踩过的同款弱断言)。
 import { describe, it, expect } from "vitest";
 import { RUN_STAMP_ATTRS } from "@/lib/monitor/run-records";
 import { generateEtlJobDag } from "@/lib/etl/dag-generator";
@@ -127,9 +126,8 @@ describe("🔴 parity:Python 侧用的属性名必须与 TS 侧同源", () => {
           applicationId: "a", logUri: "s3://b/", entryPointArguments: [],
         })
       ),
-      // @kf-batch 50-WP26-sync-schedule-carrier
       // 🔴 锚点从**源码字面量** `"taskId": env["workflow_id"]` 换成**函数名** `_update_run_record`:
-      //   WP-26 把「台账归属」做成参数(`env.get("ledger_task_id") or env["workflow_id"]`)之后,
+      //   把「台账归属」做成参数(`env.get("ledger_task_id") or env["workflow_id"]`)之后,
       //   那个字面量消失 ⇒ `indexOf` 回 -1 ⇒ `slice(-1)` 几乎切成空串 ⇒ 这条判据**假红**
       //   (而且是「看起来像少了属性」这种指不到根因的假红)。
       //   判据要钉**事实**(那段回写里有没有这几个属性名),不是钉某一行长什么样

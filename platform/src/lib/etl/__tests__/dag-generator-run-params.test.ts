@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— 经典 MWAA 的 ETL DAG(Glue 分支):定时运行把**全套**业务日期参数传给 start_job_run,
+// 经典 MWAA 的 ETL DAG(Glue 分支):定时运行把**全套**业务日期参数传给 start_job_run,
 // 取值来自同一张表(bgp_run_param_args,嵌进产物),与平台「立即运行」同一组参数名;产物是合法 Python(真 py_compile)。
 import { describe, it, expect, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";

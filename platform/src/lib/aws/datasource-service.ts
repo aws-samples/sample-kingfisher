@@ -1,18 +1,17 @@
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion as readHomeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import { GlueClient, CreateConnectionCommand, DeleteConnectionCommand, TestConnectionCommand, GetConnectionCommand, UpdateConnectionCommand } from "@aws-sdk/client-glue";
 import { RDSClient, DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
 import { EC2Client, CreateSecurityGroupCommand, AuthorizeSecurityGroupIngressCommand, DeleteSecurityGroupCommand, DescribeNetworkInterfacesCommand, DescribeSubnetsCommand, DescribeSecurityGroupsCommand, DescribeVpcsCommand, CreateTagsCommand } from "@aws-sdk/client-ec2";
 import { IAMClient, GetRoleCommand, CreateRoleCommand, AttachRolePolicyCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-// 模块 42:JDBC URL / 默认端口由数据源 SPI 提供(取代此前本文件写死的 JDBC_URL/DB_PORT 表)。
+// JDBC URL / 默认端口由数据源 SPI 提供(取代此前本文件写死的 JDBC_URL/DB_PORT 表)。
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 // 凭证读写抽到 datasource-spi/secrets.ts;本文件内部(createGlueConnection)也需 getSecret。
 import { getSecret } from "@/lib/datasource-spi/secrets";
-// @kf-batch 50-WP4quater-reads(工单 SC-2)—— 按区客户端的唯一工厂(不在本文件 new)
+// 按区客户端的唯一工厂(不在本文件 new)
 import { glueClientFor, rdsClientFor, ec2ClientFor } from "@/lib/exec-env/target-clients";
 
-// @kf-batch 50-WP4quater-reads(工单 SC-2)
 // 🔴🔴 用户 2026-09-10:「**所有的任务都要创建在当前区域,不能只是创建在主控区,没意义,
 // 除非在主控区创建任务,可以选择在主控区下发到其他指定区域执行。不然也是白干了。**」
 //
@@ -37,20 +36,19 @@ async function dsClients(region: string) {
 const iam = sdkClient("control-plane", IAMClient, { region: homeRegion });
 
 // ============ DS-04: Secrets Manager ============
-// 模块 42:凭证读写抽到 lib/datasource-spi/secrets.ts(与类型无关的底层,断循环依赖)。
+// 凭证读写抽到 lib/datasource-spi/secrets.ts(与类型无关的底层,断循环依赖)。
 // 此处 re-export 保持其他消费方(api/datasources/route.ts 等)的 import 路径零改动。
 export { createSecret, getSecret, updateSecret, deleteSecret } from "@/lib/datasource-spi/secrets";
 
 // ============ DS-03: Auto Network ============
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-2)
  * 建源落点:区 + 该区的网络事实。home 时只需要 region(其余走既有 `DEFAULT_*` env ⇒ 逐字节等价)。
  */
 export interface DsPlace {
   region: string;
   home: boolean;
-  /** 序 61 B-133:落点 id(平台自建组的归属标签 `bgp:targetId`);由 `resolveDsPlace` 给出,🔴 必填(落点不许可选) */
+  /** 落点 id(平台自建组的归属标签 `bgp:targetId`);由 `resolveDsPlace` 给出,🔴 必填(落点不许可选) */
   targetId: string;
   vpcId?: string;
   subnetId?: string;
@@ -64,7 +62,7 @@ export interface DsPlace {
 export interface NetworkConfig {
   vpcId: string;
   subnetId: string;
-  /** 可用区。B-133 第二刀起**可缺**:源行(2.1.2 及之前)从不落它、用户指定网络也可不给;写 Glue 连接的两个作者一律按子网事实取,这里只是回显 / 核对用。 */
+  /** 可用区。第二刀起**可缺**:源行(2.1.2 及之前)从不落它、用户指定网络也可不给;写 Glue 连接的两个作者一律按子网事实取,这里只是回显 / 核对用。 */
   availabilityZone?: string;
   securityGroupId: string;
   isRds: boolean;
@@ -72,9 +70,8 @@ export interface NetworkConfig {
 }
 
 /**
- * @kf-batch 37-B54-ds-user-sg
  * 用户在建源时**指定了**子网与安全组时的网络接入。
- * 🔴 B-54:这条路径平台**一个安全组都不建**、不改任何规则(原来照样先建一个 `bgp-ds-*` 而且不用它,
+ * 🔴 这条路径平台**一个安全组都不建**、不改任何规则(原来照样先建一个 `bgp-ds-*` 而且不用它,
  *   在客户生产 VPC 里留下闲置组);用户给的组**全部**进 Glue 连接(原来只取第一个)。
  * `securityGroupId` = 第一个(存量消费者读它,不能删);`securityGroupIds` = 全部。
  */
@@ -86,7 +83,7 @@ export interface UserNetworkConfig extends NetworkConfig {
 export interface UserDsNetwork {
   subnetId: string;
   securityGroupIds: readonly [string, ...string[]];
-  /** 显式给出 undefined = 用户没选 AZ(B-133 第二刀起由写连接的作者按用户子网自己的事实取,不再沿用探测出的另一子网的 AZ)。 */
+  /** 显式给出 undefined = 用户没选 AZ(第二刀起由写连接的作者按用户子网自己的事实取,不再沿用探测出的另一子网的 AZ)。 */
   availabilityZone: string | undefined;
 }
 
@@ -100,12 +97,11 @@ export interface NetworkProbe {
 }
 
 /**
- * @kf-batch 37-B54-ds-user-sg
  * **只探测、不写**:落点网络事实 + (RDS 主机时)从子网组识别 VPC / 子网 / AZ。
  * 🔴 这里只许有读调用(DescribeDBInstances);建组 / 改规则在 `createPlatformDsSecurityGroup`。
  */
 export async function probeNetwork(host: string, place: DsPlace): Promise<NetworkProbe> {
-  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 `DEFAULT_VPC_ID` / `DEFAULT_SUBNET_ID` / `DEFAULT_AZ`
+  // 🔴 `DEFAULT_VPC_ID` / `DEFAULT_SUBNET_ID` / `DEFAULT_AZ`
   // 是**主控区**的部署时快照。非主控区必须用那个区自己的网络事实(描述符 core 袋里的
   // `emrSubnetIds` / `emrSecurityGroupId` —— 那就是该区的私有子网与安全组,EMR 现在就用它们跑)。
   // 拿主控区的子网去建 SG,SG 会建在主控区的 VPC 里,Glue 连接引用一个跨区 SG ⇒ 建的时候不报错、
@@ -151,11 +147,10 @@ export async function probeNetwork(host: string, place: DsPlace): Promise<Networ
 }
 
 /**
- * @kf-batch 37-B54-ds-user-sg
  * 在 `vpcId` 里建平台自己的 `bgp-ds-*` 组并放行(自引用 + 源库端口对本 VPC CIDR)。
  * 🔴 只给「没指定网络」的老路径用;用户指定了安全组时绝不调用。
  */
-/** 序 61 B-133:平台自建对象的归属标签键(清理工具 / 人按它识别「这是平台的、还在用」;IAM 加固条件也按它)。 */
+/** 平台自建对象的归属标签键(清理工具 / 人按它识别「这是平台的、还在用」;IAM 加固条件也按它)。 */
 export const PLATFORM_DS_MANAGED_TAG_KEY = "bgp:managed";
 export const PLATFORM_DS_MANAGED_TAG_VALUE = "datasource";
 export const PLATFORM_DS_OWNER_TAG_KEY = "bgp:datasourceId";
@@ -175,7 +170,7 @@ export async function createPlatformDsSecurityGroup(args: {
   dbType: string;
   datasourceId: string;
   region: string;
-  /** 序 61 B-133:归属标签 `bgp:targetId`(🔴 必填:组建在哪个落点就标哪个) */
+  /** 归属标签 `bgp:targetId`(🔴 必填:组建在哪个落点就标哪个) */
   targetId: string;
 }): Promise<string> {
   const { vpcId, dbType, datasourceId } = args;
@@ -188,7 +183,7 @@ export async function createPlatformDsSecurityGroup(args: {
       GroupName: sgName,
       Description: `BGP datasource ${datasourceId}`,
       VpcId: vpcId,
-      // 序 61 B-133:建组即带归属标签 —— 这个组大部分时间零网卡,任何按「无网卡即孤儿」清理的工具都会删它;
+      // 建组即带归属标签 —— 这个组大部分时间零网卡,任何按「无网卡即孤儿」清理的工具都会删它;
       //   标签让清理流程能排除、让人能看出归属(2026-10-28 测试账号真撞:只有 Description 可看,被当孤儿误删 ⇒ 该源同步全败)。
       TagSpecifications: [{ ResourceType: "security-group", Tags: platformDsSgTags(datasourceId, args.targetId) }],
     }));
@@ -200,10 +195,10 @@ export async function createPlatformDsSecurityGroup(args: {
       IpPermissions: [{ IpProtocol: "-1", UserIdGroupPairs: [{ GroupId: sgId }] }],
     }));
 
-    // Allow access to DB port from this SG(模块 42:默认端口取自 provider capabilities)
+    // Allow access to DB port from this SG(默认端口取自 provider capabilities)
     const port = (isDataSourceType(dbType) ? getProvider(dbType).capabilities.defaultPort : undefined) || 3306;
-    // @kf-batch 50-WP23-xregion-peering —— 🔴 放行段必须是**这个 VPC 自己的** CIDR,不能写死 10.0.0.0/16。
-    //   原来那个字面量是「主控区 VPC 的 CIDR」的硬编码:WP-23 起非 home 执行环境的 VPC 从地址池取段
+    // 🔴 放行段必须是**这个 VPC 自己的** CIDR,不能写死 10.0.0.0/16。
+    //   原来那个字面量是「主控区 VPC 的 CIDR」的硬编码:非 home 执行环境的 VPC 从地址池取段
     //   (10.128.0.0/9,与主控区**不重叠**,否则跨区 peering 建不出来)⇒ 在那个区建数据源时,
     //   写死的 10.0.0.0/16 **一条也放行不到** ⇒ 症状是「连接建好了、浏览表 0 张」
     //   (与 [[jdbc-source-sg-port-ingress]] 那次一模一样的症状,而根因换成了网段)。
@@ -236,10 +231,10 @@ export async function createPlatformDsSecurityGroup(args: {
 
 /**
  * 老路径(没指定网络):探测 + 新建平台自己的 `bgp-ds-*` 组。
- * 调用序列与 B-54 改动前逐字节相同(`create-network-assembly.test.ts` ① 组钉住)。
+ * 调用序列与改动前逐字节相同(`create-network-assembly.test.ts` ① 组钉住)。
  */
 export async function detectNetwork(host: string, dbType: string, datasourceId: string, place: DsPlace): Promise<NetworkConfig> {
-  // 序 61 B-133:落点必填(原来 `place ?? 主控区` 是一条静默默认 —— 唯一调用方 long-ops 早已总是传 resolveDsPlace 的结果)
+  // 落点必填(原来 `place ?? 主控区` 是一条静默默认 —— 唯一调用方 long-ops 早已总是传 resolveDsPlace 的结果)
   const p = place;
   const probe = await probeNetwork(host, p);
   const sgId = await createPlatformDsSecurityGroup({ vpcId: probe.vpcId, dbType, datasourceId, region: p.region, targetId: p.targetId });
@@ -247,15 +242,14 @@ export async function detectNetwork(host: string, dbType: string, datasourceId: 
 }
 
 /**
- * @kf-batch 37-B54-ds-user-sg
- * 用户指定了子网 + 安全组:只探测(VPC / RDS 识别),**不建任何组、不改任何规则**;AZ 不兜底(B-133 第二刀,见下)。
+ * 用户指定了子网 + 安全组:只探测(VPC / RDS 识别),**不建任何组、不改任何规则**;AZ 不兜底(第二刀,见下)。
  */
 export async function userSpecifiedNetwork(host: string, place: DsPlace, user: UserDsNetwork): Promise<UserNetworkConfig> {
   const probe = await probeNetwork(host, place);
   return {
     vpcId: probe.vpcId,
     subnetId: user.subnetId,
-    // 🔴 B-133 第二刀:不再用探测出的 AZ 兜底 —— 那是**另一个子网**(RDS 子网组 / 缺省子网)的可用区,与用户选的子网未必同区;
+    // 🔴 第二刀:不再用探测出的 AZ 兜底 —— 那是**另一个子网**(RDS 子网组 / 缺省子网)的可用区,与用户选的子网未必同区;
     //   用户没给就留空,写 Glue 连接的作者按用户子网自己的事实取(给了则与事实核对,矛盾即拒)
     availabilityZone: user.availabilityZone,
     securityGroupId: user.securityGroupIds[0],
@@ -266,7 +260,6 @@ export async function userSpecifiedNetwork(host: string, place: DsPlace, user: U
 }
 
 /**
- * @kf-batch 37-B54-ds-user-sg
  * 解析建源请求里的 `network`(路由文件不许导出非路由符号 ⇒ 放这里)。三态显式返回(不用静默缺省):
  *   · `none`    —— 没给,或只给了一半(有子网没组 / 有组没子网):走自动探测老路径(与改动前一致);
  *   · `user`    —— 子网 + 至少一个组:平台不建组,用户的组全部进 Glue 连接;
@@ -310,7 +303,6 @@ export function glueSecurityGroupIds(network: NetworkConfig | UserNetworkConfig)
 export const PLATFORM_DS_SG_PREFIX = "bgp-ds-";
 
 /**
- * @kf-batch 37-B54-ds-user-sg
  * 平台为**这一条**数据源自建的安全组名 —— 建组(`createPlatformDsSecurityGroup`)与删组归属判定
  * (`deleteSecurityGroup`)的唯一作者。
  */
@@ -318,7 +310,7 @@ export function platformDsSgName(datasourceId: string): string {
   return `${PLATFORM_DS_SG_PREFIX}${datasourceId.slice(-8)}`;
 }
 
-/** 平台为数据源建的 Glue 连接名(唯一作者;建源与 B-133 自愈重建同一规则,源行 glueConnectionName 必须等于它) */
+/** 平台为数据源建的 Glue 连接名(唯一作者;建源与自愈重建同一规则,源行 glueConnectionName 必须等于它) */
 export const PLATFORM_GLUE_CONN_PREFIX = "bgp-conn-";
 export function platformGlueConnectionName(datasourceId: string): string {
   return `${PLATFORM_GLUE_CONN_PREFIX}${datasourceId.slice(-12)}`;
@@ -331,7 +323,7 @@ export type SgDeleteOutcome = "deleted" | "skipped-not-platform" | "gone" | "fai
  * 原来用户在建数据源时指定了**自己的**安全组,记录里存的就是它,删数据源时一并 DeleteSecurityGroup、
  * 错误还被吞掉 ⇒ 客户的安全组被删(或删失败也没人知道)。现在先查组名再决定,结果如实回给调用方。
  */
-// @kf-batch 37-B54-ds-user-sg —— 🔴 归属判定从「组名以 bgp-ds- 开头」收紧成「组名**恰好等于**本数据源的平台组名」:
+// 🔴 归属判定从「组名以 bgp-ds- 开头」收紧成「组名**恰好等于**本数据源的平台组名」:
 //   用户建源时可能选中**另一条数据源**的 bgp-ds-* 组,前缀判定会在删这条源时把别人的组删掉。
 //   `datasourceId` 与 `region` 都必填、无缺省(静默缺省值是一类缺陷的温床)。
 export async function deleteSecurityGroup(sgId: string, region: string, datasourceId: string): Promise<SgDeleteOutcome> {
@@ -350,7 +342,7 @@ export async function deleteSecurityGroup(sgId: string, region: string, datasour
     await ec2.send(new DeleteSecurityGroupCommand({ GroupId: sgId }));
     return "deleted";
   } catch (e: any) {
-    // 序 37 B-65:Glue 作业跑过这条连接后,它的网卡要几分钟才释放;这期间 DeleteSecurityGroup 回 DependencyViolation。
+    // Glue 作业跑过这条连接后,它的网卡要几分钟才释放;这期间 DeleteSecurityGroup 回 DependencyViolation。
     //   原来一律吞成 failed ⇒ 平台自建的组静默漏在 VPC 里(真环境 2026-10-12 第二轮撞到)。如实区分,由调用方后台重试。
     if (String(e?.name || e?.Code || "").includes("DependencyViolation")) return "failed-dependency";
     return "failed";
@@ -358,7 +350,7 @@ export async function deleteSecurityGroup(sgId: string, region: string, datasour
 }
 
 /**
- * 序 58 B-130:这个安全组现在被多少张网卡引用(DescribeNetworkInterfaces 按 group-id 过滤,翻到底)。
+ * 这个安全组现在被多少张网卡引用(DescribeNetworkInterfaces 按 group-id 过滤,翻到底)。
  * 持久清理作业按它决定「等」还是「删」:> 0 时 DeleteSecurityGroup 必 DependencyViolation,不必白试。
  * 🔴 读失败就抛(调用方回 retry),不回 0 —— 0 会被当成「可以删」。组不存在时 EC2 回空清单(= 0),删除那一步再按 `gone` 收口。
  */
@@ -382,7 +374,7 @@ export async function countNetworkInterfacesInSecurityGroup(sgId: string, region
 
 const GLUE_ROLE_NAME = "bgp-glue-role";
 
-// 序 57 / B-129 ②:`bgp-glue-role` 是平台栈(infra/lib/platform-stack.ts GlueRole)部署期就建好的基础设施,原来却在**每次建源的请求路径上**
+// ②:`bgp-glue-role` 是平台栈(infra/lib/platform-stack.ts GlueRole)部署期就建好的基础设施,原来却在**每次建源的请求路径上**
 //   都去 IAM 核一遍(GetRole 经 NAT 到公网 IAM 端点)—— 第四十七轮实测这一跳停顿 64 秒就把整条建源请求撞成 504。
 //   现在进程内只核一次:成功就缓存 ARN(角色不会在运行期消失;真被人删了,Glue 作业启动会如实报错,不在建源这一跳猜);
 //   失败不缓存(下次建源再核);🔴 只有 **NoSuchEntity** 才走补建分支(老环境自愈)—— 原来 `catch {}` 把网络超时 / 限流也当成「角色不存在」去 CreateRole,
@@ -460,14 +452,14 @@ async function verifyOrCreateGlueRole(): Promise<string> {
 // ============ DS-01: Auto Glue Connection ============
 
 /** JDBC URL 的唯一作者(建连接 / 改连接都用它;类型不在 SPI 清单 ⇒ 空串,由调用方决定拒不拒)。 */
-// @kf-batch 44-jdbc-params —— 第五个参数 = 用户附加 JDBC 参数(已归一化的 `k=v&k=v`;方言默认参数由 provider 自己带)。
+// 第五个参数 = 用户附加 JDBC 参数(已归一化的 `k=v&k=v`;方言默认参数由 provider 自己带)。
 export function jdbcUrlFor(type: string, host: string, port: number, database: string, jdbcParams?: string): string {
   return isDataSourceType(type)
     ? (getProvider(type).buildConnection({ type, connection: { host, port, database, ...(jdbcParams ? { jdbcParams } : {}) } }).jdbcUrl || "")
     : "";
 }
 
-// @kf-batch 42-B83-ds-edit-sync —— 编辑数据源改了 host / port / database / type 或登录名 / 口令 ⇒ 同步到 Glue 连接(台账 B-83)。
+// 编辑数据源改了 host / port / database / type 或登录名 / 口令 ⇒ 同步到 Glue 连接(台账)。
 // 原来只有「网络接入」会改 Glue 连接,改 host 只落库:同步作业 / 发现作业 / 探测走的 Glue 连接仍指着旧库。
 // UpdateConnection 需回传完整 ConnectionInput:先 Get,保留网络(PhysicalConnectionRequirements),只换连接串 / 凭证属性。
 export async function updateGlueConnectionEndpoint(
@@ -511,8 +503,8 @@ export async function createGlueConnection(
   // 🔴 Glue 连接是**区域资源**:建在主控区而同步作业在别的区跑,作业引用连接名时报「连接不存在」。
   const { glue } = await dsClients(region);
   const connName = platformGlueConnectionName(datasourceId);
-  // 模块 42:JDBC URL 由 provider 产出(取代写死的 JDBC_URL 表);建 / 改同一个作者 jdbcUrlFor。
-  // @kf-batch 44-jdbc-params —— 用户附加参数也进 Glue 连接的 JDBC_CONNECTION_URL(与同步脚本 / 发现脚本同一条 URL)。
+  // JDBC URL 由 provider 产出(取代写死的 JDBC_URL 表);建 / 改同一个作者 jdbcUrlFor。
+  // 用户附加参数也进 Glue 连接的 JDBC_CONNECTION_URL(与同步脚本 / 发现脚本同一条 URL)。
   const jdbcUrl = jdbcUrlFor(type, host, port, database, jdbcParams);
   const { username, password } = await getSecret(secretArn);
 
@@ -529,7 +521,7 @@ export async function createGlueConnection(
         PhysicalConnectionRequirements: {
           SubnetId: network.subnetId,
           SecurityGroupIdList: glueSecurityGroupIds(network),
-          // 🔴 B-133 第二刀:AZ 按子网事实取(源行不存 AZ,自愈重建时 network.availabilityZone 为空)
+          // 🔴 第二刀:AZ 按子网事实取(源行不存 AZ,自愈重建时 network.availabilityZone 为空)
           AvailabilityZone: await resolveConnectionAvailabilityZone(network.subnetId, region, network.availabilityZone),
         },
       },
@@ -569,14 +561,14 @@ export async function updateGlueConnectionNetwork(
       PhysicalConnectionRequirements: {
         SubnetId: net.subnetId,
         SecurityGroupIdList: net.securityGroupIds,
-        // 🔴 B-133 第二刀:UpdateConnection 整体替换 PhysicalConnectionRequirements,原先调用方不给 AZ 就把连接上已有的 AZ 冲掉 ⇒ 作业起不来;一律按子网事实补齐
+        // 🔴 第二刀:UpdateConnection 整体替换 PhysicalConnectionRequirements,原先调用方不给 AZ 就把连接上已有的 AZ 冲掉 ⇒ 作业起不来;一律按子网事实补齐
         AvailabilityZone: await resolveConnectionAvailabilityZone(net.subnetId, region, net.availabilityZone),
       },
     },
   }));
 }
 
-// ============ 序 61 B-133:外部对象事实读取(漂移核对用;只读,读不到就抛,由调用方判 unverifiable) ============
+// ============:外部对象事实读取(漂移核对用;只读,读不到就抛,由调用方判 unverifiable) ============
 
 export interface SecurityGroupFact {
   groupId: string;
@@ -667,7 +659,7 @@ export async function describeSubnetFact(subnetId: string, region: string): Prom
 }
 
 /**
- * 序 61 B-133 第二刀(2026-10-29 …4916 页面驱动 b133 B133-7 真撞):Glue 连接的 PhysicalConnectionRequirements **必须带 AvailabilityZone**,
+ * 第二刀(2026-10-29 …4916 页面驱动 b133 B133-7 真撞):Glue 连接的 PhysicalConnectionRequirements **必须带 AvailabilityZone**,
  * 缺了 Glue 作业起不来 ——「Unable to resolve any valid connection」。建源落库的 networkConfig 从不存可用区,自愈 / 改网络按源行重建
  * 连接时就把它丢了(建源那次有 AZ 是因为探测结果在内存里)。根治 = 写连接的两个作者(建 / 改)都在这里按子网事实取 AZ:
  * 调用方给了就核对一致(矛盾 ⇒ 抛,不猜);没给就按子网事实补;子网不在 ⇒ 抛(不写一条起不来的连接)。
@@ -742,7 +734,7 @@ export async function testConnection(connName: string, region: string = homeRegi
 // ============ DS-06: RDS Discovery ============
 
 export async function discoverRdsInstances(region: string = homeRegion) {
-  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 RDS 发现按区:在 us-west-2 建源时,
+  // 🔴 RDS 发现按区:在 us-west-2 建源时,
   // 用主控区客户端列出来的是**主控区的实例**,用户从里面选一台,建出来的数据源指向一台
   // 那个区连不到的库(而界面上一切正常)。
   const { rds } = await dsClients(region);

@@ -90,7 +90,7 @@ describe("cost-signature", () => {
     expect(s1.title).not.toContain("0.5");
   });
 
-  // @kf-batch 50-WP6-cost-by-region(E-174)—— 变异:去掉 target 维 ⇒ 本条红
+  // 变异:去掉 target 维 ⇒ 本条红
   it("🔴 任务级:同任务**不同区**必须是不同签名(否则两区事件落进同一知识库主档)", () => {
     const a = costSignature({ ...taskAnomaly, targetId: "tgt_home" }, "glue");
     const b = costSignature({ ...taskAnomaly, targetId: "tgt_usw2_a" }, "glue");

@@ -1,11 +1,10 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1 —— 「落点」的一等类型(WORK-PACKAGES v1.86 WP-31 ① L1)。
+// 「落点」的一等类型。
 //
 // ── 为什么要有这个文件 ──────────────────────────────────────────────────────────
-// 落点 bug 越修越多的根因(WP-31 ⓪):「在哪个区执行」从来不是一等值,而是散在各处的
+// 落点 bug 越修越多的根因(⓪):「在哪个区执行」从来不是一等值,而是散在各处的
 // `targetId?: string | null` —— **漏传 = 主控区**,而主控区返回的是**真数据**,于是错误静默。
-// B-26 的修法(`LakeTarget = { targetId: string | undefined }`)把键改成了必填,但 `undefined`
-// 仍然是合法值、仍然 = 主控区 —— 静默默认只是换了个写法留在类型里(WP-31 §⑥ D3 的对照组)。
+//该缺陷的修法(`LakeTarget = { targetId: string | undefined }`)把键改成了必填,但 `undefined`
+// 仍然是合法值、仍然 = 主控区 —— 静默默认只是换了个写法留在类型里(§⑥ D3 的对照组)。
 //
 // ⇒ 本文件的三条承重:
 //   ① `TargetRef` 是**判别联合,没有可选、没有 undefined**:要么点名一个 target,要么**写明理由**地要主控区;
@@ -35,7 +34,7 @@ export type TargetRef =
  * 解析后的落点(L1):**一切数据面资源名与区域只许从这里取**。
  *
  * 由 DDB 描述符派生(`source` 恒为 `"descriptor"`,主控区也一样 —— PL-3 判据看的就是这个字段)。
- * `version` = 描述符的乐观锁版本,请求内只读一次、同一份用到底(WP-31「DDB 唯一真值 + 读取时复核」)。
+ * `version` = 描述符的乐观锁版本,请求内只读一次、同一份用到底(「DDB 唯一真值 + 读取时复核」)。
  */
 export interface Place {
   readonly targetId: string;

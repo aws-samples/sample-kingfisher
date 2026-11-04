@@ -1,14 +1,13 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.2c-control-api
 // POST /api/admin/exec-envs/[targetId]/deploy —— 触发部署(SPEC §2.1:响应 {buildId, lockEpoch})。
 //
 // 【平台侧刻意"什么都不做"的两件事,理由都在合同里】
 // ① **不抢部署锁、不写状态**:锁与 `status→initializing` 都在 broker 内同一次条件写完成
 //    (DESIGN:549 —— 锁若放调用方一侧,任何能直接 invoke broker 的人都能绕过它);
 // ② **不透传除白名单参之外的任何东西**:broker 对未知字段是"拒"不是"忽略"(IR-P0-05)。
-// @kf-batch 50-W5-seg1-WP3 —— 🔴 SPEC §2.1 v3.21:可选 `approvedPlanHash`(与 add-components 同形态)。
+// 🔴 SPEC §2.1 v3.21:可选 `approvedPlanHash`(与 add-components 同形态)。
 //   已启用 target 的「重新部署」= **升级**:源包一变即 `drift-unauthorized` 必须审批(§3.5c ④),而此前本路由
-//   无法带审批 ⇒ 「重新部署」按钮在源漂移后根本走不通(WP-3 开工勘出)。升级动线 = preview(同集)→ 看计划 → 本路由带 hash。
+//   无法带审批 ⇒ 「重新部署」按钮在源漂移后根本走不通(开工勘出)。升级动线 = preview(同集)→ 看计划 → 本路由带 hash。
 //   平台侧只是把批准递下去;要不要审批仍由 build 侧闸重算(纵深两道锁)。
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -40,13 +39,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
     const target = await getTargetRaw(params.targetId);
     if (!target) return apiError(`执行目标不存在:${params.targetId}`, 404, { code: "NOT_FOUND" });
 
-    // @kf-batch 50-W5-seg1-WP10a —— 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
+    // 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
     //    跨法域 target 与同法域走同一条通道;它唯一的技术前置(装 residency-api + per-target 角色)由准入内核
     //    `residencyPrerequisite` 判,不在部署入口设门 —— 不装 residency-api 的跨法域 target 能部署、能探活,但 active 后**不承接**工作。
 
     // components:显式传则用之(broker 是校验权威);缺省用注册时的勾选集。
     const components = Array.isArray(body.components) ? (body.components as string[]) : (target.components ?? []);
-    // @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态:下发集必须装齐完整组件集(显式传 components 也不能绕开)。
+    // ② —— 🔴🔴 不提供精简形态:下发集必须装齐完整组件集(显式传 components 也不能绕开)。
     //   不完整的存量环境 ⇒ 先〔补齐缺失组件〕(add-components),再重新部署。
     const requiredNow = requiredComponentsForTarget(target);
     const lackingNow = requiredNow.filter((c) => !(components as unknown[]).includes(c));

@@ -7,7 +7,7 @@
 #                                          platform/src/lib/aws/s3tables-catalog.ts 的 s3TablesFederatedCatalogInput 逐字段相同);
 #                                          读不到 ⇒ die(不把「读不到」当「不存在」去盲建)
 #
-# 🔴 为什么存在(序 43 B-91,2026-10-16):Athena 直查 / 问数靠这个目录把本区 S3 Tables 表桶暴露成
+# 🔴 为什么存在:Athena 直查 / 问数靠这个目录把本区 S3 Tables 表桶暴露成
 #   `"s3tablescatalog/<表桶>"."<命名空间>"."<表>"`。它不是 CDK 能建的资源(CloudFormation 没有对应类型),deploy-all /
 #   redeploy-platform / 执行区栈组都没建它;平台只在「同步任务写 S3 Tables」的启动路径里懒创建 ⇒ 全新账号只要没跑过
 #   那样一次同步,直查 / 问数一律 CATALOG_NOT_FOUND(…7698 页面驱动 p43c 坐实;…4400 有,是 10-14 一次同步启动顺手建的)。

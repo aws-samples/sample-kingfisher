@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3a-add-components
 // POST /api/admin/exec-envs/[targetId]/add-components —— 补充部署(SPEC §2.1 / §4.6)。
 //
 // 【与 deploy 的区别只有"入参组件集从哪来"】deploy 用注册表里已装的组件重跑;本端点让管理员
@@ -12,7 +11,7 @@ export const dynamic = "force-dynamic";
 //      真读到组件栈 Outputs 之后按 observed 语义回写(G 批 P1-1:资源存在前绝不声称)。
 //
 // 【只增不减】本端点拒绝"比现装组件更小的集合":减组件意味着要销毁有状态资源,那是删除流程
-// (drain → 审批 → 销毁,§4.6 / P50.3)的地盘,绝不能靠"少传一个组件"顺手发生。
+// (drain → 审批 → 销毁,§4.6)的地盘,绝不能靠"少传一个组件"顺手发生。
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -61,7 +60,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
     const target = await getTargetRaw(params.targetId);
     if (!target) return apiError(`执行目标不存在:${params.targetId}`, 404, { code: "NOT_FOUND" });
 
-    // @kf-batch 50-W5-seg1-WP10a —— 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
+    // 原「跨法域前置闸(403)」**已删**(DESIGN §18 决策 6quinquies:平台不设法务门)。
     //    跨法域 target 与同法域走同一条通道;它唯一的技术前置(装 residency-api + per-target 角色)由准入内核
     //    `residencyPrerequisite` 判,不在部署入口设门 —— 不装 residency-api 的跨法域 target 能部署、能探活,但 active 后**不承接**工作。
 

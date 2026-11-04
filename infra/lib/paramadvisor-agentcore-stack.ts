@@ -15,8 +15,8 @@ import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as path from "path";
 import { Construct } from "constructs";
 import { attachParamAdvisorReadOnlyPolicy } from "./paramadvisor-iam";
-import { resolveModelId } from "./shared/model"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
-import { buildAgentCoreResources } from "./shared/agentcore-base"; // 模块47 L1:协议层共享基类
+import { resolveModelId } from "./shared/model"; // 模型 ID 收敛 SSOT(ai-model.json)
+import { buildAgentCoreResources } from "./shared/agentcore-base"; // 协议层共享基类
 
 export interface ParamAdvisorAgentCoreStackProps extends cdk.StackProps {
   modelId?: string;
@@ -26,7 +26,7 @@ export class ParamAdvisorAgentCoreStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ParamAdvisorAgentCoreStackProps = {}) {
     super(scope, id, props);
     const region = cdk.Stack.of(this).region;
-    // 模块47 L0:默认模型走全平台 SSOT(ai-model.json,当前 sonnet-4-5)。props > env > SSOT。
+    // 默认模型走全平台 SSOT(ai-model.json,当前 sonnet-4-5)。props > env > SSOT。
     const modelId = resolveModelId(props.modelId);
 
     // platform 目录(Lambda 源码 + tsconfig + lock 所在)。infra/lib → ../../platform。
@@ -99,7 +99,7 @@ export class ParamAdvisorAgentCoreStack extends cdk.Stack {
     repo: ecr.Repository; skillFn: NodejsFunction; gatewayRole: iam.Role; runtimeRole: iam.Role;
     modelId: string;
   }) {
-    // 模块47 L1:协议层(Gateway/Target/Runtime门控/Memory+角色+Outputs)走共享基类。
+    // 协议层(Gateway/Target/Runtime门控/Memory+角色+Outputs)走共享基类。
     // id 原样传入 → 逻辑 ID 与抽取前逐字节一致(cdk synth diff 已验 0 变化,零资源重建)。
     buildAgentCoreResources({
       stack: this,

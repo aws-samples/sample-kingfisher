@@ -1,16 +1,16 @@
-// 序 73 模块 57(57 DESIGN §3.2 / §3.5)—— 编排 DAG「离线作业节点」的**发布期解析**与「同步 / 作业节点落点一致性」的**唯一作者**。
+// 编排 DAG「离线作业节点」的**发布期解析**与「同步 / 作业节点落点一致性」的**唯一作者**。
 //
 // 【做什么】
 //   · `resolveJobNodeSpec`:读作业行(ETL `bgp-etl-jobs` / EMR `bgp-engine-jobs`)→ 作业存在 · 项目一致 · `bindingTargets(job) ∋ 工作流落点`
 //     → 调**已有**单作业 spec 构造器(`lib/etl/job-spec.ts` / `lib/engines/emr/job-spec.ts`)得到与单作业载体**同一份** spec。
 //     不满足 ⇒ 抛 `JobNodeUnbound`(code JOB_NODE_UNBOUND,路由侧映射 400,点名节点与作业)。
-//   · `assertWorkflowNodesRunOn`(R5 / B-141 ①):发布前遍历节点 —— sync ⇒ `assertDefinitionRunsHere(task, "同步任务", wfTarget)`;
+//   · `assertWorkflowNodesRunOn`:发布前遍历节点 —— sync ⇒ `assertDefinitionRunsHere(task, "同步任务", wfTarget)`;
 //     job ⇒ 上面的三道判定。任一不合 ⇒ 抛(整个发布 400,不许先发一半 —— 调用方 `publishWorkflowDag` 先把全部绑定区核完再动第一个字节)。
 //   · `withJobSpecs`:把解析结果挂进 `node.data.jobSpec`,两条生成路(serverless YAML / 经典 runtime-lib spec)都从 data 透传,
 //     运行期 `_exec_job` 只读它。
 // 【边界】本文件**只读**(DDB GetItem + 落点解析):EMR 作业在该区的就位(脚本上传 / jar 复制 / application 建立)是写操作,
 //   在 `job-node-prepare.ts`(发布的写阶段)做;只读解析用确定性读法(`applicationIdOf` / `entryPointUri` / `s3TablesJarUriFor`)
-//   拿到同一个值,所以 B-09 载体漂移比对(只读)也能重新生成同一份 spec。
+//   拿到同一个值,所以载体漂移比对(只读)也能重新生成同一份 spec。
 // 🔴 不许有静默默认值:`jobRef.kind` 闭合(JOB_NODE_KINDS);落点 / 项目不一致一律拒,绝不「替它挑一个区」。
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
@@ -128,7 +128,7 @@ export interface JobNodeSpecContext {
 /**
  * 解析一个离线作业节点在工作流落点上的运行 spec —— 与单作业载体**同一份**(同一个 spec 作者)。
  * 🔴 EMR 作业在该区还没有 application(从没在该区运行 / 发布过,且发布的写阶段还没就位)⇒ `not-prepared`:
- *    只读路径(B-09 比对)不替它建;发布路径在 `prepareJobNodesForTarget` 建好之后再来解析。
+ *    只读路径(比对)不替它建;发布路径在 `prepareJobNodesForTarget` 建好之后再来解析。
  */
 export async function resolveJobNodeSpec(
   node: WorkflowNodeLike,
@@ -200,7 +200,7 @@ export function withJobSpecs(workflow: Workflow, specs: Record<string, Serverles
 }
 
 /**
- * R5 / B-141 ①:**发布期落点一致性 fail-closed**。遍历节点:
+ * R5 ①:**发布期落点一致性 fail-closed**。遍历节点
  *   · sync ⇒ 任务存在 + `assertDefinitionRunsHere(task, "同步任务", wfTarget)`(不再等运行期 EntityNotFound);
  *   · job  ⇒ 作业存在 · 项目一致 · 绑定含 wfTarget(`loadJobNodeRow`)。
  * 任一不合 ⇒ 抛 `JobNodeUnbound`;只读、零副作用(调用方在任何写之前调它)。

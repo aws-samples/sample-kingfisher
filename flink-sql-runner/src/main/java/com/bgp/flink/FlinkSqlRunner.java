@@ -12,7 +12,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 
 /**
- * 通用 Flink SQL 流作业 runner(模块 32)。
+ * 通用 Flink SQL 流作业 runner。
  *
  * 平台把用户编写的多语句 Flink SQL 通过 MSAF 运行时属性(property group "bgp", key "sql")注入;
  * 本 runner 解析并执行:DDL/SET 即时执行,INSERT 收集进 StatementSet 一次提交(支持多 sink)。

@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // 目录单测(51 SPEC §2 GET /catalog;DESIGN D3′ 四系列(v2.0 档案驱动)/ M11 只读缓存 / §7.5 排序)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -20,7 +19,7 @@ const fm = async () => [
   { modelId: "openai.gpt-5.6-sol", modelName: "GPT-5.6 Sol", outputModalities: ["TEXT"] },
   { modelId: "openai.gpt-oss-120b", modelName: "gpt-oss", outputModalities: ["TEXT"] },
   { modelId: "amazon.titan-image-generator-v2", modelName: "Titan Image", outputModalities: ["IMAGE"] },
-  // @kf-batch 51-v2-multi-vendor —— 2026-10-14 临时账号 us-east-1 ListFoundationModels 真实形态
+  // 2026-10-14 临时账号 us-east-1 ListFoundationModels 真实形态
   { modelId: "zai.glm-5.3", modelName: "GLM 5.3", outputModalities: ["TEXT"], inferenceTypesSupported: ["INFERENCE_PROFILE"] },
   { modelId: "zai.glm-5", modelName: "GLM 5", outputModalities: ["TEXT"], inferenceTypesSupported: ["ON_DEMAND"] },
   { modelId: "zai.glm-4.7", modelName: "GLM 4.7", outputModalities: ["TEXT"], inferenceTypesSupported: ["ON_DEMAND"] },
@@ -41,7 +40,7 @@ const ip = async () => [
 
 beforeEach(() => mem.db.reset());
 
-// @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = process.env.AWS_REGION + tgt_home)
+// 落点必填(原来缺省 = process.env.AWS_REGION + tgt_home)
 const HOME_PLACE = { targetId: "tgt_home", region: "us-east-1" };
 
 describe("isSelectableSeries(D3′ 四系列,档案驱动)", () => {
@@ -104,7 +103,7 @@ describe("fetchCatalog", () => {
     expect(writesAfterSeed).toHaveLength(0);
   });
 
-  // @kf-batch 51-v2-multi-vendor —— 51 SPEC §7.5 排序
+  // 51 SPEC §7.5 排序
   it("排序:available 的在前(哪一系都行),其后按档案系列顺序 anthropic → openai → zai → moonshotai,再按 id", async () => {
     await putProbe("tgt_home", "global.moonshotai.kimi-k3", { ok: true, toolUseOk: true }, 1000);
     const models = await fetchCatalog({ place: HOME_PLACE, deps: { listFoundationModels: fm, listInferenceProfiles: ip, now: () => 1000 } });
@@ -128,7 +127,7 @@ describe("fetchCatalog", () => {
   });
 });
 
-// @kf-batch 50-PROD-A-launch-hardening(h)—— 主控区 / 执行区不在美国:该区的推理配置前缀按账号真值推,不枚举
+// 主控区 / 执行区不在美国:该区的推理配置前缀按账号真值推,不枚举
 describe("非美国区的推理配置(eu. / apac. / jp. / us-gov.)", () => {
   const arn = (r: string, m: string) => `arn:aws:bedrock:${r}::foundation-model/${m}`;
   const ipGeo = async () => [

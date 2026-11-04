@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-24)
 /**
  * 钉住成本按区。用户 2026-09-10:「『成本大盘』与『预算护栏』仍是全平台合计 ——
  * 账单来自 Cost Explorer 的服务维度采集,按区拆分需要**多采一个 REGION 分组并重采存量**」。
@@ -18,7 +17,7 @@ const SRC = resolve(__dirname, "../../..");
 const read = (p: string) => readFileSync(resolve(SRC, p), "utf8");
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
 
-describe("成本采集的区维(SC-24)", () => {
+describe("成本采集的区维", () => {
   const collector = strip(read("lib/finops/collector.ts"));
   const store = strip(read("lib/finops/store.ts"));
 
@@ -36,20 +35,20 @@ describe("成本采集的区维(SC-24)", () => {
     expect(collector).toContain('|| "NoRegion"');
   });
 
-  // @kf-batch 50-WP6-cost-by-region —— 原判据「重采后必须删掉旧格式行」被合同订正取代:
-  // WP-6 ④「读侧只读 v2;旧行留待 TTL」⇒ 换 pk 前缀让混计**结构上读不到**,不再删任何行。
-  it("🔴 WP-6:采集器不删任何成本日行(旧分区留着,回滚读侧时仍可用)", () => {
+  // 原判据「重采后必须删掉旧格式行」被合同订正取代
+  // ④「读侧只读 v2;旧行留待 TTL」⇒ 换 pk 前缀让混计**结构上读不到**,不再删任何行。
+  it("🔴 采集器不删任何成本日行(旧分区留着,回滚读侧时仍可用)", () => {
     expect(collector).not.toMatch(/purge|DeleteCommand/);
     expect(store).not.toContain("purgeLegacyCostDaily");
   });
 
-  it("🔴 WP-6:pk 只经 `COST_DAILY_PK_PREFIX`(v2)拼,不许散写 `cost#`", () => {
+  it("🔴 pk 只经 `COST_DAILY_PK_PREFIX`(v2)拼,不许散写 `cost#`", () => {
     expect(store).toContain("`${COST_DAILY_PK_PREFIX}${month}`");
     expect(store).not.toMatch(/`cost#\$\{/);
   });
 });
 
-describe("大盘 / 预算按区的三条处置(SC-24)", () => {
+describe("大盘 / 预算按区的三条处置", () => {
   const overview = strip(read("app/api/finops/overview/route.ts"));
   const budgets = strip(read("app/api/finops/budgets/route.ts"));
   const evalSrc = strip(read("lib/finops/budget-eval.ts"));
@@ -58,14 +57,14 @@ describe("大盘 / 预算按区的三条处置(SC-24)", () => {
     expect(overview).toContain("isUnattributed");
     expect(overview).toContain("unattributedUsd");
     expect(overview, "必须把「有多少钱还没归区」说给用户,否则他会拿合计去对账单总额").toContain("unattributedNote");
-    // @kf-batch 50-WP6-cost-by-region —— 「存量行 / 立即重采」分支随 v2 读侧一起删除(旧分区读不到了)
+    // 「存量行 / 立即重采」分支随 v2 读侧一起删除(旧分区读不到了)
     expect(overview).not.toContain("needsRecollect");
     // 🔴 负向:不许出现「无 region ⇒ 当成主控区」这类回落
     expect(overview).not.toMatch(/region\s*\|\|\s*process\.env\.AWS_REGION/);
   });
 
   it("🔴 只有 region 作用域的预算被范围筛掉;账号 / 服务 / 项目作用域横切所有区", () => {
-    // @kf-batch 50-WP6-cost-by-region —— 视角 → 区集合只许经 `regionsInViewOf`(全部视角 = null)
+    // 视角 → 区集合只许经 `regionsInViewOf`(全部视角 = null)
     expect(budgets).toContain("regionsInViewOf(scope)");
     expect(budgets).toContain('b.scope.kind !== "region" || regions.has(b.scope.region)');
   });

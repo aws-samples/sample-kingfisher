@@ -1,4 +1,4 @@
-// 序 41 B-118 —— 行上「启动 / 停止」判别 + 状态文案 + 接线(列表与详情页都用唯一作者,不再各写 `status === "running"`)。
+// 行上「启动 / 停止」判别 + 状态文案 + 接线(列表与详情页都用唯一作者,不再各写 `status === "running"`)。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -8,7 +8,7 @@ const SRC = resolve(__dirname, "../../..");
 const read = (rel: string) => readFileSync(resolve(SRC, rel), "utf8");
 
 describe("syncTaskCanStop / syncToggleAction", () => {
-  it("running 与 provisioning 都可停(B-118 原形:DMS 启动后那几分钟没有停止入口)", () => {
+  it("running 与 provisioning 都可停(原形:DMS 启动后那几分钟没有停止入口)", () => {
     expect(SYNC_STOPPABLE_STATUSES).toEqual(["running", "provisioning"]);
     expect(syncTaskCanStop("running")).toBe(true);
     expect(syncTaskCanStop("provisioning")).toBe(true);

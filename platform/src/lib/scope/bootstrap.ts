@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4-o1-scope
-// WP-4 O1 —— 「顶栏这一刻该显示哪个执行范围」的**纯决策函数**(合同 SPEC v3.36 §2.6.5a / §2.6.5b)。
+// O1 —— 「顶栏这一刻该显示哪个执行范围」的**纯决策函数**(合同 SPEC v3.36 §2.6.5a / §2.6.5b)。
 //
 // 为什么单独抽出来:这段逻辑有 5 条分支、每条都有一个「做错了会很难查」的失败形态,
 // 而它天然长在 React 组件里(useSearchParams / localStorage)—— 那就没法用本仓的 node 单测钉住。
@@ -8,7 +7,7 @@
 // 🔴 五条分支的取舍写在这里,别在组件里再解释一遍:
 //   ① URL 带合法 scope           ⇒ URL 赢(§2.6.2 URL 是权威),顺手存进 localStorage
 //   ② URL 带的 scope 文法非法     ⇒ **保留 URL 原样** + 渲染错误壳。绝不改写成 global —— 前端把 4xx
-//                                  吃掉再自己切 global 是最隐蔽的一种回落(判据 E-154)
+//                                  吃掉再自己切 global 是最隐蔽的一种回落(判据)
 //   ③ URL 带的 target 不在可用列表 ⇒ 同 ②(精确拒因由服务端给:404/403/409),前端只负责别装没事
 //   ④ URL 不带 + localStorage 有且仍可用 ⇒ **恢复它并把参数写回地址栏**(用户拍板:刷新不能丢选择)
 //   ⑤ URL 不带 + localStorage 的值已不可用 ⇒ 落回「全部」+ **明确告知**。
@@ -44,7 +43,7 @@ export type InitialScopeResult =
   | { kind: "restored"; scope: TargetScope; rewriteTo: string }
   /** 存的值已不可用:落回「全部」+ 告知 */
   | { kind: "restored-stale"; scope: TargetScope; staleRaw: string }
-  /** 什么都没有:全部(= 现状,E-158 的回滚点) */
+  /** 什么都没有:全部(= 现状,回滚点) */
   | { kind: "default"; scope: TargetScope };
 
 export function resolveInitialScope(input: InitialScopeInput): InitialScopeResult {

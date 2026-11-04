@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { retrieve } from "@/lib/cookbook";
-describe("P45.2 新配方可检索", () => {
+describe("新配方可检索", () => {
   it("拉链表命中 scd2", async () => {
     const s = await retrieve("redshift", { keywords: "拉链表 缓变维 用户维度变化", topK: 3 });
     expect(s.recipes.some(r => r.id === "redshift.scd2-history")).toBe(true);

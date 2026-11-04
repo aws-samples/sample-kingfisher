@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-decommission
 // POST /api/admin/exec-envs/[targetId]/delete-request —— 申请删除(INTERACTION §1.4 机制 A + C)。
 // 入参 `{confirm, previewHash}`:`confirm` 必须**逐字等于该环境的 region**(强确认,防手滑);
 // `previewHash` 是用户看过的那一份影响预览的指纹 —— 服务端重算,不一致 ⇒ 409 PREVIEW_DRIFT 要求重新预览。

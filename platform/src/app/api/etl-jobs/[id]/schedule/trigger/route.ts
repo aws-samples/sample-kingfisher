@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP15-airflow-serverless(施工序 6)
-// POST /api/etl-jobs/[id]/schedule/trigger —— 〔触发一次〕:对已发布的 target 立刻跑一次调度产物(S-7)。
+// POST /api/etl-jobs/[id]/schedule/trigger —— 〔触发一次〕:对已发布的 target 立刻跑一次调度产物。
 // 分路在 lib/scheduler/trigger.ts(serverless ⇒ StartWorkflowRun;mwaa ⇒ dags trigger);跨法域 target 的手动触发是用户发起的数据操作
 // ⇒ 与〔立即运行〕同一前置(免责告知同意);运行行仍由调度产物内的运行时写(triggeredBy=schedule + runType=ON_DEMAND)。
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— targets 子集的唯一解析作者
+// targets 子集的唯一解析作者
 import { requestedSubset } from "@/lib/place/resolve";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";

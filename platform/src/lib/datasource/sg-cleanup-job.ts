@@ -1,7 +1,7 @@
-// 序 58 B-130 —— 删数据源 / 建源失败清理后,平台自建安全组 `bgp-ds-*` 的**持久**清理作业(数据面作业 kind `sg-cleanup`)。
+// 删数据源 / 建源失败清理后,平台自建安全组 `bgp-ds-*` 的**持久**清理作业(数据面作业 kind `sg-cleanup`)。
 //
 // 【为什么要有】建源后的连通性探测 / 「检测」「浏览表」的 Glue 发现作业 / 同步作业都会把网卡挂在这个组上,网卡释放实测要 5–15 分钟;
-//   原来(序 37 B-65)删不掉就在**进程内存里**定时重试 10 × 30 秒,耗尽即放弃且不留任何记录 ⇒ 组永久遗留(2026-10-28 CloudTrail 坐实
+//   原来删不掉就在**进程内存里**定时重试 10 × 30 秒,耗尽即放弃且不留任何记录 ⇒ 组永久遗留(2026-10-28 CloudTrail 坐实
 //   两个测试账号各 11 次 DependencyViolation 后再无尝试),ECS 滚动 / 重启时重试更是当场丢。
 // 【做法】与删项目后回收凭证(`lib/exec-env/project-cred-reclaim.ts`)同一套机制:
 //   · 入队 = 一次条件写(`createJob`),之后由泵推进;进程被杀不丢(状态全在 DDB,租约过期由任一副本接手);
@@ -16,7 +16,7 @@ import { createJob, getJob } from "@/lib/dataplane-jobs/store";
 import { dataplaneJobId, isTerminalPhase, type DataplaneJobRow } from "@/lib/dataplane-jobs/model";
 import { countNetworkInterfacesInSecurityGroup, deleteSecurityGroup } from "@/lib/aws/datasource-service";
 import { sanitizeAwsErrorMessage } from "@/lib/exec-env/deploy-control";
-// 序 31 二刀 ⑤:清理步在泵的内部请求里跑,第一个数据面调用之前按作业落点记一笔决策(否则观测器把 ec2.Describe* 记成未归因)
+// 清理步在泵的内部请求里跑,第一个数据面调用之前按作业落点记一笔决策(否则观测器把 ec2.Describe* 记成未归因)
 import { notePlaceDecision } from "@/lib/place/context";
 
 /** 决策记账里的作者名(观测清单按它归类)。 */

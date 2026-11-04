@@ -1,4 +1,4 @@
-// 模块 36 — 敏感数据识别扫描服务。
+// 敏感数据识别扫描服务。
 //
 // 流程：introspectSchema 拉列元数据 → 对每张表一次抽样 SELECT（LIMIT N）→ 读回后在内存
 // 逐列跑注册表里全部检测器 → 取置信度最高者为主建议 → 写 findings（只存元数据）。
@@ -11,7 +11,7 @@
 //  4) 单表失败（表不存在/无权限）记 status:error，不影响其它表（错误隔离）。
 //  5) 扫描器只产出建议，采纳（写分级）是独立的人工动作（adopt.ts / API）。
 
-// @kf-batch 50-WP2-directquery —— 裸客户端 / 落点 / 轮询收编进 `lib/redshift/direct-query.ts`
+// 裸客户端 / 落点 / 轮询收编进 `lib/redshift/direct-query.ts`
 import {
   directQueryRaw,
   resolveDirectQueryPlaceSafe,
@@ -33,7 +33,7 @@ import {
 } from "@/lib/governance/classification";
 import { DETECTORS } from "./registry";
 import type { DetectorContext } from "./types";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 
 const DATABASE = process.env.REDSHIFT_DATABASE || "dev";
 
@@ -76,12 +76,11 @@ async function sampleTable(
   // 只 SELECT 明确列（列名经白名单校验），不使用 SELECT *（列顺序可控、可映射）。
   const safeCols = columns.map(safeIdent);
   const sql = `SELECT ${safeCols.join(", ")} FROM ${safeIdent(schema)}.${safeIdent(table)} LIMIT ${SAMPLE_N}`;
-  // @kf-batch 52-P52.5a-supply — 静态归类:**governance-read**(平台级只读受控全局读者)。
+  // 静态归类:**governance-read**(平台级只读受控全局读者)。
   // 🔴 **刻意不传 project**,而且这是合同规定的:50 SPEC §3.9 case "governance-read" 原文
   //    「🔴 【绝不】走 lookupProjectSecretArn(它们本无 project ⇒ 会被误判 fail-closed)」。
   //    敏感扫描要跨全部 schema 抽样,per-project 身份看不到别人的表 = 扫描直接判死
   //    (那正是 52 P0-3 要防的失败模式)。
-  // @kf-batch 50-WP2-directquery
   // 🔴 轮询预算保持**该站点原值 40 × 600ms**(别处是 50 × 700ms)—— 统一了就是悄悄改「多久算超时」,
   //    而抽样 SQL 的快慢直接决定扫描结果多寡,那种变化极难归因(见 direct-query.ts 的 DirectQueryPoll)。
   const raw = await directQueryRaw(place, sql, {
@@ -168,7 +167,7 @@ function round(n: number, d = 0): number {
 export interface ScanSummary {
   scanId: string;
   /**
-   * @kf-batch 50-WP28-platform-action-node —— 这次扫描**在哪个区**扫的(落点章)。
+   * 这次扫描**在哪个区**扫的(落点章)。
    * 🔴 原来 summary 不带它,而「最近一次扫描」是全表取最新 ⇒ 两个区各扫一次之后,
    *    在 A 区视角会读到 B 区的结果(串区)。存量没有它的行 = 落点改必填之前的扫描,当时只有主控区能扫 ⇒ 视为 tgt_home。
    */
@@ -191,7 +190,6 @@ export interface ScanResult {
   errors: Array<{ fqn: string; error: string }>;
 }
 
-// @kf-batch 50-WP2-directquery
 // 🔴 `scope` 缺省 = 主控区(与收编前逐字节等价);传了非 home 就扫**那个区的数仓**。
 // 🔴 静态归类仍是 **governance-read**:home 分支不传 projectId(敏感扫描要跨全部 schema 抽样,
 //    per-project 身份看不到别人的表 = 扫描直接判死,合同原话见 direct-query.ts 规矩 ②)。
@@ -200,7 +198,7 @@ export async function runSensitiveScan(input: {
   schema?: string;
   tables?: string[]; // 可选：仅扫这些表（"schema.table" 或裸表名）
   scannedBy?: string;
-  /** @kf-batch 50-WP31-place-first-class —— 必填(原来可省 = 主控区) */
+  /** 必填(原来可省 = 主控区) */
   scope: DirectQueryScope;
 }): Promise<ScanResult | DirectQueryUnavailable> {
   const pre = await resolveDirectQueryPlaceSafe(input.scope);
@@ -313,7 +311,7 @@ export async function getScan(scanId: string): Promise<ScanResult | null> {
 }
 
 // 最近一次扫描：低频低量，Scan + 内存取最大 scanId（ulid 时间有序）。
-// @kf-batch 50-WP28-platform-action-node —— 🔴 **按区取**(落点必填):原来是全表取最新 ⇒ 两个区各扫一次
+// 🔴 **按区取**(落点必填):原来是全表取最新 ⇒ 两个区各扫一次
 //   (尤其定时扫描上线之后,这是常态)就会在 A 区视角读到 B 区的扫描结果。
 //   存量 summary 没有 `targetId` = 落点改必填之前的扫描(当时只有主控区能扫)⇒ 归 `tgt_home`。
 //   Scan 要翻页扫完:Filter 在读之后生效,只读第一页会静默漏掉更新的那次扫描。

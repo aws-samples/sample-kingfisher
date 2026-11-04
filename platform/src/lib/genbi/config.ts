@@ -3,8 +3,8 @@
 // reference project. Override freely via the platform's env.
 import { homeRegion } from "@/lib/place/home-region";
 import { resolveModelId } from "@/lib/ai/model";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
-import { homeWorkgroup, homeDatabase } from "@/lib/redshift/warehouse-location"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
+// 数仓落点唯一出口(收编兜底字面量)。
+import { homeWorkgroup, homeDatabase } from "@/lib/redshift/warehouse-location"; // 模型 ID 收敛 SSOT(ai-model.json)
 
 function int(name: string, fallback: number): number {
   const v = parseInt(process.env[name] || "", 10);
@@ -13,7 +13,7 @@ function int(name: string, fallback: number): number {
 
 export const GENBI = {
   region: homeRegion(),
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:@deprecated 保留字段不动对象形状。9 个消费点已不再读它
+  // @deprecated 保留字段不动对象形状。9 个消费点已不再读它
   // (改为调用时经 lib/ai/model.ts 的运行时解析链求值:bgp-settings → env → SSOT),这里只是部署期快照,
   // 不反映页面上切换后的生效值。新代码请用 resolveModelIdRuntime("<capability>") / invokeConverse。
   /** @deprecated 模块加载期快照(env ‖ SSOT),不含运行时配置层;勿在新代码读取。 */

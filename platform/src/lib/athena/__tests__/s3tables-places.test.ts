@@ -1,4 +1,4 @@
-// 序 38 B-71 —— 一个执行环境的全部 S3 Tables 落点(平台表桶 + 已登记外部表桶)与按命名空间找桶。
+// 一个执行环境的全部 S3 Tables 落点(平台表桶 + 已登记外部表桶)与按命名空间找桶。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@aws-sdk/client-s3tables";
 
@@ -36,7 +36,7 @@ beforeEach(() => {
   h.tablesByBucketNs = { [`${S3TABLES_BUCKET}/gamedata`]: ["players"], [`${S3TABLES_BUCKET}/ods`]: ["ods_a"], "cust-own/ods": ["ods_vehicle"], "cust-own/raw": ["events"] };
 });
 
-describe("B-71 resolveS3TablesPlaces", () => {
+describe("resolveS3TablesPlaces", () => {
   it("没登记 ⇒ 只有平台表桶(external=false),与 resolveS3TablesPlace 同值", async () => {
     const ps = await resolveS3TablesPlaces("tgt_home");
     const p = await resolveS3TablesPlace("tgt_home");
@@ -57,7 +57,7 @@ describe("B-71 resolveS3TablesPlaces", () => {
   });
 });
 
-describe("B-71 listNamespaceTreeAll / resolveS3TablesPlaceForNamespace", () => {
+describe("listNamespaceTreeAll / resolveS3TablesPlaceForNamespace", () => {
   beforeEach(() => { h.ext.push({ targetId: "tgt_home", bucket: "cust-own", region: "us-east-1", addedBy: "a", addedAt: "2026-10-13T00:00:00Z" }); });
   it("树:每个命名空间带 bucket / catalog / external;外部桶的表三段名用外部桶的目录引用", async () => {
     const tree = await listNamespaceTreeAll(await resolveS3TablesPlaces("tgt_home"));

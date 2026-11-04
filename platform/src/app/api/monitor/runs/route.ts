@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.2-W2a-run-stamp
-// 监控「运行实例」列表 —— P52.2 读侧(52 SPEC §1「读写同批上线」)+ 50 INTERACTION §3.3 region 筛选。
+// 监控「运行实例」列表 —— 读侧(52 SPEC §1「读写同批上线」)+ 50 INTERACTION §3.3 region 筛选。
 //
 // 🔴 本批修掉的三件现网问题(52 DESIGN §12.4 已登记):
 // ① **零鉴权**:改动前本路由连 `resolveIdentity` 都没有 ⇒ 任一登录用户看**全平台**所有 run
@@ -8,7 +7,7 @@ export const dynamic = "force-dynamic";
 //    存量无章的 run 由 `projectFilter` 的 legacy 兜底留在默认工作区(不消失)。
 // ② **`Limit` 与 `FilterExpression` 同时用**:DDB 的过滤发生在 `Limit` **之后**
 //    ⇒ 带筛选时**静默少报**(极端情况:200 条里恰好没有 failed,页面就显示"没有失败"而事实相反)。
-//    这与 P52.1 修过的 `redshift/history` 是同一个陷阱。根治 = **翻页扫到够数或扫完**,
+//    这与修过的 `redshift/history` 是同一个陷阱。根治 = **翻页扫到够数或扫完**,
 //    `limit` 只作用在**过滤后**的结果上。
 // ③ **join 用的四张名字表也没翻页**:超 1MB 就有任务查不到名字 ⇒ 页面显示裸 ID。
 //
@@ -19,11 +18,10 @@ import { isSeedRunTaskId, targetOfSeedRunTaskId } from "@/lib/seed/seed-job";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { requireProject, projectFilter } from "@/lib/projects/guard";
-// @kf-batch 50-WP4-o1-scope —— 执行范围(50 SPEC §2.6):scope 为主轴,原有 region/targetId 筛降为次级
+// 执行范围(50 SPEC §2.6):scope 为主轴,原有 region/targetId 筛降为次级
 import { requireScope, scalarTargetOf } from "@/lib/exec-env/scope";
 import { scopeIncludesTarget } from "@/lib/scope/scope";
 import { listActiveTargets } from "@/lib/exec-env/registry";
-// @kf-batch 50-W5-seg2-WP10a
 import { auditObservedScheduledRun } from "@/lib/exec-env/residency-audit";
 
 /** 翻页扫表。`stop` 返回 true 时提前结束(带 limit 的场景不必扫完整张表)。 */
@@ -85,7 +83,7 @@ export async function GET(req: NextRequest) {
   const targetId = p.get("targetId") || "";
   const limit = Math.min(Number(p.get("limit") || 200), 500);
 
-  // @kf-batch 50-WP4-o1-scope —— 🔴 主轴是执行范围;region / targetId 两个老参数**降为次级**(与它取交集)。
+  // 🔴 主轴是执行范围;region / targetId 两个老参数**降为次级**(与它取交集)。
   // 四种拒因直出 4xx,绝不回落 home/global。
   const scope = await requireScope(req, ctx.projectId);
   if (scope instanceof NextResponse) return scope;
@@ -144,7 +142,7 @@ export async function GET(req: NextRequest) {
       () => runs.length >= limit * 5
     );
 
-    // @kf-batch 50-W5-seg2-WP10a —— 观测后审计:监控列表里出现的**定时** run 若在跨法域 target 上且尚无区域审计 ⇒ 现在补写
+    // 观测后审计:监控列表里出现的**定时** run 若在跨法域 target 上且尚无区域审计 ⇒ 现在补写
     //    (SPEC v3.23 §3.2;幂等 pending 抢占协议;非定时 / home 行零 I/O;失败不影响列表)
     await Promise.all(
       runs.map(async (r) => {
@@ -159,7 +157,7 @@ export async function GET(req: NextRequest) {
       nameIndex(TABLES.WORKFLOWS, "workflowId", pf),
       nameIndex(TABLES.ETL_JOBS, "jobId", pf),
       nameIndex(TABLES.ENGINE_JOBS, "jobId", pf),
-      // @kf-batch 50-WP28-platform-action-node —— 平台动作的调度对象(治理定时任务 / 卡片定时刷新)
+      // 平台动作的调度对象(治理定时任务 / 卡片定时刷新)
       //   🔴 少这一张表,它们的 run 行在监控页上只剩一截裸 id(「接口 200 而用户认不出这是哪次运行」)
       nameIndex(TABLES.ACTION_SCHEDULES, "taskId", pf),
     ]);
@@ -183,10 +181,10 @@ export async function GET(req: NextRequest) {
         // 🆕 归属两维直接回给前端:region 列 + "这条 run 在哪跑的"一眼可辨。
         projectId: r.projectId ?? null,
         targetId: r.targetId ?? null,
-        // @kf-batch 50-W5-seg2-WP10a —— 跨法域 run 的区域审计 ID(运行历史「审计」列;home 为 null)
+        // 跨法域 run 的区域审计 ID(运行历史「审计」列;home 为 null)
         residencyAuditId: r.residencyAuditId ?? null,
         region: tid ? targetRegion[tid] ?? "" : "",
-        // @kf-batch 50-CAPSEED-seed-dispatch —— 手动造数的台账对象是「每区一个」(`seed_<targetId>`),不在任何名字表里
+        // 手动造数的台账对象是「每区一个」(`seed_<targetId>`),不在任何名字表里
         //   ⇒ 给它一个人话名字,而不是一截裸 id(定时那次记在调度对象名下,名字从 bgp-action-schedules 来)
         taskName: nameMap[rTaskId] || (isSeedRunTaskId(rTaskId) ? `造数 · ${targetOfSeedRunTaskId(rTaskId)}` : rTaskId.slice(-12)),
         taskType:
@@ -209,10 +207,9 @@ export async function GET(req: NextRequest) {
     if (startDate) enriched = enriched.filter((r) => (r.startedAt || "") >= startDate);
     if (endDate) enriched = enriched.filter((r) => (r.startedAt || "") <= endDate + "T23:59:59");
 
-    // @kf-batch 50-WP4-o1-scope
     // 🔴 **护栏 1 的数字必须与列表同一口径**:run 列表是**带时间窗/带筛选**的,所以
     // 「其他执行范围还有 N 条」不能去问 `/api/scope/counts`(那是不带窗口的全表计数,必然对不上,
-    // 会让判据 E-151 假红)。⇒ 就在这条查询里顺手按 target 分组,随响应回给前端(SPEC v3.35 §2.6.6)。
+    // 会让判据假红)。⇒ 就在这条查询里顺手按 target 分组,随响应回给前端(SPEC v3.35 §2.6.6)。
     // 🔴 因此 scope **不下推给 DDB**:下推了就数不到「别的区还有多少条」。run 表虽大,但上面的
     // 提前结束把它钉在 limit*5 以内,代价有界。
     const countsByTarget: Record<string, number> = {};
@@ -230,7 +227,7 @@ export async function GET(req: NextRequest) {
       String(b.startedAt || b.finishedAt || "").localeCompare(String(a.startedAt || a.finishedAt || ""))
     );
 
-    // Stats。@kf-batch 50-WP4-o1-scope:现在是**当前执行范围内**的集合(scope 过滤已在上面做完)——
+    // Stats。:现在是**当前执行范围内**的集合(scope 过滤已在上面做完)——
     // 这是刻意的:切到 us-west-2 之后,KPI 卡说的就该是那个区的今日成功/失败,
     // 否则「列表按区、卡片按全部」会让人以为列表漏了行。
     const now = new Date();
@@ -251,7 +248,7 @@ export async function GET(req: NextRequest) {
       runs: enriched.slice(0, limit),
       total: enriched.length,
       targets,
-      // @kf-batch 50-WP4-o1-scope —— 护栏 1 的数据源(**与本次查询同一时间窗、同一筛选条件**)。
+      // 护栏 1 的数据源(**与本次查询同一时间窗、同一筛选条件**)。
       // 前端据它显示「其他执行范围还有 N 条」;这条 run 列表刻意**不用** `/api/scope/counts`(理由见上)。
       countsByTarget,
       stats: {

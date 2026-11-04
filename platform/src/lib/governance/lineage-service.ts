@@ -196,7 +196,7 @@ export async function repushSyncLineageToOM(): Promise<{ tasks: number }> {
   const { isHome } = await import("@/lib/exec-env/target-id");
   for (const task of tasks as any[]) {
     try {
-      // @kf-batch 50-WP7-sync-pushdown —— 🔴 与 sync/[id]/start 同一条不变量:**同步血缘只推 home**
+      // 🔴 与 sync/[id]/start 同一条不变量:**同步血缘只推 home**
       // (om-push 里的桶/workgroup 都是 home 口径,拿非 home 的任务重放会往 OM 写错区的 FQN)。
       // 兄弟路径必须一起守:运行期只 home 推、回填却全表重放 = 一样把错数据灌进去。
       if (!isHome(bindingTargets(task)[0])) continue;
@@ -204,7 +204,7 @@ export async function repushSyncLineageToOM(): Promise<{ tasks: number }> {
         new GetCommand({ TableName: TABLES.DATASOURCES, Key: { userId: USER_ID, datasourceId: task.datasourceId } })
       );
       if (!ds) continue;
-      // @kf-batch 50-o4REG-sync-om-per-target —— 落点显式(本函数只重放主控区任务;坐标作者在 om-sync-coords)。
+      // 落点显式(本函数只重放主控区任务;坐标作者在 om-sync-coords)。
       //   源落点取数据源自己的章(存量无章 = 主控区,与 start 路由同一条理由)。
       const { datasourceOwnerTarget } = await import("@/lib/datasource/placement-shared");
       const owner = datasourceOwnerTarget(ds as Record<string, unknown>);

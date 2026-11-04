@@ -1,5 +1,4 @@
-// @kf-batch 50-W3f-T0-T3
-// 模块 40 × 50 —— 存量成本行补章(门票 T1 的「一次性回填」,50 ROADMAP §2octies.17 ⑧)。
+// × 50 —— 存量成本行补章(门票 T1 的「一次性回填」,50 ROADMAP §2octies.17 ⑧)。
 //
 // 成本行由 sweep 从 run 行派生;T1 之前的 sweep 不带章 ⇒ 存量成本行没有 `{projectId, targetId}`,
 // 成本按 target 归因(O3b)对它们就是盲的。章的真值源是 run 行(`bgp-task-runs`,W2-a 起每条都有章),

@@ -1,15 +1,14 @@
-// @kf-batch 50-WP30-decommission
-// 🔴🔴 WP-30 路 B「下线销毁」装配层:decommission ↔ delete-impact ↔ lifecycle(唯一写通道)↔ registry(准入内核)
+// 🔴🔴 「下线销毁」装配层:decommission ↔ delete-impact ↔ lifecycle(唯一写通道)↔ registry(准入内核)
 //   ↔ deploy-control(broker / CodeBuild / 构建日志)↔ project-service(审批单)之间**一律不 mock**;
 //   只 mock 真外部 —— DynamoDB(多表内存 + **忠实的条件表达式求值器** + 真分页)、Lambda(broker:用**真的** validate.mjs
 //   规划开会话再落库,钉平台写的删除计划能被 broker 接住)、CodeBuild、CloudWatch Logs、CloudFormation、EC2、
 //   Redshift Serverless、MWAA。
 //
-// 承重判据(WP-30 ⑤ 的离线半边):
+// 承重判据(⑤ 的离线半边):
 //   ED-B1 drain 后绑定 / 落点 / 准入一律拒,拒因以「该执行环境已停止承接」开头(且 drain 之前是放行的 —— 正控制);
 //   ED-B2 预览计数 == 夹具里逐行算出来的真值(多表、跨项目、真分页);有绑定 ⇒ 申请删除 409 并列明细;
 //   ED-B3 申请 → 审批单带快照;指纹漂移 409;审批前再重算(漂移 ⇒ 拒批、零写);
-//   施工序 4/5:broker 收到的只有 {targetId, operationId, mode};收口真查 AWS ⇒ gone / 卡住点名资源 + 真因;重试复用同一快照名;
+//   broker 收到的只有 {targetId, operationId, mode};收口真查 AWS ⇒ gone / 卡住点名资源 + 真因;重试复用同一快照名;
 //   ED-B5 删完同区能重新注册(一区一套不把 deleted 算占位)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fileURLToPath } from "node:url";
@@ -564,7 +563,7 @@ async function approveDeletion(components: string[] = ["core", "redshift"]) {
   return decided!;
 }
 
-describe("施工序 3/4:审批通过 ⇒ 删除计划落库 ⇒ broker(真 validate.mjs)接得住", () => {
+describe("审批通过 ⇒ 删除计划落库 ⇒ broker(真 validate.mjs)接得住", () => {
   it("broker 只收到 {targetId, operationId, mode:destroy};注册表进 decommissioning + destroy 会话 + 锁;计划里的快照名合法", async () => {
     const decided = await approveDeletion();
     const r = await startApprovedDestroy(decided, { username: "platform-admin" });
@@ -609,7 +608,7 @@ describe("施工序 3/4:审批通过 ⇒ 删除计划落库 ⇒ broker(真 valid
   });
 });
 
-describe("施工序 5:观测与收口 —— 真查 AWS ⇒ gone / 卡住点名;重试幂等", () => {
+describe("观测与收口 —— 真查 AWS ⇒ gone / 卡住点名;重试幂等", () => {
   async function destroying() {
     const decided = await approveDeletion();
     await startApprovedDestroy(decided, { username: "platform-admin" });

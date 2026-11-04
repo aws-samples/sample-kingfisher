@@ -72,7 +72,7 @@ describe("deriveBaseline — 排除 backfill(用户硬约束)", () => {
     expect(deriveBaseline({ projectId: "p", taskId: "wf1", runs, now }).durationSec.samples).toBe(1);
   });
 
-  // 模块47 P4.0:copilot 触发的 run 与 backfill 同为"非常规触发",须一并排除(在线隔离)。
+  // P4.0:copilot 触发的 run 与 backfill 同为"非常规触发",须一并排除(在线隔离)。
   it("🔴 copilot 超长 run 不拉高 p90(P4.0 隔离标)", () => {
     const normal = Array.from({ length: 8 }, (_, i) => mkRun(20 + i, "manual", i + 1));
     const withCopilot = [...normal, mkRun(6000, "copilot", 1)];

@@ -5,7 +5,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { recommendOnly } from "@/lib/param-advisor";
 import type { ParamAdviceRequest, ParamChannel } from "@/lib/param-advisor";
 
-// emr:模块 33-A EMR Serverless(引擎/types/catalog/heuristics 早已支持,此处补齐路由白名单遗漏)。
+// emr:EMR Serverless(引擎/types/catalog/heuristics 早已支持,此处补齐路由白名单遗漏)。
 const CHANNELS: ParamChannel[] = ["glue-etl", "glue-sync", "flink", "dms", "emr"];
 
 // POST /api/param-advisor/recommend

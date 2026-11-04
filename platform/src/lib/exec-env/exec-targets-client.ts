@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // 🔴 `/api/exec-targets` 的**唯一**客户端读法(W3e-12 页面驱动真撞:路由回 `{targets:[…]}`,EMR 面板仍按数组读
 //    ⇒「执行目标清单读取失败:(e.data || []).map is not a function」⇒「全选当前活跃区(0)」灰掉 ⇒ 作业只能绑 home,多区域在界面上消失)。
 //    一个路由、四个消费者、只改了三个 —— 爆炸半径漏消费者的标准形态。修法不是再改一处,而是把读法收成一处:
@@ -12,11 +11,11 @@ export interface ExecTargetOption {
   region: string;
   isHome: boolean;
   jurisdiction?: string;
-  // @kf-batch 50-WP4-o1-scope —— 顶栏「执行范围」下拉要显示的两样(`component=any` 才回)。
+  // 顶栏「执行范围」下拉要显示的两样(`component=any` 才回)。
   // 🔴 可选而不是必填:老消费者(EMR 面板 / 直查 / 建模)拿的是 `component=redshift`,那条不回这两个字段。
   displayName?: string;
   components?: string[];
-  /** @kf-batch 50-WP4-o1-scope 此刻能否承接新工作(徽标用;**不是**过滤条件 —— 见 listScopeTargets 的注释) */
+  /** 此刻能否承接新工作(徽标用;**不是**过滤条件 —— 见 listScopeTargets 的注释) */
   serviceable?: boolean;
   unusableReason?: string | null;
 }
@@ -40,8 +39,8 @@ export function normalizeExecTargets(data: unknown): ExecTargetOption[] {
 }
 
 /** 读可下推执行目标清单(服务端已过准入 + 组件 + 法域)。失败**抛错**,由调用方显式呈现(不许静默留空)。
- *  @kf-batch 50-B109-exec-target-dims —— 🔴 维度参数**只认闭合清单**(`exec-targets-dims.ts`,路由同一份):
- *  编排页曾传路由不认的 "airflow"、建表向导传 "core",400 被页面吞成空列表坏了一个月(B-109);类型化后传错在 tsc 就红。 */
+ *  🔴 维度参数**只认闭合清单**(`exec-targets-dims.ts`,路由同一份):
+ *  编排页曾传路由不认的 "airflow"、建表向导传 "core",400 被页面吞成空列表坏了一个月;类型化后传错在 tsc 就红。*/
 export async function fetchExecTargets(component: ExecTargetComponentDim = "redshift"): Promise<ExecTargetOption[]> {
   const res = await fetch(`/api/exec-targets?component=${encodeURIComponent(component)}`, { cache: "no-store" });
   let body: { success?: boolean; data?: unknown; error?: { message?: string } } | null = null;
@@ -55,7 +54,6 @@ export async function fetchExecTargets(component: ExecTargetComponentDim = "reds
 }
 
 /**
- * @kf-batch 50-WP4-o1-scope
  * 顶栏「执行范围」下拉的清单(合同 SPEC v3.36 §2.6.5a)= `component=any`。
  *
  * 🔴 走同一个客户端而不是自己 fetch:本文件头那条教训(一个路由四个消费者、只改了三个)对

@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4bis-p1-scope
 // 建模两条列表路由(码表 / 维度建模)的执行范围过滤 —— B 类,字段名就是 `targets`。
 //
 // 🔴 这两条路由**不走 `requireProject`**(建模定义是平台级的,守卫是 `resolveIdentity`)。

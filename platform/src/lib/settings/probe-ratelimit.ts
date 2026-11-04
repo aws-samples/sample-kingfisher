@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — probe 限频(51 SPEC §3.4a 卡点④:6 次 / 分钟 / 管理员)。
+// probe 限频(51 SPEC §3.4a 卡点④:6 次 / 分钟 / 管理员)。
 //
 // 形状照房内 `data-service/ratelimit.ts` 的固定窗口计数(**不 import 它** —— B 流正在删整个
 // `lib/data-service`;这里按合同自实现同一形状):

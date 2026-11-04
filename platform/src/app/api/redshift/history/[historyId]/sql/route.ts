@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg2-WP10a
-// GET /api/redshift/history/[historyId]/sql —— 按需读回**留在区域**的 SQL 原文(50 SPEC v3.23 §3.2 / E-189)。
+// GET /api/redshift/history/[historyId]/sql —— 按需读回**留在区域**的 SQL 原文。
 //
 // 中央 `bgp-sql-history` 对跨法域 target 的行只存指针 `{residency:"region", sqlRef}`;原文在该 target 所在 region 的区域结果表。
 // 读原文本身也是一次跨法域数据操作 ⇒ 先同意前置(409 带文案)再写区域审计(entry=history),写不成即拒(503)。

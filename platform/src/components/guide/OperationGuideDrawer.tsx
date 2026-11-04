@@ -1,6 +1,5 @@
 "use client";
-// @kf-batch 53-guide-v1
-// 模块 53 「操作指引」抽屉(53 DESIGN §3 线框):
+// 「操作指引」抽屉(53 DESIGN §3 线框):
 //   头部 = 「操作指引」+ 当前页 Tag;三个 tab = 本页怎么用 / 快速上手(按角色)/ 多区域与合规;每步可「去这一页」。
 //   文案全部来自 lib/guide/content.ts(单一作者),本组件不拼一个字的业务说明。
 import React, { useEffect, useState } from "react";
@@ -139,7 +138,7 @@ export default function OperationGuideDrawer() {
                   options={JOURNEYS.map((j) => ({ value: j.key, label: <span data-testid={`guide-role-${j.key}`}>{t(j.label)}</span> }))}
                   style={{ marginBottom: 12 }}
                 />
-                {/* @kf-batch 53-guide-tour —— 🔴 主形态是**导览**;这份清单只是参考手册。
+                {/* 🔴 主形态是**导览**;这份清单只是参考手册。
                     用户 2026-09-14:「不是给一个操作说明放在那里不动的东西」。 */}
                 <Button type="primary" size="small" style={{ marginBottom: 10 }}
                         data-testid={`guide-start-tour-${journey.key}`}

@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 平台动作节点的**运行期**判据:python 真跑 `_exec_platform_action`(假的主控区 DDB 表,真的执行器字节)。
 //
 //   ① 投的命令行属性 ⊆ 合同 `ACTION_COMMAND_ATTRS`,状态 = pending,表名 / TTL 与 TS 侧同源;

@@ -1,4 +1,4 @@
-// 模块 37 — 报表 widget 集合路由:GET 列表 / POST 建。
+// 报表 widget 集合路由:GET 列表 / POST 建。
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -6,7 +6,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { listReports, createReport } from "@/lib/bi/reports";
-// @kf-batch 50-WP4quater-reads(工单 SC-28)—— 与 analyses 同一条:**opt-in** 过滤(默认不过滤),
+// 与 analyses 同一条:**opt-in** 过滤(默认不过滤),
 // 每行回派生的 `regions`。用户原话:「我觉得可以增加一个过滤能力,默认不过滤。」
 import { readScope } from "@/lib/exec-env/scope";
 import { scopeTargets } from "@/lib/scope/scope";

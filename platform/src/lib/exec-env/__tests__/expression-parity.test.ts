@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // 🔴 DynamoDB 表达式**配平门禁**(真环境才炸、普通 mock 测不出的一类):
 //    DynamoDB 拒绝"定义在 ExpressionAttributeNames/Values 里却未在 UpdateExpression/ConditionExpression
 //    中被引用"的 #alias/:val(ValidationException);反之"引用了却未定义"同样拒。
@@ -175,7 +174,7 @@ describe("🔴 mergeComponentResources / reconcileTarget 的 fence 写配平", (
   });
 });
 
-describe("🔴 reconcileTelemetry(P50.3b-2a 周期 telemetry 窄通道)的 DynamoDB names/values 配平", () => {
+describe("🔴 reconcileTelemetry(2a 周期 telemetry 窄通道)的 DynamoDB names/values 配平", () => {
   // 🔴 新增 DDB 写命令必须纳入本配平门禁 —— reconcileTelemetry 的 unused-names bug 真环境才炸、mock 测不出
   //    ([[mine-reviewer-reference-impl]] 铁律)。捕获它的真实 UpdateCommand 逐向配平。
   const ACCT = "123456789012";
@@ -200,7 +199,7 @@ describe("🔴 reconcileTelemetry(P50.3b-2a 周期 telemetry 窄通道)的 Dynam
   });
 });
 
-describe("🔴 recordOperationFailure(P50.3b-2b 唯一失败写入方)的 DynamoDB names/values 配平", () => {
+describe("🔴 recordOperationFailure(2b 唯一失败写入方)的 DynamoDB names/values 配平", () => {
   // 🔴 同上铁律:新增 DDB 写命令必须纳入配平门禁。本写入方有 **2 mode × buildId 有无** 四条分支,
   //    每条都按分支注册 names/values(buildId 缺失走 attribute_not_exists),逐条真捕获配平。
   const ACCT = "123456789012";

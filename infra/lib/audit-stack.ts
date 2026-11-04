@@ -7,7 +7,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as cloudtrail from "aws-cdk-lib/aws-cloudtrail";
 import { Construct } from "constructs";
 
-// 模块 27 (WS4b-1) — 审计底座。
+// (WS4b-1) — 审计底座。
 //
 // 与应用层 bgp-audit 表互补:bgp-audit 记"谁在平台里做了什么操作",本栈记"谁动了 AWS
 // 资源(控制面 API)"与"网络流量"。

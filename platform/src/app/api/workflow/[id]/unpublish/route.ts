@@ -4,11 +4,10 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { getCorrelationId } from "@/lib/observability/logger";
-// @kf-batch 50-WP17-serverless-workflow
 // 🔴 原来这里直接调 `offlineDag(dagId)` —— **不传 target ⇒ 恒打主控区**:工作流绑在别的区时,
 //    pause 与删 DAG 文件都作用在 home(静默 no-op),那个区的 DAG 继续按 cron 跑(与段 `scq` A2-3 同病)。
 //    现在统一走 `unpublishWorkflowDag`(它按落点解析端点,并且经典 / serverless 两种都能撤)。
-// 模块 55 / 序 50 第二批:下线主体(unpublishWorkflowDag 逐区撤 → 台账清每个撤下来的区 → 审计)在 lib/workflow/long-ops.ts(workflow-unpublish)。
+// 下线主体(unpublishWorkflowDag 逐区撤 → 台账清每个撤下来的区 → 审计)在 lib/workflow/long-ops.ts(workflow-unpublish)。
 //   serverless deleteWorkflow 要等在跑的 run 停完(最多 2 分钟)⇒ 超 45 秒由统一框架转 202;响应体保持摊平形状(rawBody)。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 
@@ -35,7 +34,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   } catch (err: any) {
     const lo = longOpErrorResponse(err);
     if (lo) return lo;
-    // 🔴 撤不下来就**不许**把记录改成 draft(状态必须与「调度还在那儿」一致 —— T-14 的教训)
+    // 🔴 撤不下来就**不许**把记录改成 draft(状态必须与「调度还在那儿」一致 —— 教训)
     return NextResponse.json({ error: `下线失败: ${err.message}`, code: "DAG_CLEANUP_FAILED" }, { status: 502 });
   }
 }

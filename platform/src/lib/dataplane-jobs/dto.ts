@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 作业的**对外形态**(WORK-PACKAGES WP-9 ④-1 的第三模式:DTO 允许列表)。
+// 作业的**对外形态**(④-1 的第三模式:DTO 允许列表)。
 //
 // 🔴 **允许列表,不是删除列表**:一条一条**拷**允许的字段,而不是 `{...row}` 再 `delete row.lease`。
 //    删除列表的写法会在下一次有人往行上加字段(比如 9b 加个 `backupManifestKey`)时**默认透出**;
@@ -37,7 +36,6 @@ export interface CanaryEvidence {
 }
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 凭证回收作业的证据:删的是**哪个名字**、在**哪个区**、结论是什么(不含 ARN / 口令)。
  * `outcome`:`deleted` 本次删掉了 · `absent` 确认本来就没有(该区从没给这个项目供给过)。
  */
@@ -47,7 +45,7 @@ export interface ReclaimEvidence {
   outcome?: "deleted" | "absent";
 }
 
-/** 序 58 B-130:平台自建安全组清理作业的证据(sgId / 区 / 最近一次看到的网卡数 / 收口结论)。 */
+/** 平台自建安全组清理作业的证据(sgId / 区 / 最近一次看到的网卡数 / 收口结论)。 */
 export interface SgCleanupEvidence {
   sgId?: string;
   region?: string;

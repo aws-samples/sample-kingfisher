@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // `PER_PROJECT_CRED` 这个 flag 的**两态**门禁。
 //
 // 🔴 用户 2026-09-03 拍板「一笔做完,用 env flag 兜」时明确接受了代价:
@@ -99,7 +98,7 @@ describe("🔴 ③ on 态 + 有 project ⇒ 走 §3.9 工厂", () => {
     expect(smSend, "on 态还去打 legacy 的 DescribeSecret ⇒ 两条路径都在跑").not.toHaveBeenCalled();
   });
 
-  it("非 home ⇒ **不再抛**(这正是 P52.5a 要打通的那一刀),targetId 原样传给工厂", async () => {
+  it("非 home ⇒ **不再抛**(这正是要打通的那一刀),targetId 原样传给工厂", async () => {
     const arn = await getRedshiftSecretArn({ targetId: "tgt_usw2_a", project: PROJ });
     expect(arn).toBe(PROJ_ARN);
     expect(getPrivilegedCred).toHaveBeenCalledWith("tgt_usw2_a", { purpose: "project-context", project: PROJ });

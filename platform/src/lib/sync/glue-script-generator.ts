@@ -1,5 +1,5 @@
 import type { DataSource } from "@/types/datasource";
-// @kf-batch 50-WP31-place-first-class —— 序 4(L6):PlaceWire 生产者 + Python 读取函数(单一作者)
+// PlaceWire 生产者 + Python 读取函数(单一作者)
 import { buildPlaceWire } from "@/lib/place/wire";
 import { PLACE_WIRE_PY } from "@/lib/place/wire-py";
 import { buildTargetNameMap } from "@/lib/sync/target-naming";
@@ -8,13 +8,12 @@ import { PLATFORM_TABLE_MARKER, S3_TABLE_MARKER_PROPERTY, clearsWholeTable, isSy
 import { effectiveTableBucket } from "@/lib/sync/table-bucket";
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 import { toSourceRef } from "@/lib/datasource-spi/normalize";
-// @kf-batch 37-sync-capability —— 序 37 新能力的合法形态 + 日期变量(TS / Python 两个作者同源)
+// 新能力的合法形态 + 日期变量(TS / Python 两个作者同源)
 import { validateSyncCapabilityFields, whereOf, syncTaskUsesRunDate, overwriteScopeOf, sourceColumnsOf, mergeKeysOf } from "@/lib/sync/run-vars";
 import { SYNC_RUN_VARS_PY } from "@/lib/sync/run-vars-py";
-// 序 53:这次运行的 Glue 版本(记录没存 ⇒ 5.1)决定要不要带 Spark 4 的类型兼容段
+// 这次运行的 Glue 版本(记录没存 ⇒ 5.1)决定要不要带 Spark 4 的类型兼容段
 import { glueVersionOfRecord, glueVersionNeedsSpark4Compat } from "@/lib/sync/glue-version";
 
-// @kf-batch 50-WP7-sync-pushdown(施工序 2)
 // 🔴 生成脚本里的**每一个区位值**(region / 桶 / workgroup / 库 / 凭证 ARN)从此都是**注入的数据**,
 // 本文件不再从 `process.env` / home 命名去猜任何一个 —— 猜错的后果不是报错,是
 // 「脚本看起来正常地把该区的数据写回了主控区」(驻留承诺当场破)。
@@ -25,7 +24,7 @@ import { glueVersionOfRecord, glueVersionNeedsSpark4Compat } from "@/lib/sync/gl
 // 🔴 第三参**必填、无缺省**:「有静默合法默认值的参数」是一整类缺陷的温床(本仓一天犯过六次)——
 // 缺省 home 就是把「非 home 静默打回主控区」重新引进来。
 export interface GlueScriptLanding {
-  /** @kf-batch 50-WP31-place-first-class —— 作业落点的 target(PlaceWire 的身份;调用方传的是 TargetSparkLanding,本来就有) */
+  /** 作业落点的 target(PlaceWire 的身份;调用方传的是 TargetSparkLanding,本来就有) */
   targetId: string;
   /** 作业执行区(Secrets Manager 源密钥客户端 / DDB 源缺省区也用它 —— 原则 2 已保证源 ∈ 任务章) */
   region: string;
@@ -47,7 +46,7 @@ export interface GlueScriptBindings {
   rsb: GlueScriptWarehouse | null;
 }
 
-// 模块 42:JDBC URL + driver 由数据源 SPI 的 buildConnection 产出(取代此前写死的 JDBC_URL 表 +
+// JDBC URL + driver 由数据源 SPI 的 buildConnection 产出(取代此前写死的 JDBC_URL 表 +
 // 写死 driver="com.mysql.cj.jdbc.Driver")。MySQL 产物逐字不变(mysql provider 收编同一模板);
 // PostgreSQL/Oracle/SQLServer 现在也拿到正确的 URL + driver class(根治「非 MySQL 走 Glue 用错
 // 驱动」的 #9)。driverClass 供脚本里 spark.read.format("jdbc").option("driver", ...) 使用。
@@ -57,7 +56,7 @@ function jdbcConnFor(ds: DataSource): { jdbcUrl: string; driverClass: string } {
   return { jdbcUrl: cm.jdbcUrl || "", driverClass: cm.driverClass || "" };
 }
 
-// 模块42 P42.5:数据源范式(决定读源方式)。JDBC=spark.read.format("jdbc");
+// 数据源范式(决定读源方式)。JDBC=spark.read.format("jdbc");
 //   nosql(DynamoDB)=Glue DynamoDB 连接器 create_dynamic_frame。由 provider.capabilities 派生,不硬编码。
 function paradigmOf(ds: DataSource): string {
   if (!isDataSourceType(ds.type)) return "jdbc"; // 未知类型按 JDBC 保底(与建源分流一致)
@@ -118,9 +117,9 @@ export function buildRedshiftTableClause(
   return clause;
 }
 
-// @kf-batch 37-sync-capability —— 覆盖写进已有 S3 Tables 表之前的「按列名对齐」Python 段(两个覆盖分支共用;单一作者)。
+// 覆盖写进已有 S3 Tables 表之前的「按列名对齐」Python 段(两个覆盖分支共用;单一作者)。
 //   🔴 嵌在模板串里:禁写反引号。
-const S3_ALIGN_PY = `            # 序 37:写进**已有**表之前按**列名**对齐。原来是 INSERT ... SELECT * 按位置写:列序不同就把值写进别的列、
+const S3_ALIGN_PY = `            # 写进**已有**表之前按**列名**对齐。原来是 INSERT ... SELECT * 按位置写:列序不同就把值写进别的列、
             #   只有列数不同才报错(客户现有表的列序是客户自己配的,切换时必中)。与客户库 ensure_compatible_schema 同口径:
             #   目标表缺 df 的列 / df 缺目标表的列 / 同名列类型不同 ⇒ 在任何写入之前失败,一行不动。
             _tgt_fields = spark.table(s3t_table).schema.fields
@@ -171,7 +170,7 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
         "拒绝在脚本里猜 workgroup/区/凭证 —— 猜错不报错,只是看起来正常地写进别的区"
     );
   }
-  // @kf-batch 50-WP31-place-first-class —— 序 4(L6):数仓四样(区 / 工作组 / 库 / 凭证)以 PlaceWire 进脚本(原来是四个裸字面量);
+  // 数仓四样(区 / 工作组 / 库 / 凭证)以 PlaceWire 进脚本(原来是四个裸字面量);
   //   生成期自校验一遍(buildPlaceWire),坏值在平台这侧就报错。数仓落点的区必须与作业落点同区(写别的区 = 跨区写数)。
   if (writeRedshift && rsb && rsb.region !== landing.region) {
     throw new Error(`生成同步脚本:数仓落点在 ${rsb.region},而作业落点在 ${landing.region} —— 拒绝跨区写数`);
@@ -199,21 +198,21 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
     task.incrementalValue !== undefined && task.incrementalValue !== null
       ? String(task.incrementalValue)
       : "";
-  // 序 37 B-61:merge 不再退化成 append。增量 + merge = 读水位之后的行、按键合并(幂等,不需要 append 那套按水位预删);
+  // merge 不再退化成 append。增量 + merge = 读水位之后的行、按键合并(幂等,不需要 append 那套按水位预删);
   //   增量 + append / overwrite 行为逐字不变(增量恒按 append 走)。
   const effectiveMode = incremental ? (writeMode === "merge" ? "merge" : "append") : writeMode;
 
-  // @kf-batch 37-sync-capability —— 序 37 新能力。🔴 每一段新 Python 只在任务**真用到**时才进脚本:
+  // 新能力。🔴 每一段新 Python 只在任务**真用到**时才进脚本
   //   不带新字段的存量任务,除「覆盖」写入外,脚本与改动前逐字节相同(golden-script.test.ts 钉住)。
   const capReject = validateSyncCapabilityFields(task, sourceParadigm);
   if (capReject) throw new Error(`生成同步脚本:${capReject}`);
-  // B-61:合并键(校验已在上一行过;这里再守一道 —— 没键的 merge 任务宁可运行时现形,也不许静默退化成 append)
+  // 合并键(校验已在上一行过;这里再守一道 —— 没键的 merge 任务宁可运行时现形,也不许静默退化成 append)
   const isMerge = effectiveMode === "merge";
   const mergeKeys = isMerge ? mergeKeysOf(task) : [];
   if (isMerge && mergeKeys.length === 0) {
     throw new Error("生成同步脚本:合并写入(merge)必须指定合并键 mergeKeys(至少一列),不提供缺省 —— 没有键无法判定「同一行」,拒绝按追加写入");
   }
-  const sourceWhere = whereOf(task); // B-52:源端过滤条件(空 = 没有)
+  const sourceWhere = whereOf(task); // 源端过滤条件(空 = 没有)
   const usesRunDate = syncTaskUsesRunDate(task); // ④⑥:过滤条件 / 源表名里有日期变量 ⇒ 运行时解析业务日期
   const runTz = typeof task.businessTimezone === "string" && task.businessTimezone.trim() ? task.businessTimezone.trim() : "UTC";
   const templatedSource = tables.some((t: unknown) => typeof t === "string" && t.includes("${"));
@@ -221,7 +220,7 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
   // 只读指定源列(JDBC 投影下推);没指定 = 全列(现状)
   const sourceColumns = sourceColumnsOf(task);
   const hasSourceColumns = Object.keys(sourceColumns).length > 0;
-  // B-53:「覆盖」= 全量 + overwrite(增量恒按 append 走,见上)。覆盖范围 table / partitions(⑤)。
+  // 「覆盖」= 全量 + overwrite(增量恒按 append 走,见上)。覆盖范围 table / partitions(⑤)。
   const isOverwrite = effectiveMode === "overwrite";
   const byPartitions = isOverwrite && overwriteScopeOf(task) === "partitions";
   const partitionKeys: string[] = byPartitions ? (task.partitionKeys as string[]) : [];
@@ -229,13 +228,13 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
   // 读一次、写的就是读到的那份:覆盖 / 合并要写后对数,派生列要查空值 ⇒ 读到的数据先落缓存,
   // 否则每个动作都会重新去源库读一遍(源表在变时,对数会拿两次不同的读数比)。
   const persistRead = isOverwrite || isMerge || derivedColumns.length > 0;
-  // 序 53:Glue ≥ 6.0 = Spark 4,MySQL JDBC 把 FLOAT 读成 FloatType(5.1 是 DoubleType,Spark 4.0 迁移指南,没有 legacy 开关)⇒
+  // Glue ≥ 6.0 = Spark 4,MySQL JDBC 把 FLOAT 读成 FloatType(5.1 是 DoubleType,Spark 4.0 迁移指南,没有 legacy 开关)⇒
   //   只在 MySQL 源 + Glue ≥ 6.0 时把 FloatType 规整回 double,让目标表类型与 5.1 时期逐字相同(存量任务不换版本 ⇒ 这段不进脚本,逐字节不变)。
   //   其余有开关的差异由作业定义里的 --conf 兼容开关钉住(lib/sync/glue-version.ts GLUE_SYNC_SPARK4_COMPAT_CONF)。
   const spark4MysqlFloatCompat = ds.type === "mysql" && glueVersionNeedsSpark4Compat(glueVersionOfRecord(task.glueConfig?.glueVersion));
   // Redshift 覆盖 / 合并先装进暂存表,再在一个事务里「清目标(或删键命中的行)+ 从暂存表插入」⇒ 装载阶段的目标表名是变量。
   const rsLoadTable = isOverwrite || isMerge ? "rs_load_table" : "rs_table";
-  // 序 37 B-60:S3 Tables 路的「整表清空非平台建的表需确认」守卫。只在这次运行**会**整表清空时才进脚本
+  // S3 Tables 路的「整表清空非平台建的表需确认」守卫。只在这次运行**会**整表清空时才进脚本
   //   (overwrite 任何 scope;增量且水位为空)—— 条件与 Redshift 路 `_will_clear` 的运行时判定等价:INC_COL / INC_VAL
   //   都是生成期烘进脚本的常量,所以 `(INCREMENTAL and not inc_where)` 在生成期就已确定;单一作者 = clearsWholeTable。
   const s3ClearGuard = writeS3 && clearsWholeTable(task);
@@ -250,7 +249,7 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
 
   // S3 Tables config —— 兜底改为落点的表桶(原字面量 `bgp-table-bucket` 是 home 的名字,
   // home 的 landing.tableBucket 与它逐字相等;非 home 用它就是把该区的表建进主控区的桶)。
-  // @kf-batch 56-B127-exec-env-own-table-bucket —— 与 start-run / 目标表守卫同一个作者算「写哪个桶」(此前三处各写一遍 `||`)
+  // 与 start-run / 目标表守卫同一个作者算「写哪个桶」(此前三处各写一遍 `||`)
   const tableBucketName = effectiveTableBucket(task, landing);
   // Bug#1:namespace 过 S3Tables 标识符 SSOT(与 start/route.ts、om-push.ts 同一函数同一表达式)。
   // 幂等:start/route 已 patch 过 sanitize 值到 task.s3Config.namespace,这里再过一次仍是同值(防御性)。
@@ -259,9 +258,9 @@ export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScri
   const snapshotRetention = icebergConfig.snapshotRetentionDays || 7;
   const maxSnapshots = icebergConfig.maxSnapshots || 100;
 
-  // 序 37 B-60:S3 Tables 路的守卫段(表已存在分支的第一件事;只在这次运行会整表清空时生成,见 s3ClearGuard)。
+  // S3 Tables 路的守卫段(表已存在分支的第一件事;只在这次运行会整表清空时生成,见 s3ClearGuard)。
   //   标记键 / 标记值 / 确认清单都由 TS 注入(Python 里不写第二份字面量)。🔴 嵌在模板串里:禁写反引号。
-  const s3GuardPy = s3ClearGuard ? `            # 序 37 B-60:**不许静默清空客户已有的 S3 Tables 表**(规则唯一作者 lib/sync/target-table-guard.ts,与 Redshift 路逐字对齐)。
+  const s3GuardPy = s3ClearGuard ? `            # **不许静默清空客户已有的 S3 Tables 表**(规则唯一作者 lib/sync/target-table-guard.ts,与 Redshift 路逐字对齐)。
             #   平台自己建的表在表属性里带标记;要整表清空(覆盖 / 增量空水位整表重载)一张「已存在且无标记」的表,
             #   必须在任务的确认清单里(三段名 s3tablescatalog.<namespace>.<table>),否则本次运行**在任何写 / 删之前**失败。
             _bgp_props = {str(_r[0]): str(_r[1]) for _r in spark.sql(f"SHOW TBLPROPERTIES {s3t_table}").collect()}
@@ -294,7 +293,7 @@ BGP_RUN_DATE = bgp_sync_run_date(BGP_RUN_TZ)
 BGP_RUN_VARS = bgp_sync_run_vars(BGP_RUN_DATE)
 print("SYNC_RUN_DATE ds=" + BGP_RUN_VARS["ds"] + " tz=" + BGP_RUN_TZ)
 ` : ""}${noSecretSource ? `
-# 模块42 P42.4/P42.5:iam-role 类源(DynamoDB/S3)用 IAM 角色访问(无密钥),不读 Secrets Manager。
+# iam-role 类源(DynamoDB/S3)用 IAM 角色访问(无密钥),不读 Secrets Manager。
 ${isDynamoSource ? `DDB_TABLE = "${ddbTableName}"
 DDB_REGION = "${ddbRegion}"` : `S3_URI = "${s3Uri}"
 S3_FORMAT = "${s3Format}"
@@ -307,7 +306,7 @@ db_pass = secret["password"]
 
 jdbc_url = "${jdbcUrl}"`}
 tables = ${JSON.stringify(tables)}
-# @kf-batch 50-WP24b-vacuous-sync —— 🔴 零表就**响亮失败**(不许空转成功)。
+# 🔴 零表就**响亮失败**(不许空转成功)。
 # 真环境实测:表清单为空时本脚本一路跑到 "SYNC RESULTS: {}" 然后 SUCCEEDED,
 # 于是平台把任务标成 succeeded 而数仓里连表都没建 —— 看板全绿、什么都没发生。
 if not tables:
@@ -317,17 +316,17 @@ results = ${"{}"}
 INC_COL = "${incCol}"
 INC_VAL = "${incVal}"
 INCREMENTAL = ${incremental ? "True" : "False"}
-${sourceWhere ? `# 序 37 B-52:源端过滤条件(下推到源库执行,用源库方言;可带日期变量)
+${sourceWhere ? `# 源端过滤条件(下推到源库执行,用源库方言;可带日期变量)
 SOURCE_WHERE = ${JSON.stringify(sourceWhere)}
-` : ""}${hasSourceColumns ? `# 序 37:只读指定的源列(投影下推到源库;没列出的表读全列)
+` : ""}${hasSourceColumns ? `# 只读指定的源列(投影下推到源库;没列出的表读全列)
 SOURCE_COLUMNS = ${JSON.stringify(sourceColumns)}
-` : ""}${derivedColumns.length > 0 ? `# 序 37 ⑤:派生列(写入前按来源列加到数据上)
+` : ""}${derivedColumns.length > 0 ? `# 派生列(写入前按来源列加到数据上)
 DERIVED_COLUMNS = ${JSON.stringify(derivedColumns.map((d) => ({ name: d.name, source: d.sourceColumn, fmt: d.format })))}
-` : ""}${isOverwrite ? `# 序 37 B-53:覆盖写入读到 0 行默认失败(显式允许才清空);写后对数,不一致即失败
+` : ""}${isOverwrite ? `# 覆盖写入读到 0 行默认失败(显式允许才清空);写后对数,不一致即失败
 ALLOW_EMPTY_OVERWRITE = ${allowEmptyOverwrite ? "True" : "False"}
 OVERWRITE_SCOPE = ${JSON.stringify(byPartitions ? "partitions" : "table")}
 PARTITION_KEYS = ${JSON.stringify(partitionKeys)}
-` : ""}${isMerge ? `# 序 37 B-61:按键合并(upsert)。键命中的行更新、其余插入;源内键重复 / 键为空 / 键不在列里 ⇒ 任何写入之前失败
+` : ""}${isMerge ? `# 按键合并(upsert)。键命中的行更新、其余插入;源内键重复 / 键为空 / 键不在列里 ⇒ 任何写入之前失败
 MERGE_KEYS = ${JSON.stringify(mergeKeys)}
 ` : ""}
 # S3 Tables catalog path (backtick bucket name with hyphens)
@@ -337,7 +336,7 @@ BT = chr(96)
 S3T_BUCKET = BT + S3T_BUCKET_RAW + BT
 S3T_NAMESPACE = "${namespace}"
 ${rsWire ? `${PLACE_WIRE_PY}
-# @kf-batch 50-WP31-place-first-class —— 序 4(L6):数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
+# 数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
 #   缺 / 不合法 / 没有数仓腿 ⇒ 当场抛,不会落到任何缺省区或工作组)。
 _BGP_PLACE = bgp_read_place(${JSON.stringify(JSON.stringify(rsWire))})
 _BGP_RS = bgp_place_leg(_BGP_PLACE, "redshift")
@@ -348,7 +347,7 @@ for table_name in tables:
     print(f"{'='*60}")
     # SYNC-07: resolve the target table name (defaults to the source name).
     target_name = target_names.get(table_name, table_name)
-    # 模块42 P42.4/P42.5: 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
+    # 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
     # (如 bgp-orders / my.table),但 Redshift/S3Tables 的 SQL 标识符不允许裸连字符 → 建表 DDL 语法错
     # (真 bug: "syntax error at or near '-' in context 'public.bgp-'")。JDBC 源表名本是 SQL 标识符不受影响。
     # 统一把非法字符(非字母/数字/下划线)→ 下划线,数字开头补 _。覆盖 Redshift + S3Tables 两个目标。
@@ -374,7 +373,7 @@ for table_name in tables:
         # 增量谓词:数字水位不加引号,非数字(时间戳/字符串)加引号并转义,避免 SQL 语法错。
         _pv = INC_VAL if INC_VAL.replace(".", "", 1).lstrip("-").isdigit() else "'" + INC_VAL.replace("'", "''") + "'"
         inc_where = f"{INC_COL} > {_pv}"
-${isDynamoSource ? `    # 模块42 P42.5:DynamoDB 源经 Glue DynamoDB 连接器批读(ETL connector),整表 Scan → DataFrame。
+${isDynamoSource ? `    # DynamoDB 源经 Glue DynamoDB 连接器批读(ETL connector),整表 Scan → DataFrame。
     # 无 SQL 下推(DDB 无 WHERE 谓词能力),一期全量读;dynamodb.throughput.read.percent 控制读容量占用防打满。
     # DDB item 属性异构 → Glue 推断出并集 schema;嵌套 Map/List 列在下游写 Redshift 时由类型映射兜底为 VARCHAR。
     _ddb_dyf = glueContext.create_dynamic_frame.from_options(
@@ -394,7 +393,7 @@ ${isDynamoSource ? `    # 模块42 P42.5:DynamoDB 源经 Glue DynamoDB 连接器
     # 使下游 df.schema 只出现标量数值类型,Redshift DDL/COPY 干净。与 :252 的"写前窄整型规整"同源思路。
     _ddb_dyf = _ddb_dyf.resolveChoice(choice="cast:double")
     df = _ddb_dyf.toDF()
-    print(f"Read DynamoDB table {DDB_TABLE} @ {DDB_REGION} via Glue connector (choice->double resolved)")` : isS3Source ? `    # 模块42 P42.4:S3(对象存储)源用 spark.read 批读 s3://bucket/prefix 下文件(csv/parquet/json)。
+    print(f"Read DynamoDB table {DDB_TABLE} @ {DDB_REGION} via Glue connector (choice->double resolved)")` : isS3Source ? `    # S3(对象存储)源用 spark.read 批读 s3://bucket/prefix 下文件(csv/parquet/json)。
     # 一期整前缀全量读(无增量);format=auto 时按 CSV 处理(与 introspect 一致)。CSV 首行表头 → header=True 推断列名。
     _fmt = S3_FORMAT if S3_FORMAT in ("csv", "parquet", "json") else "csv"
     if _fmt == "parquet":
@@ -403,7 +402,7 @@ ${isDynamoSource ? `    # 模块42 P42.5:DynamoDB 源经 Glue DynamoDB 连接器
         df = spark.read.json(S3_URI)
     else:
         df = spark.read.option("header", S3_HAS_HEADER).option("inferSchema", "true").csv(S3_URI)
-    print(f"Read S3 {S3_URI} (format={_fmt}) via spark.read → {len(df.columns)} cols")` : `${sourceWhere || templatedSource || hasSourceColumns ? `    # 序 37:源表名模板按业务日期解析(④);过滤条件下推到源库(B-52),与增量谓词用 AND 合并;指定了源列就只投影这些列。
+    print(f"Read S3 {S3_URI} (format={_fmt}) via spark.read → {len(df.columns)} cols")` : `${sourceWhere || templatedSource || hasSourceColumns ? `    # 源表名模板按业务日期解析(④);过滤条件下推到源库,与增量谓词用 AND 合并;指定了源列就只投影这些列。
     src_table = ${templatedSource ? "bgp_render(table_name, BGP_RUN_VARS)" : "table_name"}
     if src_table != table_name:
         print(f"SYNC_SOURCE_TABLE template={table_name} resolved={src_table}")
@@ -450,13 +449,13 @@ ${isDynamoSource ? `    # 模块42 P42.5:DynamoDB 源经 Glue DynamoDB 连接器
     for _f in df.schema.fields:
         if isinstance(_f.dataType, (_ByteT, _ShortT)):
             df = df.withColumn(_f.name, _NF.col(_f.name).cast("int"))
-${spark4MysqlFloatCompat ? `    # 序 53:Glue 6.0(Spark 4)起 MySQL FLOAT 读成 FloatType(5.1 是 DoubleType)⇒ 规整回 double,目标表列类型与 5.1 时期逐字相同
+${spark4MysqlFloatCompat ? `    # Glue 6.0(Spark 4)起 MySQL FLOAT 读成 FloatType(5.1 是 DoubleType)⇒ 规整回 double,目标表列类型与 5.1 时期逐字相同
     from pyspark.sql.types import FloatType as _FloatT
     for _f in df.schema.fields:
         if isinstance(_f.dataType, _FloatT):
             df = df.withColumn(_f.name, _NF.col(_f.name).cast("double"))
 ` : ""}${derivedColumns.length > 0 ? `
-    # 序 37 ⑤:派生列 —— 来源列按大小写不敏感匹配;新列名与已有列重名就失败(不静默覆盖源列)。
+    # 派生列 —— 来源列按大小写不敏感匹配;新列名与已有列重名就失败(不静默覆盖源列)。
     for _dc in DERIVED_COLUMNS:
         _src = next((c for c in df.columns if c.lower() == _dc["source"].lower()), None)
         if _src is None:
@@ -465,7 +464,7 @@ ${spark4MysqlFloatCompat ? `    # 序 53:Glue 6.0(Spark 4)起 MySQL FLOAT 读成
             raise Exception(f"SYNC_DERIVED_NAME_CONFLICT table={table_name} column={_dc['name']}: 派生列名与源表已有列重名")
         df = df.withColumn(_dc["name"], _NF.date_format(_NF.col(_src).cast("timestamp"), _dc["fmt"]))
 ` : ""}${persistRead ? `
-    # 序 37:读到的数据先落缓存 —— 计数、写入、写后对数用的是同一份读数(不让每个动作各自重读源库)。
+    # 读到的数据先落缓存 —— 计数、写入、写后对数用的是同一份读数(不让每个动作各自重读源库)。
     from pyspark import StorageLevel as _BGP_SL
     df = df.persist(_BGP_SL.MEMORY_AND_DISK)
 ` : ""}
@@ -485,7 +484,7 @@ ${derivedColumns.length > 0 ? `    for _dc in DERIVED_COLUMNS:
         _pk_nulls = df.filter(_NF.col(_pk).isNull()).count()
         if _pk_nulls > 0:
             raise Exception(f"SYNC_PARTITION_KEY_NULL table={table_name} column={_pk} rows={_pk_nulls}: 分区列为空的行无法判定属于哪个分区")
-` : ""}${isMerge ? `    # 序 37 B-61:按键合并的三道前检 —— 两个目标共用,只做一次,放在任何写入之前;任何一道不过就一行不动。
+` : ""}${isMerge ? `    # 按键合并的三道前检 —— 两个目标共用,只做一次,放在任何写入之前;任何一道不过就一行不动。
     #   合并键按大小写不敏感匹配到本次读到的列(_bgp_mk 用的是数据里的真实写法)。
     _bgp_mk = []
     for _k in MERGE_KEYS:
@@ -513,13 +512,13 @@ ${derivedColumns.length > 0 ? `    for _dc in DERIVED_COLUMNS:
             print(f"INC_WATERMARK skip: {str(_e)[:120]}")
 ${writeS3 ? `
     # Write to S3 Tables (managed Iceberg)
-    # 模块42:Spark 临时视图名也需标识符安全(源表名 table_name 可能含连字符/点,如 DynamoDB 表
+    # Spark 临时视图名也需标识符安全(源表名 table_name 可能含连字符/点,如 DynamoDB 表
     # bgp-verify-ddb-1m → temp_bgp-verify-ddb-1m 是非法视图名 "Invalid view name")。用已 sanitize 的
     # target_name(上方 re.sub 处理过)构造,保证视图名合法。真 bug:100万 DDB→S3Table 首次现形。
     temp_view = f"temp_{target_name}"
     df.createOrReplaceTempView(temp_view)
     s3t_table = f"s3tablescatalog.{S3T_NAMESPACE}.{target_name}"
-${isMerge ? `    # 序 37 B-61:合并键在目标表里的写法(表已存在时按列名对齐后改成目标表的写法;新建表 = 源的写法)
+${isMerge ? `    # 合并键在目标表里的写法(表已存在时按列名对齐后改成目标表的写法;新建表 = 源的写法)
     _bgp_mk_t = list(_bgp_mk)
 ` : ""}
     try:
@@ -534,7 +533,7 @@ ${isMerge ? `    # 序 37 B-61:合并键在目标表里的写法(表已存在时
 
         # Step 2: Write data
         if table_exists:
-${effectiveMode === "overwrite" ? (byPartitions ? `${s3GuardPy}${S3_ALIGN_PY}            # 序 37 ⑤:按分区覆盖 = Iceberg 动态分区覆盖,**一次提交**只替换本批数据涉及的分区。
+${effectiveMode === "overwrite" ? (byPartitions ? `${s3GuardPy}${S3_ALIGN_PY}            # 按分区覆盖 = Iceberg 动态分区覆盖,**一次提交**只替换本批数据涉及的分区。
             # 🔴 动态覆盖按表的分区规格替换:规格必须恰好是分区列(按原值),否则「只覆盖本批分区」不成立
             #    (无分区表会被整表替换、规格更细会留下旧行)⇒ 不一致就在任何写入之前失败。
             _bgp_pschema = spark.table(f"{s3t_table}.partitions").schema
@@ -546,11 +545,11 @@ ${effectiveMode === "overwrite" ? (byPartitions ? `${s3GuardPy}${S3_ALIGN_PY}   
                 spark.sql(f"INSERT OVERWRITE {s3t_table} SELECT * FROM {temp_view}")
             finally:
                 spark.conf.set("spark.sql.sources.partitionOverwriteMode", "static")
-            print(f"OVERWRITE PARTITIONS {s3t_table}: replaced partitions of {PARTITION_KEYS} with {row_count} rows")` : `${s3GuardPy}${S3_ALIGN_PY}            # 序 37 B-53:整表覆盖 = 静态模式的 INSERT OVERWRITE(不带 PARTITION 子句 ⇒ 替换整张表),**一次提交**。
+            print(f"OVERWRITE PARTITIONS {s3t_table}: replaced partitions of {PARTITION_KEYS} with {row_count} rows")` : `${s3GuardPy}${S3_ALIGN_PY}            # 整表覆盖 = 静态模式的 INSERT OVERWRITE(不带 PARTITION 子句 ⇒ 替换整张表),**一次提交**。
             #   原来是「先 DELETE 再 INSERT」两次提交:中途失败会留下一张空表。
             spark.conf.set("spark.sql.sources.partitionOverwriteMode", "static")
             spark.sql(f"INSERT OVERWRITE {s3t_table} SELECT * FROM {temp_view}")
-            print(f"OVERWRITE {s3t_table}: atomically replaced with {row_count} rows")`) : isMerge ? `${S3_ALIGN_PY}            # 序 37 B-61:按键合并 = Iceberg MERGE INTO,**一次提交**。UPDATE SET * / INSERT * 按**列名**展开
+            print(f"OVERWRITE {s3t_table}: atomically replaced with {row_count} rows")`) : isMerge ? `${S3_ALIGN_PY}            # 按键合并 = Iceberg MERGE INTO,**一次提交**。UPDATE SET * / INSERT * 按**列名**展开
             #   (上面已把 df 对齐成目标表的列集合与写法)。键命中 ⇒ 整行更新;未命中 ⇒ 插入;不清表、不预删(与 append / overwrite 都不同)。
             _bgp_mk_t = [next(c for c in df.columns if c.lower() == _k.lower()) for _k in _bgp_mk]
             _bgp_on = " AND ".join(f"t.{_k} = s.{_k}" for _k in _bgp_mk_t)
@@ -577,7 +576,7 @@ ${partitionFields.length > 0 ? `            partition_clause = "PARTITIONED BY (
             spark.sql(create_sql)
             print(f"CREATED {s3t_table} with {row_count} rows")
 ${isOverwrite ? `
-        # 序 37 B-53:写后对数 —— 目标(整表 / 本批涉及的分区)行数必须等于本次读到的行数。
+        # 写后对数 —— 目标(整表 / 本批涉及的分区)行数必须等于本次读到的行数。
         ${byPartitions ? `_bgp_on = " AND ".join(f"t.{k} <=> b.{k}" for k in PARTITION_KEYS)
         _bgp_keys = ", ".join(PARTITION_KEYS)
         _bgp_target_rows = spark.sql(f"SELECT COUNT(*) FROM {s3t_table} t LEFT SEMI JOIN (SELECT DISTINCT {_bgp_keys} FROM {temp_view}) b ON {_bgp_on}").collect()[0][0]` : `_bgp_target_rows = spark.sql(f"SELECT COUNT(*) FROM {s3t_table}").collect()[0][0]`}
@@ -585,7 +584,7 @@ ${isOverwrite ? `
         if _bgp_target_rows != row_count:
             raise Exception(f"SYNC_VERIFY_MISMATCH target=s3tables table={s3t_table}: 写入后目标 {_bgp_target_rows} 行,本次读到 {row_count} 行")
 ` : ""}${isMerge ? `
-        # 序 37 B-61:写后对数 —— 目标里键命中本批的行数必须等于本次读到的行数(源内键唯一 ⇒ 一行对一行;多了 = 重复,少了 = 丢行)。
+        # 写后对数 —— 目标里键命中本批的行数必须等于本次读到的行数(源内键唯一 ⇒ 一行对一行;多了 = 重复,少了 = 丢行)。
         _bgp_on = " AND ".join(f"t.{_k} <=> b.{_k}" for _k in _bgp_mk_t)
         _bgp_keys = ", ".join(_bgp_mk_t)
         _bgp_target_rows = spark.sql(f"SELECT COUNT(*) FROM {s3t_table} t LEFT SEMI JOIN (SELECT DISTINCT {_bgp_keys} FROM {temp_view}) b ON {_bgp_on}").collect()[0][0]
@@ -608,7 +607,7 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
     # 改用 **Redshift 托管 admin secret**(与 DMS 路径 execAdminSql 一致,有全权),所有 Data API 语句
     # 都带 SecretArn=admin 执行,从而能建 schema/表/授权。admin secret 名固定 redshift!bgp-namespace-admin。
     import time
-    # @kf-batch 50-WP7-sync-pushdown:数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
+    # 数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
     rs_client = boto3.client("redshift-data", region_name=_BGP_PLACE["region"])
     rs_workgroup = _BGP_RS["workgroup"]
     rs_database = _BGP_RS["database"]
@@ -618,7 +617,7 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
     RS_SORT_KEYS = ${JSON.stringify(_rsSortKeys)}
     RS_DIST_KEY = ${JSON.stringify(_rsDistKey)}
     RS_DIST_STYLE = ${JSON.stringify(_rsDistStyle)}
-    # 🔴 WP-7:执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
+    # 🔴 执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
     # 与旧运行期探名拿到的是同一把;非 home = 该 target 自己的凭证)。原先 Python 侧按 home 命名
     # 运行期探名的写法已退役 —— 那个名字是主控区的,非 home 区按它探,探到 = 连错身份,
     # 探不到 = 静默回 IAM,两头都是错。值为 None(无密钥裸环境)= 回退 IAM 身份(旧语义不变)。
@@ -684,7 +683,7 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
         # reach FINISHED raises immediately — never silently continue (root-caused two
         # bugs: a failed INSERT was swallowed so the job "succeeded" with 0 rows, and a
         # permission-denied INSERT was retried for every batch, burning minutes of compute).
-        # B-126(2026-10-26 测试账号真环境):Redshift Data API 对单条语句偶发回「An I/O error occurred while sending to the backend」
+        # (2026-10-26 测试账号真环境):Redshift Data API 对单条语句偶发回「An I/O error occurred while sending to the backend」
         #   这类**连接层瞬态错**;原来一次失败即抛 ⇒ CREATE 已成、COMMENT(平台标记)失败 ⇒ 留下一张**无标记的空表**,
         #   之后每次运行都被 SYNC_REFUSED_CLEAR_FOREIGN_TABLE 拒绝(守卫按设计,可那张表是平台自己建的,用户无路可走)。
         #   修两处:① run_stmt / run_batch / 探测只对连接层瞬态签名**有界重试**(3 次,2 / 4 秒;权限 / 语法 / 对象不存在等照旧
@@ -778,7 +777,7 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
         ensure_schema(f"CREATE SCHEMA IF NOT EXISTS {rs_schema}", "CREATE SCHEMA")
         # Create table if missing. 用 DELETE 而不是 TRUNCATE:①TRUNCATE 是 owner-only;
         # ②增量幂等路径要按 WHERE 精确删区间(见下方 inc_where),TRUNCATE 做不到。
-        # 🔴 L1(52 P52.1)后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
+        # 🔴 L1后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
         #    已改用同一个 admin secret ⇒ 两侧同 owner,不靠任何补授权。
         #    (本注释在 TS 模板串里,禁写反引号——它会当场截断模板字符串。)
         # SYNC-FIX(sortkey): 建表带上 DISTKEY/DISTSTYLE/SORTKEY(与预览 DDL 一致;此前执行脚本裸建表丢了它们)。
@@ -819,7 +818,7 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
             # 已存在(带标记,或用户已确认覆盖)⇒ 建表语句照旧单条跑(IF NOT EXISTS 下是 no-op),不碰标记。
             run_stmt(create_sql, "DDL")
         else:
-            # B-126:建表 + 打平台标记在**同一个事务**里 —— 标记打不上就连表也不留(否则下次运行会被守卫当成客户的表拒掉)。
+            # 建表 + 打平台标记在**同一个事务**里 —— 标记打不上就连表也不留(否则下次运行会被守卫当成客户的表拒掉)。
             run_batch([create_sql, f"COMMENT ON TABLE {rs_table} IS '{PLATFORM_TABLE_MARKER}'"], "DDL+COMMENT(platform marker)")
             print(f"SYNC_TABLE_MARKED table={_rs_fq}")
 
@@ -829,12 +828,12 @@ ${partitionFields.length > 0 ? `        print(f"Partitioned by: ${partitionField
         # 平台 16 处读路径现在都用同一个 admin secret ⇒ 同 owner,天然可读可写。
         # 🔴 别加回来(生成侧提示词/配方已同步撤掉该建议,并有扫描门禁钉死)。
 
-${isOverwrite || isMerge ? `${isMerge ? `        # 序 37 B-61:按键合并复用覆盖路的暂存表机制:先装进暂存表(结构同目标表),装好后在**一个事务**里
-        #   「删掉目标里键命中的行 + 从暂存表插入」,再按键对数;任何一步失败,目标表保持原样。暂存表用完即删。` : `        # 序 37 B-53:覆盖写入**不再先清目标表**。原来是 DELETE 与 COPY 两条独立语句:COPY 失败就留下一张空表。
+${isOverwrite || isMerge ? `${isMerge ? `        # 按键合并复用覆盖路的暂存表机制:先装进暂存表(结构同目标表),装好后在**一个事务**里
+        # 「删掉目标里键命中的行 + 从暂存表插入」,再按键对数;任何一步失败,目标表保持原样。暂存表用完即删。` : `        #:覆盖写入**不再先清目标表**。原来是 DELETE 与 COPY 两条独立语句:COPY 失败就留下一张空表。
         #   现在:先装进暂存表(结构同目标表),装好后在**一个事务**里「清目标(整表 / 本批涉及的分区)+ 从暂存表插入」,
         #   再对数;任何一步失败,目标表保持原样。暂存表用完即删。`}
         rs_stage = f"{rs_schema}.{target_name[:110]}__bgp_stage"
-        # run_batch(一个事务)的唯一定义在上面 run_stmt 旁边(B-126 起建表 + 打标记也用它)。
+        # run_batch(一个事务)的唯一定义在上面 run_stmt 旁边(建表 + 打标记也用它)。
 
         run_stmt(f"DROP TABLE IF EXISTS {rs_stage}", "DROP(stage)")
         run_stmt(f"CREATE TABLE {rs_stage} (LIKE {rs_table})", "CREATE(stage)")
@@ -934,7 +933,7 @@ ${isOverwrite || isMerge ? `${isMerge ? `        # 序 37 B-61:按键合并复�
                 inserted += len(batch)
             loaded_via = "INSERT"
 
-${isOverwrite ? `        # 序 37 B-53:一个事务里换入 + 对数(对数在暂存表删除之前做,按分区覆盖要用它圈定分区)。
+${isOverwrite ? `        # 一个事务里换入 + 对数(对数在暂存表删除之前做,按分区覆盖要用它圈定分区)。
         _cols_csv = ",".join(cols)
         if OVERWRITE_SCOPE == "partitions":
             _pk = PARTITION_KEYS[0]
@@ -950,7 +949,7 @@ ${isOverwrite ? `        # 序 37 B-53:一个事务里换入 + 对数(对数在�
         print(f"SYNC_VERIFY target=redshift table={rs_table} scope={OVERWRITE_SCOPE} source_rows={row_count} target_rows={_bgp_target_rows}")
         if _bgp_target_rows != row_count:
             raise Exception(f"SYNC_VERIFY_MISMATCH target=redshift table={rs_table}: 写入后目标 {_bgp_target_rows} 行,本次读到 {row_count} 行")
-` : ""}${isMerge ? `        # 序 37 B-61:一个事务里「删掉目标里键命中的行 + 从暂存表插入」= upsert;按键对数(暂存表删除之前做)。
+` : ""}${isMerge ? `        # 一个事务里「删掉目标里键命中的行 + 从暂存表插入」= upsert;按键对数(暂存表删除之前做)。
         #   Redshift 标识符不区分大小写,键按本次读到的列名写即可。
         _cols_csv = ",".join(cols)
         _bgp_on = " AND ".join(f"{rs_table}.{_k} = {rs_stage}.{_k}" for _k in _bgp_mk)

@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
 // 🔴 **改动前零守卫**(52 SPEC §2 缺口B 第 7 面之二;台账 §11.2 第 5 项):探活会**回写该数据源的
 //    `status`/`lastHeartbeatAt`** ⇒ 任一登录用户可跨项目把别人的数据源标成 unreachable。
 // 🔴 守卫**按数据源的归属项目**判(`guardResourceAccess`),不是调用方 active project —— 否则是混淆代理。
 //
-// 序 38 B-70 —— 探测可以走数据源自己的 Glue 连接(见 lib/datasource/glue-reach.ts 顶部的缺陷原形):
+// 探测可以走数据源自己的 Glue 连接(见 lib/datasource/glue-reach.ts 顶部的缺陷原形):
 //   POST:probeVia=auto(缺省)先控制面直连;**连不上且有 Glue 连接** ⇒ 不再把源刷成 unreachable,而是起(或复用在跑的)
 //        一次发现作业当探测,状态置 testing、heartbeat.state=testing,顺带记下控制面那一下的结果(页面明示);
 //        probeVia=glue-connection ⇒ 直接起。
@@ -36,7 +35,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     if (ctx instanceof NextResponse) return ctx;
     if (!ds) return apiError("数据源不存在", 404);
     const row = ds as unknown as DataSource;
-    // 序 49 ② B-73:连通性检测本体搬到唯一作者 lib/datasource/reachability-probe.ts(建源收口也调它),响应形状逐字不变
+    // 连通性检测本体搬到唯一作者 lib/datasource/reachability-probe.ts(建源收口也调它),响应形状逐字不变
     const out = await probeDataSourceReachability(row);
     if (out.kind === "settled") return apiOk({ status: out.status, ...out.cp });
     return apiOk({

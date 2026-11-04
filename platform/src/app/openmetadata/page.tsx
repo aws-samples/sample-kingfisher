@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Card, Button, Space, Spin, Alert, Descriptions, Tag, Row, Col } from "antd";
 import { LinkOutlined, CheckCircleOutlined, DatabaseOutlined, ApartmentOutlined, SearchOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-9)。🔴🔴 用户 2026-09-10 拍板「治理目录必须走
+// 执行范围。🔴🔴 用户 2026-09-10 拍板「治理目录必须走
 // 同一个 OpenMetadata」⇒ 「哪个区」= OM 的 **service 维度**(`bgp-*-<targetSlug>`,主控区不加后缀)。
 // 所以这一页按区要做的不是换实例,而是把**该区对应的那几个 service** 直接指出来并可点进去。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -14,7 +14,7 @@ export default function OpenMetadataPage() {
   const t = useT();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  // @kf-batch 50-WP4ter-coverage —— 当前范围决定「列哪几个区的 service」
+  // 当前范围决定「列哪几个区的 service」
   const { scope, targets } = useScope();
   const scopedTargets =
     scope.kind === "target"
@@ -78,7 +78,7 @@ export default function OpenMetadataPage() {
             </Col>
           </Row>
 
-          {/* @kf-batch 50-WP4ter-coverage —— 按区的入口:OM 是同一个实例,区的差别在 service 名上。
+          {/* 按区的入口:OM 是同一个实例,区的差别在 service 名上。
               🔴 不显示表数:那要查 OM 才知道,而这一页只负责导航;目录页(/governance)才是看表的地方
               (那边已经带新鲜度,且刻意不用 facet 的 tables —— 实测它只统计定时来源,会显示 0)。 */}
           <Card title={t("按执行范围的 OpenMetadata 服务")} style={{ marginTop: 24 }} data-testid="om-services-by-scope">

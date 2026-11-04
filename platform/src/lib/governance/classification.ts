@@ -1,4 +1,4 @@
-// 模块 18 — 数据分级分类 + 权限授权 (v1.9.0)
+// 数据分级分类 + 权限授权 (v1.9.0)
 //
 // Control-plane store (DynamoDB) for table/column sensitivity classification and per-user
 // data-access grants. The masking layer (masking.ts) reads these to decide what to mask;

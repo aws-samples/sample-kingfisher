@@ -1,7 +1,7 @@
-// @kf-batch 37-sync-capability —— 序 37 改动前录下的「存量任务形态」矩阵(A3 先钉现状)。
-// 每个形态 = 一个存量同步任务可能长成的样子(不带任何序 37 新字段)。
+// 改动前录下的「存量任务形态」矩阵(A3 先钉现状)。
+// 每个形态 = 一个存量同步任务可能长成的样子(不带任何新字段)。
 // 判据 `golden-script.test.ts` 用它断:改动后生成的脚本与改动前**逐字节相同**;
-// 只有「覆盖」写入的形态允许变化(B-53 根治本来就要改它),那几个单独列名、单独断新行为。
+// 只有「覆盖」写入的形态允许变化(根治本来就要改它),那几个单独列名、单独断新行为。
 import type { DataSource } from "@/types/datasource";
 import type { GlueScriptBindings } from "@/lib/sync/glue-script-generator";
 
@@ -44,7 +44,7 @@ const base = {
 
 export interface GoldenShape {
   name: string;
-  /** 「覆盖」写入 ⇒ B-53 要改它,不进逐字节断言 */
+  /** 「覆盖」写入 ⇒ 要改它,不进逐字节断言 */
   overwrite: boolean;
   task: Record<string, unknown>;
   ds: DataSource;

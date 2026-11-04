@@ -1,11 +1,10 @@
-// @kf-batch 50-WP15-airflow-serverless(T-11)
 // **MWAA Serverless 的 Code 包 = zip,模块在根**(50 SPEC v3.30 §3.15)。
 //
 // 🔴 为什么必须是 zip:`CreateWorkflow.Code.S3Location` 指的是**代码包**,服务把它解开后放到 worker 的 import 路径上。
 //    给一个裸 `.py` 对象:CreateWorkflow **成功**、workflow **READY**、cron **照点触发** —— 然后每个 run 都在
 //    「Filling up the DagBag」阶段死于 `ModuleNotFoundError: No module named 'bgp_runtime'`,run 秒失败。
 //    这条事实 spike 阶段就已坐实并写进记忆(「PythonOperator 模块必须经 Code.S3Location(zip,模块在根)」),
-//    而施工时 WORK-PACKAGES 写成了「官方接受单 .py,免 zip」这个**没验过的假设** ⇒ 真环境第四轮才炸出来(T-11)。
+//    而施工时写成了「官方接受单 .py,免 zip」这个**没验过的假设** ⇒ 真环境第四轮才炸出来。
 //    ⇒ 打包收成本文件这一个作者,任何人都拿不到「裸 .py」那条路(publish 只认 BGP_RUNTIME_ZIP)。
 //
 // 🔴 为什么固定时间戳:workflowBucket 开了版本 + RETAIN。zip 头里默认写「当前时间」⇒ 同一份运行时每次发布都产出不同字节,

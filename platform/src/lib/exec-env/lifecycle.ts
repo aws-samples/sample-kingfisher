@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // 执行环境状态机的【唯一权威】—— 期望态(spec)/ 观测态(observed)分离 + 单一写通道。
 //
 // 合同:SPEC §1.1 v3.15(status 降派生投影 + spec/observed 双轴 + phase 转移表);台账 DESIGN §20.23。
@@ -66,7 +65,7 @@ export type TargetIntent = (typeof TARGET_INTENTS)[number];
  *    **基线校验(批 3)落地前恒 `true`** ⇒ fail-closed:部署期一律不承接新工作(见 serviceabilityReason)。
  */
 export interface DeployOperation {
-  /** @kf-batch 50-WP30-decommission:+`destroy`(下线销毁会话;broker 开、平台收口 `settleDestroy` 清) */
+  /** +`destroy`(下线销毁会话;broker 开、平台收口 `settleDestroy` 清) */
   kind: "deploy" | "drain" | "destroy";
   operationId: string;
   /** 🔴 v2 审核(§4.1):epoch 进 operation —— 完成方才能证明自己清的是**同一次**部署会话,而非后启动的新 operation。 */
@@ -233,8 +232,7 @@ export interface EnableLifecycleFence extends ExactGreenLifecycleEvidence {
 }
 
 /**
- * @kf-batch 50-WP30-discard
- * 弃置(WP-30 路 A)授权:`registered|provisioning → gone`。
+ * 弃置授权:`registered|provisioning → gone`。
  * `noStacksVerifiedAt` = 本次**真查** CFN 的时刻(目标 region 无 `BgpExecEnv-<slug>-*` 任何非 DELETE_COMPLETE 栈)——
  * 资源事实由调用方现查,条件写只能钉描述符侧的事实(无 operation / 无锁 / 从没 ready / 无资源袋)。
  */
@@ -284,14 +282,14 @@ export interface TargetObserved {
   operation?: DeployOperation;
   lastReconcileAt?: string;
   lastError?: string;
-  /** 🔴 P50.3b-2a:连续探活未全绿次数(health 降级抖动防护;全绿即清 0)。周期 reconciler 维护。 */
+  /** 🔴 2a:连续探活未全绿次数(health 降级抖动防护;全绿即清 0)。周期 reconciler 维护。 */
   unhealthyStreak?: number;
-  /** 🔴 P50.3b-2b:上一次失败会话的**已核验**处置(唯一失败写入方 `recordOperationFailure` 写)。诊断/审计用,不参与准入判定。 */
+  /** 🔴 2b:上一次失败会话的**已核验**处置(唯一失败写入方 `recordOperationFailure` 写)。诊断/审计用,不参与准入判定。 */
   lastFailure?: ObservedFailureRecord;
 }
 
 /**
- * 🔴 P50.3b-2b:失败会话的落库记录(SPEC §3.5b)。**全部字段都是"查出来的"**,不是调用方声明的意图 ——
+ * 🔴 2b:失败会话的落库记录(SPEC §3.5b)。**全部字段都是"查出来的"**,不是调用方声明的意图
  * `buildStatus` 来自对 exact buildId 的 CodeBuild 查询(无 buildId 时为 `"no-build"`),
  * `stacks`/`checkedAt` 来自 `describeStackDisposition`,`decisionId`/`decidedBy` 来自管理员显式确认。
  */
@@ -322,18 +320,18 @@ export interface ObservedFailureRecord {
  *   重试 = provisioning→provisioning 幂等自转(清 lastError)。
  */
 export const PHASE_EDGES: Record<TargetPhase, readonly TargetPhase[]> = {
-  // @kf-batch 50-WP30-discard —— `→ gone` 是**弃置**(WP-30 路 A):从没装出来、目标区无本 slug 栈的环境直接退役。
+  // `→ gone` 是**弃置**:从没装出来、目标区无本 slug 栈的环境直接退役。
   //   🔴 这两条边**只能**由 `DiscardFence` 授权(transitionPhase 里与 enableFence 同一手法:边 ⇔ fence 成对),
   //   条件写里再钉「无 operation / 无部署锁 / 从没 ready / 无资源袋」—— 不许被普通转移顺手走掉。
   registered: ["provisioning", "gone"],
-  // @kf-batch 50-WP30-decommission —— `→ decommissioning` 四条边(provisioning / verifying / ready / draining):
+  // `→ decommissioning` 四条边(provisioning / verifying / ready / draining):
   //   装过(或装了一半、有栈)的环境经删除审批后进入销毁。🔴 这些边**只能**由 broker 的 destroy 开会话走
   //   (与部署锁、destroy operation 同一次条件写;validate.mjs planDestroyOpen),`transitionPhase` 一律拒 ——
   //   否则任何调用方都能把一个资源还在的环境标成「销毁中」(tombstone 谎的前一步)。
   provisioning: ["verifying", "gone", "decommissioning"], // 成功进 verifying;失败留 provisioning+lastError;重试走幂等自转
   verifying: ["ready", "provisioning", "decommissioning"], // 探活绿→ready;探活红或需重部→退回 provisioning
   ready: ["draining", "decommissioning"], // 🔴 升级不改 phase(只置 operation);健康在 health 轴。退役才离开 ready
-  // 🔴 P50.3b-4:`draining → ready` 是**回服务**(un-drain)。排空是**运维动作**(维护/腾挪前先停接新活),
+  // 🔴 4:`draining → ready` 是**回服务**(un-drain)。排空是**运维动作**(维护/腾挪前先停接新活),
   //    做完就该能放回来;原表只有 `draining → decommissioning` ⇒ 排空成了**单向门**,一旦排空只能走向销毁,
   //    这会逼运维不敢用排空(于是他们改去做更危险的事:直接改状态或干脆不排空)。
   //    回服务仍要过**同一条证据路**(fresh 全绿探活),不是把标记翻回去就算。
@@ -423,8 +421,8 @@ export function materializedProjection(
  *    **任何** observed.operation 在途(§20.2:不只 disruptive —— 损坏数据写 disruptive=false 也拒)。degraded 仍可服务。
  */
 export function serviceabilityReason(spec: TargetSpec, observed: TargetObserved): string | null {
-  // @kf-batch 50-WP30-decommission:拒因开头固定为「该执行环境已停止承接」—— 绑定 / 调度 / 运行三个入口
-  //   都经 requireReadyTarget → 本函数,页面原样显示这一句(WP-30 ED-B1;用户看得懂,不是 intent=drain 这种内部词)。
+  // 拒因开头固定为「该执行环境已停止承接」—— 绑定 / 调度 / 运行三个入口
+  //   都经 requireReadyTarget → 本函数,页面原样显示这一句(ED-B1;用户看得懂,不是 intent=drain 这种内部词)。
   if (spec.intent !== "serve") {
     return `该执行环境已停止承接(${spec.intent === "delete" ? "已批准删除,等待 / 正在销毁" : "已排空"};intent=${spec.intent})—— 不承接新绑定、新调度、新运行`;
   }
@@ -443,7 +441,7 @@ export function serviceabilityReason(spec: TargetSpec, observed: TargetObserved)
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 P50.3b-2a:周期 reconciler 的 health 派生(fail-open 反转禁令的核心)
+// 🔴 2a:周期 reconciler 的 health 派生(fail-open 反转禁令的核心)
 // ══════════════════════════════════════════════════════════════════════════════
 
 /** 🔴 连续 N 次探活未全绿才降级 health(防单次瞬时失败误杀健康 region;全绿即清 0)。 */
@@ -501,18 +499,18 @@ export function adoptLegacy(t: ExecutionTarget): { spec: TargetSpec; observed: T
   //    而 `initializing/upgrading` 卡死的存量(bug#11 真环境 tgt_usw2_a):**不**在这里自愈成 ready
   //    (旧实现据 stored probe 推 ready = fail-open,被拒绝清单 #12 明令禁止);它落非服务态(fallback
   //    provisioning + health=unknown),由 **probe route 本次 fresh green** 经 `adoptLegacyAfterFreshProbe`
-  //    (Steps 3-4 交付,携 LegacyCompletionFence)物化成 ready ——"只凭本次探活自愈"(E-99)。
+  //    (Steps 3-4 交付,携 LegacyCompletionFence)物化成 ready ——"只凭本次探活自愈"。
   //    刻意**不**自愈 `testing`:它是"待人工启用",自愈成 ready = 跳过 enable(§20.23 明确不许)。
   const provenReady = t.ready === true && servingStatus && !retiring;
   const phase: TargetPhase = provenReady ? "ready" : legacyFallbackPhase(status);
 
   const intent: TargetIntent = status === "deleted" || status === "decommissioning" ? "delete" : status === "draining" ? "drain" : "serve";
-  // 🔴🔴 P50.3b-2a fail-open 反转禁令(**legacy 侧**,re-audit 揪出):周期 reconciler 会对 legacy target 也无条件
+  // 🔴🔴 2a fail-open 反转禁令(**legacy 侧**,re-audit 揪出):周期 reconciler 会对 legacy target 也无条件
   //    刷新顶层 `probe.at`(writeProbeResult),废掉了"红探活 15min 后 stale 掉线"这条唯一安全网。若这里仍从 status
   //    派生 healthy 而无视 stored `probe.ok`,红探活(资源死了)的 legacy active 目标会"新鲜 + healthy"永远被准入 = fail-open。
   //    ⇒ **据 stored `probe.ok` DEMOTE**:红探活 ⇒ health=unknown(fail-closed,serviceabilityReason 拒)。
   // 🔴 只降级、不提升:拒绝清单 #12 只禁"据 stored probe.ok **推成 ready**",**降级不在禁列**(demote 只会更保守);
-  //    phase 仍按 status/ready 派生(不碰 #12),E-99 自愈仍只走 adoptLegacyAfterFreshProbe 的本次 fresh green。
+  //    phase 仍按 status/ready 派生(不碰 #12),自愈仍只走 adoptLegacyAfterFreshProbe 的本次 fresh green。
   // 🔴 **仅非 home**:与 stale 豁免同口径(unusableReason 的新鲜度分支也 `if (!isHome)`)——home 的可服务性语义
   //    (始终可服务、无"探活失联"失败模式)是**既有行为、本批不改**;reconciler 引入的 fail-open 回归只发生在
   //    非 home legacy(agent 复现用的就是 tgt_usw2_a)。home 是 legacy 时红探活仍 healthy,避免"全平台 fail-closed"。
@@ -534,7 +532,7 @@ export function adoptLegacy(t: ExecutionTarget): { spec: TargetSpec; observed: T
 }
 
 /**
- * 🔴 **只凭本次 fresh green probe 收养存量**(E-99 / 初装 legacy 完成路;§21.4)——与保守的 `adoptLegacy` 的区别:
+ * 🔴 **只凭本次 fresh green probe 收养存量**(初装 legacy 完成路;§21.4)——与保守的 `adoptLegacy` 的区别
  *    `adoptLegacy` 绝不据 stored probe 推 ready(拒绝清单 #12);本函数由 **probe route 本次真探全绿** 授权,
  *    经 `reconcileAfterProbe` 携 `LegacyCompletionFence` 一次条件写物化。三种 mode:
  *      · `stable`  = 曾真服务(active/degraded)且 ready ⇒ phase=ready(继续服务);
@@ -755,14 +753,14 @@ export function canonicalJson(value: unknown): string {
 }
 
 /**
- * 🔴 P50.3b-4:**`spec.intent` 的唯一写入方**(SPEC §1.1 双轴模型:spec 由人/API 写,observed 只由控制器写)。
+ * 🔴 4:**`spec.intent` 的唯一写入方**(SPEC §1.1 双轴模型:spec 由人/API 写,observed 只由控制器写)。
  *
  * 【它买到什么】排空(drain)= "这个 target 不再承接**新**工作,在途的让它跑完"。准入判定读
  * `serviceabilityReason(spec, observed)`,`intent ≠ serve` **立刻**判不可用 ⇒ 不必等 reconciler 改 phase,
  * 停接新活是**同步生效**的。phase 由 reconciler 随后驱动到 `draining`(那是观测态,归控制器)。
  *
  * 🔴 **只允许 `serve ⟷ drain`**:`delete` 会把 phase 推向 `decommissioning/gone`,而**真正销毁栈**
- * (影响预览 → 输名强确认 → 审批 → 销毁,数据桶 RETAIN)是 §4.6 / P50.3 的流程。这一批要是放开 `delete`,
+ * (影响预览 → 输名强确认 → 审批 → 销毁,数据桶 RETAIN)是 §4.6 的流程。这一批要是放开 `delete`,
  * 就会把 target 标成"已退役"而**资源还都在** —— 那是比不做更糟的谎(tombstone 骗人)。
  *
  * 🔴 **在途部署会话期间一律拒**:完成栅栏的后像校验断言 `post.spec.intent === "serve"`
@@ -793,7 +791,7 @@ export async function setSpecIntent(
   const cls = classifyDescriptor(current);
   if (cls.kind === "invalid") throw new PhaseTransitionError(`描述符形态非法(fail-closed):${cls.reason}`);
   const { spec, observed } = cls;
-  // @kf-batch 50-WP30-decommission —— 🔴 删除一经批准(intent=delete)就是单向门:不许借「恢复承接」把一个
+  // 🔴 删除一经批准(intent=delete)就是单向门:不许借「恢复承接」把一个
   //   正在 / 即将销毁的环境放回服务(审批人批的是「删掉它」,不是「排空一会儿」)。要留着它 = 驳回审批,而不是改意图。
   if (spec.intent === "delete") {
     throw new PhaseTransitionError("该执行环境的删除已经批准(intent=delete)—— 不能再改回承接 / 排空;销毁卡住请在详情页「重试销毁」");
@@ -859,12 +857,12 @@ export async function setSpecIntent(
   return { written: true, phaseHint: observed.phase };
 }
 
-// @kf-batch 50-WP15-airflow-serverless(K-5 网络规模)
-// @kf-batch 50-WP16-zero-egress:`setNetworkProfile` **已删除** —— 执行环境零出网,NAT 恒为 0,
+// (K-5 网络规模)
+// `setNetworkProfile` **已删除** —— 执行环境零出网,NAT 恒为 0,
 // 没有可调的档;对应路由 POST .../network-profile 已改回 410(SPEC §3.16-E)。
 
 /**
- * @kf-batch 50-WP15-airflow-serverless(施工序 6)—— 顶层 `schedulerPreference` 的**唯一**写入方(INTERACTION §2.2b「调度器偏好」;SPEC §3.15)。
+ * 顶层 `schedulerPreference` 的**唯一**写入方(INTERACTION §2.2b「调度器偏好」;SPEC §3.15)。
  * 只改**之后**发布走哪个调度器(已发布产物保持原调度器直到重新发布);不碰 spec / observed / status / ready / components 投影。
  * 条件写:version = :expected ∧ attribute_not_exists(observed.operation) ∧ attribute_not_exists(deployLockOperationId)
  * (与 setNetworkProfile 同一机制互咬理由:部署途中改偏好会让本次发布与期望不一致)。home 也允许(home 两者都装时同样要选)。
@@ -878,7 +876,6 @@ export async function setSchedulerPreference(
   if (!isSchedulerPreference(preference)) {
     throw new PhaseTransitionError(`schedulerPreference 只允许 ${SCHEDULER_PREFERENCES.join(" / ")}(收到 ${String(preference)})`);
   }
-  // @kf-batch 50-WP20b-retire-mwaa-preference
   // 🔴🔴 写侧值域(见 scheduler-preference.ts 那段):经典 MWAA 已整体下线 ⇒ **写不进**。
   //   校验放在这个**唯一写通道**里而不是只放路由上:新调用方自动被管住。
   if (!isWritableSchedulerPreference(preference)) {
@@ -1029,7 +1026,7 @@ export async function transitionPhase(
     legacyCompletionFence?: LegacyCompletionFence;
     /** 人工 enable(verifying→ready)本次 fresh probe fence。 */
     enableFence?: EnableLifecycleFence;
-    /** @kf-batch 50-WP30-discard —— 弃置(registered|provisioning→gone)fence;与那两条边成对 */
+    /** 弃置(registered|provisioning→gone)fence;与那两条边成对 */
     discardFence?: DiscardFence;
     reason: string;
   }
@@ -1055,12 +1052,12 @@ export async function transitionPhase(
   if (isEnableTransition !== (opts.enableFence !== undefined)) {
     throw new PhaseTransitionError("verifying→ready 只能由 fresh EnableLifecycleFence 授权,且 fence 不得用于其它边");
   }
-  // @kf-batch 50-WP30-discard —— 弃置边 ⇔ DiscardFence 成对(同 enable 手法)
+  // 弃置边 ⇔ DiscardFence 成对(同 enable 手法)
   const isDiscardTransition = (opts.from === "registered" || opts.from === "provisioning") && to === "gone";
   if (isDiscardTransition !== (opts.discardFence !== undefined)) {
     throw new PhaseTransitionError("registered|provisioning→gone 只能由 DiscardFence(弃置)授权,且 fence 不得用于其它边");
   }
-  // @kf-batch 50-WP30-decommission —— 进入销毁 / 销毁收口都不走这里:前者归 broker(destroy 开会话),
+  // 进入销毁 / 销毁收口都不走这里:前者归 broker(destroy 开会话),
   //   后者归 `settleDestroy`(带 destroy 会话 fence + 真查 AWS 的时刻)。
   if (to === "decommissioning" || (opts.from === "decommissioning" && to === "gone")) {
     throw new PhaseTransitionError(
@@ -1350,7 +1347,7 @@ export async function transitionPhase(
     }
   }
 
-  // ══ @kf-batch 50-WP30-discard —— 弃置 fence:描述符侧的四条事实全部钉进同一次条件写 ══
+  // ══ —— 弃置 fence:描述符侧的四条事实全部钉进同一次条件写 ══
   const discardFence = opts.discardFence;
   if (discardFence) {
     if (
@@ -1492,7 +1489,7 @@ export async function transitionPhase(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 P50.3b-2a:observed 的【周期 telemetry 窄通道】—— reconciler 稳态回写 health/observedVersion
+// 🔴 2a:observed 的【周期 telemetry 窄通道】—— reconciler 稳态回写 health/observedVersion
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
@@ -1587,7 +1584,7 @@ export async function reconcileTelemetry(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 P50.3b-2b:**唯一的失败路径写入方** —— 清在途会话 + 落已核验失败(SPEC §3.5b / 审核 §19.8)
+// 🔴 2b:**唯一的失败路径写入方** —— 清在途会话 + 落已核验失败(SPEC §3.5b / 审核 §19.8)
 // ══════════════════════════════════════════════════════════════════════════════
 
 /** 恢复前置/形状不满足(调用方给的 fence 与真 item 不符、或压根没有待恢复会话)⇒ 路由映射 400。 */
@@ -1997,7 +1994,7 @@ async function failureRecoveryPostcondition(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP30-decommission —— 下线销毁(WP-30 路 B)的两个写通道
+// 下线销毁的两个写通道
 //   ① `markDecommissionApproved`:审批通过 ⇒ `spec.intent = delete` + 删除计划(审批单 / 影响预览指纹 / 最终快照名 / 将保留清单)
 //      —— 这是平台把 intent 置成 delete 的**唯一**入口;broker 的 destroy 只认它写下的计划。
 //   ② `settleDestroy`:销毁会话收口 —— 真查 AWS 全清 ⇒ `gone`;否则留 `decommissioning` + lastError(点名卡住的资源 + 真因)。

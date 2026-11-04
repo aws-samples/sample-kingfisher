@@ -1,7 +1,7 @@
-// 模块 42 — 数据源 SPI 契约(DataSourceProvider)。
+// 数据源 SPI 契约(DataSourceProvider)。
 //
 // 【信条】(照抄 lib/engines/spi.ts 精神):provider 每个方法语义对应现有某段实现,不凭空发明。
-// P42.1 是「把散落的 MySQL 实现收编进 mysql provider」,行为逐字不变;之后每期加一个 provider 纯增量。
+// 是「把散落的 MySQL 实现收编进 mysql provider」,行为逐字不变;之后每期加一个 provider 纯增量。
 //
 // 方法语义映射现有实现:
 //  validateConfig  ← app/api/datasources/test/route.ts:62-92(建源表单字符串校验)

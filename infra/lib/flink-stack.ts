@@ -2,7 +2,6 @@ import * as cdk from "aws-cdk-lib";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
-// @kf-batch 50-WP27-9cap-matrix
 // 🔴 ARN 的 region 段一律经唯一出口 `regionalStatement`(轴 + 理由都要写在代码里)。
 //    本文件原来有 7 处手拼 —— 它们**逃过了门禁**,因为门禁的 `RAW_REGION` 只枚举了四种拼法
 //    (`${region}` / `${this.region}` / `${cdk.Aws.REGION}` / `${props…region}`),偏偏漏掉这里用的
@@ -10,7 +9,7 @@ import { Construct } from "constructs";
 //    **结构判定**(region 段只允许 `regionalStatement` 的回调参数),不再枚举拼法。
 import { regionalStatement } from "./shared/execution-regions";
 
-// 模块 32 (实时计算 Flink) — 门控基建(MSAF 引擎的耐久依赖)。
+// (实时计算 Flink) — 门控基建(MSAF 引擎的耐久依赖)。
 //
 // ⚠️ 门控栈,但**默认打开**(bin/app.ts 默认 enable-flink=1):本栈现在只创建 **≈零成本的 MSAF 服务角色**,
 // 不再建常驻计费资源,故默认全开也几乎零常驻计费。
@@ -38,7 +37,7 @@ export class FlinkStack extends cdk.Stack {
     // KMS:解密输出桶 / S3Tables
     props.dataKey.grant(role, "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey");
 
-    // 模块42 P42.7(多数据源):Kinesis 作为 Flink 源 —— MSAF 应用消费流所需的读权限。
+    // (多数据源):Kinesis 作为 Flink 源 —— MSAF 应用消费流所需的读权限。
     //  2026-07-07 曾删固定流 bgp-flink-source 走成本优化;现按 B 方案(用户拍板 2026-07-26)恢复多源支持:
     //  【不建固定流】,流由数据源 provision 按需新建(第二层可有多个);此处只授【消费任意平台流】的读权限。
     //  资源限定到本账号本区 stream/*(平台建的流都在此;不放开跨账号)。DescribeStreamSummary 供 introspect/探活。
@@ -54,7 +53,7 @@ export class FlinkStack extends cdk.Stack {
       resources: (r) => [`arn:aws:kinesis:${r}:${acct}:stream/*`],
     }));
 
-    // 模块42 P42.6b(MSK/Kafka 源):MSAF 应用【IAM 认证消费】Kafka broker 所需的数据面权限。
+    // (MSK/Kafka 源):MSAF 应用【IAM 认证消费】Kafka broker 所需的数据面权限。
     //  🔴 IAM 认证连 MSK 用 kafka-cluster:* 动作族(数据面,作用于 cluster/topic/group 三类资源 ARN),
     //     不是 kafka:*(那是控制面,如 DescribeClusterV2,归平台 TaskRole)。see aws-msk-iam-auth SigV4。
     //  · Connect + DescribeCluster:连集群。
@@ -120,7 +119,7 @@ export class FlinkStack extends cdk.Stack {
       resources: ["*"],
     }));
 
-    // 模块 32 — S3 Tables(托管 Iceberg)sink:S3TablesCatalog 经 s3tables API 建命名空间/表 + 读写
+    // S3 Tables(托管 Iceberg)sink:S3TablesCatalog 经 s3tables API 建命名空间/表 + 读写
     // 数据/元数据(限定到平台表桶 bgp-table-bucket);经 Glue/Lake Formation 联邦目录治理需 glue/
     // lakeformation(与平台 glueRole 同源,已实证可访问 S3 Tables)。表桶静态加密为 SSE-S3,无需额外 KMS。
     role.addToPolicy(regionalStatement(this, {

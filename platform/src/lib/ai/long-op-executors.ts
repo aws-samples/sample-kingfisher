@@ -1,5 +1,5 @@
-// 序 46 B-107 → 模块 55 —— 七种 AI 长调用的执行体(kind ↔ 执行体一一对应,tsc 钉死:少一个 / 多一个都编不过)。
-// 2026-10-21 序 50:框架从 lib/ai/long-call*.ts 泛化成 lib/long-ops/(全平台唯一),本文件只剩七个执行体原文,经 lib/long-ops/registry.ts 装配。
+// → —— 七种 AI 长调用的执行体(kind ↔ 执行体一一对应,tsc 钉死:少一个 / 多一个都编不过)。
+// 2026-10-:框架从 lib/ai/long-call*.ts 泛化成 lib/long-ops/(全平台唯一),本文件只剩七个执行体原文,经 lib/long-ops/registry.ts 装配。
 //
 // 执行体 = 原七条 POST 路由的「主体」原样搬入:鉴权 / 入参校验 / 落点点名(`requestedTargetId`)**留在路由**,
 // 这里只做「拿到已校验的入参 → 调模型 → 记记忆 / 审计 → 回 data + 实际用的模型」。
@@ -108,7 +108,7 @@ const paramAdviseExec: LongOpExecutor<"param-advise"> = async (params, ctx) => {
 };
 
 // ── ④ 离线作业 AI 生成(原 app/api/etl-jobs/generate/route.ts 主体) ──
-// @kf-batch 50-B27-codegen-place —— 按作业绑定的区做目录 grounding(区由路由经 requestedTargetId 点名后落在 params.targetId)
+// 按作业绑定的区做目录 grounding(区由路由经 requestedTargetId 点名后落在 params.targetId)
 const codegenEtl: LongOpExecutor<"codegen-etl"> = async (params, ctx) => {
   const bizCtx = contextToPromptText(await getContextForGrounding(params.projectId, params.prompt).catch(() => []));
   const gen = await generateEtlCode({ intent: params.prompt, currentCode: params.currentCode }, params.targetType, bizCtx, params.targetId, params.projectId);
@@ -117,7 +117,7 @@ const codegenEtl: LongOpExecutor<"codegen-etl"> = async (params, ctx) => {
     resourceId: "(draft)",
     detail: { targetType: params.targetType, outputTokens: gen.usage.outputTokens },
   }).catch(() => {});
-  // data 比 B-107 之前多回 `dialect`(页面 etl-jobs 一直在读它,此前服务端没给)。
+  // data 比此前多回 `dialect`(页面 etl-jobs 一直在读它,此前服务端没给)。
   return {
     data: { targetType: params.targetType, code: gen.code, explanation: gen.explanation, usage: gen.usage, groundedOn: gen.groundedOn, dialect: gen.dialect },
     meta: { model: gen.model },
@@ -149,7 +149,7 @@ const codegenRequirement: LongOpExecutor<"codegen-requirement"> = async (params,
     targetType: params.targetType,
     generatedCode: gen.code,
     explanation: gen.explanation,
-    // 「按哪个区生成」记到实现上:「创建作业」据此要求绑定区含它(B-36)
+    // 「按哪个区生成」记到实现上:「创建作业」据此要求绑定区含它
     groundedTargetId: gen.groundedOn.targetId,
   });
   recordAudit(ctx.req, "requirement.generate", {

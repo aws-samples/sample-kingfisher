@@ -1,8 +1,7 @@
-// @kf-batch 50-WP15-airflow-serverless
 // MWAA Serverless workflow 生命周期的**唯一**客户端(SPEC v3.27 §3.15)。create / update / delete / stop runs / get run / task instances。
 // 🔴 spike 坐实:定义 / 代码桶必须与 workflow 同 region;新桶数小时内 S3 返回 307 Temporary Redirect ⇒ CreateWorkflow 报 ValidationException
 //    「Failed to download YAML file from S3: Temporary Redirect」—— 这是**可重试**的(桶 DNS 传播),其余 ValidationException 不重试。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   MWAAServerlessClient,
@@ -114,11 +113,10 @@ export async function ensureWorkflow(input: EnsureWorkflowInput, opts: { attempt
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 按**名字**找 workflow 的 ARN(名字 = dagId;服务侧 ARN 带随机后缀,所以名字是唯一可推导的键)。
  * 🔴 为什么要这个:重新发布必须走 UpdateWorkflow(同名 CreateWorkflow 会被服务拒),而 ARN 只在台账里。
  *   台账丢了 / 行被重建 / 别人手工建过同名的,都会让「台账里没有 ⇒ 那就 Create」变成失败或**孤儿**
- *   (T-14 已经付过一次孤儿的学费)。所以:台账优先,台账没有就问服务本身 —— 服务是真值源。
+ *   (已经付过一次孤儿的学费)。所以:台账优先,台账没有就问服务本身 —— 服务是真值源。
  */
 export async function findWorkflowArnByName(region: string, name: string): Promise<string | undefined> {
   const c = serverlessClientFor(region);
@@ -159,7 +157,7 @@ export async function deleteWorkflow(region: string, workflowArn: string): Promi
     if (!/ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) throw e;
     return { deleted: true, stoppedRuns };
   }
-  // 🔴 T-14(2026-09-07 真环境):Stop 之后**必须等 run 真到终态**再删。
+  // 🔴 Stop 之后**必须等 run 真到终态**再删。
   //   服务对「还有 run 没停」的 DeleteWorkflow 会拒;原版停完立刻删 ⇒ 有 run 在跑时下线必失败,
   //   而上层把异常吞成 skipped 且照样清台账 ⇒ **孤儿 workflow 继续按 cron 跑,平台再也删不掉它**(真环境已留下 4 个)。
   const NON_TERMINAL = ["STARTING", "QUEUED", "RUNNING", "STOPPING"];
@@ -219,7 +217,7 @@ export async function startWorkflowRun(region: string, workflowArn: string,
   }
   throw lastErr;
 }
-/** @kf-batch 50-WP15-airflow-serverless(施工序 6):最近的 run 列表(任务日志按时间窗对台账行;最多一页)。 */
+/** 最近的 run 列表(任务日志按时间窗对台账行;最多一页)。 */
 export async function listWorkflowRuns(region: string, workflowArn: string, maxResults = 20) {
   const r = await serverlessClientFor(region).send(new ListWorkflowRunsCommand({ WorkflowArn: workflowArn, MaxResults: maxResults }));
   return r.WorkflowRuns ?? [];

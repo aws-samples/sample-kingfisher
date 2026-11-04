@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // 执行环境部署的**平台侧接线**(50 SPEC §2.1 deploy/build-status;DESIGN §12.0/§12.4)。
 //
 // 【本文件的三条承重】
@@ -17,9 +16,9 @@ import { CloudFormationClient, DescribeStacksCommand, ListChangeSetsCommand, Des
 import { CloudWatchLogsClient, GetLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import { execEnvStackName } from "@/lib/aws/naming";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
-// @kf-batch 50-WP31-place-first-class 序 31 第二刀 ②:逐栈进度查的是**目标区**的 CloudFormation(控制面服务,但客户端不在主控区
+// 逐栈进度查的是**目标区**的 CloudFormation(控制面服务,但客户端不在主控区
 //   ⇒ 观测器不豁免);GET build-status 路由没有任何一笔决策 ⇒ 未归因。读取进度 = 替这个 target 做事,在唯一作者这里记账。
 import { notePlaceDecision } from "@/lib/place/context";
 
@@ -33,13 +32,13 @@ export const BUILD_STATUS_PLACE_VIA = "readBuildStatus";
  * 钉住 —— 两侧跨构建边界无法共享常量,与 naming.json 双侧出口同一处境。
  */
 export const EXEC_ENV_BROKER_NAME = "bgp-exec-env-broker";
-// 序 31 二刀 ⑤:项目名(与其日志组名)搬进零 import 叶子 `exec-env-project-name.ts` —— 落点观测器据它把「读执行环境部署日志」
+// 项目名(与其日志组名)搬进零 import 叶子 `exec-env-project-name.ts` —— 落点观测器据它把「读执行环境部署日志」
 //   判成控制面(它在 instrumentation 可达面上,不能 import 本文件的 AWS SDK);这里 re-export,既有 import 路径零改动。
 import { EXEC_ENV_PROJECT_NAME } from "@/lib/exec-env/exec-env-project-name";
 export { EXEC_ENV_PROJECT_NAME };
 
 /**
- * 🔴 P50.3b-2b:CodeBuild 项目的 **build 超时**(= `infra/lib/exec-env/deploy-stack.ts` 的
+ * 🔴 2b:CodeBuild 项目的 **build 超时**(= `infra/lib/exec-env/deploy-stack.ts` 的
  * `timeout: cdk.Duration.hours(2)`,由 `__tests__/deploy-control.test.ts` 读 infra 源码逐字钉住)。
  *
  * 【为什么平台侧需要知道它】`startUncertain`(broker 开了 operation 但 StartBuild 结果未知)时**没有 buildId 可查**,
@@ -64,7 +63,7 @@ export function isTerminalFailedBuildStatus(phase: string): boolean {
 export const BUILD_NOT_FOUND = "not-found";
 
 /**
- * 🔴 P50.3b-2b:**恢复路专用**的 exact build 终态读取器。
+ * 🔴 2b:**恢复路专用**的 exact build 终态读取器。
  *
  * 【为什么不复用 `readBuildStatus`】① 它顺带并发拉**逐栈 DescribeStacks + 日志尾巴**,恢复判定一个都不要,
  *   纯浪费(每次开详情页都打一圈);更要紧的是它那份 `stacks` 是**会降级成 UNKNOWN 的那一版**,
@@ -118,7 +117,7 @@ export function noBuildRecoveryWindow(
   }
   const earliestMs = startedMs + EXEC_ENV_BUILD_TIMEOUT_MS + RECOVERY_NO_BUILD_MARGIN_MS;
   if (now >= earliestMs) return { earliestRecoverAt: new Date(earliestMs).toISOString(), recoverable: true, by: "window" };
-  // @kf-batch 50-WP15-airflow-serverless —— 🔴 第二条放行证据:**CodeBuild 项目里根本没有这次 operation 的 build**。
+  // 🔴 第二条放行证据:**CodeBuild 项目里根本没有这次 operation 的 build**。
   //   结构窗(2h15m)是「StartBuild 结局未知」时的兜底;但 broker 在 open 之后、StartBuild 之前就停了(如 post-image 不匹配)的场景
   //   在真环境里发生了,而 ListBuildsForProject 能**正面证明**没有 build(StartBuild 成功的 build 会立即进列表)。
   //   为防与 broker 的 StartBuild 竞态,证据只在会话开始 ≥ START_ABSENCE_MIN_AGE_MS 后才算数;找到 build 则不走本分支(那是 attach 丢响应)。
@@ -142,7 +141,7 @@ export interface NoBuildEvidence {
 }
 
 /**
- * @kf-batch 50-WP15-airflow-serverless —— 在 exec-env CodeBuild 项目里找「带 EXEC_ENV_OPERATION_ID = operationId」的 build。
+ * 在 exec-env CodeBuild 项目里找「带 EXEC_ENV_OPERATION_ID = operationId」的 build。
  * 只翻会话开始(startedAt − 5min)之后的 build(列表按开始时间倒序,翻到更早的就停),每批 ≤ 100 个 BatchGetBuilds。
  * 🔴 查询失败一律**不给** absent=true(fail-closed:查不到 ≠ 没有)。
  */
@@ -202,7 +201,7 @@ export function brokerCodeToHttp(code: string): number {
       return 400; // 入参白名单/格式被拒
     case "bad-descriptor":
       return 500; // 注册表 item 缺 region/accountId —— 数据坏了,不是调用方的错
-    // 🔴 P50.3b(审核 §19.7)新增的四个分类码:都是"有在途/陈旧会话,先按既定路收口"⇒ 冲突语义 409;
+    // 🔴 (审核 §19.7)新增的四个分类码:都是"有在途/陈旧会话,先按既定路收口"⇒ 冲突语义 409;
     //    落 default 502 会把"该走 finalize/恢复"误报成上游故障(拒因即解释,不能糊成 502)。
     case "needs-finalize":
     case "needs-legacy-finalize":
@@ -250,7 +249,7 @@ export async function invokeDeployBroker(
       })
     );
   } catch (e) {
-    // @kf-batch 50-init-deploy-mechanism —— 「部署机制没装」翻译成可执行的话(其余不可达形态原样透出)
+    // 「部署机制没装」翻译成可执行的话(其余不可达形态原样透出)
     throw describeBrokerInvokeFailure(e);
   }
   // FunctionError = broker 自身未捕获异常(它的 handler 全 try/catch,出现这个说明 broker 部署坏了)
@@ -275,7 +274,6 @@ export async function invokeDeployBroker(
   return parsed as BrokerResult;
 }
 
-// @kf-batch 50-init-deploy-mechanism
 /**
  * 🔴 broker **不可达**的诸多形态里,`ResourceNotFoundException`(Function not found)= 「部署机制根本没装」。
  *   2026-09-06 新账号真跑:deploy-all 21 栈全绿、向导注册成功、「开始部署」报 `Function not found: <arn>`——
@@ -377,7 +375,7 @@ async function fetchBuild(buildId: string): Promise<BuildLite | undefined> {
 /**
  * 目标 region 的逐栈状态。
  *
- * 🔴 **P50.2f 改为「按命名 SSOT 推定栈名、逐栈指名查询」**(销掉无参列举):
+ * 🔴 **改为「按命名 SSOT 推定栈名、逐栈指名查询」**(销掉无参列举):
  *    切片 f 把平台角色的 DescribeStacks 从 `Resource:*` 收窄到 `stack/BgpExecEnv-*` —— 资源级授权下
  *    **无参列举整个 region 会被 AccessDenied**,原实现会把它当"降级"吞成 stacks:[],进度页栈级明细
  *    静默消失(第三个跨切片接缝:f 的 IAM × e 的代码)。指名查询的 ARN 落在 BgpExecEnv-* 内 ⇒ 可行,
@@ -424,7 +422,7 @@ async function fetchStackStatuses(target: ExecutionTarget): Promise<Array<{ name
 }
 
 /**
- * 🔴 P50.3b-2a:观测态模板版本(`observed.templateVersion` 真写入方,复活 SPEC §1.1 死字段;周期 reconciler 调)。
+ * 🔴 2a:观测态模板版本(`observed.templateVersion` 真写入方,复活 SPEC §1.1 死字段;周期 reconciler 调)。
  * = 目标 region 的 `BgpExecEnv-*` 栈中**最近一次更新时间**(`LastUpdatedTime ?? CreationTime` 的最大 ISO)——
  * "当前部署的基础设施最后一次变更于何时"的**真实观测**(desired/observed 模板漂移会体现为时间差)。
  * 🔴 **best-effort**:任一栈失败 / 尚未创建 / 无栈 ⇒ 忽略该栈;全无 ⇒ 返回 undefined
@@ -455,7 +453,7 @@ export async function describeObservedTemplateVersion(target: ExecutionTarget): 
 }
 
 /**
- * 🔴 P50.3b-2b:**恢复闸专用**的目标 region 基础设施处置(SPEC §3.5b ④)。
+ * 🔴 2b:**恢复闸专用**的目标 region 基础设施处置(SPEC §3.5b ④)。
  *
  * 【与 `fetchStackStatuses`(进度页)的关键差别 —— 这是两个函数而不是加一个参数的原因】
  *   进度页把 DescribeStacks 失败**降级**成 `UNKNOWN` 继续显示(权限抖动不该让进度接口 500);
@@ -541,7 +539,7 @@ export async function describeStackDisposition(target: ExecutionTarget): Promise
         return;
       }
 
-      // @kf-batch 50-WP15-airflow-serverless(K-5):失败栈把**第一个**资源级失败原因带回页面(翻成人话;EIP 配额撞上时页面只见「部署失败」= 真因不可见)
+      // 失败栈把**第一个**资源级失败原因带回页面(翻成人话;EIP 配额撞上时页面只见「部署失败」= 真因不可见)
       let failureReason: string | undefined;
       if (/ROLLBACK|FAILED/.test(status)) {
         try {
@@ -659,7 +657,6 @@ async function fetchBuildMarkerJson(buildId: string, marker: string): Promise<un
   }
 }
 
-// @kf-batch 50-WP30-decommission
 /** 与 `infra/scripts/exec-env-destroy.sh` 打印的标记逐字一致(两侧同一个字面量;漂移会让取值静默失败 —— 单测读脚本源码钉住)。 */
 export const DESTROY_REPORT_MARKER = "EXEC_ENV_DESTROY_REPORT";
 
@@ -681,7 +678,7 @@ export async function fetchDestroyReport(buildId: string): Promise<DestroyReport
 }
 
 /**
- * 触发下线销毁(WP-30 路 B):invoke broker `{targetId, operationId, mode:"destroy"}` —— **不传组件、不传快照名**
+ * 触发下线销毁:invoke broker `{targetId, operationId, mode:"destroy"}` —— **不传组件、不传快照名**
  * (broker 只从注册表的删除计划读;多传一个字段它就拒)。失败形态与 `invokeDeployBroker` 同一套。
  */
 export async function invokeDestroyBroker(targetId: string, operationId: string): Promise<BrokerResult> {

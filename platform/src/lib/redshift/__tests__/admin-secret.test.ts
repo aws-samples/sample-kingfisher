@@ -1,5 +1,4 @@
-// @kf-batch 50-G2
-// G6(模块 50)—— `getRedshiftSecretArn` 改复合键缓存后的**行为等价**单测。
+// G6—— `getRedshiftSecretArn` 改复合键缓存后的**行为等价**单测。
 //
 // 【为什么必须有这个测试】这个函数有 **16 处调用表达式、分布 14 个文件**(execute / genbi / etl / 指标 / 质量 / 敏感扫描 …;
 // 口径 = `node scripts/ast-count-callsites.mjs getRedshiftSecretArn`,AST 计数。原写 17/15 是 grep 目测的错数,见审核 v2 P2-3)。
@@ -79,7 +78,7 @@ describe("非 home 一律拒(本函数不该从 env 猜别的区域的 secret)",
 });
 
 describe("project 维只进缓存键,不改 G 阶段的解析结果", () => {
-  it("不同 project 各成一槽(为 P52.5a 的 per-project 凭证预留)", async () => {
+  it("不同 project 各成一槽(为  per-project 凭证预留)", async () => {
     sendMock.mockResolvedValue({ ARN: "arn:x" });
     await getRedshiftSecretArn({ project: "proj_a" });
     await getRedshiftSecretArn({ project: "proj_b" });
@@ -107,7 +106,7 @@ describe("project 维只进缓存键,不改 G 阶段的解析结果", () => {
 //
 // 附带观察(不在本批修):上面那个吞一切的 `catch` 会把**基础设施层错误**(import 失败/凭证层异常)
 // 也当成"没有 secret"并**缓存为负结果**,整个进程生命周期回落联邦身份。这是既有语义
-// (文件头写明"解析失败回退调用者联邦身份"),改它会动 home 行为 ⇒ 归 P52.5a 的凭证收口一起看。
+// (文件头写明"解析失败回退调用者联邦身份"),改它会动 home 行为 ⇒ 的凭证收口一起看。
 describe("并发/多槽(P2-2)", () => {
   it("串行收敛:两次调用只解析一次,且拿到同一个值(槽没分裂)", async () => {
     sendMock.mockResolvedValue({ ARN: "arn:x" });

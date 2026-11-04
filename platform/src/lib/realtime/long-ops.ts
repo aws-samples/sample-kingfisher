@@ -1,11 +1,11 @@
-// 模块 55 / 序 50 第二批 —— 实时计算三种长操作的执行体:启动 / 停止 / 删除 Flink 作业。
+// 实时计算三种长操作的执行体:启动 / 停止 / 删除 Flink 作业。
 //
 // 原路由(app/api/flink/jobs/[id]/{start,stop} · app/api/flink/jobs/[id] DELETE)的「主体」原样搬入:
 // 读作业行 / 项目鉴权 / 启动前的落点反向卡(章说别区而通道解析不出来 ⇒ 409,不静默落主控区)/ 用户确认令牌 **留在路由**;
 // 这里只做「拿到已校验的入参 → 调 flink-service(内部经 awaitTerminal 等 MSAF 过渡态)→ 写状态 / 审计 → 回 data」。
 //
 // 🔴 为什么它们要进长操作:MSAF 的过渡态等待实测 1–3 分钟(STARTING / STOPPING / UPDATING),原来三条路由都在请求里原地等,
-//    撞 CloudFront 60s 墙就 504,而应用其实在那个区照常启停 —— 与 B-111 同一种病。
+//    撞 CloudFront 60s 墙就 504,而应用其实在那个区照常启停 —— 与同一种病。
 // 错误口径与接入前逐字一致(409 DECISION_REQUIRED 带诊断 / 500 真失败并标 error / 502 销毁失败不删行 / 202 已受理)。
 
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
@@ -81,7 +81,7 @@ const flinkStop: LongOpExecutor<"flink-stop"> = async (params, ctx) => {
   try {
     // 停止前抓真实根因错误(若有),持久化到 lastError —— 这样停止后 AI 诊断仍能直接拿到根因。
     const { lastError } = await pauseFlinkJob(jobId, targetId);
-    // @kf-batch 50-B28b-flink-delete-async —— 🔴 StopApplication 是**异步**的(实测 STOPPING → READY 约 44s):
+    // 🔴 StopApplication 是**异步**的(实测 STOPPING → READY 约 44s):
     //   写 `stopping`(不短路),读取时对账到 READY 才变 `stopped`;原来直接写 `stopped` 让用户据此去删,正撞上过渡态。
     const values: Record<string, unknown> = { ":s": "stopping", ":now": new Date().toISOString() };
     if (lastError) values[":e"] = lastError;
@@ -99,8 +99,8 @@ const flinkStop: LongOpExecutor<"flink-stop"> = async (params, ctx) => {
 };
 
 // ── 删除(原 app/api/flink/jobs/[id] DELETE):真正销毁 MSAF 应用(+删日志组)再删记录 ──
-// @kf-batch 50-WP18d-unpublish-seam —— 🔴🔴 销毁失败**不许删记录**:流式作业「一区一个」,记录一删,那个区的应用就成了
-//   继续消费、继续写数、继续计费、平台再也看不见的孤儿(T-14 不变量)。`requestFlinkDeletion` 抛出来的就是真失败。
+// 🔴🔴 销毁失败**不许删记录**:流式作业「一区一个」,记录一删,那个区的应用就成了
+//   继续消费、继续写数、继续计费、平台再也看不见的孤儿(不变量)。`requestFlinkDeletion` 抛出来的就是真失败。
 const flinkDelete: LongOpExecutor<"flink-delete"> = async (params, ctx) => {
   const { jobId, targetId } = params;
   const job = await readJob(jobId);
@@ -115,7 +115,7 @@ const flinkDelete: LongOpExecutor<"flink-delete"> = async (params, ctx) => {
       { code: "UPSTREAM_ERROR", cause: e },
     );
   }
-  // @kf-batch 50-B28b-flink-delete-async —— 应用还在停:删除**已受理**(202),后台停稳后销毁并删行;列表上显示「删除中」直到消失
+  // 应用还在停:删除**已受理**(202),后台停稳后销毁并删行;列表上显示「删除中」直到消失
   if (outcome === "accepted") {
     recordAudit(ctx.req, "flink.delete.accepted", { resourceType: "flink", resourceId: jobId, detail: { name: job.name } }).catch(() => {});
     return {

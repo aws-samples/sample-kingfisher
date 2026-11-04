@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 同步 / 发现作业**运行失败原话**的分类与中文呈现(唯一作者)。
+// 同步 / 发现作业**运行失败原话**的分类与中文呈现(唯一作者)。
 //
 // 【为什么要有】Glue 作业失败时 `JobRun.ErrorMessage` 是 AWS 原话(「… failed to execute with exception Security Group Not Found
 //   The security group 'sg-…' does not exist (Service: AWSGlueJobExecutor; …)」),原来被 `pollGlueJob` / 读时对账 / 调度运行时
@@ -16,7 +16,7 @@ export type RunErrorKind =
   | "glue-connection-missing"
   | "concurrent-runs"
   | "foreign-table-guard"
-  /** 不是 Glue 原话:启动前核对就发现用户自带的网络对象 / 密钥缺失(B-133 预检拒绝),扇出路径落 failed 运行行时用 */
+  /** 不是 Glue 原话:启动前核对就发现用户自带的网络对象 / 密钥缺失(预检拒绝),扇出路径落 failed 运行行时用 */
   | "datasource-network-broken"
   | "unknown";
 

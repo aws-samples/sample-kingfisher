@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-31)
 /**
  * 钉住:数据源凭证的 Secrets Manager 客户端**按 secret ARN 的 region** 建,不是模块级主控区客户端。
  *

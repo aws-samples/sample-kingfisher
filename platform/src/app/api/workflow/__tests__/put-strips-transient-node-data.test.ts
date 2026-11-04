@@ -1,4 +1,4 @@
-// 序 73 模块 57 —— `PUT /api/workflow/[id]`:持久化的 dagDefinition 里**没有** jobMissing(编辑期派生字段不落库)。
+// `PUT /api/workflow/[id]`:持久化的 dagDefinition 里**没有** jobMissing(编辑期派生字段不落库)。
 //
 // 【缺陷原形】节点配置面板按候选清单算出 jobMissing 写进 node.data 给画布显示警示,保存时整个 node.data 原样 PUT ⇒ 一个随候选变化的派生判断
 //   被钉进定义:作业重新绑回该区后,存量定义里仍写着 jobMissing=true。判据钉**真落库的 UpdateCommand 值**:节点 data 里没有 jobMissing,

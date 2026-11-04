@@ -1,7 +1,7 @@
-// 模块 44 — Copilot 短期会话记忆(P44.1:自管 DynamoDB TTL,形态照抄 lib/genbi/memory.ts)。
+// Copilot 短期会话记忆(自管 DynamoDB TTL,形态照抄 lib/genbi/memory.ts)。
 // 表名走 env(COPILOT_TURNS_TABLE),默认 bgp-copilot-turns。表未建时读写静默降级(不阻断问答),
 // 使 inprocess 后端在任何基建就绪度下都可用(面向全球自安装:零基建也能先跑起来)。
-// P44.2/后续可接 AgentCore 托管 Memory(COPILOT_MEMORY_BACKEND=agentcore),此处保留切换位。
+// 后续可接 AgentCore 托管 Memory(COPILOT_MEMORY_BACKEND=agentcore),此处保留切换位。
 
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";

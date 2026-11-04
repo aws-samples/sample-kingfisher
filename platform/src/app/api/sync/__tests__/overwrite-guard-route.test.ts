@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 🔴 行为判据(路由层):建任务 / 改任务 / 生成 DDL / 执行 DDL 四个入口对「客户已有的表」的处理。
 //   只 mock 真外部:DynamoDB、身份、注册表 / 凭证解析、Redshift Data API。
 //   假 Redshift 按 SQL 内容作答(查的是夹具 EXISTING 的「库中现有表 + 注释」),并记下每一条语句 ——
@@ -32,7 +31,7 @@ vi.mock("@/lib/projects/guard", () => ({
   envFilter: vi.fn(() => ({ clause: "1=1", values: {} })),
 }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
-// @kf-batch 50-WP31-place-first-class —— B-35:入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
+// 入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
 vi.mock("@/lib/exec-env/registry", async (orig) => {
   const real: any = await orig();
   const mk = (targetId: string, region: string) => ({ targetId, region, accountId: "000000000000", partition: "aws", status: "active", ready: true, components: ["core"], resources: {} });

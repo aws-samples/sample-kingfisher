@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg2-WP10a
-// GET /api/admin/exec-envs/[targetId]/statements?auditId=<ulid> —— E-186 关联回查(50 SPEC v3.25 §2.1 / §3.2;bgp-admin)。
+// GET /api/admin/exec-envs/[targetId]/statements?auditId=<ulid> —— 关联回查(50 SPEC v3.25 §2.1 / §3.2;bgp-admin)。
 //
 // 为什么必须有这个端点:跨法域 execute 的区域审计行在**提交之前**写(「写不成即拒」的前提),行内不可能有 statementId;
 // 关联靠 Redshift 语句的 `StatementName == auditId`。但 Data API 的 ListStatements / DescribeStatement 按**调用者 IAM 身份**隔离

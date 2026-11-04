@@ -1,9 +1,8 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1/2 —— 全局落点观测器(L9 观测模式):量「真实越区调用清单」,不靠 grep。
+// 全局落点观测器(L9 观测模式):量「真实越区调用清单」,不靠 grep。
 //
 // ── 它看什么 ─────────────────────────────────────────────────────────────────────
 // 装在 Node 的出站 HTTP 诊断通道上(见 installPlaceObserver 的理由)⇒ 不论客户端是工厂建的、业务文件里散建的、
-// 还是模块级单例(B-26 那种),每一次打到 AWS 端点的请求都经过这里。每次请求记下:
+// 还是模块级单例(那种),每一次打到 AWS 端点的请求都经过这里。每次请求记下
 //   · 客户端在哪个区;· 本请求「应该在哪儿」(显式上下文 > 解析函数的决策记账 > URL 视角);
 //   · 入参里点名的资源(工作组 / 桶 / 应用 / 流 …)按描述符反查归谁。
 // 然后判:越区(cross-region)/ 资源与客户端不同区(resource-region-mismatch)/ 碰了别的 target 的资源
@@ -18,7 +17,7 @@
 //    `http.client.request.start` 在请求**真正发出**时触发(DNS 失败就不触发),ALS 上下文在那一刻仍可读。
 
 import { CENTRAL_COMPONENT_RESOURCES, matchesCentralPrefix } from "./central";
-// 序 31 二刀 ⑤:零 import 叶子(观测器在 instrumentation 可达面上,不能 import 带 AWS SDK 的 deploy-control)
+// 零 import 叶子(观测器在 instrumentation 可达面上,不能 import 带 AWS SDK 的 deploy-control)
 import { EXEC_ENV_CODEBUILD_LOG_GROUP } from "@/lib/exec-env/exec-env-project-name";
 import { SCOPE_PARAM, parseScope, type TargetScope } from "@/lib/scope/scope";
 import { currentPlace, currentRequestStore, decisionsOfCurrentRequest, type PlaceDecision } from "./context";
@@ -52,20 +51,20 @@ export const CONTROL_PLANE_SERVICES: ReadonlySet<string> = new Set([
  * `monitoring.PutMetricData` = 平台**自身**的业务遥测,只往主控区发(第九轮实测 ~45 次,原来全被当成越区,淹没真信号);
  * 而 `monitoring.GetMetricStatistics` 读的是某个区的作业指标 ⇒ 仍按区判。
  * `s3.ListBuckets` = 账号级清点(全球命名空间,结果不分区、不含数据;唯一消费点 = 系统设置「服务状态」数桶,`/api/s3/buckets`
- *   走控制面轴,序 31 三刀 IAM 侧 2026-10-21)—— 测试账号 observe 实测它是 unattributedTop 仅剩的 1 类;S3 的别的操作(GetObject /
+ *   走控制面轴,IAM 侧 2026-10-21)—— 测试账号 observe 实测它是 unattributedTop 仅剩的 1 类;S3 的别的操作(GetObject /
  *   ListObjects / PutObject …)碰的都是某个区的桶 ⇒ 仍按区判,不许整块豁免 s3。
  */
 export const CONTROL_PLANE_OPERATIONS: ReadonlySet<string> = new Set([
   "monitoring.PutMetricData",
   "s3.ListBuckets",
-  // 序 31 二刀 ⑤:`ec2.DescribeRegions` = 账号级清点(这个账号启用了哪些 region;结果不分区、不含数据),唯一消费点 = 执行环境候选区
+  // `ec2.DescribeRegions` = 账号级清点(这个账号启用了哪些 region;结果不分区、不含数据),唯一消费点 = 执行环境候选区
   //   `/api/admin/exec-envs/candidate-regions`(控制面轴 + 主控区客户端);EC2 的别的操作(DescribeSubnets / DescribeVpcs …)碰的都是
   //   某个区的网络事实 ⇒ 仍按区判,不许整块豁免 ec2。Query 协议的操作名由 `queryProtocolAction` 从表单体读出(此前全记成 `ec2.POST /`)。
   "ec2.DescribeRegions",
 ]);
 
 /**
- * 序 31 二刀 ⑤:主控区里按「服务.操作 + **日志组名**」才算控制面的调用 —— 执行环境部署的 CodeBuild 日志
+ * 主控区里按「服务.操作 + **日志组名**」才算控制面的调用 —— 执行环境部署的 CodeBuild 日志
  * (`/aws/codebuild/bgp-exec-env-deploy`:CodeBuild 在主控区跑,日志组也在主控区)。读它的路由(build-status / probe / preview)
  * 决策记的是**目标区**(`readBuildStatus` 替那个 target 做事),客户端却在主控区 ⇒ 观测器把每次读日志都记成 cross-region
  * (测试账号三天 23 条违规全部是它,而它恰恰不是越区)。日志组是平台自己的控制面产物,与 ACTION_DISPATCH 密钥同一口径。
@@ -80,7 +79,7 @@ function isControlPlaneLogCall(f: CallFacts): boolean {
 }
 
 /**
- * 序 31 第二刀 ②:主控区里按「服务.操作 + **资源名**」才算控制面的调用 —— 平台**自身**的内部端点共享密钥
+ * 主控区里按「服务.操作 + **资源名**」才算控制面的调用 —— 平台**自身**的内部端点共享密钥
  * (`ACTION_DISPATCH_SECRET_ARN`,推进泵 / 内部守卫每 5 分钟读一次;第四十三轮 observe 实测 16 次请求外 + 8 次 sweep 路由)。
  * 🔴 不许整块豁免 secretsmanager:数据源密钥(`bgp/datasource/*`)越区才是真违规(central.ts 文件头同一条理由)。
  * 密钥 ARN 由部署期注入 env,这里**不另抄名字**:索引装载时把 env 里那一个 ARN 的资源 token 收进 `controlSecretIds`,
@@ -122,7 +121,7 @@ export interface TargetIndex {
   readonly ownerOf: ReadonlyMap<string, string>;
   /** 全局资源(ARN 的 region 段为空,如 IAM 角色):它没有「在哪个区」,不参与「资源与客户端不同区」判定 */
   readonly globalIds: ReadonlySet<string>;
-  /** 序 31 第二刀 ②:平台自身控制面密钥的资源 token(见 controlPlaneSecretTokens);缺 ⇒ 不豁免任何密钥读取 */
+  /** 平台自身控制面密钥的资源 token(见 controlPlaneSecretTokens);缺 ⇒ 不豁免任何密钥读取 */
   readonly controlSecretIds?: ReadonlySet<string>;
 }
 
@@ -207,7 +206,7 @@ const RESOURCE_INPUT_KEYS = new Set([
   "WorkGroup", "WorkgroupName", "workgroupName", "Bucket", "tableBucketARN", "TableBucketARN",
   "ApplicationName", "StreamName", "StreamARN", "SecretId", "SecretArn", "OutputLocation", "Catalog",
   "CatalogName", "ScriptLocation", "executionRoleArn", "Role", "ServiceExecutionRole", "entryPoint",
-  // 序 31 二刀 ⑤:CloudWatch Logs 的日志组(控制面日志组豁免要靶向到名字;流名不收 —— 它不决定归属)
+  // CloudWatch Logs 的日志组(控制面日志组豁免要靶向到名字;流名不收 —— 它不决定归属)
   "logGroupName", "logGroupIdentifier",
 ]);
 
@@ -278,7 +277,7 @@ export function buildTargetIndex(
 type IndexLoader = () => Promise<TargetIndex>;
 let loader: IndexLoader = async () => {
   const { listTargetsRaw, HOME_TARGET_ID } = await import("@/lib/exec-env/registry");
-  // 序 31 第二刀 ②:平台自身的控制面密钥 ARN 与读它的两处(dataplane-jobs/pump · scheduler/internal-guard)同一个 env 键
+  // 平台自身的控制面密钥 ARN 与读它的两处(dataplane-jobs/pump · scheduler/internal-guard)同一个 env 键
   return buildTargetIndex(await listTargetsRaw(), HOME_TARGET_ID, {
     controlSecretIds: controlPlaneSecretTokens(process.env.ACTION_DISPATCH_SECRET_ARN),
   });
@@ -378,7 +377,7 @@ function record(r: ObservationRecord): void {
     view: r.facts.view,
     owners: r.verdict.owners,
     // 资源**名**(工作组 / 桶 / 密钥 ARN 等,不含任何值;S3 的 body 本来就不解析)—— 归不了属的也要看得见,
-    //   否则「中心件密钥(合法)」与「数据源密钥越区(违规)」在清单里长得一模一样(第九轮实测)
+    //   否则「中心件密钥(合法)」与「数据源密钥越区(违规)」在清单里长得一模一样
     resourceIds: r.facts.resourceIds.slice(0, 12),
     url: r.url,
     stack: r.stack,
@@ -493,7 +492,7 @@ export function requestFacts(
   const path = String(req.path ?? "/");
   const target = req.getHeader("x-amz-target");
   const xid = /[?&]x-id=([A-Za-z]+)/.exec(path)?.[1];
-  // 序 31 二刀 ⑤:Query 协议(EC2 / RDS / IAM …)既没有 x-amz-target 也没有 x-id,操作名在表单体 `Action=<Op>&…` 里;
+  // Query 协议(EC2 / RDS / IAM …)既没有 x-amz-target 也没有 x-id,操作名在表单体 `Action=<Op>&…` 里;
   //   不读它就全记成 `ec2.POST /`,「DescribeRegions(账号级清点)」与「DescribeSubnets(某区网络事实)」在清单里长得一模一样。
   const queryAction = queryProtocolAction(body);
   const operation =

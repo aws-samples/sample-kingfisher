@@ -1,4 +1,4 @@
-// 序 45 B-93 —— 表桶候选清单接口:登录即可读、落点必填(不默认主控区)、上游失败 502 不冒充空清单。
+// 表桶候选清单接口:登录即可读、落点必填(不默认主控区)、上游失败 502 不冒充空清单。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 

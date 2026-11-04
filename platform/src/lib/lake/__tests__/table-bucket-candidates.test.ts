@@ -1,4 +1,4 @@
-// 序 45 B-93 —— 「数据湖配置」表桶下拉清单的装配判据。
+// 「数据湖配置」表桶下拉清单的装配判据。
 // 只 mock 真外部(DDB 登记表、落点解析、s3tables 客户端);同目录兄弟 external-table-buckets **不 mock**(mock 卫生棘轮),
 // 所以「已登记」标记走的是真的 listExternalTableBuckets → QueryCommand 这条接缝。
 import { describe, it, expect, vi, beforeEach } from "vitest";

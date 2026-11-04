@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.2e2-seed-home
 // POST /api/admin/exec-envs/seed-home —— home 描述符的部署期 seed(SPEC §1.1 的「seed 入口」)。
 //
 // 【这不是"读路径自愈"】G 批 P1-1 禁的是"读请求顺手写库";本端点是 **bgp-admin 的显式管理动作**
@@ -37,11 +36,10 @@ export async function POST(req: NextRequest) {
 
     // ProbeResult 是 interface(无索引签名),描述符的 probe 字段是 Record<string,unknown> —— 结构兼容,展开即可。
     const outcome = await seedHomeTarget({ ...candidate, probe: { ...probe } });
-    // @kf-batch 50-WP15-airflow-serverless —— seedHomeTarget 对已存在只做位置比对与 contentDrift 报告,不改内容;
+    // seedHomeTarget 对已存在只做位置比对与 contentDrift 报告,不改内容;
     //   控制面新建的组件(deploy-all 6.6 / redeploy §2c 的 BgpAirflowServerlessStack)由下面的 adoptHomeComponents **只增采纳**。
     let merged: { components?: string[]; resources?: string[] } | undefined;
     if (outcome.outcome === "already-complete") {
-      // @kf-batch 50-WP15-airflow-serverless
       // 🔴 home 已在服务:控制面新建的组件(如 BgpAirflowServerlessStack)只能经**只增采纳**通道进描述符。
       //    reconcileTarget 是维修态门(active 必拒,真环境 HTTP 500),mergeComponentResources 要 finalize fence(home 没有部署会话)
       //    ⇒ adoptHomeComponents:只增不改 / 三处同步 / 本次真探全绿才写 / version + 无在途会话条件写。没有增量就是幂等无写。

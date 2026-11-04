@@ -1,4 +1,4 @@
-// 序 73 模块 57(R3)—— 工作流实例「节点详情」每行(Airflow task_id)→ 它在 dagDefinition 里引用的作业 / 同步任务(服务端组装)。
+// 工作流实例「节点详情」每行(Airflow task_id)→ 它在 dagDefinition 里引用的作业 / 同步任务(服务端组装)。
 //
 // 节点状态 API 回的是 **task_id**(§15.2 归一后的 id,含碰撞后缀),而回链要的是原始节点的 jobRef / syncTaskId
 // ⇒ 必须用生成器那一份权威映射 `buildIdMap`(task_id 的唯一作者)把两边对上;页面只拿到 `backLink`,不自己猜 id。

@@ -6,10 +6,10 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { getIntegrationStatus, ensureDestinationDatabase, getReplicatedCounts } from "@/lib/realtime/zeroetl-service";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
-// @kf-batch 56-B128-channel-reconcile —— 集成 failed 的判定 / 落库与列表读时对账**同一份**(lib/sync/reconcile)
+// 集成 failed 的判定 / 落库与列表读时对账**同一份**(lib/sync/reconcile)
 import { applyZeroEtlStatus } from "@/lib/sync/reconcile";
 
-// 模块 31 (Zero-ETL) — 增量同步(真·CDC)运行态:集成状态 + 已复制行数。viewer+ RBAC。
+// (Zero-ETL) — 增量同步(真·CDC)运行态:集成状态 + 已复制行数。viewer+ RBAC。
 //
 // 幂等推进(进程重启可恢复):若集成已 active 但任务仍 provisioning,则在此补建目标库并把任务
 // 置 running——这样即便 /start 的后台长轮询进程被回收,用户打开详情页轮询本端点也能推进到位。
@@ -49,7 +49,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       try {
         await ensureDestinationDatabase(cfg.destDb, cfg.integrationId);
         if (task.status !== "running") {
-          // @kf-batch 50-B08-sync-task-write-guard —— 唯一写通道
+          // 唯一写通道
           await updateSyncTaskIfExists({
             taskId: params.id,
             UpdateExpression: "SET #s = :s, updatedAt = :now REMOVE zeroEtlError",
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       }
     }
   } else if (integrationStatus === "failed") {
-    // B-128:改动前这里只把响应算成 error、**不落库** ⇒ 列表仍「运行中」。现在与列表对账共用一份判定 + 条件写
+    // 改动前这里只把响应算成 error、**不落库** ⇒ 列表仍「运行中」。现在与列表对账共用一份判定 + 条件写
     //   (任务行 error + zeroEtlError;运行记录收口 failed;用户已停止则让路)。
     effectiveStatus = (await applyZeroEtlStatus(task as never, integrationStatus, errors)) ?? "error";
   } else {

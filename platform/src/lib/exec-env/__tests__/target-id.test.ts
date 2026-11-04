@@ -1,5 +1,4 @@
-// @kf-batch 50-G1
-// G1(模块 50)—— targetId/targetSlug 契约单测。
+// G1—— targetId/targetSlug 契约单测。
 //
 // 【为什么必须有这个测试】外部审核 P1-6 抓到"targetId 合同自撞且**无资源长度预算**":
 // SPEC 原写 `^tgt_[a-z0-9_]{1,40}$`(总长 44),而 `bgp-redshift-copy-role-` + 44 = 67

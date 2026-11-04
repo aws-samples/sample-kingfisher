@@ -1,4 +1,3 @@
-// @kf-batch 50-G2R
 // G2R —— admin-DDL defense-in-depth lint 单测(50 SPEC §3.9a v3.3)。
 //
 // 【本文件存在的理由,写清楚免得后人重蹈】
@@ -17,7 +16,7 @@ import {
   lintGeneratedStatement,
   AdminDdlRejected,
 } from "@/lib/exec-env/admin-ddl-guards";
-// @kf-batch 52-P52.5a-supply — role/user 名一律取自 SSOT,测试里不手拼(手拼会掩盖派生错)。
+// role/user 名一律取自 SSOT,测试里不手拼(手拼会掩盖派生错)。
 import { projectRoleName, projectDbUserName } from "@/lib/exec-env/project-schema";
 
 /** 审核报告 audit-results/v2 §P0-4 的 5 个 payload,原文照抄。 */
@@ -33,7 +32,7 @@ const AUDIT_PAYLOADS: Array<[string, string]> = [
 //    正是"校验只收小写而平台只生成大写"那个真 bug 能一路全绿的原因(2026-09-03 D4 真环境逮到)。
 const PROJ_A = "proj-01M1KP594D2E6DJQC8EZ8CRAES";
 const PROJ_A_SCHEMA = "proj_proj_01m1kp594d2e6djqc8ez8craes"; // schema 一律小写(sanitize)
-// @kf-batch 52-P52.5a-supply — 第二个项目(跨项目负测用);末位不同,确保派生名真的不同。
+// 第二个项目(跨项目负测用);末位不同,确保派生名真的不同。
 const PROJ_B = "proj-01M1KP594D2E6DJQC8EZ8CRAEZ";
 
 describe("🔴 审核 v2 P0-4 的 5 个 payload —— 一条都不许再放行", () => {
@@ -96,7 +95,7 @@ describe("assertNotUserDataRead", () => {
     }
   });
 
-  it("结构/权限类 DDL 放行(误拒会让 P52.5a 建 schema 全过不去)", () => {
+  it("结构/权限类 DDL 放行(误拒会让建 schema 全过不去)", () => {
     for (const sql of [
       "CREATE SCHEMA IF NOT EXISTS proj_abc",
       'CREATE ROLE "role_proj_abc"',
@@ -143,12 +142,11 @@ describe("🔴 assertOwnedByProject —— 正则做不到的那一条(参数绑
     expect(() => assertOwnedByProject(own, PROJ_A)).not.toThrow();
   });
 
-  // @kf-batch 52-P52.5a-supply
-  // 🔴🔴 **本组是补一个真盲区(P52.5a 施工时逮到)**:原正则 `\bproj_[a-z0-9_]+` 里的 `\b`
+  // 🔴🔴 **本组是补一个真盲区(施工时逮到)**:原正则 `\bproj_[a-z0-9_]+` 里的 `\b`
   // 在 `role_proj_x` / `user_proj_x` 中**不成立** —— `_` 与 `p` 都是 word 字符、中间没有词边界。
   // 后果:整条语句只提到 role/user 名(不直接提 schema)时,归属校验**完全不生效**。
   // 既有 `create-role` 模板产物(`CREATE ROLE role_proj_x`)就从来没被这条守卫覆盖过;
-  // P52.5a 要新增的登录用户名 `user_proj_x` 同理。
+  // 要新增的登录用户名 `user_proj_x` 同理。
   it("🔴 只提到**别的项目的 role 名**(不提 schema)也必须被拒", () => {
     expect(() => assertOwnedByProject(`CREATE ROLE ${projectRoleName(PROJ_B)}`, PROJ_A)).toThrow(
       /cross-project-object|不属于本项目/

@@ -1,5 +1,5 @@
-// @kf-batch 50-WP4-o1-scope   ← 审核用批次标签
-// WP-4 O1 —— 「执行范围」(scope)的**唯一文法作者**。
+// ← 审核用批次标签
+// O1 —— 「执行范围」(scope)的**唯一文法作者**。
 //
 // 合同:docs/design/50-multi-region-execution/SPEC.md §2.6.1(文法)· §2.6.2(读取器)。
 // 交互:INTERACTION-DESIGN.md §9(三态 · URL 权威 · 六条护栏)· §9.6(路由能力矩阵)。
@@ -100,7 +100,7 @@ export function serializeScope(scope: TargetScope): string {
 /**
  * 写进 URL 的值;**global 返回 `null` = 不带该参数**。
  *
- * 🔴 这条是回滚点:不带参数的 URL 与本包上线前**逐字节相同**(判据 E-158),
+ * 🔴 这条是回滚点:不带参数的 URL 与本包上线前**逐字节相同**(判据),
  * 所以「全部」视角下不许往地址栏塞 `?scope=global`。
  */
 export function toScopeParam(scope: TargetScope): string | null {
@@ -119,7 +119,6 @@ export function scopeTargets(scope: TargetScope): string[] {
   }
 }
 
-// @kf-batch 50-WP31-place-first-class
 /**
  * 在这个视角下**新建 / 取区域资源**的落点 —— 唯一作者(原来各页各写一遍 `scope.kind === "target" ? … : undefined`,
  * 再交给后端「缺省 = 主控区」)。规则(INTERACTION §9:顶栏视角决定新建默认落点):

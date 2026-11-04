@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { listPlans } from "@/lib/backfill/service";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围(50 SPEC §2.6;WP-4bis 阶段 1)
+// 执行范围(50 SPEC §2.6;当前阶段 1)
 import { filterRowsByScope, requireScope } from "@/lib/exec-env/scope";
 import { BACKFILL_PLAN_BINDING_ATTR } from "@/lib/backfill/types";
 
@@ -11,12 +11,12 @@ import { BACKFILL_PLAN_BINDING_ATTR } from "@/lib/backfill/types";
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
-  // @kf-batch 50-WP4bis-p1-scope —— 执行范围。只认 URL,不回落。
+  // 执行范围。只认 URL,不回落。
   const scope = await requireScope(req, ctx.projectId);
   if (scope instanceof NextResponse) return scope;
   try {
     const plans = await listPlans(ctx.projectId);
-    // @kf-batch 50-WP4bis-p1-scope —— B 类(绑定列表)只许内存过滤,且**换字段名读**:
+    // B 类(绑定列表)只许内存过滤,且**换字段名读**:
     // 计划行的绑定字段历史上叫 `execTargets`(创建时由所选作业自己的 `bindingTargets` 派生),
     // 三级回落仍然只有 `bindingTargets` 一个作者(见 `filterRowsByScope` 的 `bindingAttr`)。
     return apiOk({

@@ -1,6 +1,5 @@
-// @kf-batch 50-W5-seg2-WP1
-// 模块 37 — renderSql / coerceParams 防注入回归网。
-// 2026-09-05 随「数据服务」下线(50 SPEC §3.9c / WP-1)从 lib/data-service/__tests__/validate.test.ts **原样搬来**:
+// renderSql / coerceParams 防注入回归网。
+// 2026-09-05 随「数据服务」下线从 lib/data-service/__tests__/validate.test.ts **原样搬来**:
 // 这些用例守的是 BI 筛选器 {{key}} 注入的安全渲染,不是数据服务的测试;validateApiDefinition 的用例随 lib 删。
 import { describe, it, expect } from "vitest";
 import { coerceParams, renderSql } from "../param-render";

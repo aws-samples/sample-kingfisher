@@ -4,7 +4,7 @@
 // 新增 Redshift provisioned/serverless 解析、AWS 服务 endpoint 模型判定。
 // 不可发现（跨账号/SaaS）→ discoverable=false，交 L2 出 needs-input + questions。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { regionalClient } from "@/lib/aws/clients";
 import { DescribeDBInstancesCommand, DescribeDBClustersCommand } from "@aws-sdk/client-rds";
 import { DescribeClustersCommand } from "@aws-sdk/client-redshift";
@@ -18,7 +18,7 @@ const USER_ID = process.env.PLATFORM_USER_ID || "default-user";
 
 /**
  * 解析上下文:降级记录 + **落点 region**。
- * @kf-batch 41-B115-netadvisor-place —— RDS / Redshift / Redshift Serverless 都是区域服务:客户端按 ctx.region 经唯一工厂建、按区缓存;
+ * RDS / Redshift / Redshift Serverless 都是区域服务:客户端按 ctx.region 经唯一工厂建、按区缓存;
  *   原来是三个模块级主控区客户端 ⇒ 别的区的实例永远「未发现」、安全组解析为空。
  */
 export interface ResolveCtx {
@@ -99,7 +99,7 @@ async function resolveOne(t: Target, ctx: ResolveCtx): Promise<ResolvedTarget> {
             ...base,
             vpcId: ds.networkConfig.vpcId,
             port,
-            // @kf-batch 37-B54-ds-user-sg —— 用户指定的多个组(建源 / 改网络时落库的 securityGroupIds)全部算上;
+            // 用户指定的多个组(建源 / 改网络时落库的 securityGroupIds)全部算上;
             //   存量行只有 securityGroupId ⇒ 与改动前一致。
             securityGroupIds: Array.isArray(ds.networkConfig.securityGroupIds) && ds.networkConfig.securityGroupIds.length
               ? [...ds.networkConfig.securityGroupIds]

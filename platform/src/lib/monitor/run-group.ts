@@ -1,5 +1,4 @@
-// @kf-batch 50-W3f-T0-T3
-// 模块 50 —— 多区运行的**关联标识** `runGroupId`(50 ROADMAP §2octies.17 ⑤ / 门票 T2)。
+// 多区运行的**关联标识** `runGroupId`(50 ROADMAP §2octies.17 ⑤ / 门票 T2)。
 //
 // 用户原话:「在主控区创建任务下发到多个区域,这些任务会产生关联性,后续主控区执行可以选择联动」。
 // 承载关联性的是将来的持久 RunGroup 父对象(O2:整组看 / 一键取消 / 只重试失败区);
@@ -11,7 +10,7 @@
 // 🔴 定时触发的分组键(`definitionId + scheduledTime + definitionVersion` 的确定性键)**刻意不在本刀**:
 //    它要改 Python DAG 侧(runtime-lib 升版),归 O2;这里只有手动 / API 扇出这一条 TS 路径。
 import { ulid } from "ulid";
-// @kf-batch 50-WP5-rungroup —— 只取类型(编译期擦除,不给运行期/边缘面加任何依赖)。
+// 只取类型(编译期擦除,不给运行期/边缘面加任何依赖)。
 import type { ResourceType } from "@/lib/versions/version-service";
 
 /** run 行上的属性名 —— 写通道 / 门禁 / 验收脚本共用同一份真值,不各写字符串。 */
@@ -25,7 +24,7 @@ export const SCHEDULED_RUN_GROUP_PREFIX = "rgs_" as const;
 export const RUN_GROUP_ID_PATTERN = /^rg_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 export function isRunGroupId(v: unknown): v is string {
-  // @kf-batch 50-WP5-rungroup —— 两种形态都是合法的组 id(手动扇出 `rg_<ULID>` / 定时确定性 `rgs_<24hex>`)。
+  // 两种形态都是合法的组 id(手动扇出 `rg_<ULID>` / 定时确定性 `rgs_<24hex>`)。
   // 🔴 写通道用它做守卫 ⇒ 漏掉 `rgs_` 那一支的故障形态是「定时运行整批写不进台账」(而不是「没分组」)。
   return isManualRunGroupId(v) || isScheduledRunGroupId(v);
 }
@@ -35,10 +34,10 @@ export function isRunGroupId(v: unknown): v is string {
  * 调用方(运行路由)在扇出循环**之前**调一次,把同一个值传给每一条 run。
  * 单区返回 `undefined` ⇒ 写通道不落该属性(不是 null、不是空串)。
  *
- * 🔴 **`forceGroup` 的唯一正当用途 = 重试链**(WP-5 步 4 落地时暴露的合同冲突):
+ * 🔴 **`forceGroup` 的唯一正当用途 = 重试链**(步 4 落地时暴露的合同冲突):
  * 「只重试失败区」若只剩**一个**区失败,按上面那条规则就不成组 ⇒ 新的一次运行**回指不到原组**,
- * 而 E-162 明确要求这条链可点回。重试**本来就是上一次联动的延续**,所以它成组是对的;
- * 普通单区运行照旧不成组(E-166)。
+ * 而明确要求这条链可点回。重试**本来就是上一次联动的延续**,所以它成组是对的;
+ * 普通单区运行照旧不成组。
  */
 export function runGroupIdFor(
   targets: readonly string[],
@@ -47,16 +46,16 @@ export function runGroupIdFor(
   return targets.length > 1 || opts.forceGroup ? `${MANUAL_RUN_GROUP_PREFIX}${ulid()}` : undefined;
 }
 
-// ─────────────────────── O2(WP-5):持久父对象的形态契约 ───────────────────────
-// @kf-batch 50-WP5-rungroup —— 50 SPEC v3.44 §1.3a S7 / §2.7 / §3.17。
+// ─────────────────────── O2:持久父对象的形态契约 ───────────────────────
+// 50 SPEC v3.44 §1.3a S7 / §2.7 / §3.17。
 //
 // 🔴 本文件**只放形态与词汇**(它被 DAG 生成器与运行路由一路引到,依赖越轻越好 ——
 //    `instrumentation` 可达面碰上 node 内置会直接构建失败,记忆 instrumentation-edge-bundle-boundary)。
-//    确定性键的 sha256 计算落在独立模块(施工序第 5 步),不进这里。
+//    确定性键的 sha256 计算落在独立模块,不进这里。
 
 /**
  * 组所属定义的种类。
- * 🔴 **刻意复用模块 14 既有的单一作者 `ResourceType`**(`workflow|etl-job|sync|redshift-task|engine-job`),
+ * 🔴 **刻意复用既有的单一作者 `ResourceType`**(`workflow|etl-job|sync|redshift-task|engine-job`),
  * 不另造一套「资源词汇」—— 同一概念两套表示必然各自漂移(SSOT/A1;本仓 `targetType` 的
  * warehouse 事故就是「planner 一套词、路由另一套词」造出来的)。
  */

@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening(h)
 // 「这次 synth 出来的控制面栈,真的落在部署脚本要的那个主控区吗」的单一判定。
 //
 // 🔴 2026-10-10 第二账号 production 彩排(主控区 us-west-2)实撞:部署机 shell 里有 `AWS_REGION=us-east-1`,

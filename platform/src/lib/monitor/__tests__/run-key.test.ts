@@ -1,6 +1,5 @@
-// @kf-batch 50-WP15-airflow-serverless(T-12)
 // 台账行键不变量:**一行 = 一次 (作业 × target × 运行)**。四个调度器侧写入方都必须经本文件的口径。
-// 真环境反例(2026-09-07 sls 第六轮):两区 workflow 都 SUCCESS、两区 CTAS 都真跑,而 bgp-task-runs 只剩 1 行
+// 真环境反例(2026-09-07 sls):两区 workflow 都 SUCCESS、两区 CTAS 都真跑,而 bgp-task-runs 只剩 1 行
 //   —— 因为 runId 用了 raw `scheduled__<logical_date>`(两区完全相同)⇒ 后写盖掉先写。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -12,7 +11,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, "../../..");
 const read = (p: string) => readFileSync(resolve(SRC, p), "utf8");
 
-describe("T-12 台账行键(复合 runId + taskTargetKey)", () => {
+describe("台账行键(复合 runId + taskTargetKey)", () => {
   it("同一次 cron 的两个 target ⇒ 两个不同的 runId(这就是复合存在的唯一理由)", () => {
     const raw = "scheduled__2026-09-07T00:00:00+00:00";
     const a = composeRunId(raw, "tgt_home");

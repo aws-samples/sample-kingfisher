@@ -1,4 +1,4 @@
-// 模块 45 P45.5b — core-guard(容器入口)与 inprocess guard 的【双跑一致性】守卫。
+// core-guard(容器入口)与 inprocess guard 的【双跑一致性】守卫。
 //
 // 决策3(抽 guard-core 纯核,零漂移)的机器铁证:core-guard 直取 seed、inprocess guard 经 registry,
 // 二者共用同一纯核 runGuardWithRules → 必须【同输入同输出】。本单测遍历各引擎 × 各类 SQL(含方言易错、
@@ -22,12 +22,12 @@ const CASES: Array<{ engine: CookbookEngine; sql: string; note: string }> = [
   { engine: "athena", sql: "SELECT * FROM ecommerce.orders LIMIT 10;", note: "athena正常" },
   { engine: "flink", sql: "CREATE TABLE s3t.`db`.`tbl` (a INT) WITH ('connector'='filesystem');", note: "flink反引号合法(不该误改)" },
   { engine: "glue", sql: "df = spark.read.parquet('s3://b/k')  # CREATE TABLE IF NOT EXISTS", note: "glue命令式(no-op)" },
-  // @kf-batch 37-recipes-atomic-overwrite —— 先 drop 再 createOrReplace(warn 级 violation,两入口都要报、都不改写)
+  // 先 drop 再 createOrReplace(warn 级 violation,两入口都要报、都不改写)
   { engine: "emr", sql: "spark.sql(f'DROP TABLE IF EXISTS {T}')\ndf.writeTo(T).using('iceberg').createOrReplace()", note: "emr 非原子覆盖(warn)" },
   { engine: "redshift", sql: "", note: "空串" },
 ];
 
-describe("P45.5b — core-guard 与 inprocess guard 双跑逐字节一致(零漂移铁证)", () => {
+describe("core-guard 与 inprocess guard 双跑逐字节一致(零漂移铁证)", () => {
   for (const c of CASES) {
     it(`[${c.engine}] ${c.note}`, () => {
       const a = inprocessGuard(c.engine, c.sql);

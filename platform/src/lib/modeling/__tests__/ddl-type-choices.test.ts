@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47c-catalog-ddl —— 页面「列类型」候选(客户端清单)必须与服务端白名单 DDL_TYPES 逐项一致(两处同改,少一处就红)。
+// 页面「列类型」候选(客户端清单)必须与服务端白名单 DDL_TYPES 逐项一致(两处同改,少一处就红)。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

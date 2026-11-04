@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 平台动作命令的**消费端状态机**:pending → running → succeeded | failed。
 //
 // 判据钉的是**收口**,不是「动作被调用了」(记忆 verify-must-assert-settled-state):
@@ -79,7 +78,7 @@ function seed(over: Record<string, unknown> = {}) {
 
 beforeEach(() => store.clear());
 
-describe("平台动作命令的消费端状态机(WP-28)", () => {
+describe("平台动作命令的消费端状态机", () => {
   it("① 正常路径收口到 succeeded + 摘要;执行体拿到的落点 / 项目 / 参数都来自命令行本身", async () => {
     seed();
     const seen: any[] = [];

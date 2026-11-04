@@ -1,4 +1,4 @@
-// 模块 24 — Athena 只读 SQL 守卫（应用层防御，深度防御之一）。
+// Athena 只读 SQL 守卫（应用层防御，深度防御之一）。
 //
 // SECURITY: 仅允许单条只读语句（SELECT / WITH / SHOW / DESCRIBE / EXPLAIN）到达 Athena。
 // 对 SELECT / WITH 额外包一层有界子查询硬性限制返回行数（防扫全表导致高额扫描费用）；

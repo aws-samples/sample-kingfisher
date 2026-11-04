@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-seq5-dataplane-role
-// 平台数据面角色的**唯一作者**(WP-31 L5「能力即授权」)。主控区(平台栈)与每个执行环境(base 栈)都经这里建,
+// 平台数据面角色的**唯一作者**(L5「能力即授权」)。主控区(平台栈)与每个执行环境(base 栈)都经这里建,
 // 两边同一套语句、同一个命名真源 —— 「主控区与其他区走同一条派生路径」在 IAM 层也成立。
 //
 // 【它是什么】平台 ECS 任务(控制面)要碰**某个区的数据**时,不再用任务角色本身,而是代入这个区的这一个角色
@@ -17,7 +16,7 @@
 //   本角色只读得到**本区**的桶(本区的平台桶只属于本 target,一区一套),别区的桶(含别的 target 的平台桶)一律拒。
 //   写权限只给本 target 的实名桶。
 //
-// 🔴 本刀是**只增**:平台任务角色的数据面直授一条没动(序 5 第三刀才收回)。策略先给到服务级,
+// 🔴 本刀是**只增**:平台任务角色的数据面直授一条没动(才收回)。策略先给到服务级,
 //   缺口由 `BGP_DATAPLANE_CREDS=observe` 跑一轮全量硬门量出来(`place.creds.denied`,带 AWS 原话)再补。
 //
 // 🔴 资源文案(description)一律英文:IAM 只收 Latin-1。
@@ -89,7 +88,7 @@ export const REGIONAL_DATA_PLANE_ACTIONS: readonly string[] = [
   "kms:CreateGrant",
   "kms:ListGrants",
   "kms:RetireGrant",
-  // 序 31 三刀 IAM 侧(2026-10-21):RDS 发现(`datasource-service.ts#discoverRdsInstances`)按区 ListSecrets 找实例的托管密钥;
+  // IAM 侧(2026-10-21):RDS 发现(`datasource-service.ts#discoverRdsInstances`)按区 ListSecrets 找实例的托管密钥;
   //   动作不支持资源级权限(只能 `*`),靠区域条件关在本区。读某个密钥的值仍只到下面 OwnRegionSecretsRead 列出的名字。
   "secretsmanager:ListSecrets",
   // 数据源 DynamoDB 只读(用户表名部署期不可知)+ 本区驻留表(下面单独给写)
@@ -170,7 +169,7 @@ export function buildPlatformDataRole(scope: Construct, id: string, p: PlatformD
       resources: [sec("bgp/datasource/*"), sec(`bgp/project/${slug}/*`), sec("bgp/shared-writer/*"), sec("redshift!*")],
     })
   );
-  // 序 31 三刀 IAM 侧(2026-10-21,…9435 observe 第四十四轮 `place.creds.denied` 量出):
+  // IAM 侧(2026-10-21,…9435 observe 第四十四轮 `place.creds.denied` 量出):
   //   · `bgp/datasource/*` —— 建源 / 改口令 / 删源的 CreateSecret / UpdateSecret / DeleteSecret 一直走该区的数据面客户端
   //     (`lib/datasource-spi/secrets.ts`),而本角色此前只给了读 ⇒ 「能读不能建」是上一轮「能建不能读」的镜像,同样是非对称授权;
   //   · `bgp/dms/*` —— 实时链给 DMS 建 Redshift 专用用户后写完整字段密钥(`lib/realtime/redshift-target.ts`,CreateSecret / PutSecretValue)。

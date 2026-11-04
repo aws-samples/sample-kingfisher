@@ -1,4 +1,4 @@
-// 序 31 三刀 IAM 侧(2026-10-21)—— …9435 observe 第四十四轮 `place.creds.denied` 量出的四族缺口,产品侧两处改轴 + 一处删死请求,
+// IAM 侧(2026-10-21)—— …9435 observe 第四十四轮 `place.creds.denied` 量出的四族缺口,产品侧两处改轴 + 一处删死请求,
 //   加数据面角色策略(infra)补三族写 / 列权限。本文件钉**事实**(调用点在、轴对、区从 ARN 派生、角色资源面齐),不钉形态。
 //   缺口清单(主控区数据面角色,04:50–06:55Z):s3:ListAllMyBuckets ×20 · bgp/datasource/* Create ×11 / Delete ×13 / Update ×1 ·
 //   bgp/dms/redshift-target PutSecretValue ×1 · 账号自有 RDS 主密钥 GetSecretValue ×3。
@@ -24,7 +24,7 @@ vi.mock("@/lib/aws/clients", async (importOriginal) => ({
   regionalClient: async () => { throw new Error("控制面读点不该走数据面工厂 regionalClient"); },
 }));
 
-describe("序 31 三刀 IAM 侧 ① 账号自有 RDS 主密钥读点 getAccountSecretViaControlPlane", () => {
+describe("IAM 侧 ① 账号自有 RDS 主密钥读点 getAccountSecretViaControlPlane", () => {
   beforeEach(() => { seen.length = 0; });
 
   it("走控制面轴(sdkClient use=control-plane)、客户端是 SecretsManagerClient、region 从 ARN 派生而不是主控区", async () => {
@@ -46,7 +46,7 @@ describe("序 31 三刀 IAM 侧 ① 账号自有 RDS 主密钥读点 getAccountS
 });
 
 // ── 接缝判据:调用点存在(「写了」≠「接上了」,纪律 5)─────────────────────────────────────
-describe("序 31 三刀 IAM 侧 ② 调用点与轴", () => {
+describe("IAM 侧 ② 调用点与轴", () => {
   it("建源路由对 rdsSecretArn 用的是 getAccountSecretViaControlPlane,不再是数据面的 getSecret", () => {
     const src = stripComments(read("platform/src/app/api/datasources/route.ts"));
     expect(src).toMatch(/getAccountSecretViaControlPlane\(rdsSecretArn\)/);
@@ -71,7 +71,7 @@ describe("序 31 三刀 IAM 侧 ② 调用点与轴", () => {
 });
 
 // ── 基础设施判据:数据面角色(唯一作者)资源面与清单同笔补齐 ────────────────────────────────
-describe("序 31 三刀 IAM 侧 ③ 数据面角色唯一作者 infra/lib/shared/platform-data-role.ts", () => {
+describe("IAM 侧 ③ 数据面角色唯一作者 infra/lib/shared/platform-data-role.ts", () => {
   const src = stripComments(read("infra/lib/shared/platform-data-role.ts"));
   const stmt = (sid: string) => {
     const at = src.indexOf(`sid: "${sid}"`);

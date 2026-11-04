@@ -32,7 +32,7 @@ function Arrow() {
 
 export default function ModelingGuide() {
   const t = useT();
-  // B-138:首帧按「展开」渲染(= 服务端),挂载后再读 localStorage;初值函数里读浏览器状态会让 React 19 报水合不一致
+  // 首帧按「展开」渲染(= 服务端),挂载后再读 localStorage;初值函数里读浏览器状态会让 React 19 报水合不一致
   const [collapsed, setCollapsed] = useBrowserInitialState<boolean>(false, () => localStorage.getItem(KEY) === "1");
   const toggle = () => {
     setCollapsed((c) => {

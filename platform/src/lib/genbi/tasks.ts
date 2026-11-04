@@ -1,4 +1,4 @@
-// 模块 38 — GenBI 异步化:任务表服务层(bgp-genbi-tasks)。
+// GenBI 异步化:任务表服务层(bgp-genbi-tasks)。
 //
 // 状态机:pending → running →(succeeded | failed | timeout)。终态不可逆。
 // B1+ 三大并发正确性保证:
@@ -39,7 +39,6 @@ export interface GenBiTaskParams {
   workgroup: string;
   database: string;
   /**
-   * @kf-batch 50-WP2-directquery
    * 这次问数在**哪个执行环境的数仓**上取数(缺省 = 主控区)。
    * 🔴 必须落库:异步任务由**另一次请求**接管执行,不落就等于「认领的那一刻忘了在哪个区问的」。
    */

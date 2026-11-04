@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // 跨地域元数据镜像的**纯函数层**(50 SPEC §3.13 / §1.1 表 / INTERACTION §4quater)。
 //
 // ── 为什么单独一个 shared 文件 ────────────────────────────────────────────────
@@ -24,7 +23,7 @@ export type MirrorKind = (typeof MIRROR_KINDS)[number];
  *     一次刷新从 ~10² 涨到 ~10⁴ 次写(500 表 × 20 列),而读侧一次也用不到"按列查" ⇒ 纯浪费;
  *     键空间保留给轴C 的列级分级镜像(那时才有"按列查"的读侧)。
  *   · `lineage-edge`:平台的血缘边存在**中央** `bgp-lineage`,**没有 target 维度**
- *     (两个区的同名表现在共用一条边 —— 那正是 SPEC §4「轴B」列的 P50.4 待修项)。
+ *     (两个区的同名表现在共用一条边 —— 那正是 SPEC §4「轴B」列的待修项)。
  *     ⇒ 本刀**不编造**按区血缘数,分面上照实显示「未采集」+ 原因(见 `NOT_COLLECTED`)。
  */
 export const MIRROR_WRITTEN_KINDS: readonly MirrorKind[] = ["db", "table"] as const;
@@ -147,7 +146,7 @@ export type MirrorSource = (typeof MIRROR_SOURCES)[number];
  *   (混进去就等于用一次 2 小时前的手动采集冒充实时)。
  */
 //
-// @kf-batch 50-WP28-platform-action-node —— 🔴 口径修订(2026-10-10,用户拍板序 33「治理定时」):
+// 🔴 口径修订(2026-10-10,用户拍板「治理定时」):
 //   上面那条成本决定管的是**平台自己的 30 分钟镜像定时器**(leader 循环)—— 它仍然只刷 Glue,一个字都不变。
 //   新增的是**用户自己建的「定时治理任务 · 目录同步」**:用户可以显式勾上 `redshift`(定时采数仓目录),
 //   建任务的页面上明示「定时采数仓目录会唤醒该区数仓并产生计费」;不勾就不采。
@@ -185,19 +184,19 @@ export const NOT_COLLECTED = [
     metric: "lineage-edges",
     label: "血缘边",
     reason: "平台血缘边存在中央表且**没有 target 维度**(两个区的同名表共用一条边)⇒ 按区计数会是同一个数重复显示",
-    slice: "SPEC §4 轴B / P50.4",
+    slice: "SPEC §4 轴B",
   },
   {
     metric: "quality-score",
     label: "质量分",
     reason: "质量结果按 FQN 存、无 target 维度 ⇒ 两个区的同名表互相覆盖,现在拿出来的「该区质量分」其实是最后一次跑的那个区",
-    slice: "SPEC §4 轴B / P50.4",
+    slice: "SPEC §4 轴B",
   },
   {
     metric: "sensitive-hits",
     label: "敏感命中",
     reason: "敏感扫描结果同样无 target 维度;且跨法域的画像必须**在区内算**(中央不留列值画像)",
-    slice: "SPEC §4 轴B/轴D / P50.4",
+    slice: "SPEC §4 轴B/轴D",
   },
 ] as const;
 

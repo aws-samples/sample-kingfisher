@@ -1,7 +1,6 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // scripts/10-bootstrap-cognito.sh 的初始用户名单必须跟随部署模式(与 infra/lib/shared/deploy-mode.ts 的
 // rosterForMode 同一条规则):production / 缺省 ⇒ 只建 admin;demo ⇒ 五个。把脚本里「名册 → resolve_deploy_mode → 裁剪」
-// 这一段**原样切出来**用 bash 真跑。序 39 二刀起裁剪读的是 resolve_deploy_mode 的结果(SSM /bgp/deploy-mode 优先),
+// 这一段**原样切出来**用 bash 真跑。裁剪读的是 resolve_deploy_mode 的结果(SSM /bgp/deploy-mode 优先),
 // 这里用 aws 函数桩让 SSM 恒读不到 ⇒ 走 env 缺省分支;SSM 优先 / 冲突拒绝两条分支由 infra/test/cognito-mode-guard 钉。
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";

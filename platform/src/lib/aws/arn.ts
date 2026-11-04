@@ -1,10 +1,9 @@
-// @kf-batch 56-B128-channel-reconcile
 /**
  * ARN 的位置属性读取 —— **唯一作者**。
  *
  * 🔴 为什么要单独一个文件:「region 是 ARN 的第 4 段」这件事此前在 `datasource-spi/secrets.ts`(secret ARN)
  * 与 `scheduler/serverless/task-logs.ts`(workflow ARN)各写了一遍(一份带分区 / 服务名校验、一份只看第 4 段);
- * B-128 要给 DMS 复制任务 ARN 再加一处时就是第三份 —— 三份各自漂移正是 SSOT 纪律要挡的。
+ * 要给 DMS 复制任务 ARN 再加一处时就是第三份 —— 三份各自漂移正是 SSOT 纪律要挡的。
  * 本文件只做「切段 + 形态校验」,回 `null` 表示读不出;**抛不抛、文案写什么由调用方定**(文案是它们的合同,各自的单测钉着)。
  */
 import { REGION_RE } from "@/lib/aws/clients";

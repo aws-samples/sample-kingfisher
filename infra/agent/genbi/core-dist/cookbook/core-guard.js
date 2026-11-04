@@ -1,5 +1,5 @@
 "use strict";
-// 模块 45 P45.5b — cookbook 方言 guard 的【容器/core 化入口】。
+// cookbook 方言 guard 的【容器/core 化入口】。
 //
 // 【为什么单独一个入口】GenBI AgentCore 远程 Runtime 容器要在"模型生成 SQL 后、执行前"过方言 guard
 // (消除 inprocess 有、远程无的盲区)。容器经 core-dist 机制 import 编译产物,静态图必须零 @/、零 DynamoDB。

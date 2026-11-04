@@ -1,4 +1,4 @@
-// 模块 27 (WS0) — 结构化日志 + 全链路 correlation-id 关联。
+// 结构化日志 + 全链路 correlation-id 关联。
 //
 // 生产化加固的可观测底座。设计约束:
 //  - **Edge + Node 双运行时安全**:middleware 跑在 Edge runtime(不支持 node:async_hooks /

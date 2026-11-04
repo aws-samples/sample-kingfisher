@@ -1,13 +1,12 @@
-// @kf-batch 50-W5-seg2-WP1
-// 模块 37 — SQL 模板参数的安全渲染(值位置转义 / 白名单代入)。纯逻辑,Vitest 覆盖。
+// SQL 模板参数的安全渲染(值位置转义 / 白名单代入)。纯逻辑,Vitest 覆盖。
 //
-// 【来历】2026-09-05 用户拍板下线「数据服务」(模块 30;50 SPEC §3.9c / WORK-PACKAGES WP-1)。
+// 【来历】2026-09-05 用户拍板下线「数据服务」。
 //   原 lib/data-service/validate.ts 的 coerceParams / renderSql / CoerceResult 与 types.ts 的
 //   ApiParam / ParamType **不是数据服务的私有物** —— BI 分析看板筛选器的 {{key}} 注入(lib/bi/query.ts)
 //   复用它们做防注入渲染。⇒ 逐字节搬到这里(单作者;下方各段与原文件一字不差,搬家零行为变化),
 //   数据服务的其余部分随 lib 删除;validateApiDefinition / validateParamDecl 只服务 DataApi 定义,随 lib 删,不在此。
 //
-// 【模块 37 R2 铁律 —— 为什么这层必须存在】筛选器 / 参数值只允许落在 SQL 的【值位置】:
+// 【R2 铁律 —— 为什么这层必须存在】筛选器 / 参数值只允许落在 SQL 的【值位置】:
 //   · string:单引号转义('→'')并用单引号包裹成字符串字面量,绝不裸拼;
 //   · number:Number() 归一后代入;
 //   · identifier / enum:只允许白名单(enumValues)命中的值原样代入 —— 标识符位置的唯一合法来源是白名单,

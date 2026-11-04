@@ -1,4 +1,4 @@
-// 模块 43-C — 生产级补数据:类型定义(单一事实源)。
+// 生产级补数据:类型定义(单一事实源)。
 //
 // 语义:一个「补数计划(plan)」把 [目标 × 日期范围] 展开成一组「补数实例(instance)」,
 // 每个实例 = 一个(日期,节点)的独立重算。实例的 run 一律以 triggeredBy="backfill" 写
@@ -11,10 +11,9 @@
 //  - workflow 作用域:kind = workflow。每(日期 × DAG 节点)一个实例;cascade=true 时按 DAG 边
 //    求同日期上游依赖(dependsOn),同日期内拓扑串行、跨日期可并;cascade=false 时同日期节点全并行。
 //    (task 作用域不支持 cascade —— 平台无跨作业依赖登记表,依赖仅存在于 workflow DAG。)
-// @kf-batch 37-wf-sync-backfill —— 仅取类型(编译期擦除;本文件在后台推进泵的 instrumentation 可达面上,不能带运行时依赖)
+// 仅取类型(编译期擦除;本文件在后台推进泵的 instrumentation 可达面上,不能带运行时依赖)
 import type { WorkflowNodeType } from "@/types/workflow";
 
-// @kf-batch 50-WP4bis-p1-scope
 // 计划行「覆盖哪些执行目标」的字段名。历史上叫 `execTargets`(不是通用的 `targets`)——
 // 🔴 不改名:它已经写进存量行,改名就要迁移,而迁移期内两个名字都得读 = 又一处漂移源。
 // 改为把这个名字**导出成常量**,让「按区过滤」(`filterRowsByScope`)与「按区计数」
@@ -22,7 +21,7 @@ import type { WorkflowNodeType } from "@/types/workflow";
 export const BACKFILL_PLAN_BINDING_ATTR = "execTargets";
 
 export type BackfillScope = "task" | "workflow";
-// @kf-batch 37-sync-backfill —— 序 37 ⑦:+ `sync-task`(glue 通道的同步任务,task 作用域;每个业务日期一个实例,
+// + `sync-task`(glue 通道的同步任务,task 作用域;每个业务日期一个实例,
 //   执行走与手动运行同一个启动核心 `lib/sync/start-run.ts`,StartJobRun 带 `--ds=<实例日期>`)。
 export const BACKFILL_TARGET_KINDS = ["etl-job", "engine-job", "workflow", "sync-task"] as const;
 export type BackfillTargetKind = (typeof BACKFILL_TARGET_KINDS)[number];
@@ -40,7 +39,6 @@ export const BACKFILL_FORCED_CONCURRENCY: Readonly<Record<BackfillTargetKind, nu
   "sync-task": 1,
 });
 
-// @kf-batch 37-wf-sync-backfill
 /** 工作流里「按业务日期跑一次同步任务」的节点类型(与 node-registry 的 sync 节点同一个字面量;类型由 WorkflowNodeType 钉住)。 */
 const WORKFLOW_SYNC_NODE_TYPE: WorkflowNodeType = "sync";
 
@@ -110,7 +108,7 @@ export interface BackfillPlanRow {
   cascade: boolean;
   concurrency: number; // 并发上限(硬闸)
   maxInstances: number; // 天花板(防跑飞)
-  // @kf-batch 50-P50.3-mrquery —— 该计划覆盖的执行目标(展示用;实例上带各自的 targetId)。
+  // 该计划覆盖的执行目标(展示用;实例上带各自的 targetId)。
   execTargets?: string[];
   status: PlanStatus;
   progress: BackfillProgress;
@@ -133,7 +131,7 @@ export interface BackfillInstanceRow {
   nodeId: string;
   nodeName: string;
   nodeType?: string; // workflow 节点类型 sql|python|sync;task 作用域为底层 taskType
-  // @kf-batch 50-P50.3-mrquery —— 该实例在哪个执行目标上重算(见 InstanceSpec.targetId)。
+  // 该实例在哪个执行目标上重算(见 InstanceSpec.targetId)。
   targetId?: string;
   status: InstanceStatus;
   dependsOn: string[]; // 同计划内前置实例 sk(依赖链)
@@ -158,7 +156,6 @@ export interface CreatePlanInput {
   cascade: boolean;
   concurrency: number;
   maxInstances: number;
-  // @kf-batch 50-P50.3-mrquery
   /**
    * 🔴 目标资源**绑定的执行目标集合**(由 API 层用 `bindingTargets()` 从资源行解析,
    * **不接受客户端指定** —— 那等于让人挑"补到哪个区")。缺省/空 ⇒ `["tgt_home"]`。
@@ -174,7 +171,6 @@ export interface InstanceSpec {
   nodeName: string;
   nodeType?: string;
   dependsOn: string[];
-  // @kf-batch 50-P50.3-mrquery
   /**
    * 🔴 **执行目标**(多 region)。实例的维度从 (日期 × 节点) 变成 (日期 × 节点 × **target**) ——
    * 这是**纯追加**:每个实例仍然是"一次独立的异步提交",runner / reconcile / 依赖机制**一行不改**。

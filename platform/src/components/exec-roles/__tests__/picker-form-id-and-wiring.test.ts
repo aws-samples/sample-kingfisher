@@ -1,6 +1,6 @@
-// 序 72 B-139 —— ExecutionRolePicker:
+// ExecutionRolePicker:
 //   ① 服务端真渲染(renderToStaticMarkup + 真 I18nProvider):三个 testid(下拉 / 刷新 / 手填开关)与「检查权限」都在,平台默认文案在;
-//   ② Form.Item 注入的 id 透传到控件(B-94 教训:漏传 ⇒ 字段 id 消失);负向对照:不在 Form.Item 里就没有;
+//   ② Form.Item 注入的 id 透传到控件(教训:漏传 ⇒ 字段 id 消失);负向对照:不在 Form.Item 里就没有;
 //   ③ 四处表单都换成了选择器(源码字面:import + <ExecutionRolePicker engine=…);旧的「执行角色 ARN」自由文本 Input 不许回来(DMS 通道除外);
 //   ④ 候选接口 URL 带 targetId=(执行范围读取守卫认它);英文词典含本组件全部 t() 键由 en-coverage-guard 另钉。
 import { describe, it, expect } from "vitest";
@@ -77,7 +77,7 @@ describe("四处表单接线(源码字面)", () => {
   });
 });
 
-describe("离线计算页保存被拒时的拒因可见(序 72 R5 / R8 的友好半边;子代理读码抓到:原一句「保存失败」吞掉预检原话)", () => {
+describe("离线计算页保存被拒时的拒因可见(R5 / R8 的友好半边;子代理读码抓到:原一句「保存失败」吞掉预检原话)", () => {
   const src = strip(read("app/etl-jobs/page.tsx"));
   it("doSave 返回布尔并把 d.error.message 原话给用户看(长文走 Modal.error pre-wrap,带 etl-save-rejection testid;短文走 message.error)", () => {
     expect(src).toMatch(/const doSave = async \(\): Promise<boolean> =>/);

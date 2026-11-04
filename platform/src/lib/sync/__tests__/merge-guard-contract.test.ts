@@ -1,6 +1,6 @@
-// @kf-batch 37-sync-capability —— 序 37 第五路的契约判据(纯函数,零 mock):
-//   B-61 合并键(必填、形态、大小写不敏感去重、非 Glue 通道不要求、非 merge 忽略)
-//   B-60 确认清单收三段名 / S3 目标三段名 / merge 不清表 / 生成器对无键 merge 的拒绝 / 生成脚本 py_compile。
+// 第五路的契约判据(纯函数,零 mock):
+//   合并键(必填、形态、大小写不敏感去重、非 Glue 通道不要求、非 merge 忽略)
+//   确认清单收三段名 / S3 目标三段名 / merge 不清表 / 生成器对无键 merge 的拒绝 / 生成脚本 py_compile。
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
@@ -17,7 +17,7 @@ import { GOLDEN_BINDINGS, GOLDEN_SHAPES } from "./golden-shapes";
 const mysqlDs = GOLDEN_SHAPES[0].ds;
 const legacy = { sourceTables: ["a", "b"], syncMode: "full", targetType: "both" };
 
-describe("B-61 合并键契约", () => {
+describe("合并键契约", () => {
   it("mergeKeysOf:去空白、大小写不敏感去重、保留首次写法;非数组 ⇒ []", () => {
     expect(mergeKeysOf({ mergeKeys: [" id ", "ID", "Name", "name", "id"] })).toEqual(["id", "Name"]);
     expect(mergeKeysOf({ mergeKeys: "id" })).toEqual([]);
@@ -76,7 +76,7 @@ describe("B-61 合并键契约", () => {
   });
 });
 
-describe("B-60 契约", () => {
+describe("契约", () => {
   it("clearsWholeTable:merge 恒不清表(全量 / 增量空水位都不);其余口径不变", () => {
     expect(clearsWholeTable({ syncMode: "full", writeMode: "merge" })).toBe(false);
     expect(clearsWholeTable({ syncMode: "incremental", writeMode: "merge" })).toBe(false);

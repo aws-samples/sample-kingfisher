@@ -1,4 +1,4 @@
-// 模块 43-A — 沉淀 hook:把一条 done 诊断归一成结构化事件写入 bgp-incidents。零侵入模块25:
+// 沉淀 hook:把一条 done 诊断归一成结构化事件写入 bgp-incidents。零侵入
 // 只【读取】诊断记录 + 关联 run,不改诊断主流程。可由 reconcile(A.1)或升级后的 AgentCore
 // 编排(A.2)调用。幂等:同一 diagnosticId 只沉淀一次(occ 条件写);主档 occurrenceCount 原子累加。
 
@@ -18,10 +18,10 @@ export interface RecordResult {
 // 从关联运行取错误文本:Glue/Redshift/sync 读 bgp-task-runs.error;Flink 读 bgp-flink-jobs.lastError。
 // 与 lib/diagnostics/evidence.ts 的取数一致(诊断本身不持久化原始错误,故须回读)。
 //
-// @kf-batch 50-WP4quater-reads(工单 SC-20)—— 顺带把**这次跑在哪个区**取回来。
-// 🔴 为什么在这里取而不是让 `Diagnostic` 加字段:`Diagnostic` 是模块 25 的类型,而知识库对它是
+// 顺带把**这次跑在哪个区**取回来。
+// 🔴 为什么在这里取而不是让 `Diagnostic` 加字段:`Diagnostic` 是类型,而知识库对它是
 // **零侵入**(只读不改)。run 行上本来就有 `targetId`(run-records 的章),而这个函数**已经在读那一行**
-// —— 顺手带回来是零额外往返;让诊断类型长一个字段则要改模块 25 的写侧,违反零侵入。
+// 顺手带回来是零额外往返;让诊断类型长一个字段则要改写侧,违反零侵入。
 // 🔴 取不到就留空,由读侧 `bindingTargets` 统一回落主控区 —— 绝不在这里瞎猜一个区。
 async function fetchRunFacts(diag: Diagnostic): Promise<{ errorText: string; targetId?: string }> {
   const taskType = (diag.taskType || "").toLowerCase();
@@ -30,7 +30,7 @@ async function fetchRunFacts(diag: Diagnostic): Promise<{ errorText: string; tar
       const { Item } = await docClient.send(
         new GetCommand({ TableName: TABLES.FLINK_JOBS, Key: { userId: "default-user", jobId: diag.taskId }, ProjectionExpression: "lastError, targetId, targets" })
       );
-      // Flink 作业行上眼下还没有区维(工单 SC-5)⇒ 读到就用,读不到留空由读侧回落
+      // Flink 作业行上眼下还没有区维⇒ 读到就用,读不到留空由读侧回落
       const t = typeof Item?.targetId === "string" ? Item.targetId : Array.isArray(Item?.targets) ? String(Item!.targets[0] ?? "") : "";
       return { errorText: String(Item?.lastError || ""), targetId: t || undefined };
     }

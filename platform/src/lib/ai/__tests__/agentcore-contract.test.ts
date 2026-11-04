@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // AgentCore 回执校验单测(51 SPEC §6.1⑤;ACCEPTANCE M17 单测面)。
 import { describe, it, expect, beforeEach } from "vitest";
 import { assertAgentCoreModelMeta, AgentCoreModelMismatch, agentCoreEchoedModelId, getAgentCoreMetaStatus, _resetAgentCoreContractForTests, currentReleaseId } from "../agentcore-contract";

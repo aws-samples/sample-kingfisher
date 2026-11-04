@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 50-WP5-rungroup
 // GET —— 这个定义最近的几次**多区联动运行**(50 SPEC v3.44 §2.7)。
 // 🔴 走 GSI `byDefinition`,**不 Scan**(Scan 在多组之后只回首页且不报错 = 静默漏数)。
-// 🔴 **单区运行不成组** ⇒ 不会出现在这里(运行历史照旧一行,E-166)。
+// 🔴 **单区运行不成组** ⇒ 不会出现在这里(运行历史照旧一行)。
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";

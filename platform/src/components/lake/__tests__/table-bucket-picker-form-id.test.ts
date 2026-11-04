@@ -1,7 +1,7 @@
-// 序 45 B-93 回归(第三十八轮 b 硬门 o4 E-218 抓到)—— TableBucketPicker 放进 Form.Item 后,
+//该缺陷回归—— TableBucketPicker 放进 Form.Item 后,
 // Form.Item 经 cloneElement 注入的字段 id 必须落到输入框上。
 // 首版只透传 value / onChange,漏了 id ⇒ 同步向导里 `#s3Config_tableBucket` 消失:
-//   标签「Table Bucket」点了不聚焦、校验提示的 aria 关联断了,依赖它的无头判据(o4 E-218 / s38 B-68)整条读不到。
+//   标签「Table Bucket」点了不聚焦、校验提示的 aria 关联断了,依赖它的无头判据(o4 s38)整条读不到。
 // 判据钉事实(真渲染出来的 DOM:input 的 id、label 的 for),不钉写法。
 import { describe, it, expect } from "vitest";
 import React from "react";

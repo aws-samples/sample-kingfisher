@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP15-airflow-serverless(施工序 6)
 // POST /api/admin/exec-envs/[targetId]/scheduler-preference —— 两者都装时走哪个调度器(INTERACTION §2.2b;SPEC §3.15)。
 // 只改「之后发布」的走向;已发布作业保持原调度器直到重新发布(重新发布会先下线旧产物,见 dag-fanout.offlinePreviousSchedulerIfSwitched)。
 import { NextRequest, NextResponse } from "next/server";
@@ -28,7 +27,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
   const pref = body.schedulerPreference;
   const expectedVersion = body.expectedVersion;
   if (!isSchedulerPreference(pref)) return apiError(`schedulerPreference 只允许 ${SCHEDULER_PREFERENCES.join(" / ")}(收到 ${JSON.stringify(pref)})`, 400, { code: "VALIDATION_FAILED" });
-  // @kf-batch 50-WP20b-retire-mwaa-preference
   // 🔴🔴 **已停供的取值写不进**(用户 2026-09-20:「后面所有的调度都走 mwaa serverless」)。
   //   真根是「经典 MWAA 下线只做了一半」——入口(注册/补装)都关了,而**偏好这条旁路**还开着:
   //   实测往只装 serverless 的 target 写 `mwaa` 回 **HTTP 200** 且描述符真写成 mwaa

@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2b-failure-recovery
 // 🔴 **跨构建边界的投影 parity 门禁**:平台 `lifecycle.deriveStatusProjection`/`deriveReady`
 //    与 broker `validate.mjs#materializedBrokerProjection` 必须**逐格一致**(全交叉积穷举)。
 //
@@ -9,7 +8,7 @@
 //   而 broker 自己又断言"顶层投影必须与 spec/observed 一致",于是平台写出的 `degraded`
 //   会被 broker 判 `bad-descriptor`(HTTP 500)⇒ **该 target 再也无法发起部署**。
 //   这条分叉此前"不可达",只因另一条断言把 `ready+unknown` 当损坏数据先挡了;
-//   P50.3b-2a 让 health 变成独立轴之后它就可达了 —— 典型的"两份实现 + 一个过期不变量"复合坑。
+//   2a 让 health 变成独立轴之后它就可达了 —— 典型的"两份实现 + 一个过期不变量"复合坑。
 //   ⇒ 用**真 import broker 源码 + 全交叉积**钉死,让下一次分叉在门禁上立刻红。
 //
 // (validate.mjs 是零依赖纯 ESM(不 import AWS SDK),可以被 vitest 直接 import —— 这比文本锚点强得多:
@@ -31,10 +30,10 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BROKER_VALIDATE = resolve(HERE, "../../../../../infra/lambda/exec-env-broker/validate.mjs");
-// @kf-batch 50-WP15-airflow-serverless:validate.mjs 的组件全集来自 env(部署期 deploy-stack.ts 从 context.ts 注入;缺即加载抛)。
+// validate.mjs 的组件全集来自 env(部署期 deploy-stack.ts 从 context.ts 注入;缺即加载抛)。
 //   测试侧用平台枚举 TARGET_COMPONENTS 灌入 —— 两侧枚举同源由 implemented-components.test 另钉。
 process.env.EXEC_ENV_COMPONENT_ENUM = TARGET_COMPONENTS.join(",");
-// @kf-batch 50-PROD-B-seq33 ②:broker 的完整组件集同样由部署期注入(deploy-stack.ts ← context.ts)
+// ②:broker 的完整组件集同样由部署期注入(deploy-stack.ts ← context.ts)
 process.env.EXEC_ENV_REQUIRED_COMPONENTS = "core,redshift,dms,flink,airflow-serverless";
 
 type BrokerProjection = (
@@ -136,7 +135,7 @@ describe("🔴 跨边界投影 parity:平台 lifecycle ↔ broker validate.mjs(�
         lastError: "上一次部署会话失败",
       },
     };
-    // @kf-batch 50-PROD-B-seq33 ②:重新部署 = 下发完整组件集(这正是「补齐」修复路径)
+    // ②:重新部署 = 下发完整组件集(这正是「补齐」修复路径)
     const req = { targetId: "tgt_usw2_a", components: ["core", "redshift", "dms", "flink", "airflow-serverless"], operationId: "op_next0001" };
     // 不抛 = 放行开新部署会话(修复路径存在)。抛 bad-descriptor 就是"永久卡死"回归。
     expect(() => mod.planDeployOpen(item, req, 4, now)).not.toThrow();

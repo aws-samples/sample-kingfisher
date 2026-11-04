@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-prod-only-layers
 // 🔴🔴 **「只有真部署才会执行的层」的覆盖面门禁**(台账 `infra/prod-only-layers.json`)。
 //
 // 【为什么存在 —— 用户 2026-09-15:「这些最关键的环节一定要做到万无一失…你每次都是边修边产生 bug」】
@@ -57,7 +56,7 @@ function discoverLambdas(): string[] {
  *   压根不在台账上。「覆盖面就是判据本身」第 N 次生效:漏掉一类执行者 = 台账在说谎。
  */
 function discoverShellScripts(): string[] {
-  // 🔴 2026-10-14(序 39):只认 **git 跟踪**的脚本。开发机 scripts/ 下有 .gitignore 掉的本机工具
+  // 🔴 2026-10-14:只认 **git 跟踪**的脚本。开发机 scripts/ 下有 .gitignore 掉的本机工具
   //   (30-seed-tasks.sh / check_aws_context.sh),原来按目录扫 ⇒ 台账里长出了仓库里**不存在**的层:
   //   在这台机器上绿、在任何全新 clone / 工作树上「台账里不许有已经不存在的层」当场红 —— 台账说的是只有这台机器才有的事实。
   //   仓库里有什么,git 是唯一作者;git 不可用就让它炸出来(不退回目录扫,那是静默回落)。

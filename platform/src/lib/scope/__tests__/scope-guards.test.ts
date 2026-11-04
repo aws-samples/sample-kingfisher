@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4-o1-scope
 // 三道门禁(合同 SPEC v3.34 §2.6.8):
 //   · `scope-header-guard`  —— 全仓不得出现 `x-bgp-target-id`;拦截器不许长出第三个注入
 //   · `scope-write-guard`   —— 写方法的 handler 不得读 scope
@@ -10,9 +9,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { KIND_INDEX, COUNTABLE_KINDS, LEGACY_PARTITION_USER_ID } from "../resource-index";
-// @kf-batch 50-WP4bis-p1-scope
 import { MENU_ROUTE_SCOPE } from "../route-scope";
-// @kf-batch 50-WP4sexies-home-region —— 非菜单页那张表也要进「wired 必须真读 scope」的循环
+// 非菜单页那张表也要进「wired 必须真读 scope」的循环
 import { EXTRA_ROUTE_SCOPE } from "../capability";
 import { BACKFILL_PLAN_BINDING_ATTR } from "@/lib/backfill/types";
 
@@ -42,7 +40,7 @@ function stripComments(src: string): string {
 
 /**
  * 产品代码 = 排除 `__tests__`。测试**可以**合法出现被禁的字面量 ——
- * E-156 的负向判据本身就要构造一个带 `x-bgp-target-id` 的请求来证明它被忽略。
+ * 负向判据本身就要构造一个带 `x-bgp-target-id` 的请求来证明它被忽略。
  */
 const PROD_FILES = FILES.filter((f) => !f.includes("__tests__"));
 const codeOf = (f: string) => stripComments(read(f));
@@ -168,7 +166,6 @@ describe("scope-filter-guard", () => {
     expect(problems, problems.join(" | ")).toEqual([]);
   });
 
-  // @kf-batch 50-WP4bis-p1-scope
   it("🔴 `bindingAttr` 只许引各模块自己导出的常量,登记表里不许写字面量", () => {
     expect(KIND_INDEX["backfill-plan"].bindingAttr).toBe(BACKFILL_PLAN_BINDING_ATTR);
     const src = codeOf(resolve(SRC, "lib/scope/resource-index.ts"));
@@ -190,7 +187,6 @@ describe("scope-filter-guard", () => {
   });
 });
 
-// @kf-batch 50-WP4bis-p1-scope
 describe("scope-wired-guard", () => {
   /** 菜单 key → 页面文件(`/` = `app/page.tsx`;`/admin/users` = `app/admin/users/page.tsx`)。 */
   function pageFileOf(key: string): string {
@@ -198,7 +194,6 @@ describe("scope-wired-guard", () => {
   }
 
   /**
-   * @kf-batch 50-WP4ter-coverage
    * 页面读没读 scope,**不能只看 page.tsx** —— 好几页(`/finops` 四个 Tab、`/bi` 工作台)
    * 只是个壳,真读数据的是它 import 的组件。只看壳会得出「没接入」的**假红**,
    * 而假红逼人放宽判据,最后连真红也不看了(台账 V-13 的同一课)。
@@ -233,7 +228,7 @@ describe("scope-wired-guard", () => {
    */
   it("🔴 声明 `wired: true` 的非全局页,页面文件必须真的读了 `useScope(`", () => {
     const bad: string[] = [];
-    // @kf-batch 50-WP4sexies-home-region —— 🔴 原来这里**只遍历 MENU_ROUTE_SCOPE**:
+    // 🔴 原来这里**只遍历 MENU_ROUTE_SCOPE**:
     //   `EXTRA_ROUTE_SCOPE` 里的非菜单页(`/metrics` `/sla` …)声明 `wired: true` 却从没被查过。
     //   实测后果:`/sla` 是个 19 行跳转页、压根不读 scope,照样"已接入"了好几刀
     //   ⇒ 棘轮可以被一个什么都没做的页面满足。两张表**必须一起遍历**。
@@ -264,7 +259,7 @@ describe("scope-wired-guard", () => {
     expect(readFileSync(pageFileOf("/admin/users"), "utf8").length).toBeGreaterThan(100);
     // 反向:只在注释里写 useScope( 不算接入
     expect(stripComments("// 这里应该 useScope(\nconst a = 1;").includes("useScope(")).toBe(false);
-    // @kf-batch 50-WP4ter-coverage —— BFS 探测器自检:壳页要能靠子组件算接入,不认识的文件必须回 false
+    // BFS 探测器自检:壳页要能靠子组件算接入,不认识的文件必须回 false
     expect(readsScopeDeep(pageFileOf("/finops"))).toBe(true);
     expect(readsScopeDeep(resolve(SRC, "app/not-a-real-page/page.tsx"))).toBe(false);
     // 至少要有一页真被检查到(否则上一条是空断言)

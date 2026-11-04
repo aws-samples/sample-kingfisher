@@ -5,7 +5,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireAuth } from "@/lib/auth/verify-token";
 import { NextResponse } from "next/server";
 
-// 模块 18: return a table's columns (name + type) from OpenMetadata, for the 数据分级 editor.
+// return a table's columns (name + type) from OpenMetadata, for the 数据分级 editor.
 export async function GET(req: NextRequest) {
   const auth = await requireAuth(req);
   if (auth instanceof NextResponse) return auth;

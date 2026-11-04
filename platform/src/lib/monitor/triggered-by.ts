@@ -1,4 +1,3 @@
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101)
 // run 行 `triggeredBy` 的**闭合清单与页面文案**唯一作者。
 //
 // 【为什么要有这个文件】任务监控页原来把「触发」列写成 `v === "schedule" ? 自动 : 手动`,筛选下拉也只有 自动 / 手动 两项 ——

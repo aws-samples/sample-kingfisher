@@ -5,7 +5,7 @@ import { Card, Table, Tag, Button, Space, Modal, Form, Input, Select, message, P
 import { ApiOutlined, PlusOutlined, ThunderboltOutlined, RobotOutlined, GlobalOutlined } from "@ant-design/icons";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-23):技能**定义**是全平台一份
+// 执行范围:技能**定义**是全平台一份
 // (用户 2026-09-10 拍板「都走同一个 AgentCore」⇒ 技能全区共用),但**用量与报错按区**
 // —— 「这个区的问数把哪个技能调爆了」是运维要看的东西。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -30,7 +30,6 @@ export default function SkillsPage() {
   const [obs, setObs] = useState<any>(null);
   const [skills, setSkills] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  // @kf-batch 50-WP4ter-coverage
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
@@ -54,7 +53,7 @@ export default function SkillsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      // @kf-batch 50-WP4ter-coverage —— 用量按区(技能清单本身全平台一份,不带 scope)
+      // 用量按区(技能清单本身全平台一份,不带 scope)
       const [o, s] = await Promise.all([authedFetch(`/api/observability/genbi${scopeQs}`), authedFetch("/api/genbi/skills")]);
       if (o) { const d = await o.json(); setObs(d?.success ? d.data : null); }
       if (s) { const d = await s.json(); setSkills(d?.success ? d.data : []); }
@@ -67,7 +66,7 @@ export default function SkillsPage() {
     (async () => { const tok = await getToken(); if (tok) { try { const p = JSON.parse(atob(tok.split(".")[1] || "")); setIsAdmin((p["cognito:groups"] || []).includes("bgp-admin")); } catch {} } })();
     load();
     // eslint-disable-next-line
-    // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,重拉用量(护栏 4)
+    // 切区不重载页面,重拉用量(护栏 4)
   }, [authLoading, user, scopeQs]);
 
   const parseParams = (paramsText: string) => {

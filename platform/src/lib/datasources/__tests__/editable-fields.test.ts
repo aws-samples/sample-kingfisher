@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— 数据源可编辑字段闭合清单(用户 2026-10-15 反馈 ①「编辑数据源改名报错」)。
+// 数据源可编辑字段闭合清单(用户 2026-10-15 反馈 ①「编辑数据源改名报错」)。
 // 钉三件事:① 整条记录回显(主键 / 租户 / 服务端字段)全部被丢、只剩可编辑字段;② undefined 与空密码丢弃(「没填」≠「清空」);
 // ③ 清单本身闭合:不含任何服务端字段名(datasourceId / userId / updatedAt / createdAt / status / secretArn / glueConnectionName / networkConfig / heartbeat / discovery / ownerTargetId)。
 import { describe, it, expect } from "vitest";
@@ -18,7 +18,7 @@ const RECORD_ECHO = {
 describe("① 整条记录回显 ⇒ 只剩可编辑字段", () => {
   it("主键 / 租户 / 服务端字段全部丢弃并点名;name / type / host / port / database / username / jdbcParams / env / tags / probeVia 留下", () => {
     const { picked, dropped } = pickEditableDatasourceFields(RECORD_ECHO);
-    expect(Object.keys(picked).sort()).toEqual(["database", "env", "host", "jdbcParams", "name", "port", "probeVia", "tags", "type", "username"]); // 序 44:附加 JDBC 参数可编辑
+    expect(Object.keys(picked).sort()).toEqual(["database", "env", "host", "jdbcParams", "name", "port", "probeVia", "tags", "type", "username"]); // 附加 JDBC 参数可编辑
     expect(picked.name).toBe("p42-rename-x-renamed");
     for (const k of ["datasourceId", "userId", "updatedAt", "createdAt", "status", "secretArn", "glueConnectionName", "ownerTargetId", "networkConfig", "heartbeat", "discovery", "discoveredSchema", "paradigm", "credentialKind", "createdBy", "createdBySub", "projectId"]) {
       expect(dropped, `${k} 必须被丢弃`).toContain(k);

@@ -22,7 +22,7 @@ db_pass = secret["password"]
 
 jdbc_url = "jdbc:mysql://db.example.internal:3306/gamedb"
 tables = ["players","orders"]
-# @kf-batch 50-WP24b-vacuous-sync —— 🔴 零表就**响亮失败**(不许空转成功)。
+# 🔴 零表就**响亮失败**(不许空转成功)。
 # 真环境实测:表清单为空时本脚本一路跑到 "SYNC RESULTS: {}" 然后 SUCCEEDED,
 # 于是平台把任务标成 succeeded 而数仓里连表都没建 —— 看板全绿、什么都没发生。
 if not tables:
@@ -46,7 +46,7 @@ for table_name in tables:
     print(f"{'='*60}")
     # SYNC-07: resolve the target table name (defaults to the source name).
     target_name = target_names.get(table_name, table_name)
-    # 模块42 P42.4/P42.5: 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
+    # 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
     # (如 bgp-orders / my.table),但 Redshift/S3Tables 的 SQL 标识符不允许裸连字符 → 建表 DDL 语法错
     # (真 bug: "syntax error at or near '-' in context 'public.bgp-'")。JDBC 源表名本是 SQL 标识符不受影响。
     # 统一把非法字符(非字母/数字/下划线)→ 下划线,数字开头补 _。覆盖 Redshift + S3Tables 两个目标。
@@ -117,7 +117,7 @@ for table_name in tables:
             print(f"INC_WATERMARK skip: {str(_e)[:120]}")
 
     # Write to S3 Tables (managed Iceberg)
-    # 模块42:Spark 临时视图名也需标识符安全(源表名 table_name 可能含连字符/点,如 DynamoDB 表
+    # Spark 临时视图名也需标识符安全(源表名 table_name 可能含连字符/点,如 DynamoDB 表
     # bgp-verify-ddb-1m → temp_bgp-verify-ddb-1m 是非法视图名 "Invalid view name")。用已 sanitize 的
     # target_name(上方 re.sub 处理过)构造,保证视图名合法。真 bug:100万 DDB→S3Table 首次现形。
     temp_view = f"temp_{target_name}"

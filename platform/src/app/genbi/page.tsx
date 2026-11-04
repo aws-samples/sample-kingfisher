@@ -9,18 +9,17 @@ import { RobotOutlined, SendOutlined, BulbOutlined, ReloadOutlined, FileAddOutli
 import MiniChart from "@/components/genbi/MiniChart";
 import type { GenBiResult, GenBiHistoryItem } from "@/types/genbi";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP2-directquery —— 🔴🔴 用户拍板「连问数都可以切区」:取数落点跟顶栏「执行范围」走。
+// 🔴🔴 用户拍板「连问数都可以切区」:取数落点跟顶栏「执行范围」走。
 //    AgentCore(Runtime/Gateway/Memory)只装在主控区 ⇒ 非主控区自动走进程内引擎,页面如实说一句。
 import { useScope } from "@/components/scope/ScopeProvider";
-// @kf-batch 54-genbi-session-cards —— 会话卡片三件:保存弹框 / 我的卡片抽屉 / 打开别范围卡片的二选一(§9.7)
+// 会话卡片三件:保存弹框 / 我的卡片抽屉 / 打开别范围卡片的二选一(§9.7)
 import { SaveCardModal, MyCardsDrawer, ScopeSwitchConfirm, fetchCards } from "@/components/genbi/SessionCards";
 import type { CardRow } from "@/components/genbi/SessionCards";
 import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 import { ranInView, ranInLabel } from "@/lib/genbi/ran-in";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
-// @kf-batch 50-P50.1-workgroup-ssot
 // 前端默认值也收编到命名 SSOT(与改动前**同值**,零行为变化)。
-// 🔴 P50.3 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
+// 🔴 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
 //    客户端拿不到)—— 届时改这一个 import 的用法即可,不必再回来找字面量。
 
 const { Title, Paragraph, Text } = Typography;
@@ -41,12 +40,12 @@ const ATHENA_EXAMPLES = [
 type ChartView = "auto" | "table" | "bar" | "line";
 
 // 单轮助手回答的渲染（结论 + 命中表 + 图表/表格 + SQL/推理）。各自维护图表切换。
-// @kf-batch 54-genbi-session-cards —— 🔴 `onSaveCard` 与 `onPromote` **同级**(用户原话:「这个功能是在提为需求的同级别需求」);
+// 🔴 `onSaveCard` 与 `onPromote` **同级**(用户原话:「这个功能是在提为需求的同级别需求」);
 //   但两者语义不同:提为需求 = 拿**这一轮**去开需求单;保存对话 = 把**整段对话**收进「我的卡片」⇒ 文案必须写清「对话」。
-// @kf-batch 50-B26-lake-place —— `expectRegion` = 这次提问应当落在的区(视角所在区;未知传 null)
+// `expectRegion` = 这次提问应当落在的区(视角所在区;未知传 null)
 function TurnResult({ result, onPromote, onSaveCard, expectRegion }: { result: GenBiResult; onPromote: () => void; onSaveCard: () => void; expectRegion: string | null }) {
   const t = useT();
-  // 🔴 B-25/B-26:答案区必须说出**执行层回报**的真落点;与视角不一致当场红字(横幅只是请求侧声称)
+  // 🔴 答案区必须说出**执行层回报**的真落点;与视角不一致当场红字(横幅只是请求侧声称)
   const ran = ranInView(result._meta?.ranIn, expectRegion);
   const [chartView, setChartView] = useState<ChartView>("auto");
   const tableColumns = (result.columns || []).map((c, idx) => ({ title: c, dataIndex: String(idx), key: String(idx), ellipsis: true }));
@@ -88,7 +87,7 @@ function TurnResult({ result, onPromote, onSaveCard, expectRegion }: { result: G
     >
       <Paragraph style={{ whiteSpace: "pre-wrap", fontSize: 15 }} data-testid="genbi-answer">{result.answer}</Paragraph>
 
-      {/* @kf-batch 51-v2-multi-vendor —— 🔴 本次回答**实际用的模型 / 后端**(执行层回报的 _meta,不是「打算用」):多厂商模型通道之后
+      {/* 🔴 本次回答**实际用的模型 / 后端**(执行层回报的 _meta,不是「打算用」):多厂商模型通道之后
           管理员换了全局默认,用户在这里就能看见这次答案是谁答的;页面驱动的验收也只认这里(判据需要的真值,产品有义务暴露)。 */}
       {result._meta?.modelId ? (
         <div data-testid="genbi-model-used" data-model={result._meta.modelId} data-backend={result._meta.backend || ""} data-degraded={result._meta.degraded ? "true" : "false"} style={{ marginBottom: 6 }}>
@@ -214,7 +213,7 @@ function TurnResult({ result, onPromote, onSaveCard, expectRegion }: { result: G
 interface Turn { id: string; question: string; result: GenBiResult | null; error: string; loading: boolean; elapsedMs?: number; }
 const newConvId = () => `conv-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-// 模块 38 — 异步轮询参数。前端上限略高于服务端 300s 天花板(兜底,正常情况下服务端会先返回
+// 异步轮询参数。前端上限略高于服务端 300s 天花板(兜底,正常情况下服务端会先返回
 // timeout/succeeded)。轮询间隔 2s(复用 workflow runs 心智)。
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_MS = 320_000;
@@ -225,12 +224,12 @@ export default function GenBiPage() {
   const { scope, targets: scopeTargets, setScope } = useScope();
   // 缺省(全部视角)= 主控区,与改动前逐字节等价
   const askTargetId = scope.kind === "target" ? scope.targetId : undefined;
-  // @kf-batch 50-WP31-place-first-class —— 取数请求的落点(恒有:全部 / 对比视角 = 主控区,显式);askTargetId 只管界面语义
+  // 取数请求的落点(恒有:全部 / 对比视角 = 主控区,显式);askTargetId 只管界面语义
   const askLanding = landingOfScope(scope);
   const askRegion = askTargetId ? scopeTargets?.find((x) => x.targetId === askTargetId)?.region || askTargetId : "";
-  // @kf-batch 50-B26-lake-place —— 这次提问**应当**落在的区:选了区 = 该区;没选 = 主控区(问数缺省 target)。查不到就 null(不臆测)
+  // 这次提问**应当**落在的区:选了区 = 该区;没选 = 主控区(问数缺省 target)。查不到就 null(不臆测)
   const expectRegion = scopeTargets?.find((x) => x.targetId === (askTargetId || HOME_TARGET_ID))?.region ?? null;
-  // @kf-batch 50-WP4quater-reads —— 读路由一律 `?scope=`(执行/写路由才用 body.targetId,SPEC §2.6.3)
+  // 读路由一律 `?scope=`(执行/写路由才用 body.targetId,SPEC §2.6.3)
   const scopeParam = toScopeParam(scope);
   const historyScopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
   const [question, setQuestion] = useState("");
@@ -242,8 +241,8 @@ export default function GenBiPage() {
   const [engine, setEngine] = useState<"redshift" | "athena">("redshift");
 
   const [workgroups, setWorkgroups] = useState<any[]>([]);
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴 不再以 home 的 workgroup 常量打底:在 us-west-2 视角下那是
-  // **别的区**的名字,清单到达前它会在下拉里当选中项显示(与向导 E-218 同族)。空 = 清单到达后选第一个;
+  // 🔴 不再以 home 的 workgroup 常量打底:在 us-west-2 视角下那是
+  // **别的区**的名字,清单到达前它会在下拉里当选中项显示(与向导同族)。空 = 清单到达后选第一个;
   // 空着提交时服务端按执行目标解析(唯一作者 resolveRedshiftBinding)。
   const [selectedWg, setSelectedWg] = useState("");
   const [databases, setDatabases] = useState<string[]>(["dev"]);
@@ -255,7 +254,7 @@ export default function GenBiPage() {
   const [s3Catalog, setS3Catalog] = useState<string>("");
   const [history, setHistory] = useState<GenBiHistoryItem[]>([]);
 
-  // @kf-batch 54-genbi-session-cards —— 会话卡片
+  // 会话卡片
   const [saveOpen, setSaveOpen] = useState(false);
   const [cardsOpen, setCardsOpen] = useState(false);
   const [cardsRefresh, setCardsRefresh] = useState(0);
@@ -269,7 +268,7 @@ export default function GenBiPage() {
   const [reqCtx, setReqCtx] = useState<{ question: string; result: GenBiResult } | null>(null);
   const [reqForm] = Form.useForm();
 
-  // @kf-batch 50-WP4ter-coverage —— 🔴 工作组下拉必须跟随**问数自己的执行目标**:
+  // 🔴 工作组下拉必须跟随**问数自己的执行目标**:
   // 否则在 us-west-2 问数时下拉里列的是主控区的工作组,选中一个就等于让用户挑一个不存在于该区的落点。
   const fetchWorkgroups = () => {
     // 🔴🔴 先清空再取 + **丢弃陈旧响应**:一次进站可能并发发出「上一个区」与「当前区」两个清单请求
@@ -291,7 +290,7 @@ export default function GenBiPage() {
       })
       .catch(() => {});
   };
-  // @kf-batch 50-WP4quater-reads(工单 SC-26 同批)—— 🔴 库列表也必须跟随问数的执行目标。
+  // 🔴 库列表也必须跟随问数的执行目标。
   // 上一刀只修了工作组下拉,库列表仍打主控区 ⇒ 在 us-west-2 问数时,工作组是对的、库名是主控区的,
   // 选出来的组合根本不存在。**半截跟随比不跟随更坏**:错得像对的。
   const fetchDatabases = (wg: string) =>
@@ -299,11 +298,11 @@ export default function GenBiPage() {
       .then((r) => r.json())
       .then((d: any[]) => Array.isArray(d) && d.length && setDatabases(d.map((x) => x.name)))
       .catch(() => {});
-  // @kf-batch 50-WP4quater-reads(工单 SC-26 同批)—— 问数历史按区过滤(行上已有 `targetId` 章)。
+  // 问数历史按区过滤(行上已有 `targetId` 章)。
   const fetchHistory = () =>
     fetch(`/api/genbi/history${historyScopeQs}`).then((r) => r.json()).then((d) => setHistory(d?.success ? d.data : [])).catch(() => {});
   // 拉真实 S3 Tables 命名空间(控制面 ListNamespaces,复用 athena 查询页同款端点);默认选第一个存在的 namespace。
-  // @kf-batch 50-WP4quater-reads —— S3 Tables 命名空间也按执行目标取(每个区一个表桶)。
+  // S3 Tables 命名空间也按执行目标取(每个区一个表桶)。
   const fetchNamespaces = () => fetch(`/api/athena/tables?targetId=${encodeURIComponent(askLanding)}`).then((r) => r.json()).then((d) => {
     const ns: string[] = Array.isArray(d?.namespaces) ? d.namespaces.map((n: any) => n.namespace).filter(Boolean) : [];
     setS3Namespaces(ns);
@@ -311,8 +310,8 @@ export default function GenBiPage() {
     setSelectedNs((cur) => cur || ns[0] || "");
   }).catch(() => {});
 
-  // @kf-batch 50-WP4ter-coverage —— 执行目标一换,工作组下拉必须跟着重拉(否则列的是上一个区的)
-  // @kf-batch 50-WP4quater-reads —— 🔴 deps 必须同时含 `scopeParam`:`askTargetId` 只在**单区**视角有值,
+  // 执行目标一换,工作组下拉必须跟着重拉(否则列的是上一个区的)
+  // 🔴 deps 必须同时含 `scopeParam`:`askTargetId` 只在**单区**视角有值,
   // 只写它 ⇒ 在两个多区分组之间切换时 effect 不触发,历史列表停在上一个分组的数据上(护栏 4 的漏洞)。
   useEffect(() => { fetchWorkgroups(); fetchDatabases(selectedWg); fetchHistory(); fetchNamespaces(); /* eslint-disable-next-line */ }, [askTargetId, scopeParam]);
 
@@ -385,7 +384,7 @@ export default function GenBiPage() {
     try {
       const res = await fetch("/api/genbi/ask", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-WP2-directquery —— `targetId` 走 body(写/执行路由不读 `?scope=`)
+        // `targetId` 走 body(写/执行路由不读 `?scope=`)
         // 🔴 选了 target 就**不带** workgroup:页面这个选择器列的是主控区的工作组,带过去会撞落点冲突
         body: JSON.stringify({ question: query, workgroupName: askTargetId ? undefined : selectedWg, database: engine === "athena" ? selectedNs : selectedDb, engine, conversationId, targetId: askLanding }),
       });
@@ -403,7 +402,6 @@ export default function GenBiPage() {
     } finally { setSending(false); }
   };
 
-  // @kf-batch 54-genbi-session-cards
   // 拉一次配额给按钮显示 n/100(读路由带 ?scope=,与列表同一口径)
   const refreshQuota = () => {
     void fetchCards(scopeParam).then((r) => { if (!("error" in r)) setQuota({ used: r.used, limit: r.limit }); });
@@ -463,7 +461,7 @@ export default function GenBiPage() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Title level={3} style={{ marginBottom: 0 }}><RobotOutlined /> {t("智能问数 GenBI")}</Title>
         <Space>
-          {/* @kf-batch 54-genbi-session-cards —— 个人卡片集合入口。🔴 用抽屉而**不新增菜单叶**:
+          {/* 个人卡片集合入口。🔴 用抽屉而**不新增菜单叶**:
               新增一个叶子会触发 31 叶全覆盖那一整套棘轮机制(54 DESIGN §9 反模式 ⑤)。*/}
           <Button icon={<FolderOpenOutlined />} onClick={() => setCardsOpen(true)} data-testid="genbi-my-cards-btn">
             {quota ? t("我的卡片 {u}/{l}", { u: quota.used, l: quota.limit }) : t("我的卡片")}
@@ -475,7 +473,7 @@ export default function GenBiPage() {
         {t("多轮对话式问数：用自然语言连续提问、可承上启下地追问（“他们按地区怎么分布？”“那按分类呢？”）。平台基于 Amazon Bedrock AgentCore 生成只读 SQL、执行并给出结论、数据与图表，所有数字均来自真实查询。")}
       </Paragraph>
 
-      {/* @kf-batch 50-WP2-one-agentcore-one-om —— 🔴 用户 2026-09-10 拍板「都走同一个 AgentCore」。
+      {/* 🔴 用户 2026-09-10 拍板「都走同一个 AgentCore」。
           于是提示条只说**一件**事:SQL 在这个区域的数仓上执行。**不再**提「进程内引擎」——
           那是上一版按区分流的说法,已被推翻(同一个 Runtime / Gateway / 技能 / 记忆服务所有区)。 */}
       {askTargetId && (
@@ -503,7 +501,7 @@ export default function GenBiPage() {
             </>
           ) : (
             <>
-              {/* @kf-batch 50-WP7-sync-pushdown —— 表桶名随执行目标(原来写死主控区的 bgp-table-bucket,在别的区视角下是谎话) */}
+              {/* 表桶名随执行目标(原来写死主控区的 bgp-table-bucket,在别的区视角下是谎话) */}
               <Tag color="cyan">{s3Catalog ? t("联邦目录 {c}（Iceberg）", { c: s3Catalog }) : t("联邦目录（Iceberg）· 按执行目标解析")}</Tag>
               <Text type="secondary">{t("命名空间：")}</Text>
               <Select value={selectedNs || undefined} style={{ width: 180 }} placeholder={t("选择命名空间")} onChange={setSelectedNs} showSearch
@@ -546,7 +544,7 @@ export default function GenBiPage() {
 
       {/* 输入区 */}
       <Card style={{ marginBottom: 16 }}>
-        {/* @kf-batch 54-genbi-session-cards —— 🔴 50 INTERACTION v2.30 §9.7 第 4 条:
+        {/* 🔴 50 INTERACTION v2.30 §9.7 第 4 条
             只读态**必须 disable 且说明为什么**(上面那条 `genbi-card-readonly-note` 就是那句原因 +
             保留的切区入口)。只给横幅不 disable ⇒ 用户照样能问,而问的是**错的区** —— 那比不能问坏得多;
             只 disable 不解释 ⇒ 用户以为页面坏了。两半都要有。 */}
@@ -584,7 +582,7 @@ export default function GenBiPage() {
         )}
       </Card>
 
-      {/* @kf-batch 54-genbi-session-cards —— 三件:保存弹框 / 我的卡片抽屉 / 打开别范围卡片的二选一(§9.7)*/}
+      {/* 三件:保存弹框 / 我的卡片抽屉 / 打开别范围卡片的二选一(§9.7)*/}
       <SaveCardModal
         open={saveOpen} onCancel={() => setSaveOpen(false)}
         onSaved={(_id, used) => { setSaveOpen(false); setQuota((q) => ({ used, limit: q?.limit ?? 100 })); setCardsRefresh((n) => n + 1); }}

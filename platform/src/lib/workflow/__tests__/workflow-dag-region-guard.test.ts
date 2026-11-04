@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quinquies-pushdown
 // 🔴🔴 **编排 DAG 的「区」门禁** —— 真环境段 `scq` A2-1 抓到的那个缺陷的守护网。
 //
 // 缺陷形态(实测,不是推演):usw2 视角发布的工作流,DAG 文件**写进了 usw2 的桶**、
@@ -15,7 +14,7 @@ import { resolve } from "node:path";
 import { generateAirflowDag } from "../dag-generator";
 import { buildDagSpec } from "../dag-generator-v2";
 import { assertDagPlace } from "../dag-place";
-// @kf-batch 50-WP17-serverless-workflow —— 断**产物**(两份运行时的 Python 源),不断某个文件的文本
+// 断**产物**(两份运行时的 Python 源),不断某个文件的文本
 import { RUNTIME_LIB_SOURCE, RUNTIME_LIB_VERSION } from "../runtime-lib";
 import { BGP_RUNTIME_PY } from "@/lib/scheduler/serverless/runtime-py";
 import type { Workflow } from "@/types/workflow";
@@ -70,7 +69,7 @@ describe("workflow-dag-region-guard(编排 DAG 的执行区)", () => {
   });
 
   it("🔴 runtime-lib:干活的客户端用执行区,台账用主控区(合成一个就是那个 bug)", () => {
-    // @kf-batch 50-WP17-serverless-workflow —— 🔴 判据改断**产物**(导出的 Python 源)而不是某个文件的文本:
+    // 🔴 判据改断**产物**(导出的 Python 源)而不是某个文件的文本
     //   `_mk` 已搬进单一作者 `node-exec-py.ts`(经典与 serverless 共用同一份字节),
     //   继续 grep runtime-lib.ts 会永远红 —— 而且断产物更强:两份产物里这三行都必须是对的。
     for (const [name, art] of [["经典 runtime-lib", RUNTIME_LIB_SOURCE], ["serverless 代码包", BGP_RUNTIME_PY]] as const) {
@@ -93,11 +92,11 @@ describe("workflow-dag-region-guard(编排 DAG 的执行区)", () => {
     expect(iBinding, "publish 里找不到数仓落点解析(唯一作者)").toBeGreaterThan(0);
     expect(iResolve, "落点解析排在生成之后 ⇒ 生成器拿不到落点(这正是缺陷成因)").toBeLessThan(iGen);
     expect(iBinding, "数仓落点解析排在生成之后").toBeLessThan(iGen);
-    // @kf-batch 50-B09-secret-single-author —— 🔴 **改判:从「形态」改到「事实」。**
+    // 🔴 **改判:从「形态」改到「事实」。**
     //   原来这一行钉的是那个三元的**长相**:
     //       /rsBinding\.home \? opts\.redshiftSecretArn : rsBinding\.secretArn/
     //   它要保证的**事实**是「非 home 必须用该 target 自己的凭证,不许拿主控区的 secret
-    //   去连别的区」。B-09 的前置把凭证收成**单一作者** `resolveRedshiftBinding` 之后,
+    //   去连别的区」。该缺陷的前置把凭证收成**单一作者** `resolveRedshiftBinding` 之后,
     //   那个事实**依然成立而且更强**(所有 target 一律用自己的),但形态变了 ⇒ 这条判据会红在
     //   一件完全正确的改动上。(记忆 `criteria-pin-facts-not-shapes`:判据钉形态、承重是事实。)
     // ⇒ 改成钉事实:产物里的凭证**只能**来自 `rsBinding`(落点解析的结果),
@@ -164,12 +163,11 @@ describe("workflow-dag-region-guard(编排 DAG 的执行区)", () => {
     expect(spec.region, "旧的单一 region 键必须消失(留着就会有人继续读它)").toBeUndefined();
   });
 
-  // @kf-batch 50-WP17-serverless-workflow
   it("🔴🔴 章的 target 必须等于**这份产物真正执行的那个 target**,不许被行上过期/非法的字段带偏", () => {
     // 形态:路由写的是 `targets: [tgt_usw2_a]`(落点权威,`bindingTargets` 读它),
     //      而 `...body` 顺手存下来的 `targetId` 是别的值(甚至非法)。
     //      老写法 `resolveRunStamp(workflow)` **只看 targetId** ⇒ DAG 在 usw2 跑而台账盖了别的章,
-    //      连**作业锁属性名**和台账 `runId` 的复合段一起错(= T-12 修过的「两区互相覆盖」再来一遍)。
+    //      连**作业锁属性名**和台账 `runId` 的复合段一起错(= 修过的「两区互相覆盖」再来一遍)。
     const rogue = {
       ...wf("tgt_usw2_a"),
       targets: ["tgt_usw2_a"],
@@ -187,7 +185,7 @@ describe("workflow-dag-region-guard(编排 DAG 的执行区)", () => {
   });
 
   it("🔴🔴 删工作流必须先收走 DAG,收不掉就不许删记录(否则留下没人管的孤儿)", () => {
-    // 序 50 第二批:DELETE 主体在执行体 workflow-delete(路由只 submitLongOp 自己的 kind)
+    // DELETE 主体在执行体 workflow-delete(路由只 submitLongOp 自己的 kind)
     const route = stripComments(read("app/api/workflow/[id]/route.ts"));
     expect(route).toContain('kind: "workflow-delete"');
     expect(route, "路由里不许再直接删记录").not.toMatch(/new DeleteCommand\(/);

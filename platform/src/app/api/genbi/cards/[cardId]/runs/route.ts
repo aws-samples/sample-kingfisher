@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // GET /api/genbi/cards/[cardId]/runs  这张卡的刷新历史(手动 + 定时,同一条 taskId `gcard_<cardId>`)。
 // 🔴 只回 run 台账里的非数据字段(时间 / 状态 / 触发方式 / 行数 / 快照 id / 真因);结果行在该区快照里。
 import { NextRequest, NextResponse } from "next/server";

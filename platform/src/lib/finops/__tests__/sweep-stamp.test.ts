@@ -1,4 +1,3 @@
-// @kf-batch 50-W3f-T0-T3
 // 门票 T1:成本行继承 run 的归属章 + 存量成本行回填。
 //
 // 🔴 只打桩到 AWS SDK 边界(DDB / Glue / EMR)与 finops store;sweep / backfill 本体用真的。
@@ -203,7 +202,7 @@ describe("🔴 T1 backfill:存量成本行从 run 行补章(只补空缺、不�
     h.costRows = [{ taskId: "J1", runId: "R1", sk: "R1" }];
     h.runRows["J1#R1"] = { taskId: "J1", runId: "R1", projectId: "proj-x", targetId: "tgt_usw2_a" };
     await backfillCostRunStamps();
-    // 第二轮:scanAllCostRuns 仍回同一数组(mock),但行上已有章 ⇒ 走 alreadyStamped 分支
+    // scanAllCostRuns 仍回同一数组(mock),但行上已有章 ⇒ 走 alreadyStamped 分支
     const r2 = await backfillCostRunStamps();
     expect(r2).toMatchObject({ backfilled: 0, alreadyStamped: 1 });
   });

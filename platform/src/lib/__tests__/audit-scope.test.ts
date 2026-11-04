@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4ter-coverage
-// 审计的区章(派生规则 + 显式传)与**按区读必须翻页**(工单 SC-12)。
+// 审计的区章(派生规则 + 显式传)与**按区读必须翻页**。
 //
 // 🔴 承重的两条:
 //  ① 派生规则:`resourceType==="exec-env"` 时 `resourceId` 就是 targetId ——

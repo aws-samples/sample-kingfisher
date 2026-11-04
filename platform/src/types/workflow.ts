@@ -3,10 +3,9 @@ export interface Workflow {
   workflowId: string;
   name: string;
   description: string;
-  // @kf-batch 52-P52.2-W2a-run-stamp
   // DDB 行已带(读侧在按它 projectFilter),类型层此前缺失;run 盖章以工作流行的 projectId 为权威。
   projectId?: string;
-  // ⚠️ 保持 any[](非强类型)是【有意为之】(模块 33-B / Strangler):
+  // ⚠️ 保持 any[](非强类型)是【有意为之】(Strangler):
   // 冻结的 legacy 生成器 dag-generator.ts 在 type 判别前就访问 node.data.*,
   // 若在此收紧为判别式 union 会强制修改冻结引擎、违反"旧引擎一行不动"。
   // 强类型走下方 WorkflowNode(服务新引擎 v2 + node-registry);A4 的编译期收益
@@ -25,16 +24,16 @@ export interface Workflow {
   updatedAt: string;
 }
 
-// ── 模块 33-B 富节点类型系统(新引擎 v2 专用；change-safety A4)──────────────
+// ── 富节点类型系统(新引擎 v2 专用；change-safety A4)──────────────
 // 判别式联合(discriminated union):type 做判别，让"未知节点类型/缺字段"在 tsc 阶段暴露。
 // 老三节点(sync/sql/python)= legacy+runtime-lib 双引擎共有；六新节点仅 runtime-lib。
 
 export type WorkflowNodeType =
   | "sync" | "sql" | "python"                          // 老三节点(双引擎)
   | "branch" | "empty" | "join" | "foreach" | "setvar" | "external" // 六新节点(仅新引擎)
-  // @kf-batch 50-WP28-platform-action-node —— 平台动作节点(只由调度载体合成,不进拖拽面板)
+  // 平台动作节点(只由调度载体合成,不进拖拽面板)
   | "platform-action"
-  // 序 73 模块 57 —— 离线作业节点:引用本项目一个离线计算作业(Glue / Redshift,`bgp-etl-jobs`)或 EMR Serverless 作业(`bgp-engine-jobs`)
+  // 离线作业节点:引用本项目一个离线计算作业(Glue / Redshift,`bgp-etl-jobs`)或 EMR Serverless 作业(`bgp-engine-jobs`)
   | "job";
 
 // Airflow trigger_rule 子集(join 节点用；skip 传播见 DESIGN §11.3)。
@@ -66,7 +65,7 @@ export type WorkflowNode = { id: string; position?: { x: number; y: number } } &
   | { type: "setvar";   data: CommonNodeData & { vars?: Record<string, string> } }
   | { type: "external"; data: CommonNodeData & { externalDagId?: string; externalTaskId?: string; executionDelta?: number } }
   | { type: "platform-action"; data: CommonNodeData & { action?: string; params?: Record<string, unknown> } }
-  // 序 73 模块 57(57 DESIGN §3.1):`kind` 闭合 —— `etl` 覆盖 glue / redshift 两种离线计算作业(引擎从作业行读,不在节点里重复存),
+  // `kind` 闭合 —— `etl` 覆盖 glue / redshift 两种离线计算作业(引擎从作业行读,不在节点里重复存),
   //   `emr` = EMR Serverless 引擎作业。`jobSpec` 是**发布期**解析出的运行 spec(与单作业载体同一份,`lib/workflow/job-node-spec.ts`),
   //   画布上不填、保存时不写;只出现在生成的 DAG spec / YAML 里。
   | { type: "job";      data: CommonNodeData & { jobRef?: JobNodeRef; jobSpec?: Record<string, unknown> } }

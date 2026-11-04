@@ -1,4 +1,4 @@
-// @kf-batch 44-sync-switch-datasource —— `PUT /api/sync/[id]` 换数据源(用户 2026-10-15 反馈 ②「同步任务切换个数据源,没法保存」;…7698 页面探针坐实)。
+// `PUT /api/sync/[id]` 换数据源(用户 2026-10-15 反馈 ②「同步任务切换个数据源,没法保存」;…7698 页面探针坐实)。
 //   mock 形态照抄 sync-capability-route.test.ts(只 mock 真外部:DynamoDB / 注册表 / 数仓 Data API)。
 //   钉:① 换源 + 表单回显的旧 sourceDatabase ⇒ 落库的是**新源的库名**(不是请求体里的旧值);② 新源不存在 ⇒ 404 不落库;
 //      ③ 新源在别的区 ⇒ 409 CROSS_REGION_SOURCE 不落库、拒因点名两个执行环境;④ 没换源的保存不多读数据源行;⑤ 新源没有 database(非 JDBC)⇒ 不碰 sourceDatabase。

@@ -1,8 +1,8 @@
-// 模块 37 — BI 取数统一入口(纯逻辑,复用既有底座,不重造)。
+// BI 取数统一入口(纯逻辑,复用既有底座,不重造)。
 //
 // 三种 WidgetSource 归一到一个 executeBiQuery:
 //  - sql / genbi:引擎分支 runSelect / runSelectAthena → **必过 maskRows**(R2 铁律)。
-//  - dataapi:@kf-batch 50-W5-seg2-WP1 —— 「数据服务」已于 2026-09-05 下线(50 SPEC §3.9c / WP-1):**类型保留、能力下线**,
+//  - dataapi:「数据服务」已于 2026-09-05 下线:**类型保留、能力下线**,
 //    任何 dataapi 取数一律抛同一句 410(DATA_SERVICE_GONE),本文件不再 import data-service。
 //
 // 筛选器:仪表盘筛选器值以 {{key}} 注入 SQL,走 lib/sql/param-render 的安全渲染(值位置转义 / select 白名单),绝不裸拼。
@@ -15,7 +15,7 @@ import { maskRows } from "@/lib/governance/masking";
 import { GENBI } from "@/lib/genbi/config";
 import type { ApiErrorCode } from "@/lib/api-response";
 import type { Identity } from "@/lib/auth/identity";
-// @kf-batch 50-W5-seg2-WP1 — 共享件搬家:renderSql / coerceParams / ApiParam 从已下线的 data-service 搬到 lib/sql/param-render(逐字节)。
+// 共享件搬家:renderSql / coerceParams / ApiParam 从已下线的 data-service 搬到 lib/sql/param-render(逐字节)。
 import { coerceParams, renderSql, type ApiParam } from "@/lib/sql/param-render";
 import type { WidgetSource, DashboardFilter, BiQueryResult } from "./types";
 
@@ -67,12 +67,12 @@ function renderWithFilters(
 export interface BiQueryError {
   status: number;
   error: string;
-  /** 可选机器码;路由有则透传、无则按 status 归类。@kf-batch 50-W5-seg2-WP1(数据服务下线的 410 GONE 用) */
+  /** 可选机器码;路由有则透传、无则按 status 归类。(数据服务下线的 410 GONE 用) */
   code?: ApiErrorCode;
 }
 
-// @kf-batch 50-W5-seg2-WP1 — dataapi 取数源的**唯一出口**(单一真值源):三条 BI 路由(bi/query / bi/analysis-query / bi/export)
-// 与 executeBiQuery 的 dataapi 分支抛的都是这一个对象。🔴 只能是 410 + 这一句,不许在路由里各写一份文案(ACCEPTANCE E-135「同一句」)。
+// dataapi 取数源的**唯一出口**(单一真值源):三条 BI 路由(bi/query / bi/analysis-query / bi/export)
+// 与 executeBiQuery 的 dataapi 分支抛的都是这一个对象。🔴 只能是 410 + 这一句,不许在路由里各写一份文案(ACCEPTANCE「同一句」)。
 export const DATA_SERVICE_GONE: BiQueryError = {
   status: 410,
   code: "GONE",
@@ -88,7 +88,6 @@ function upstreamError(msg: string | undefined): BiQueryError {
 
 // 执行一个 widget 的取数。filters/filterValues 来自仪表盘筛选器(编辑期预览可为空)。
 // 成功返回 BiQueryResult;失败抛 BiQueryError(带建议 HTTP status)。
-// @kf-batch 50-WP31-place-first-class
 /**
  * 一次 BI 取数的落点 —— 唯一作者。两种对象两条规则:
  *  · **已保存的视觉对象**(分析取数 / 导出 CSV):落点是它**自己的章** —— 新建时单区视角写进 `source.targetId`,
@@ -111,14 +110,13 @@ export async function executeBiQuery(
     filters?: DashboardFilter[];
     filterValues?: Record<string, string>;
     /**
-     * @kf-batch 50-WP4ter-coverage(工单 SC-7)
      * 取数落点。优先级:**widget 自己声明的 > 调用方传的 > 主控区**。
      * 🔴 为什么 widget 优先:仪表盘是**跨区并排**的(SPEC §8.3),页面范围只是默认值;
      * 让页面范围盖掉 widget 的声明会让「保存好的跨区仪表盘」在切区时整张变成同一个区的数据。
-     * @kf-batch 50-WP31-place-first-class —— 🔴 调用方**必填**(原来两者都没有 = 主控区):路由从请求里点名取。
+     * 🔴 调用方**必填**(原来两者都没有 = 主控区):路由从请求里点名取。
      */
     targetId: string;
-    /** @kf-batch 50-WP31-place-first-class —— 非主控区数仓凭证按项目发(§3.9b),必填(原来不传 ⇒ 非主控区取数被落点解析当场拒) */
+    /** 非主控区数仓凭证按项目发(§3.9b),必填(原来不传 ⇒ 非主控区取数被落点解析当场拒) */
     projectId: string;
   }
 ): Promise<BiQueryResult> {
@@ -129,7 +127,7 @@ export async function executeBiQuery(
 
   // ── sql / genbi:引擎分支 + 必过脱敏 ──────────────────────────────────────
   const engine = source.engine;
-  // @kf-batch 50-WP4ter-coverage —— widget 自己声明的落点赢(见 opts.targetId 注释)
+  // widget 自己声明的落点赢(见 opts.targetId 注释)
   const targetId = (source as { targetId?: string }).targetId || opts.targetId;
   let sql: string;
   try {
@@ -184,7 +182,7 @@ export async function executeBiQuery(
 }
 
 // dataapi 来源的取数入口:三条 BI 路由的 dataapi 分支都调它。
-// @kf-batch 50-W5-seg2-WP1 —— 「数据服务」下线后它**不再取数、不再 import data-service**:签名原样保留(路由零改动),
+// 「数据服务」下线后它**不再取数、不再 import data-service**:签名原样保留(路由零改动),
 // 一律抛 DATA_SERVICE_GONE(410 同一句),由路由按 BiQueryError 透传 ⇒ 存量 dataapi 组件渲染「已下线」占位而不是 500 / 白屏。
 export async function executeBiDataApi(
   _projectId: string,

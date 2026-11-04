@@ -1,13 +1,12 @@
-// @kf-batch 37-recipes-atomic-overwrite
-// 模块 45 seed — 「S3 Tables(Iceberg)结果表怎么**原子地**整表 / 按分区覆盖」的**唯一作者**(规则文本 + 反例判据)。
+// seed — 「S3 Tables(Iceberg)结果表怎么**原子地**整表 / 按分区覆盖」的**唯一作者**(规则文本 + 反例判据)。
 //
-// 🔴 序 37(2026-10-12)把平台自己的同步脚本生成器(lib/sync/glue-script-generator.ts,B-53)从「先 DELETE 再 INSERT
+// 🔴 把平台自己的同步脚本生成器(lib/sync/glue-script-generator.ts)从「先 DELETE 再 INSERT
 //   两次提交」改成「INSERT OVERWRITE 一次提交 + 读到 0 行拒绝清空 + 写后对数」。配方库却还在教另一半 AI 生成路径
 //   (规划大脑 / Copilot / 作业开发 AI 生成)**先 drop 表再 createOrReplace**:
 //     spark.sql(f'DROP TABLE IF EXISTS {TARGET}')            ← 多余且有害
 //     df.writeTo(TARGET).using('iceberg').createOrReplace()  ← 本身就是原子的 REPLACE TABLE … AS SELECT
 //   drop 之后到新表提交之间是一段「没有这张表」的窗口;drop 成功而写入失败(源读不到 / 类型不合 / 容量)⇒ 表**没了**,
-//   下游第二天的作业全红,而重跑一次才可能回来。这正是「非原子覆盖」—— 与 B-53 修掉的是同一类缺陷,只是长在配方里。
+//   下游第二天的作业全红,而重跑一次才可能回来。这正是「非原子覆盖」—— 与修掉的是同一类缺陷,只是长在配方里。
 // ⇒ 规则文本与 antiPattern 在这里写**一次**,emr / glue / s3tables 三个引擎各实例化一份(与 shared-rules.ts、
 //   warehouse-facts.ts 同形:加引擎 = 那个引擎的 seed 文件多一行,不改本文件)。
 

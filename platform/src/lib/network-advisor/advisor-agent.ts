@@ -4,7 +4,7 @@
 // 返回：模型的自然语言 reasoning + 它探到的 facts + 所有 ruling + 它选定的 placement（若有）。
 // 结构化字段的最终组装/兜底在 index.ts（解析失败也能确定性产出，场景 D3）。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand, type Message, type Tool } from "@aws-sdk/client-bedrock-runtime";
 import { NET_ADVISOR } from "./config";
@@ -13,7 +13,7 @@ import { probeEnvironment } from "./environment-probe";
 import { adjudicate } from "./connectivity-judge";
 import { buildRemediations } from "./remediation";
 import type { PlacedConnectivityRequest, EnvironmentFacts, RecommendedPlacement, Ruling } from "./types";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:循环内 Converse 的 modelId 改调用处求值(循环外解析一次候选层,经 invokeConverse
+// 循环内 Converse 的 modelId 改调用处求值(循环外解析一次候选层,经 invokeConverse
 // 退避/降级),不再读模块加载期常量 NET_ADVISOR.modelId(NET_ADVISOR 其余字段不动)。
 import { resolveLayered } from "@/lib/ai/model";
 import { invokeConverse } from "@/lib/ai/invoke";
@@ -77,7 +77,7 @@ export interface AgentResult {
   state: AgentState;
   usage: { inputTokens: number; outputTokens: number };
   llmAvailable: boolean;
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显:实际用的模型(降级则为回落层)。
+  // `_meta` 回显:实际用的模型(降级则为回落层)。
   model: AiModelUse;
 }
 
@@ -109,7 +109,7 @@ export async function runAdvisorAgent(
 
   const toolConfig = { tools: tools() };
 
-  // @kf-batch 50-W5-seg2-WP8:循环外求值一次候选层;`used` = 最近一次实际用的模型。
+  // 循环外求值一次候选层;`used` = 最近一次实际用的模型。
   const layers = await resolveLayered("net-advisor");
   let used: AiModelUse = { modelId: layers[0].modelId, modelSource: layers[0].source };
 

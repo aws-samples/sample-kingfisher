@@ -1,4 +1,3 @@
-// @kf-batch 50-CAPSEED-seed-dispatch
 // 造数的 **异常 → HTTP** 单一作者(手动入口与定时任务路由共用;route.ts 只许导出固定名,所以放这里)。
 import { apiError } from "@/lib/api-response";
 import { placeErrorResponse } from "@/lib/place/route";

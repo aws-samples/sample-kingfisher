@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// @kf-batch 50-P50.2a-exec-env-stackgroup(v2 @ 50-P50.2c-control-api:+--fast、+§10 broker E-49)
+// (v2 @ 50--control-api:+--fast、+§10 broker)
 // 执行环境栈组 **synth 门禁**(50 DESIGN §4.1a-5「编译级验收先行」+ ACCEPTANCE〔兜 P0-7〕synth 级验收)。
 // 跑法:`npm run synth-gate`(在 infra 下)。
 // ⚡ 迭代提速:`npm run synth-gate -- --fast` —— 跳过 §7(负向组件 synth)与 §9(控制面 synth,最慢
-//   的一节,1-2 分钟);其余节(含 §10 的 broker E-49,秒级)照跑。
+//   的一节,1-2 分钟);其余节(含 §10 的 broker,秒级)照跑。
 //   🔴 **--fast 只用于开发迭代;提交前必须跑一次全量**(--fast 的绿不作为提交依据)。
 //
 // 【为什么这道门禁必须存在、且必须离线】
@@ -39,8 +39,8 @@ const LS_OUT = resolve(tmpdir(), "bgp-synth-gate-ee-ls");
 const problems = [];
 const fail = (m) => problems.push(m);
 
-// @kf-batch 50-WP30-decommission —— §11f 的有状态 aws 替身(源码以字符串内嵌:门禁自带夹具,不依赖仓外文件)
-const DESTROY_AWS_STUB = "\n// @kf-batch 50-WP30-decommission —— §11f 的**有状态** aws 替身(只答销毁脚本会问的问题;没见过的调用一律 exit 99)。\n// 状态在 STUB_STATE(JSON 文件)里,每次调用读 → 改 → 写回;每次调用原样记进 STUB_LOG(断言的就是这份调用序列)。\nconst fs = require(\"fs\");\nconst [svc, op, ...rest] = process.argv.slice(2);\nfs.appendFileSync(process.env.STUB_LOG, [svc, op, ...rest].join(\" \") + \"\\n\");\nconst st = JSON.parse(fs.readFileSync(process.env.STUB_STATE, \"utf8\"));\nconst opt = {};\nfor (let i = 0; i < rest.length; i++) {\n  if (!rest[i].startsWith(\"--\")) continue;\n  const k = rest[i].slice(2);\n  const v = rest[i + 1] !== undefined && !rest[i + 1].startsWith(\"--\") ? rest[++i] : true;\n  opt[k] = v;\n}\nconst q = String(opt.query || \"\");\nconst save = () => fs.writeFileSync(process.env.STUB_STATE, JSON.stringify(st));\nconst out = (v) => { process.stdout.write(v === undefined || v === null || v === \"\" ? \"\" : String(v) + \"\\n\"); save(); process.exit(0); };\nconst nf = (what) => { save(); process.stderr.write(`An error occurred (ResourceNotFoundException): ${what} not found\\n`); process.exit(254); };\nconst k = `${svc} ${op}`;\nswitch (k) {\n  case \"ec2 describe-vpcs\": {\n    if (q.startsWith(\"Vpcs[0]\")) out(st.vpc || \"None\");\n    out(st.vpc || \"\");\n  }\n  case \"ec2 describe-subnets\": out(st.vpc ? st.subnets.join(\"\\t\") : \"\");\n  case \"kinesisanalyticsv2 list-applications\": out(Object.keys(st.flink).join(\"\\t\"));\n  case \"kinesisanalyticsv2 describe-application\": {\n    const a = st.flink[opt[\"application-name\"]];\n    if (!a) nf(\"application\");\n    if (q.endsWith(\"ApplicationStatus\")) out(a.status);\n    out(`${a.role}\\t${a.status}\\t2026-10-01T00:00:00+00:00`);\n  }\n  case \"kinesisanalyticsv2 stop-application\": { st.flink[opt[\"application-name\"]].status = \"READY\"; out(\"\"); }\n  case \"kinesisanalyticsv2 delete-application\": { delete st.flink[opt[\"application-name\"]]; out(\"\"); }\n  case \"mwaa-serverless list-workflows\": out(Object.keys(st.workflows).join(\"\\t\"));\n  case \"mwaa-serverless get-workflow\": {\n    const r = st.workflows[opt[\"workflow-arn\"]];\n    if (!r) nf(\"workflow\");\n    out(q === \"RoleArn\" ? r : opt[\"workflow-arn\"]);\n  }\n  case \"mwaa-serverless delete-workflow\": { delete st.workflows[opt[\"workflow-arn\"]]; out(\"\"); }\n  case \"glue get-jobs\": out(Object.entries(st.glueJobs).map(([n, r]) => `${n}\\t${r}`).join(\"\\n\"));\n  case \"glue delete-job\": { delete st.glueJobs[opt[\"job-name\"]]; out(\"\"); }\n  case \"glue get-connections\": out(Object.entries(st.glueConns).map(([n, s]) => `${n}\\t${s}`).join(\"\\n\"));\n  case \"glue delete-connection\": { delete st.glueConns[opt[\"connection-name\"]]; out(\"\"); }\n  case \"emr-serverless list-applications\": out(Object.entries(st.emr).filter(([, a]) => a.state !== \"TERMINATED\").map(([id]) => id).join(\"\\t\"));\n  case \"emr-serverless get-application\": {\n    const a = st.emr[opt[\"application-id\"]];\n    if (!a) nf(\"application\");\n    out(q.endsWith(\"subnetIds\") ? a.subnets.join(\"\\t\") : a.state);\n  }\n  case \"emr-serverless stop-application\": { st.emr[opt[\"application-id\"]].state = \"STOPPED\"; out(\"\"); }\n  case \"emr-serverless delete-application\": { st.emr[opt[\"application-id\"]].state = \"TERMINATED\"; out(\"\"); }\n  case \"dms describe-replication-instances\": {\n    if (opt.filters) {\n      const arn = String(opt.filters).split(\"Values=\")[1];\n      if (!st.dms[arn]) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Replication Instance found\\n\"); process.exit(254); }\n      out(arn);\n    }\n    const m = q.match(/ReplicationSubnetGroupIdentifier=='([^']+)'/);\n    out(Object.entries(st.dms).filter(([, x]) => x.subnetGroup === (m && m[1])).map(([a]) => a).join(\"\\t\"));\n  }\n  case \"dms describe-replication-tasks\": {\n    const f = String(opt.filters || \"\");\n    const v = f.split(\"Values=\")[1];\n    if (f.startsWith(\"Name=replication-instance-arn\")) {\n      const inst = st.dms[v];\n      const rows = inst ? Object.entries(inst.tasks).map(([a, s]) => `${a}\\t${s}`) : [];\n      if (!rows.length) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254); }\n      out(rows.join(\"\\n\"));\n    }\n    for (const inst of Object.values(st.dms)) if (inst.tasks[v] !== undefined) out(q.endsWith(\"Status\") ? inst.tasks[v] : v);\n    save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254);\n  }\n  case \"dms stop-replication-task\": { for (const inst of Object.values(st.dms)) if (inst.tasks[opt[\"replication-task-arn\"]]) inst.tasks[opt[\"replication-task-arn\"]] = \"stopped\"; out(\"\"); }\n  case \"dms delete-replication-task\": { for (const inst of Object.values(st.dms)) delete inst.tasks[opt[\"replication-task-arn\"]]; out(\"\"); }\n  case \"dms delete-replication-instance\": { delete st.dms[opt[\"replication-instance-arn\"]]; out(\"\"); }\n  case \"mwaa get-environment\": { const s = st.mwaa[opt.name]; if (!s) nf(\"environment\"); out(s); }\n  case \"mwaa delete-environment\": { delete st.mwaa[opt.name]; out(\"\"); }\n  case \"redshift-serverless get-workgroup\": { const s = st.workgroups[opt[\"workgroup-name\"]]; if (!s) nf(\"workgroup\"); out(s); }\n  case \"redshift-serverless delete-workgroup\": { delete st.workgroups[opt[\"workgroup-name\"]]; out(\"\"); }\n  case \"redshift-serverless get-namespace\": { const s = st.namespaces[opt[\"namespace-name\"]]; if (!s) nf(\"namespace\"); out(s); }\n  case \"redshift-serverless delete-namespace\": {\n    if (Object.keys(st.workgroups).length) { save(); process.stderr.write(\"An error occurred (ConflictException): namespace has a workgroup\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && st.snapshots[opt[\"final-snapshot-name\"]]) { save(); process.stderr.write(\"An error occurred (ConflictException): snapshot already exists\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && !st.noFinalSnapshot) st.snapshots[opt[\"final-snapshot-name\"]] = \"AVAILABLE\";\n    delete st.namespaces[opt[\"namespace-name\"]];\n    out(\"\");\n  }\n  case \"redshift-serverless get-snapshot\": { const s = st.snapshots[opt[\"snapshot-name\"]]; if (!s) nf(\"snapshot\"); out(s); }\n  case \"cloudformation describe-stacks\": {\n    const s = st.stacks[opt[\"stack-name\"]];\n    if (!s) { save(); process.stderr.write(`An error occurred (ValidationError): Stack with id ${opt[\"stack-name\"]} does not exist\\n`); process.exit(254); }\n    out(s);\n  }\n  case \"cloudformation delete-stack\": {\n    const n = opt[\"stack-name\"];\n    if (st.stackFail[n]) st.stacks[n] = \"DELETE_FAILED\";\n    else { delete st.stacks[n]; if (n.endsWith(\"-base\")) st.vpc = \"\"; }\n    out(\"\");\n  }\n  case \"cloudformation describe-stack-events\": out(st.stackFail[opt[\"stack-name\"]] || \"\");\n  case \"s3api head-bucket\": { if (st.buckets.includes(opt.bucket)) out(\"\"); save(); process.stderr.write(\"An error occurred (404) when calling the HeadBucket operation: Not Found\\n\"); process.exit(254); }\n  case \"s3tables list-table-buckets\": { const m = q.match(/name=='([^']+)'/); out((m && st.tableBuckets[m[1]]) || \"None\"); }\n  case \"dynamodb describe-table\": { if (st.tables.includes(opt[\"table-name\"])) out(\"{}\"); nf(\"table\"); }\n  case \"kms list-aliases\": { const m = q.match(/AliasName=='([^']+)'/); out((m && st.aliases[m[1]]) || \"None\"); }\n  default:\n    save();\n    process.stderr.write(`stub: 未预期的 aws 调用: ${k}\\n`);\n    process.exit(99);\n}\n";
+// §11f 的有状态 aws 替身(源码以字符串内嵌:门禁自带夹具,不依赖仓外文件)
+const DESTROY_AWS_STUB = "\n// §11f 的**有状态** aws 替身(只答销毁脚本会问的问题;没见过的调用一律 exit 99)。\n// 状态在 STUB_STATE(JSON 文件)里,每次调用读 → 改 → 写回;每次调用原样记进 STUB_LOG(断言的就是这份调用序列)。\nconst fs = require(\"fs\");\nconst [svc, op, ...rest] = process.argv.slice(2);\nfs.appendFileSync(process.env.STUB_LOG, [svc, op, ...rest].join(\" \") + \"\\n\");\nconst st = JSON.parse(fs.readFileSync(process.env.STUB_STATE, \"utf8\"));\nconst opt = {};\nfor (let i = 0; i < rest.length; i++) {\n  if (!rest[i].startsWith(\"--\")) continue;\n  const k = rest[i].slice(2);\n  const v = rest[i + 1] !== undefined && !rest[i + 1].startsWith(\"--\") ? rest[++i] : true;\n  opt[k] = v;\n}\nconst q = String(opt.query || \"\");\nconst save = () => fs.writeFileSync(process.env.STUB_STATE, JSON.stringify(st));\nconst out = (v) => { process.stdout.write(v === undefined || v === null || v === \"\" ? \"\" : String(v) + \"\\n\"); save(); process.exit(0); };\nconst nf = (what) => { save(); process.stderr.write(`An error occurred (ResourceNotFoundException): ${what} not found\\n`); process.exit(254); };\nconst k = `${svc} ${op}`;\nswitch (k) {\n  case \"ec2 describe-vpcs\": {\n    if (q.startsWith(\"Vpcs[0]\")) out(st.vpc || \"None\");\n    out(st.vpc || \"\");\n  }\n  case \"ec2 describe-subnets\": out(st.vpc ? st.subnets.join(\"\\t\") : \"\");\n  case \"kinesisanalyticsv2 list-applications\": out(Object.keys(st.flink).join(\"\\t\"));\n  case \"kinesisanalyticsv2 describe-application\": {\n    const a = st.flink[opt[\"application-name\"]];\n    if (!a) nf(\"application\");\n    if (q.endsWith(\"ApplicationStatus\")) out(a.status);\n    out(`${a.role}\\t${a.status}\\t2026-10-01T00:00:00+00:00`);\n  }\n  case \"kinesisanalyticsv2 stop-application\": { st.flink[opt[\"application-name\"]].status = \"READY\"; out(\"\"); }\n  case \"kinesisanalyticsv2 delete-application\": { delete st.flink[opt[\"application-name\"]]; out(\"\"); }\n  case \"mwaa-serverless list-workflows\": out(Object.keys(st.workflows).join(\"\\t\"));\n  case \"mwaa-serverless get-workflow\": {\n    const r = st.workflows[opt[\"workflow-arn\"]];\n    if (!r) nf(\"workflow\");\n    out(q === \"RoleArn\" ? r : opt[\"workflow-arn\"]);\n  }\n  case \"mwaa-serverless delete-workflow\": { delete st.workflows[opt[\"workflow-arn\"]]; out(\"\"); }\n  case \"glue get-jobs\": out(Object.entries(st.glueJobs).map(([n, r]) => `${n}\\t${r}`).join(\"\\n\"));\n  case \"glue delete-job\": { delete st.glueJobs[opt[\"job-name\"]]; out(\"\"); }\n  case \"glue get-connections\": out(Object.entries(st.glueConns).map(([n, s]) => `${n}\\t${s}`).join(\"\\n\"));\n  case \"glue delete-connection\": { delete st.glueConns[opt[\"connection-name\"]]; out(\"\"); }\n  case \"emr-serverless list-applications\": out(Object.entries(st.emr).filter(([, a]) => a.state !== \"TERMINATED\").map(([id]) => id).join(\"\\t\"));\n  case \"emr-serverless get-application\": {\n    const a = st.emr[opt[\"application-id\"]];\n    if (!a) nf(\"application\");\n    out(q.endsWith(\"subnetIds\") ? a.subnets.join(\"\\t\") : a.state);\n  }\n  case \"emr-serverless stop-application\": { st.emr[opt[\"application-id\"]].state = \"STOPPED\"; out(\"\"); }\n  case \"emr-serverless delete-application\": { st.emr[opt[\"application-id\"]].state = \"TERMINATED\"; out(\"\"); }\n  case \"dms describe-replication-instances\": {\n    if (opt.filters) {\n      const arn = String(opt.filters).split(\"Values=\")[1];\n      if (!st.dms[arn]) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Replication Instance found\\n\"); process.exit(254); }\n      out(arn);\n    }\n    const m = q.match(/ReplicationSubnetGroupIdentifier=='([^']+)'/);\n    out(Object.entries(st.dms).filter(([, x]) => x.subnetGroup === (m && m[1])).map(([a]) => a).join(\"\\t\"));\n  }\n  case \"dms describe-replication-tasks\": {\n    const f = String(opt.filters || \"\");\n    const v = f.split(\"Values=\")[1];\n    if (f.startsWith(\"Name=replication-instance-arn\")) {\n      const inst = st.dms[v];\n      const rows = inst ? Object.entries(inst.tasks).map(([a, s]) => `${a}\\t${s}`) : [];\n      if (!rows.length) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254); }\n      out(rows.join(\"\\n\"));\n    }\n    for (const inst of Object.values(st.dms)) if (inst.tasks[v] !== undefined) out(q.endsWith(\"Status\") ? inst.tasks[v] : v);\n    save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254);\n  }\n  case \"dms stop-replication-task\": { for (const inst of Object.values(st.dms)) if (inst.tasks[opt[\"replication-task-arn\"]]) inst.tasks[opt[\"replication-task-arn\"]] = \"stopped\"; out(\"\"); }\n  case \"dms delete-replication-task\": { for (const inst of Object.values(st.dms)) delete inst.tasks[opt[\"replication-task-arn\"]]; out(\"\"); }\n  case \"dms delete-replication-instance\": { delete st.dms[opt[\"replication-instance-arn\"]]; out(\"\"); }\n  case \"mwaa get-environment\": { const s = st.mwaa[opt.name]; if (!s) nf(\"environment\"); out(s); }\n  case \"mwaa delete-environment\": { delete st.mwaa[opt.name]; out(\"\"); }\n  case \"redshift-serverless get-workgroup\": { const s = st.workgroups[opt[\"workgroup-name\"]]; if (!s) nf(\"workgroup\"); out(s); }\n  case \"redshift-serverless delete-workgroup\": { delete st.workgroups[opt[\"workgroup-name\"]]; out(\"\"); }\n  case \"redshift-serverless get-namespace\": { const s = st.namespaces[opt[\"namespace-name\"]]; if (!s) nf(\"namespace\"); out(s); }\n  case \"redshift-serverless delete-namespace\": {\n    if (Object.keys(st.workgroups).length) { save(); process.stderr.write(\"An error occurred (ConflictException): namespace has a workgroup\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && st.snapshots[opt[\"final-snapshot-name\"]]) { save(); process.stderr.write(\"An error occurred (ConflictException): snapshot already exists\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && !st.noFinalSnapshot) st.snapshots[opt[\"final-snapshot-name\"]] = \"AVAILABLE\";\n    delete st.namespaces[opt[\"namespace-name\"]];\n    out(\"\");\n  }\n  case \"redshift-serverless get-snapshot\": { const s = st.snapshots[opt[\"snapshot-name\"]]; if (!s) nf(\"snapshot\"); out(s); }\n  case \"cloudformation describe-stacks\": {\n    const s = st.stacks[opt[\"stack-name\"]];\n    if (!s) { save(); process.stderr.write(`An error occurred (ValidationError): Stack with id ${opt[\"stack-name\"]} does not exist\\n`); process.exit(254); }\n    out(s);\n  }\n  case \"cloudformation delete-stack\": {\n    const n = opt[\"stack-name\"];\n    if (st.stackFail[n]) st.stacks[n] = \"DELETE_FAILED\";\n    else { delete st.stacks[n]; if (n.endsWith(\"-base\")) st.vpc = \"\"; }\n    out(\"\");\n  }\n  case \"cloudformation describe-stack-events\": out(st.stackFail[opt[\"stack-name\"]] || \"\");\n  case \"s3api head-bucket\": { if (st.buckets.includes(opt.bucket)) out(\"\"); save(); process.stderr.write(\"An error occurred (404) when calling the HeadBucket operation: Not Found\\n\"); process.exit(254); }\n  case \"s3tables list-table-buckets\": { const m = q.match(/name=='([^']+)'/); out((m && st.tableBuckets[m[1]]) || \"None\"); }\n  case \"dynamodb describe-table\": { if (st.tables.includes(opt[\"table-name\"])) out(\"{}\"); nf(\"table\"); }\n  case \"kms list-aliases\": { const m = q.match(/AliasName=='([^']+)'/); out((m && st.aliases[m[1]]) || \"None\"); }\n  default:\n    save();\n    process.stderr.write(`stub: 未预期的 aws 调用: ${k}\\n`);\n    process.exit(99);\n}\n";
 
 /** 零凭证环境:任何 context 查找都会失败 ⇒ 门禁立刻红。 */
 const NO_CRED_ENV = {
@@ -53,7 +53,7 @@ const NO_CRED_ENV = {
   AWS_SHARED_CREDENTIALS_FILE: "/dev/null",
   AWS_EC2_METADATA_DISABLED: "1",
   BGP_SKIP_WIRING_HEAL: "1",
-  // 序 48:放行清单的第二条通道(部署脚本导出)。门禁进程若从本机 shell 继承了它,§9f 的「缺省零数组化」会假红 / §9c-env 会假绿 ⇒ 这里剥掉。
+  // 放行清单的第二条通道(部署脚本导出)。门禁进程若从本机 shell 继承了它,§9f 的「缺省零数组化」会假红 / §9c-env 会假绿 ⇒ 这里剥掉。
   BGP_EXECUTION_REGIONS: undefined,
 };
 for (const k of ["AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "BGP_EXECUTION_REGIONS"]) {
@@ -141,7 +141,7 @@ function assertAsciiDescriptions(tpl, stackName) {
           `EC2 SG 只收 ASCII、IAM 只收 Latin-1,synth 不校验、真部署 400(切片 g 实测整栈 ROLLBACK)`);
       }
     }
-    // 🔴 @kf-batch 50-WP16-zero-egress(台账 N-2):**SG 规则**的 Description 是**另一层**,
+    // 🔴 (台账 N-2):**SG 规则**的 Description 是**另一层**,
     //   而且字符集比 GroupDescription 更窄(只收 a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*)。
     //   2026-09-08 真环境:中文规则描述 ⇒ `Invalid rule description` 400 ⇒ base 栈整栈回滚。
     //   原扫描只看资源顶层的 Description/GroupDescription ⇒ 这一层是盲区,补上。
@@ -162,7 +162,7 @@ function assertAsciiDescriptions(tpl, stackName) {
         if (!RULE_DESC_OK.test(d)) {
           fail(`${stackName}/${lid} 的 ${k} 规则描述含非法字符:「${d.slice(0, 60)}」—— ` +
             `SG **规则**描述的合法集只有 a-zA-Z0-9. _-:/()#,@[]+=&;{}!$*(比 GroupDescription 还窄),` +
-            `synth 不校验、真部署 400 Invalid rule description 并整栈回滚(WP-16 实测)`);
+            `synth 不校验、真部署 400 Invalid rule description 并整栈回滚(真部署实测)`);
         }
       }
     }
@@ -178,7 +178,7 @@ function expectName(kind) {
   return rule.target.split("{slug}").join(SLUG).split("{account}").join(ACCOUNT);
 }
 
-// ── @kf-batch 50-W5-seg1-WP3:per-target 执行角色的模板读法(SPEC v3.21 §6.1 段二)────────────────────
+// ──:per-target 执行角色的模板读法(SPEC v3.21 §6.1 段二)────────────────────
 /** Output 值若是 `Fn::GetAtt [lid, Arn]` ⇒ 回该 Role 资源的 RoleName;否则回 JSON 文本(旧写法是拼串)。 */
 function roleNameOfOutput(tpl, value) {
   const ga = value && typeof value === "object" ? value["Fn::GetAtt"] : undefined;
@@ -347,11 +347,11 @@ function controlPlaneStackIds() {
 // ══════════════════════════════════════════════════════════════════════════════
 // 1) 正向:零凭证 synth 成功 + 零 context 查找
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP13-mwaa-region:控制面 region(mwaa 组件回写 home 运行台账要它;其余组件忽略)—— 与 buildspec 传 $AWS_REGION 同位
+// 控制面 region(mwaa 组件回写 home 运行台账要它;其余组件忽略)—— 与 buildspec 传 $AWS_REGION 同位
 const HOME_REGION = "us-east-1";
-// @kf-batch 50-WP23-xregion-peering:非 home 的 VPC 段(池内第一个;真部署由 broker 从描述符透传)
+// 非 home 的 VPC 段(池内第一个;真部署由 broker 从描述符透传)
 const VPC_CIDR = "10.128.0.0/16";
-// @kf-batch 50-WP23-xregion-peering:主控区那一侧的三件事实(真部署由 buildspec 从 BgpVpcStack 的 Outputs 读)
+// 主控区那一侧的三件事实(真部署由 buildspec 从 BgpVpcStack 的 Outputs 读)
 const HOME_VPC_ID = "vpc-0123456789abcdef0";
 const HOME_VPC_CIDR = "10.0.0.0/16";
 const HOME_DDB_ENDPOINT_ID = "vpce-0123456789abcdef0";
@@ -366,9 +366,9 @@ const baseCtx = [
   `exec-env-home-vpc-cidr=${HOME_VPC_CIDR}`,
   `exec-env-home-ddb-endpoint-id=${HOME_DDB_ENDPOINT_ID}`,
 ];
-// @kf-batch 50-WP16-zero-egress(§14):零出网静态门 —— 取代 WP-15 的 K-5「NAT 数量链路」检查。
+// 零出网静态门 —— 取代  K-5「NAT 数量链路」检查。
 //    K-5 那条链(注册表 networkProfile → broker env → buildspec / p0e-gate `-c exec-env-nat-gateways` → context.ts)
-//    自 WP-16 起**整条退役**:执行环境不再有 NAT / EIP。这里反过来钉「链路必须已拆干净」+「不许再长出来」。
+//    **整条退役**:执行环境不再有 NAT / EIP。这里反过来钉「链路必须已拆干净」+「不许再长出来」。
 {
   const bs = readFileSync(resolve(REPO, "infra", "buildspec", "exec-env-deploy.yml"), "utf8");
   const pg = readFileSync(resolve(HERE, "p0e-gate.mjs"), "utf8");
@@ -382,7 +382,7 @@ const baseCtx = [
   }
   // ② 执行环境栈组里不许再出现 PRIVATE_WITH_EGRESS(带 NAT 出网的子网类型)
   //    🔴 为什么要扫:`selectSubnets` 选不中时**返回空集不报错** ⇒ 漏改一处的症状是
-  //    「Output 空串 / subnetIds 传空数组」,报错点离根因极远(WP-16 施工时 core 栈真炸过一次)。
+  //    「Output 空串 / subnetIds 传空数组」,报错点离根因极远(施工时 core 栈真炸过一次)。
   const eeDir = resolve(REPO, "infra", "lib", "exec-env");
   for (const f of readdirSync(eeDir).filter((x) => x.endsWith(".ts"))) {
     // 🔴 先剥注释行(本仓第四次同一教训:注释里的措辞会骗出假阳性 —— 本节自己的注释就写了
@@ -398,7 +398,7 @@ const baseCtx = [
 }
 /**
  * 🔴 **按 key 改 context,不按下标切**。
- * 教训(WP-23 施工时被自己坑到):原来用 `baseCtx.slice(0, 4)` 表示「不传 home-region」——
+ * 教训(施工时被自己坑到):原来用 `baseCtx.slice(0, 4)` 表示「不传 home-region」——
  * 一旦 baseCtx 新增入参(vpc-cidr / home-link 三件事实),下标 4 之后的东西被**一起丢掉**,
  * 于是那几条负向用例改成因「缺 vpc-cidr」而抛 ⇒ 它们要验的东西根本没被验到(判据因错误的原因通过)。
  * 位置耦合在本仓已经犯过多次(组件清单是集合不是序列、DDB 键序…);这里一次性改成显式语义。
@@ -431,7 +431,7 @@ const NON_US_HOME = "ap-southeast-1";
 const GUARD_RE = /默认大模型 \S+ 是「us\.」地理推理配置,主控区 ap-southeast-1 调不通/;
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 1c) B-103:非美主控区下,执行环境栈组不许被控制面的「默认大模型地理守卫」误伤;守卫本身必须仍在
+// 1c):非美主控区下,执行环境栈组不许被控制面的「默认大模型地理守卫」误伤;守卫本身必须仍在
 // ══════════════════════════════════════════════════════════════════════════════
 // 【为什么有这一节(2026-10-19 客户现网真撞)】页面「新建执行环境」触发的 CodeBuild 在主控区跑 `cdk bootstrap` /
 //   `cdk deploy BgpExecEnv-*`,进程里 CDK_DEFAULT_REGION = 主控区、没有 BEDROCK_MODEL_ID。bin/app.ts 原来把两道控制面
@@ -456,7 +456,7 @@ const GUARD_RE = /默认大模型 \S+ 是「us\.」地理推理配置,主控区 
   const ee = listApp(baseCtx, { env: guardEnv });
   if (!ee.ok) {
     fail(
-      `§1c B-103 复发:主控区 ${NON_US_HOME} + 无 BEDROCK_MODEL_ID 时执行环境栈组构造失败 —— 控制面守卫又跑到了 exec-env 分叉之前` +
+      `§1c 控制面守卫误伤复发:主控区 ${NON_US_HOME} + 无 BEDROCK_MODEL_ID 时执行环境栈组构造失败 —— 控制面守卫又跑到了 exec-env 分叉之前` +
         `(页面新建执行区的 CodeBuild 会在 bootstrap 就炸):\n${ee.out.slice(-600)}`
     );
   } else if (GUARD_RE.test(ee.out)) {
@@ -478,9 +478,9 @@ const GUARD_RE = /默认大模型 \S+ 是「us\.」地理推理配置,主控区 
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 1d) B-134:buildspec 的 `cdk bootstrap` 不许执行 app(否则非美主控区 + CodeBuild 无 BEDROCK_MODEL_ID 必撞控制面守卫)
+// 1d):buildspec 的 `cdk bootstrap` 不许执行 app(否则非美主控区 + CodeBuild 无 BEDROCK_MODEL_ID 必撞控制面守卫)
 // ══════════════════════════════════════════════════════════════════════════════
-// 【为什么有这一节(2026-10-29 客户现网真撞,B-103 复发)】§1c 钉的是「带 -c exec-env-target 的 synth 不过守卫」,
+// 【为什么有这一节(2026-10-29 客户现网真撞,该缺陷复发)】§1c 钉的是「带 -c exec-env-target 的 synth 不过守卫」,
 //   但 buildspec 第 3 步 `npx cdk bootstrap aws://…` **不带任何 -c**,而 CDK CLI(2.11xx)在显式环境下仍会执行 cdk.json 的 app
 //   ⇒ app 走控制面分支 ⇒ 守卫抛 ⇒ 页面「新建 / 重新部署执行环境」在 bootstrap 一步就炸。三个测试账号主控区都在美国,
 //   §1c 的全绿与三次 production 再演练全是假阴性 —— 判据没有锚定到它要判的那条命令。
@@ -495,7 +495,7 @@ const GUARD_RE = /默认大模型 \S+ 是「us\.」地理推理配置,主控区 
   } else {
     const line = bootLines[0];
     if (!/\s--app ''\s/.test(line)) {
-      fail(`§1d B-134:buildspec 的 bootstrap 没带 --app ''(CLI 会执行 app 走控制面分支 ⇒ 非美主控区撞守卫):${line}`);
+      fail(`§1d buildspec 的 bootstrap 没带 --app ''(CLI 会执行 app 走控制面分支 ⇒ 非美主控区撞守卫):${line}`);
     }
     const guardEnv = {
       ...NO_CRED_ENV,
@@ -517,7 +517,7 @@ const GUARD_RE = /默认大模型 \S+ 是「us\.」地理推理配置,主控区 
     if (real.ok) {
       fail("§1d 零凭证下 buildspec 的 bootstrap 居然成功 ⇒ 判据前提失效(应因 NoCredentials 停)");
     } else if (GUARD_RE.test(real.out)) {
-      fail(`§1d B-134 复发:buildspec 的 bootstrap 仍执行了 app 并撞控制面守卫(页面新建 / 重新部署执行环境会在 bootstrap 就炸):\n${real.out.slice(-600)}`);
+      fail(`§1d bootstrap 守卫复发:buildspec 的 bootstrap 仍执行了 app 并撞控制面守卫(页面新建 / 重新部署执行环境会在 bootstrap 就炸):\n${real.out.slice(-600)}`);
     } else if (!CRED_RE.test(real.out)) {
       fail(`§1d buildspec 的 bootstrap 停在了预期之外的地方(既非守卫原话也非凭证):\n${real.out.slice(-600)}`);
     }
@@ -565,7 +565,7 @@ if (manifest) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 序 31 三刀 IAM 侧(2026-10-21)—— 平台数据面角色(主控区那一个在平台栈、其余每区一个在 base 栈,同一作者
+// IAM 侧(2026-10-21)—— 平台数据面角色(主控区那一个在平台栈、其余每区一个在 base 栈,同一作者
 //   `lib/shared/platform-data-role.ts`)的密钥授权必须**成对**:…9435 observe 第四十四轮量到「bgp/datasource/* 能读不能建 / 改 / 删」
 //   「bgp/dms/* 写不了」「RDS 发现的 ListSecrets 没给」三族 denied。这里对**合成后的模板**钉事实(不是钉源码字面):
 //   该角色的策略里要有一条含 CreateSecret / UpdateSecret / PutSecretValue / DeleteSecret 且资源面同时覆盖 `secret:bgp/datasource/*` 与 `secret:bgp/dms/*`,
@@ -596,7 +596,7 @@ function assertDataRoleSecretGrants(tpl, roleLid, label) {
 // ══════════════════════════════════════════════════════════════════════════════
 if (manifest) {
   const cp = controlPlaneStackIds();
-  // @kf-batch 50-WP31-seq5-dataplane-role —— 🔴 **唯一**例外:平台数据面角色的信任条件要点名「平台任务角色」
+  // 🔴 **唯一**例外:平台数据面角色的信任条件要点名「平台任务角色」
   //   (`aws:PrincipalArn` 钉到 `BgpPlatformStack-TaskRole*`)。那是**身份名模式**,不是构造引用(没有 export / import,
   //   控制面栈删了重建也照样对得上)。例外是闭合的:只摘掉那一个角色的那一条信任语句,且逐字核它的形态;
   //   模板里任何别处再出现控制面栈名照样红。
@@ -629,7 +629,7 @@ if (manifest) {
   if (pdrSeen !== 1) fail(`§4 平台数据面角色 ${PDR_NAME} 应恰好出现 1 次(base 栈),实际 ${pdrSeen} —— 例外条款在空转或角色建重了`);
 }
 
-// @kf-batch 50-WP16-zero-egress —— 端点清单**只有一个作者**(`lib/exec-env/endpoints.ts`)。
+// 端点清单**只有一个作者**(`lib/exec-env/endpoints.ts`)。
 //   门禁绝不自己再写一份清单(那就正好是它要防的漂移),而是用 ts-node 驱动去读那个唯一真值。
 let _endpointsSsot = null;
 function endpointsSsot() {
@@ -666,7 +666,7 @@ function endpointsSsot() {
 }
 const execEnvEndpointPlan = () => endpointsSsot().plan;
 
-// @kf-batch 50-WP30-decommission —— 删栈顺序的唯一作者是 lib/exec-env/destroy-order.ts;门禁用 ts-node 读它,绝不自己再写一份
+// 删栈顺序的唯一作者是 lib/exec-env/destroy-order.ts;门禁用 ts-node 读它,绝不自己再写一份
 let _destroyOrder = null;
 function destroyOrderSsot() {
   if (_destroyOrder) return _destroyOrder;
@@ -688,7 +688,7 @@ function destroyOrderSsot() {
 const execEnvRuntimeBoto3Services = () => endpointsSsot().runtime;
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 4b) 🔴 @kf-batch 50-WP16-zero-egress —— **零出网不变量**(SPEC §3.16-A;ACCEPTANCE N0-1/N0-2/N0-3)
+// 4b) 🔴 **零出网不变量**(SPEC §3.16-A;ACCEPTANCE N0-1/N0-2/N0-3)
 //     这一节是本包的承重:每一条都对应一个「synth 全绿、真环境静默失败」的形状。
 // ══════════════════════════════════════════════════════════════════════════════
 if (manifest) {
@@ -712,8 +712,8 @@ if (manifest) {
   //    为什么:CDK 按 subnetConfiguration 顺序切 CIDR。把 Public 那层直接删掉(而不是 reserved:true)
   //    会让私有子网从 10.0.2/3.0/24 挪到 10.0.0/1.0/24 ⇒ CidrBlock 变更 = **子网被替换**
   //    ⇒ 连带 MWAA 环境 / Redshift 子网组 / EMR 网络配置全部重建(ACCEPTANCE N0-10 明令禁止)。
-  // 🔴🔴 @kf-batch 50-WP23-xregion-peering:冻结的是**偏移**,不是绝对地址。
-  //    WP-23 起非 home 的 VPC 从地址池取 /16(与主控区不重叠,否则跨区 peering 建不出来)
+  // 🔴🔴 冻结的是**偏移**,不是绝对地址。
+  //    非 home 的 VPC 从地址池取 /16(与主控区不重叠,否则跨区 peering 建不出来)
   //    ⇒ 绝对值 10.0.2.0/24 会随 `-c exec-env-vpc-cidr` 变。而这条判据真正承重的性质是
   //    「私有子网仍是 VPC 的第 3、4 个 /24」—— 那才是 `reserved: true` 保住的东西
   //    (删掉 Public 层会让它们挪到第 1、2 个 /24 ⇒ 子网被替换)。
@@ -743,13 +743,13 @@ if (manifest) {
     }
   }
 
-  // ③b 🔴 **存量资源的逻辑 id 冻结**(2026-09-08 真环境撞过,WP-16 台账 N-1)
-  //    S3 网关端点在 WP-16 之前就存在(构造 id `S3Gw` ⇒ 逻辑 id `ExecEnvVpcS3Gw93394E80`)。
+  // ③b 🔴 **存量资源的逻辑 id 冻结**(2026-09-08 真环境撞过,台账 N-1)
+  //    S3 网关端点在此前就存在(构造 id `S3Gw` ⇒ 逻辑 id `ExecEnvVpcS3Gw93394E80`)。
   //    把构造 id 改成 `GwS3` 会让 CFN 当成**新资源**:一边建新的、老的还挂在同一张路由表上占着
   //    S3 前缀列表 ⇒ `already has a route with destination-prefix-list-id pl-…` ⇒ 整个 base 栈回滚。
   //    逻辑 id 就是资源身份;这一条把它钉死。
   const FROZEN_LOGICAL_IDS = {
-    ExecEnvVpcS3Gw93394E80: "AWS::EC2::VPCEndpoint", // S3 网关端点(WP-16 之前就有)
+    ExecEnvVpcS3Gw93394E80: "AWS::EC2::VPCEndpoint", // S3 网关端点(此前就有)
     ExecEnvVpc280E74AE: "AWS::EC2::VPC",
   };
   for (const [lid, ty] of Object.entries(FROZEN_LOGICAL_IDS)) {
@@ -769,7 +769,7 @@ if (manifest) {
   if (JSON.stringify(sameRegionNames) !== JSON.stringify(wantSameRegion)) {
     fail(`同区接口端点与清单不一致:\n  模板 ${JSON.stringify(sameRegionNames)}\n  清单 ${JSON.stringify(wantSameRegion)}`);
   }
-  // ⑤ 🔴🔴 @kf-batch 50-WP23-xregion-peering:**跨区 VPC 端点这个形态必须消失**(负向)。
+  // ⑤ 🔴🔴 **跨区 VPC 端点这个形态必须消失**(负向)。
   //    它被组织 SCP 拦死(`vpce:AllowMultiRegion` 的 AllowedByOrganizations=False,账号内放不开)⇒
   //    模板里再出现一个,真部署就会在创建端点那一步 403、整栈回滚。这一条从「必须有」改判成「必须没有」。
   const xr = iface.filter((e) => e.p.ServiceRegion);
@@ -825,7 +825,7 @@ if (manifest) {
     }
     // ⑦ 🔴 授权锚点**反向**:`vpce:AllowMultiRegion` 那条特殊授权必须已从源码里删掉。
     //    留着一条组织层永远拒的授权,会让下一个人以为「权限给了、是别处的问题」——
-    //    它正是让序 18 挂了三天的原因(ROADMAP §2octies.58)。
+    //    它正是让挂了三天的原因(ROADMAP §2octies.58)。
     const psText = readFileSync(resolve(INFRA, "lib/platform-stack.ts"), "utf8")
       .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
     if (/vpce:AllowMultiRegion/.test(psText)) {
@@ -835,7 +835,7 @@ if (manifest) {
   }
 
   // ⑧ 🔴 清单 ⊇ 运行时真实 boto3 服务集(ACCEPTANCE N0-2 第二层)
-  //    只比「模板 == 清单」等于自己跟自己对账;这一层才是防「漏项」复发的门(spike S-7 漏了两个)。
+  //    只比「模板 == 清单」等于自己跟自己对账;这一层才是防「漏项」复发的门(spike 漏了两个)。
   const covered = new Set([...plan.iface, ...plan.gateway]);
   for (const svc of execEnvRuntimeBoto3Services()) {
     if (!covered.has(svc)) {
@@ -858,7 +858,7 @@ if (manifest) {
     const declared = new Set(execEnvRuntimeBoto3Services());
     const missing = [...found].filter((x) => !declared.has(x)).sort();
     if (missing.length) {
-      fail(`运行时新增了 boto3 服务 ${JSON.stringify(missing)} 而 endpoints.ts 的 RUNTIME_BOTO3_SERVICES 没登记 —— 这正是 spike S-7 漏掉 s3tables / redshift-serverless 的形状`);
+      fail(`运行时新增了 boto3 服务 ${JSON.stringify(missing)} 而 endpoints.ts 的 RUNTIME_BOTO3_SERVICES 没登记 —— 这正是早期 spike 漏掉 s3tables / redshift-serverless 的形状`);
     }
   }
 }
@@ -867,7 +867,7 @@ if (manifest) {
 // 5) 🔴 数据保护(§12 P0-A;风险表唯一"客户数据永久丢失"项)
 //    数据桶 / 表桶 / CMK 必须 Retain,且**整组模板里不许有 S3 自动清空的 Custom Resource**
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP30-retain-key-alias —— 别名也必须 Retain:钥匙留下而别名随栈删掉 ⇒ 删除预览承诺保留的
+// 别名也必须 Retain:钥匙留下而别名随栈删掉 ⇒ 删除预览承诺保留的
 //   `alias/bgp-data-<slug>` 找不到(2026-10-11 第二账号真销毁实测)。
 const RETAIN_TYPES = ["AWS::S3::Bucket", "AWS::S3Tables::TableBucket", "AWS::KMS::Key", "AWS::KMS::Alias"];
 if (manifest) {
@@ -962,15 +962,15 @@ if (manifest) {
   if (alias?.Properties?.AliasName !== expectName("dataKeyAlias")) {
     fail(`KMS 别名=${JSON.stringify(alias?.Properties?.AliasName)},SSOT 期望 ${expectName("dataKeyAlias")}`);
   }
-  // ── @kf-batch 50-W5-seg1-WP3:🔴 **反转**(SPEC v3.21 §6.1 段二)—— 原「glueRoleArn 必须指向 home 角色、出现 slug 即 fail」
-  //    是 P50.2 段一的过渡定案;跨法域 target 上线前的硬门 = 每个 target 用**绑死本 target** 的角色。
+  // ──:🔴 **反转**(SPEC v3.21 §6.1 段二)—— 原「glueRoleArn 必须指向 home 角色、出现 slug 即 fail」
+  //    是段一的过渡定案;跨法域 target 上线前的硬门 = 每个 target 用**绑死本 target** 的角色。
   //    ⇒ glueRoleArn 必须是本 target 的 SSOT 名、**不许**是 home 名;core 还必须吐 emrExecutionRoleArn。
   const glueName = roleNameOfOutput(core, coreOuts.glueRoleArn);
   if (glueName !== expectName("glueRole")) {
-    fail(`glueRoleArn 不是本 target 的角色(SSOT 期望 ${expectName("glueRole")},实为 ${glueName})—— WP-3 起共享角色只剩 home`);
+    fail(`glueRoleArn 不是本 target 的角色(SSOT 期望 ${expectName("glueRole")},实为 ${glueName})—— 共享角色只剩 home`);
   }
   if (typeof glueName === "string" && glueName === naming.kinds.glueRole.home) {
-    fail(`glueRoleArn 仍指向 home 的 ${glueName} —— 那是 P50.2 的过渡形态,SPEC v3.21 已作废`);
+    fail(`glueRoleArn 仍指向 home 的 ${glueName} —— 那是早期过渡形态,SPEC v3.21 已作废`);
   }
   const emrName = roleNameOfOutput(core, coreOuts.emrExecutionRoleArn);
   if (emrName !== expectName("emrServerlessRole")) {
@@ -989,22 +989,22 @@ if (manifest) {
 // ══════════════════════════════════════════════════════════════════════════════
 // 7) 负向:未实现的组件必须**报错**,不许静默少装(⚡ --fast 跳过:多一次完整 synth)
 // ══════════════════════════════════════════════════════════════════════════════
-// 🔴 P50.3a 起 redshift/dms/flink 已实现 ⇒ 负向清单收缩到"仍未实现"的四个。
+// 🔴 起 redshift/dms/flink 已实现 ⇒ 负向清单收缩到"仍未实现"的四个。
 //    这份名单必须与 stack-group.ts 的 IMPLEMENTED_COMPONENTS **互补**:门禁从源码抽那个常量来核对,
 //    免得"代码实现了组件、门禁还在期待它报错"(或反过来:组件被摘掉而门禁仍当它可用)。
-// @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 已实现 ⇒ 名单收缩到三个
-// @kf-batch 50-WP13-mwaa-region:mwaa 已实现(每个 target 自己的 Airflow)⇒ 名单收缩到两个
-// 🔴🔴 @kf-batch 50-WP23:名单是**三分**的,不是二分 —— WP-22 起多了 `EXTERNAL_COMPONENTS`
+// residency-api 片 1 已实现 ⇒ 名单收缩到三个
+// mwaa 已实现(每个 target 自己的 Airflow)⇒ 名单收缩到两个
+// 🔴🔴 名单是**三分**的,不是二分 —— 多了 `EXTERNAL_COMPONENTS`
 //    (由平台自己的栈部署,栈组**跳过**它:既不建栈也不报错)。这里原来把 `agentcore` 留在
-//    「未实现」里,于是本节期待它 synth 报错;而 WP-22 让它变成静默跳过 ⇒ 本节从那天起就是红的
-//    (WP-22 收官时只跑了 `--fast`,而这一节 `--fast` 会跳过 ⇒ **红了没人看见**)。
+//    「未实现」里,于是本节期待它 synth 报错;而让它变成静默跳过 ⇒ 本节从那天起就是红的
+//    (收官时只跑了 `--fast`,而这一节 `--fast` 会跳过 ⇒ **红了没人看见**)。
 //    ⇒ external 从源码读(单一作者 = stack-group.ts),闭合式改成三段;并给 external 补正向判据。
 const NOT_YET_COMPONENTS = ["kafka"];
 const EXTERNAL_COMPONENTS_FROM_SOURCE = (() => {
   const sgSrc = readFileSync(resolve(INFRA, "lib/exec-env/stack-group.ts"), "utf8");
   const m = sgSrc.match(/EXTERNAL_COMPONENTS\s*=\s*\[([^\]]+)\]/);
   if (!m) {
-    fail("stack-group.ts 里找不到 EXTERNAL_COMPONENTS —— WP-22 的第三类名单没了?门禁的组件模型会与源码脱节");
+    fail("stack-group.ts 里找不到 EXTERNAL_COMPONENTS —— 第三类(外部组件)名单没了?门禁的组件模型会与源码脱节");
     return [];
   }
   return Array.from(m[1].matchAll(/"([^"]+)"/g)).map((x) => x[1]);
@@ -1029,14 +1029,14 @@ const EXTERNAL_COMPONENTS_FROM_SOURCE = (() => {
     }
   }
 }
-// ── 7c) @kf-batch 50-WP15-airflow-serverless:broker 的组件全集必须**派生自** context.ts,不许自持名单 ──
+// ── 7c):broker 的组件全集必须**派生自** context.ts,不许自持名单 ──
 //   真环境撞到:平台 / 栈组已认 airflow-serverless,broker validate.mjs 还是旧的八项 ⇒ 页面「+ 补充部署」被拒「未知组件」。
 {
   const validateSrc = readFileSync(resolve(INFRA, "lambda/exec-env-broker/validate.mjs"), "utf8");
   if (/export const COMPONENTS\s*=\s*\[/.test(validateSrc)) fail("validate.mjs 又出现字面组件名单 `export const COMPONENTS = [...]` —— 组件全集只许从 EXEC_ENV_COMPONENT_ENUM 派生(context.ts 唯一真源)");
   if (!/parseComponentEnum\(process\.env\.EXEC_ENV_COMPONENT_ENUM\)/.test(validateSrc)) fail("validate.mjs 没有 `parseComponentEnum(process.env.EXEC_ENV_COMPONENT_ENUM)` —— broker 组件全集与 context.ts 断链");
   const depSrc = readFileSync(resolve(INFRA, "lib/exec-env/deploy-stack.ts"), "utf8");
-  // @kf-batch 50-PROD-B-seq33 ②:完整组件集注入 broker(validate.mjs 判「下发集 ⊇ 它」)
+  // ②:完整组件集注入 broker(validate.mjs 判「下发集 ⊇ 它」)
   if (!/EXEC_ENV_REQUIRED_COMPONENTS:\s*EXEC_ENV_REQUIRED_BASE_COMPONENTS\.join\(","\)/.test(depSrc)) fail("deploy-stack.ts 没把 EXEC_ENV_REQUIRED_BASE_COMPONENTS 注入 broker env EXEC_ENV_REQUIRED_COMPONENTS(broker 判不了精简形态)");
   if (!/EXEC_ENV_COMPONENT_ENUM:\s*EXEC_ENV_COMPONENTS\.join\(","\)/.test(depSrc)) fail("deploy-stack.ts 没把 EXEC_ENV_COMPONENTS.join(\",\") 注入 broker env EXEC_ENV_COMPONENT_ENUM(broker 加载即抛)");
 }
@@ -1063,23 +1063,23 @@ if (!FAST) {
       fail(`勾选未实现组件 ${c} 时报错信息不对(应指名 ${c}、说明"未实现的组件"并列出"已实现"清单):${neg.out.slice(-400)}`);
     }
   }
-  // @kf-batch 50-WP13-mwaa-region:mwaa 缺 -c exec-env-home-region 必须 synth 抛(不知道控制面在哪就不许建回写策略;猜错 = 定时 run 静默写不进台账)
+  // mwaa 缺 -c exec-env-home-region 必须 synth 抛(不知道控制面在哪就不许建回写策略;猜错 = 定时 run 静默写不进台账)
   {
     const noHome = listApp(ctxWith({ drop: ["exec-env-home-region"], add: ["exec-env-components=core,mwaa"] }));
     if (noHome.ok) fail("勾 mwaa 却没传 exec-env-home-region 竟然构造成功 —— context.ts 的 fail-closed 失效");
     else if (!/exec-env-home-region/.test(noHome.out)) fail(`mwaa 缺 home-region 时报错未指名 exec-env-home-region:${noHome.out.slice(-300)}`);
-    // @kf-batch 50-WP15-airflow-serverless:同理(该区 workflow 回写 home 台账)
+    // 同理(该区 workflow 回写 home 台账)
     const noHomeSls = listApp(ctxWith({ drop: ["exec-env-home-region"], add: ["exec-env-components=core,airflow-serverless"] }));
     if (noHomeSls.ok) fail("勾 airflow-serverless 却没传 exec-env-home-region 竟然构造成功 —— context.ts 的 fail-closed 失效");
     else if (!/exec-env-home-region/.test(noHomeSls.out)) fail(`airflow-serverless 缺 home-region 时报错未指名 exec-env-home-region:${noHomeSls.out.slice(-300)}`);
   }
-  // @kf-batch 50-WP23:external 组件(agentcore)= **跳过**语义 —— synth 必须成功,且**不为它建栈**。
+  // external 组件(agentcore)= **跳过**语义 —— synth 必须成功,且**不为它建栈**。
   //   两条都要:只断「不报错」的话,「悄悄给它建一个空栈」也能过;只断「没有栈」的话,报错也算没栈。
   for (const c of EXTERNAL_COMPONENTS_FROM_SOURCE) {
     const ext = listApp(ctxWith({ add: [`exec-env-components=core,${c}`] }));
     if (!ext.ok) {
       fail(`勾选 core,${c}(external:由平台自己的栈部署)竟然构造失败 —— 栈组该**跳过**它而不是报错` +
-        `(WP-22:留在「未实现」里会让装了它的 home 永远补装不了任何组件):${ext.out.slice(-300)}`);
+        `(留在「未实现」里会让装了它的 home 永远补装不了任何组件):${ext.out.slice(-300)}`);
     } else {
       const stacks = ext.out.split("\n").map((x) => x.trim()).filter(Boolean);
       const forExt = stacks.filter((n) => n.endsWith(`-${c}`));
@@ -1097,7 +1097,7 @@ if (!FAST) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 7b) 🔴 正向:已实现的组件栈(P50.3a 的 redshift / dms / flink)必须真装出来且合同对得上
+// 7b) 🔴 正向:已实现的组件栈(redshift / dms / flink)必须真装出来且合同对得上
 //
 // 【为什么必须单独一节】§1-6 只 synth 了 core-only ⇒ 组件栈的 Output 键、RETAIN、per-target 角色名
 //   一条都没被看过。这一节带 `exec-env-components=core,redshift,dms,flink` 再 synth 一次,逐条打:
@@ -1130,7 +1130,7 @@ if (!FAST) {
       fail(`勾 core,redshift,dms,flink,residency-api,mwaa,airflow-serverless 应产出 ${wantStacks.join(", ")},实际:${names.join(", ")}`);
     }
 
-    // @kf-batch 50-WP30-decommission —— 🔴 删栈顺序 vs 真实依赖图:一个栈被删的时候,依赖它的栈必须**都已经删完**
+    // 🔴 删栈顺序 vs 真实依赖图:一个栈被删的时候,依赖它的栈必须**都已经删完**
     //   (否则 CFN 报 Export 正被引用 ⇒ 整条删除链停住)。顺序的唯一作者 = destroy-order.ts;这里只核对,不另写一份。
     {
       const order = destroyOrderSsot();
@@ -1226,7 +1226,7 @@ if (!FAST) {
       }
     }
 
-    // ①b @kf-batch 50-W5-seg1-WP3:per-target COPY 角色挂在 namespace 上(非 home 的 `COPY … IAM_ROLE default` 从此成立)
+    // ①b:per-target COPY 角色挂在 namespace 上(非 home 的 `COPY … IAM_ROLE default` 从此成立)
     const copyLid = assertPerTargetRole(rs, "redshift", "redshiftCopyRole", { trustServices: ["redshift.amazonaws.com"] });
     if (copyLid && ns) {
       const iamRoles = JSON.stringify(ns[1].Properties?.IamRoles ?? "");
@@ -1256,7 +1256,7 @@ if (!FAST) {
       }
     }
 
-    // ②b @kf-batch 50-W5-seg1-WP3:per-target DMS 角色(信任含区域化 dms.<region>;消费方接线归 WP-7/10b)
+    // ②b:per-target DMS 角色(信任含区域化 dms.<region>;消费方接线)
     assertPerTargetRole(dmsTpl, "dms", "dmsKinesisRole", {
       trustServices: ["dms.amazonaws.com", `dms.${REGION}.amazonaws.com`, "redshift.amazonaws.com"],
     });
@@ -1292,7 +1292,7 @@ if (!FAST) {
         fail(`flink 角色策略里出现 home 的 ${kind}(${homeName})—— 第二 region 的作业不许读写 home 的数据`);
       }
     }
-    // ④ @kf-batch 50-W5-seg1-WP10a:residency-api 片 1(区域审计表 / 结果表 / 结果桶;SPEC v3.22 §1.3a S4)
+    // ④:residency-api 片 1(区域审计表 / 结果表 / 结果桶;SPEC v3.22 §1.3a S4)
     const resTpl = template(prefix + "residency-api");
     const resOuts = outsOf(prefix + "residency-api");
     const wantResOuts = {
@@ -1323,16 +1323,16 @@ if (!FAST) {
       const pol = Object.values(resTpl.Resources).find((x) => x.Type === "AWS::S3::BucketPolicy");
       const polText = JSON.stringify(pol?.Properties?.PolicyDocument ?? {});
       for (const a of ["s3:ReplicateObject", "s3:PutReplicationConfiguration"]) {
-        if (!polText.includes(a)) fail(`residency-api 桶策略缺 deny ${a}(结果留区 = E2 / E-182)`);
+        if (!polText.includes(a)) fail(`residency-api 桶策略缺 deny ${a}(结果留区)`);
       }
       if (!/"Effect":"Deny"/.test(polText)) fail("residency-api 桶策略没有 Deny 语句");
     }
-    // 栈里不许有任何 API / Lambda(片 2 归 WP-10b;混进来就是把「区域数据面」偷跑进片 1)
+    // 栈里不许有任何 API / Lambda(片 2 ;混进来就是把「区域数据面」偷跑进片 1)
     for (const [lid, x] of Object.entries(resTpl.Resources)) {
-      if (/^AWS::(ApiGateway|ApiGatewayV2|Lambda)::/.test(x.Type)) fail(`residency-api 片 1 不该有 ${x.Type}(${lid})—— 区域 API 归 WP-10b`);
+      if (/^AWS::(ApiGateway|ApiGatewayV2|Lambda)::/.test(x.Type)) fail(`residency-api 片 1 不该有 ${x.Type}(${lid})—— 区域 API 不在片 1`);
     }
 
-    // ⑥ @kf-batch 50-WP15-airflow-serverless:airflow-serverless 栈(MWAA Serverless 入口;SPEC v3.27 §3.15)
+    // ⑥:airflow-serverless 栈(MWAA Serverless 入口;SPEC v3.27 §3.15)
     {
       const slTpl = template(prefix + "airflow-serverless");
       const slOuts = outsOf(prefix + "airflow-serverless");
@@ -1369,7 +1369,7 @@ if (!FAST) {
         if (passRoles.length < 2) fail("airflow-serverless 角色 PassRole 须覆盖本 target 的 EMR 与 Glue 两个执行角色");
       }
     }
-    // ⑤ @kf-batch 50-WP13-mwaa-region:mwaa 栈(每个 target 自己的 Airflow;SPEC v3.26 §3.14)
+    // ⑤:mwaa 栈(每个 target 自己的 Airflow;SPEC v3.26 §3.14)
     {
       const mwTpl = template(prefix + "mwaa");
       const mwOuts = outsOf(prefix + "mwaa");
@@ -1450,7 +1450,7 @@ if (!FAST) {
 // ══════════════════════════════════════════════════════════════════════════════
 const CTX_DRIVER = `
 const { readExecEnvContext, parseComponents, parseAzs } = require(${JSON.stringify(resolve(INFRA, "lib/exec-env/context.ts"))});
-// @kf-batch 50-PROD-B-seq33 ②:组件集不再缺省成 core ⇒ 夹具默认带完整组件集(显式写 undefined 才是「不传」)
+// 组件集不再缺省成 core ⇒ 夹具默认带完整组件集(显式写 undefined 才是「不传」)
 const FULL_COMPONENTS = "core,redshift,dms,flink,airflow-serverless";
 const mk = (o) => (k) => (k === "exec-env-components" && !("exec-env-components" in o) ? FULL_COMPONENTS : o[k]);
 const cases = [];
@@ -1472,7 +1472,7 @@ t("context 显式不传组件 ⇒ 抛", () => readExecEnvContext(mk({ "exec-env-
 t("缺 core", () => parseComponents("redshift"));
 t("空串组件", () => parseComponents(""));
 t("组件顺序归一", () => parseComponents("redshift,core"));
-// @kf-batch 50-WP16-zero-egress:入参 exec-env-nat-gateways 已退役 ⇒ 传任何值都必须抛
+// 入参 exec-env-nat-gateways 已退役 ⇒ 传任何值都必须抛
 //   (不是「1..3 合法、其余非法」,而是整个入参消失;静默忽略会让运维以为自己调了档)。
 //   🔴 本块在 CTX_DRIVER 模板字面量内 —— 注释里不许出现反引号,否则提前结束模板串。
 for (const any of ["0", "1", "2", "3", "4", "x"]) {
@@ -1483,12 +1483,12 @@ for (const any of ["0", "1", "2", "3", "4", "x"]) {
 t("非 home 缺 home-region", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2" }), "123456789012"));
 // home target 不需要 home-region(不能被上一条误伤)
 t("home 不需要 home-region", () => readExecEnvContext(mk({ "exec-env-target": "tgt_home", "exec-env-region": "us-east-1" }), "123456789012"));
-// @kf-batch 50-WP23-xregion-peering:VPC 地址段(非 home 必填;池子与主控区 10.0.0.0/16 构造上不相交)
+// VPC 地址段(非 home 必填;池子与主控区 10.0.0.0/16 构造上不相交)
 t("非 home 缺 vpc-cidr", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", ...HL }), "123456789012"));
 t("非法 cidr 与主控区重叠", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", "exec-env-vpc-cidr": "10.0.0.0/16" }), "123456789012"));
 t("非法 cidr 掩码不是 16", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", "exec-env-vpc-cidr": "10.128.0.0/20" }), "123456789012"));
 t("home 不需要 vpc-cidr", () => readExecEnvContext(mk({ "exec-env-target": "tgt_home", "exec-env-region": "us-east-1" }), "123456789012"));
-// @kf-batch 50-WP23-xregion-peering:主控区那三件事实(非 home 三个都必需;少一个就是「peering 有、回程路由没有」)
+// 主控区那三件事实(非 home 三个都必需;少一个就是「peering 有、回程路由没有」)
 t("非 home 缺 home-vpc-id", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", "exec-env-vpc-cidr": "10.128.0.0/16", "exec-env-home-vpc-cidr": "10.0.0.0/16", "exec-env-home-ddb-endpoint-id": "vpce-0123456789abcdef0" }), "123456789012"));
 t("非 home 缺 home-ddb-endpoint", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", "exec-env-vpc-cidr": "10.128.0.0/16", "exec-env-home-vpc-id": "vpc-0123456789abcdef0", "exec-env-home-vpc-cidr": "10.0.0.0/16" }), "123456789012"));
 t("非法 home-vpc-id 形态", () => readExecEnvContext(mk({ "exec-env-target": "tgt_a", "exec-env-region": "us-west-2", "exec-env-home-region": "us-east-1", "exec-env-vpc-cidr": "10.128.0.0/16", ...HL, "exec-env-home-vpc-id": "not-a-vpc" }), "123456789012"));
@@ -1528,7 +1528,7 @@ const mustThrow = ctxCases.filter((c) => /非法|缺 region|缺 core|未知组�
 for (const c of mustThrow) {
   if (c.ok) fail(`context 用例「${c.name}」应当抛错,却通过了(值 ${JSON.stringify(c.value)})`);
 }
-// @kf-batch 50-PROD-B-seq33 ②:不传组件必须**因为这个原因**抛(只断「抛了」会让换个原因抛的缺陷存活)
+// ②:不传组件必须**因为这个原因**抛(只断「抛了」会让换个原因抛的缺陷存活)
 for (const n of ["不传组件(不再缺省成 core)", "context 显式不传组件 ⇒ 抛"]) {
   const c = byName[n];
   if (!c || c.ok || !/必须显式给/.test(c.err || "")) fail(`context 用例「${n}」应以「必须显式给」拒绝,实际 ${JSON.stringify(c)}`);
@@ -1545,15 +1545,14 @@ if (!okCase?.ok || okCase.value?.region !== "us-west-2" || okCase.value?.isHome 
 }
 const homeCase = byName["home target"];
 if (!homeCase?.ok || homeCase.value?.isHome !== true) fail(`home target 的 isHome 应为 true:${JSON.stringify(homeCase)}`);
-// @kf-batch 50-WP16-zero-egress:正控制 —— 「非 home 缺 home-region 必抛」这条不许把 home 一起误伤
+// 正控制 —— 「非 home 缺 home-region 必抛」这条不许把 home 一起误伤
 const homeNoHr = byName["home 不需要 home-region"];
 if (!homeNoHr?.ok) fail(`home target 不该被 home-region 校验拦住:${JSON.stringify(homeNoHr)}`);
-// @kf-batch 50-WP23-xregion-peering:段必须**真的**进到 context 里(少这一处,栈组拿到 undefined 而 tsc 照样绿)
+// 段必须**真的**进到 context 里(少这一处,栈组拿到 undefined 而 tsc 照样绿)
 if (okCase?.value?.vpcCidr !== "10.128.0.0/16") {
   fail(`context 没把 exec-env-vpc-cidr 解析进返回值:${JSON.stringify(okCase?.value?.vpcCidr)} —— ` +
     `base 栈会回落 CDK 默认 10.0.0.0/16,与主控区逐位相同 ⇒ 跨区 peering 建不出来`);
 }
-// @kf-batch 50-WP23-xregion-peering
 // 🔴🔴 负向用例必须断**拒因**,不能只断「抛了」。
 //    实测教训(本批变异 M3):我把「非 home 缺 vpc-cidr」写成同时也缺 home-link 三件事实 ⇒
 //    它是因为**缺 home-link** 抛的;于是「给 vpcCidr 留一个静默默认值」这个变异**存活**
@@ -1574,7 +1573,7 @@ for (const [name, re] of [
   }
 }
 
-// @kf-batch 50-WP23-xregion-peering:三件事实必须**成组**进 context(捆成一个对象 = 「只有两个」不可表达)
+// 三件事实必须**成组**进 context(捆成一个对象 = 「只有两个」不可表达)
 if (!okCase?.value?.homeLink || okCase.value.homeLink.vpcId !== "vpc-0123456789abcdef0" ||
     okCase.value.homeLink.vpcCidr !== "10.0.0.0/16" || okCase.value.homeLink.ddbEndpointId !== "vpce-0123456789abcdef0") {
   fail(`context 的 homeLink 不对:${JSON.stringify(okCase?.value?.homeLink)} —— 少一件就是「peering 建了、回程路由没加」`);
@@ -1588,7 +1587,7 @@ if (!homeNoCidr?.ok || homeNoCidr.value?.vpcCidr !== "10.0.0.0/16") {
 }
 // 退役入参:正常用例里不该出现 natGateways 字段(留着 = 类型没真删)
 if (okCase?.value && "natGateways" in okCase.value) {
-  fail("context 返回值里仍有 natGateways —— 该字段应随 WP-16 从类型里删除(A4:让非法状态无法表达)");
+  fail("context 返回值里仍有 natGateways —— 该字段应已从类型里删除(A4:让非法状态无法表达)");
 }
 const orderCase = byName["组件顺序归一"];
 if (JSON.stringify(orderCase?.value) !== JSON.stringify(["core", "redshift"])) {
@@ -1622,7 +1621,7 @@ try {
   //    那是既有代码、本批不动;而 CDK 只对**被选中的栈**报 annotation error ⇒ 选中这两个即可全离线。
   //    (试过用 `-c` 直接喂 AZ context:不行 —— context key 本身含 `=`,`-c k=v` 按**第一个** `=` 切,
   //     key 会被截成 `availability-zones:account`。这条弯路记下来,免得下一个人再试。)
-  // @kf-batch 50-W5-seg1-WP3:多 synth 一个 `BgpEmrStack`(-c enable-emr=1)—— 9.7 要断 home EMR 角色的 S3 面已收回。
+  // 多 synth 一个 `BgpEmrStack`(-c enable-emr=1)—— 9.7 要断 home EMR 角色的 S3 面已收回。
   execFileSync("npx", ["cdk", "synth", "BgpExecEnvDeployStack", "BgpPlatformStack", "BgpEmrStack", "-c", "enable-emr=1", "--quiet", "-o", CP_OUT], {
     cwd: INFRA,
     env: { ...NO_CRED_ENV, CDK_DEFAULT_ACCOUNT: ACCOUNT, CDK_DEFAULT_REGION: "us-east-1" },
@@ -1639,7 +1638,7 @@ try {
 if (cpOk) {
   const cpTpl = (n) => JSON.parse(readFileSync(resolve(CP_OUT, `${n}.template.json`), "utf8"));
 
-  // ── §9r 🔴🔴 @kf-batch 50-PROD-A-launch-hardening:**主控区**数据类资源必须 Retain(§5 只管执行区)──
+  // ── §9r 🔴🔴 **主控区**数据类资源必须 Retain(§5 只管执行区)──
   //    原来主控区数据湖 / 脚本 / DAG 桶 = DESTROY + 自动清空、表桶 / Athena 工作组 = DESTROY、
   //    数仓命名空间不设(CFN 默认 Delete)⇒ 一次误删栈 = 客户数据湖整片消失。闭合式:按**类型**列全,
   //    不按逻辑 ID 点名(新加一个桶也自动进来);下限防「类型名写错 ⇒ 一个都没查到」的假绿。
@@ -1667,7 +1666,7 @@ if (cpOk) {
     for (const t of HOME_DATA_TYPES.slice(1)) if (seen[t] < 1) fail(`§9r 主控区没查到 ${t} —— 类型名或栈名写错了(判据不许假绿)`);
   }
 
-  // ── §9m 🔴🔴 @kf-batch 50-PROD-A-launch-hardening:**部署模式**(唯一作者 lib/shared/deploy-mode.ts)──
+  // ── §9m 🔴🔴 **部署模式**(唯一作者 lib/shared/deploy-mode.ts)──
   //    production(也是缺省)⇒ app 里**没有**演示源库 BgpRdsStack、初始用户名单**只有 admin**;
   //    demo ⇒ 两样都有(正控制)。各 synth 一次 BgpAuthStack(离线、秒级),读 manifest 与引导 Lambda 的 ROSTER_JSON。
   {
@@ -1700,7 +1699,7 @@ if (cpOk) {
     }
   }
 
-  // ── §9z 🔴🔴 @kf-batch 50-WP23-xregion-peering:**主控区那一侧**的跨区落点(ACCEPTANCE N0-13 的静态半边)──
+  // ── §9z 🔴🔴 **主控区那一侧**的跨区落点(ACCEPTANCE N0-13 的静态半边)──
   //    非 home 的私网通路全靠这一个端点。三条都要:是**接口**端点 · `PrivateDnsEnabled` **必须 false**
   //    (开着会把 home 本区的 DynamoDB 流量劫到计费路径上 —— 症状是账单不是报错)· SG 只放行**整池**。
   {
@@ -1756,7 +1755,7 @@ if (cpOk) {
       }
     }
     if (startStmts.length !== 1) fail(`部署栈里 codebuild:StartBuild 的 Allow 语句应恰好 1 条(broker),实际 ${startStmts.length} 条`);
-    // 9.1b @kf-batch 50-WP15-airflow-serverless:broker Lambda 的 EXEC_ENV_COMPONENT_ENUM(模板真值)必须 == context.ts 枚举
+    // 9.1b broker Lambda 的 EXEC_ENV_COMPONENT_ENUM(模板真值)必须 == context.ts 枚举
     {
       const fns = resources.filter(([, r]) => r.Type === "AWS::Lambda::Function" && r.Properties?.FunctionName === "bgp-exec-env-broker");
       if (fns.length !== 1) fail(`部署栈里应恰好 1 个 bgp-exec-env-broker Lambda,实际 ${fns.length}`);
@@ -1860,7 +1859,7 @@ if (cpOk) {
   if (!sawInvoke) fail("平台栈没有对 broker 的 lambda:InvokeFunction —— 那平台根本触发不了部署(§12.0)");
   if (!sawBatchGet) fail("平台栈没有 codebuild:BatchGetBuilds —— 进度回读拿不到 build 整体状态(§12.4)");
 
-  // ── 9.4b @kf-batch 50-W5-seg1-WP3:TaskRole 的 iam:PassRole 必含四类 per-target 模式、**不含** flink(仍登记)────
+  // ── 9.4b TaskRole 的 iam:PassRole 必含四类 per-target 模式、**不含** flink(仍登记)────
   {
     const passRes = [];
     for (const [, r] of Object.entries(plat.Resources || {})) {
@@ -1873,8 +1872,8 @@ if (cpOk) {
       }
     }
     const passText = passRes.join("\n");
-    // 🔴 @kf-batch 50-WP4quinquies-pushdown —— flink 从「必须不在」反转成「必须在」:
-    //    SC-5 已把 MSAF 落点参数化并在真环境跑,缺这条 PassRole 时启动恒 500(实测)。
+    // 🔴 flink 从「必须不在」反转成「必须在」:
+    //此前已把 MSAF 落点参数化并在真环境跑,缺这条 PassRole 时启动恒 500(实测)。
     for (const kind of ["glue", "emr", "redshift-copy", "dms-kinesis", "flink"]) {
       if (!passText.includes(`role/BgpExecEnv-*-${kind}-role`)) {
         fail(`平台 TaskRole 的 iam:PassRole 缺 per-target 模式 role/BgpExecEnv-*-${kind}-role —— 非 home 的 Glue CreateJob / EMR StartJobRun 会 PassRole 拒`);
@@ -1886,7 +1885,7 @@ if (cpOk) {
     }
   }
 
-  // ── 9.4d 序 72 B-139(模块 56):TaskRole 必有「role/* 的 iam:PassRole 且带 iam:PassedToService 条件」,服务集合恰为
+  // ── 9.4d TaskRole 必有「role/* 的 iam:PassRole 且带 iam:PassedToService 条件」,服务集合恰为
   //    glue / emr-serverless / kinesisanalytics(任务执行角色可选 —— 客户自建角色也能传给这三个服务);
   //    🔴 任何 role/* 的 PassRole 语句都**不许没有**服务条件(那等于把账号里任意角色的提权面交给平台)────
   {
@@ -1905,14 +1904,14 @@ if (cpOk) {
         }
       }
     }
-    if (!wild.length) fail("平台 TaskRole 没有 role/* 的 iam:PassRole(带 iam:PassedToService 条件)—— 客户自建执行角色绑不上(B-139 复发)");
+    if (!wild.length) fail("平台 TaskRole 没有 role/* 的 iam:PassRole(带 iam:PassedToService 条件)—— 客户自建执行角色绑不上(客户自建角色绑定回归)");
     for (const w of wild) {
       if (!w.svc) fail("平台 TaskRole 有一条 role/* 的 iam:PassRole **没有** iam:PassedToService 条件 —— 任意角色提权面,拒");
       else if (JSON.stringify(w.svc) !== JSON.stringify(WANT)) fail(`role/* 的 iam:PassRole 服务集合 ${JSON.stringify(w.svc)} ≠ 约定 ${JSON.stringify(WANT)}(dms 不许进;少一个 = 该引擎自建角色绑不上)`);
     }
   }
 
-  // ── 9.4c @kf-batch 50-W5-seg1-WP10a:TaskRole 的审计防篡改 Deny(三动作 × 三表)+ 区域审计 / 结果表的写(execution 轴)────
+  // ── 9.4c TaskRole 的审计防篡改 Deny(三动作 × 三表)+ 区域审计 / 结果表的写(execution 轴)────
   {
     const denyRes = []; // 三动作齐的 Deny 语句资源面**合并**看(中央两表走 home 轴、区域表走 * region,是两条语句)
     let regionalWriteOk = false;
@@ -1931,7 +1930,7 @@ if (cpOk) {
     }
     const denyText = denyRes.join("\n");
     const denyOk = ["table/bgp-audit", "table/bgp-region-audit-*", "table/bgp-residency-acks"].every((t) => denyText.includes(t));
-    if (!denyOk) fail("平台 TaskRole 缺审计防篡改 Deny(UpdateItem / DeleteItem / BatchWriteItem × bgp-audit / bgp-region-audit-* / bgp-residency-acks)—— 审计完整性 E-192");
+    if (!denyOk) fail("平台 TaskRole 缺审计防篡改 Deny(UpdateItem / DeleteItem / BatchWriteItem × bgp-audit / bgp-region-audit-* / bgp-residency-acks)—— 审计完整性");
     if (!regionalWriteOk) fail("平台 TaskRole 缺区域审计 / 结果表的 PutItem(execution 轴,带 aws:RequestedRegion)—— 跨法域 residencyAudit 写不成即拒会把所有跨法域操作拒掉");
     // 2026-09-05 真环境抓到:结果桶探活要 GetBucketReplication **API**,对应 IAM 动作是 `s3:GetReplicationConfiguration`(不同名)。
     //   写成 API 名 ⇒ synth 绿、真探活 AccessDenied ⇒ 补充部署会话收不了口。正名必须在,假名必须不在(§13 再扫全部模板)。
@@ -1946,7 +1945,7 @@ if (cpOk) {
     if (!bucketRwOk) fail("平台 TaskRole 对 bgp-region-results-* 桶缺 s3:GetReplicationConfiguration(+ ListBucket)—— residency-api:bucket 探活会被拒,补充部署永远收不了口");
   }
 
-  // ── 9.7 @kf-batch 50-W5-seg1-WP3:home EMR 角色的 S3 面**收回**到 home 两桶全名(ACCEPTANCE E-144;W3-g 放宽撤销)──
+  // ── 9.7 home EMR 角色的 S3 面**收回**到 home 两桶全名(ACCEPTANCE;W3-g 放宽撤销)──
   if (!existsSync(resolve(CP_OUT, "BgpEmrStack.template.json"))) {
     fail("控制面 synth 没产出 BgpEmrStack(-c enable-emr=1)—— 9.7 无法判定 home EMR 角色的 S3 面");
   } else {
@@ -2002,7 +2001,7 @@ if (cpOk) {
     .filter((l) => !/^\s*#/.test(l))
     .join("\n");
   // 🔴 shell 必须显式 bash(切片 g 真跑撞出:CodeBuild 缺省 sh/dash,`set -o pipefail`/`${!v}` 间接展开
-  //    在 PRE_BUILD 首行即炸;synth 与 E-49 都测不出 —— 这是"命令由哪个 shell 执行"的运行期属性)。
+  //    在 PRE_BUILD 首行即炸;synth 与都测不出 —— 这是"命令由哪个 shell 执行"的运行期属性)。
   //    `shell: bash` 是 env 配置行不是注释,剥注释后的 bs 里仍在,可以直接在 bs 上断言。
   if (!/^\s*shell:\s*bash\s*$/m.test(bs)) {
     fail("buildspec 缺 `env.shell: bash` —— CodeBuild 缺省 dash,bash 语法(pipefail/${!v})会在 PRE_BUILD 首行炸(切片 g 实测)");
@@ -2020,7 +2019,7 @@ if (cpOk) {
     fail("buildspec 里出现 update-item —— 描述符回写归切片 e;半份描述符写进注册表比不写更糟(§20.11-N2)");
   }
 
-  // ── 9.6b 🔴 P0-E 闸(SPEC §3.5c;P50.3b-3)────────────────────────────────────
+  // ── 9.6b 🔴 P0-E 闸(SPEC §3.5c;-3)────────────────────────────────────
   // 【为什么钉在这里】P0-E 是"唯一能毁数据的洞":补组件在源漂移下可能 REPLACE Redshift namespace /
   //   MWAA env / S3 桶。真正能毁数据的那一步在 **本 buildspec** 里执行(部署强权焊在 CodeBuild 服务角色上),
   //   而平台侧那道闸可能被绕(拿到平台角色即可直接 invoke broker)⇒ **build 侧这一关是最后一道**,
@@ -2127,7 +2126,7 @@ if (cpOk) {
     }
   }
 
-  // ── §9f(P50.2 切片 f):aws:RequestedRegion 列表机制 + DescribeStacks 收窄 + 无策略溢出 ──
+  // ── §9f(切片 f):aws:RequestedRegion 列表机制 + DescribeStacks 收窄 + 无策略溢出 ──
   //
   // 三条承重:
   //   a) **缺省零行为变化**:不传 execution-regions 时,全部 RequestedRegion 条件是**裸 string**
@@ -2152,13 +2151,13 @@ if (cpOk) {
     if (arrays > 0) fail(`缺省(无 execution-regions)有 ${arrays} 处 RequestedRegion 被数组化 —— 破坏「缺省模板零 diff」`);
     if (bare < 10) fail(`缺省 RequestedRegion 裸条件只有 ${bare} 处(平台栈应 ≥15)—— helper 可能没接上`);
 
-    // ── §9g(P50.3a):**per-target 资源的既有 IAM 覆盖面**——同族坑连撞三次(#7/#8/#10)后钉整类 ──
+    // ── §9g:**per-target 资源的既有 IAM 覆盖面**——同族坑连撞三次(#7/#8/#10)后钉整类 ──
     // 【坑的形状】既有 IAM 的资源 ARN 有两个**隐含前提**,而多 region 把两个都打破了:
     //   ① region 段写死成 home ⇒ 新 region 的同类资源一律 AccessDenied(bug #7 表桶、#8 Redshift secret);
     //   ② 资源名按 `bgp-*` 命名约定写死 ⇒ per-target 资源叫 `BgpExecEnv-<slug>-*`,不在白名单里(bug #10 flink 角色)。
     // 【为什么必须机械钉】这三个都是"链路每一环都对、只有 IAM 静默拒",而且每次都要一整轮真部署才发现。
     // 这里断的是"**该在的窄语句在不在**",不试图判定 26 处 ARN 各自该不该放开(那要逐个看语义,
-    // 属 P50.3 数据面下推时的逐一过审;门禁只保证已知的三处不回退)。
+    // 数据面下推时的逐一过审;门禁只保证已知的三处不回退)。
     {
       const wantStatements = [
         ["ExecEnvRedshiftManagedSecretRead", /secretsmanager:\*:\d+:secret:redshift!\*|secretsmanager:\*:\$\{[^}]*\}:secret:redshift!\*/, "bug #8:执行环境的 Redshift 托管 secret 在目标 region,原语句 region 段写死成 home"],
@@ -2216,10 +2215,10 @@ if (cpOk) {
     });
     const multi = JSON.parse(readFileSync(resolve(CP_OUT2, "BgpPlatformStack.template.json"), "utf8"));
     let tot = 0, ok = 0;
-    // @kf-batch 50-WP31-seq5-dataplane-role —— 主控区**平台数据面角色**是 per-target 角色(只属主控区这一个 target):
+    // 主控区**平台数据面角色**是 per-target 角色(只属主控区这一个 target):
     //   它的区域条件**必须**只有主控区一个区(放进别的区 = 主控区凭证能碰别区数据,正是 L5 要堵的横移)⇒ 反向判,不计入上面的「数组化」。
     const pdrLid = Object.entries(multi.Resources || {}).find(([, r]) => r.Type === "AWS::IAM::Role" && r.Properties?.RoleName === "bgp-platform-data-role")?.[0];
-    if (!pdrLid) fail("平台栈里没有 RoleName=bgp-platform-data-role 的角色(WP-31 序 5 主控区平台数据面角色)");
+    if (!pdrLid) fail("平台栈里没有 RoleName=bgp-platform-data-role 的角色(主控区平台数据面角色)");
     let pdrStatements = 0;
     for (const v of Object.values(multi.Resources || {})) {
       const docs = v?.Properties?.PolicyDocument ? [v.Properties.PolicyDocument] : (v?.Properties?.Policies || []).map((x) => x.PolicyDocument);
@@ -2241,7 +2240,7 @@ if (cpOk) {
     if (tot < 10) fail(`multi-region synth 只见 ${tot} 处 RequestedRegion 条件 —— 断言可能扫错了地方`);
     if (ok !== tot) fail(`带 execution-regions 时 ${tot} 处条件只有 ${ok} 处数组化并含两 region —— 漏改的那处会把平台对新 region 的调用静默拒掉`);
 
-    // ── §9c-env(序 48):放行清单的第二条通道 = 进程变量 BGP_EXECUTION_REGIONS(部署脚本导出,给三个智能体栈 / EMR 栈 / 连带部署的
+    // ── §9c-env:放行清单的第二条通道 = 进程变量 BGP_EXECUTION_REGIONS(部署脚本导出,给三个智能体栈 / EMR 栈 / 连带部署的
     //   依赖栈用)。必须与 `-c execution-regions` **逐字节同模板**:两通道在 requestedRegionCondition 里是同一处解析,这里钉住它不分叉。
     //   同时钉「-c 优先」:两者都给且不同时,模板随 -c。
     const CP_OUT3 = resolve(tmpdir(), "bgp-synth-gate-cp-multi-env");
@@ -2293,7 +2292,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
 } // end !FAST(§9)
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 10) 🔴 broker 入参 fail-closed(ACCEPTANCE **E-49**,切片 b 如实登记未做、本节补上)
+// 10) 🔴 broker 入参 fail-closed(ACCEPTANCE,切片 b 如实登记未做、本节补上)
 //
 // 【为什么能无头】broker 的全部"不碰 AWS 的判定"已拆到 `lambda/exec-env-broker/validate.mjs`
 // (零依赖纯函数)—— 本节用 node **原生 import** 真执行它(秒级、零凭证、--fast 也照跑)。
@@ -2310,14 +2309,14 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
     }
   };
   try {
-    // @kf-batch 50-WP15-airflow-serverless:validate.mjs 的组件全集来自 env(部署期由 deploy-stack.ts 从 context.ts 注入);
+    // validate.mjs 的组件全集来自 env(部署期由 deploy-stack.ts 从 context.ts 注入);
     //   这里用同一真源灌入 —— 不设 = 模块加载即抛(fail-closed 就该如此)
     process.env.EXEC_ENV_COMPONENT_ENUM = allComponentsFromSource().join(",");
-    // @kf-batch 50-PROD-B-seq33 ②:完整组件集同样由部署期注入(deploy-stack.ts ← context.ts)
+    // ②:完整组件集同样由部署期注入(deploy-stack.ts ← context.ts)
     process.env.EXEC_ENV_REQUIRED_COMPONENTS = "core,redshift,dms,flink,airflow-serverless";
     const v = await import(pathToFileURL(resolve(INFRA, "lambda/exec-env-broker/validate.mjs")).href);
     const okInput = { targetId: "tgt_usw2_a", components: ["core"], operationId: "op_abcdef12" };
-    // 正向:枚举里每个组件 broker 都认(WP-15 真环境撞到 airflow-serverless 被 broker 判「未知组件」)
+    // 正向:枚举里每个组件 broker 都认(真环境撞到 airflow-serverless 被 broker 判「未知组件」)
     for (const c of allComponentsFromSource()) {
       if (c === "core") continue;
       t(`合法组件 ${c}(枚举同源)`, () => v.validateInput({ ...okInput, components: ["core", c] }));
@@ -2340,20 +2339,20 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
     t("组件顺序归一", () => v.validateInput({ ...okInput, components: ["redshift", "core"] }));
     t("合法基线", () => v.validateInput(okInput));
 
-    // —— 🔴 P0-E(P50.3b-3):两个**可选**入参 mode / approvedPlanHash ——
+    // 🔴 P0-E(3):两个**可选**入参 mode / approvedPlanHash
     // 命名遵既有约定:要被拒的用例名里带"拒/非法",好让下面的 mustReject 通吃;正向用例另有具名核对。
     const PLAN_H = "a".repeat(64);
     t("P0-E:mode 缺省为 deploy(向后兼容,老三参照旧行为)", () => v.validateInput(okInput).mode);
     t("P0-E:mode=preview 被接受", () => v.validateInput({ ...okInput, mode: "preview" }).mode);
     t("P0-E:合法 approvedPlanHash 被接受", () => v.validateInput({ ...okInput, approvedPlanHash: PLAN_H }).approvedPlanHash);
     t("P0-E:mode 非法词拒", () => v.validateInput({ ...okInput, mode: "teardown" }));
-    // @kf-batch 50-WP30-decommission —— destroy 只接 targetId / operationId / mode;销毁范围与快照名只从注册表读
+    // destroy 只接 targetId / operationId / mode;销毁范围与快照名只从注册表读
     const dInput = { targetId: "tgt_usw2_a", operationId: "op_abcdef12", mode: "destroy" };
-    t("WP-30:destroy 带 components 拒(销毁范围只从注册表读)", () => v.validateInput({ ...dInput, components: ["core"] }));
-    t("WP-30:destroy 带 approvedPlanHash 拒", () => v.validateInput({ ...dInput, approvedPlanHash: PLAN_H }));
-    t("WP-30:destroy 对 tgt_home 拒 bad-status", () => v.validateInput({ ...dInput, targetId: "tgt_home" }));
-    t("WP-30:destroy 带多余字段拒", () => v.validateInput({ ...dInput, finalSnapshotName: "bgp-final-x" }));
-    t("WP-30:destroy 三参被接受", () => v.validateInput(dInput).mode);
+    t("destroy 带 components 拒(销毁范围只从注册表读)", () => v.validateInput({ ...dInput, components: ["core"] }));
+    t("destroy 带 approvedPlanHash 拒", () => v.validateInput({ ...dInput, approvedPlanHash: PLAN_H }));
+    t("destroy 对 tgt_home 拒 bad-status", () => v.validateInput({ ...dInput, targetId: "tgt_home" }));
+    t("destroy 带多余字段拒", () => v.validateInput({ ...dInput, finalSnapshotName: "bgp-final-x" }));
+    t("destroy 三参被接受", () => v.validateInput(dInput).mode);
     t("P0-E:mode=null 非法拒(不许当缺省)", () => v.validateInput({ ...okInput, mode: null }));
     t("P0-E:approvedPlanHash 非 64hex 拒", () => v.validateInput({ ...okInput, approvedPlanHash: "deadbeef" }));
     t("P0-E:approvedPlanHash 大写 hex 非法拒(canonical 只认小写)", () => v.validateInput({ ...okInput, approvedPlanHash: "A".repeat(64) }));
@@ -2381,7 +2380,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
       return "null";
     });
 
-    // —— staleLockCandidate / isTerminalBuildStatus:陈锁接管的判定(P50.2g)——
+    // staleLockCandidate / isTerminalBuildStatus:陈锁接管的判定——
     // 🔴 命名刻意避开 mustReject 的筛选词(拒/非法/空串/超长/不存在/"缺 ")—— 这些是"返回 null",
     //    不是"抛拒绝";混进去会让下面的负向断言判错对象。每条都有下方的**具名**正向核对(否则
     //    断言抛错只会被记成 ok:false 而静默放过 = 门禁假阴性)。
@@ -2435,7 +2434,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
         fail(`planDeployOpen 向量「${label}」应拒 ${code},实际却成功`);
       };
       let pvOk = 0;
-      // @kf-batch 50-PROD-B-seq33 ② —— 「下发集 ⊇ 完整组件集」(纵深锁)先用真值单独验三向:
+      // ② —— 「下发集 ⊇ 完整组件集」(纵深锁)先用真值单独验三向
       {
         const FULLC = ["core", "redshift", "dms", "flink", "airflow-serverless"];
         const item0 = { targetId: "tgt_usw2_a", version: 1, status: "registered", components: FULLC };
@@ -2468,7 +2467,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
       // ⑤ legacy testing 不跳 enable → provisioning
       const tst = v.planDeployOpen({ targetId: "tgt_usw2_a", version: 3, status: "testing", ready: false, components: ["core"], probe: { at: "2026-08-31T23:59:00.000Z", ok: true, items: [{ name: "core", ok: true }] } }, { ...pReq, components: ["core"] }, 2, now);
       if (tst.post.observed.phase !== "provisioning" || tst.ifAbsent !== true) fail("planDeployOpen: legacy testing 不得跳过 enable"); pvOk++;
-      // ⑥ 🔴 legacy initializing∧ready∧stored-probe(E-99)→ needs-fresh-probe(拒绝清单 #12)
+      // ⑥ 🔴 legacy initializing∧ready∧stored-probe→ needs-fresh-probe(拒绝清单 #12)
       pv(() => v.planDeployOpen({ targetId: "tgt_usw2_a", version: 5, status: "initializing", ready: true, components: ["core"], probe: { at: "2026-09-01T16:00:00.000Z", ok: true, items: [{ name: "core", ok: true }] } }, { ...pReq, components: ["core"] }, 2, now), "needs-fresh-probe", "stuck-after-ready"); pvOk++;
       // ⑦ partial spec/observed → bad-descriptor(不回落 legacy)
       pv(() => v.planDeployOpen({ ...pBase, observed: undefined }, pReq, 4, now), "bad-descriptor", "partial-axes"); pvOk++;
@@ -2478,7 +2477,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
       pv(() => v.planDeployOpen({ ...pBase, components: ["core", "dms"], spec: { intent: "serve", desiredComponents: ["core", "dms"] }, observed: { phase: "ready", health: "healthy", components: ["core", "dms"] } }, { ...pReq, components: ["core"] }, 4, now), "bad-components", "drop-component"); pvOk++;
       // ⑩ legacy 残留部署锁 → locked
       pv(() => v.planDeployOpen({ targetId: "tgt_usw2_a", version: 2, status: "active", ready: true, components: ["core"], deployLockToken: "op_x" }, { ...pReq, components: ["core"] }, 2, now), "locked", "legacy-residual-lock"); pvOk++;
-      // ⑪ @kf-batch 50-WP15-airflow-serverless:顶层 components 与 observed.components **同集合不同序** ⇒ 不许判 bad-descriptor
+      // ⑪:顶层 components 与 observed.components **同集合不同序** ⇒ 不许判 bad-descriptor
       //    (真环境:平台 finalize 按 IMPLEMENTED 序写顶层,broker 按枚举序归一 observed,逐字节比 ⇒ 补装被拒)
       try {
         const oo = v.planDeployOpen({ targetId: "tgt_usw2_a", version: 9, status: "active", ready: true, components: ["core", "dms", "mwaa"], spec: { intent: "serve", desiredComponents: ["core", "mwaa", "dms"] }, observed: { phase: "ready", health: "healthy", components: ["core", "dms", "mwaa"] } }, { ...pReq, components: ["core", "mwaa", "dms", "flink"] }, 5, now);
@@ -2487,7 +2486,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
         fail(`planDeployOpen ⑪:顶层 components 与 observed.components 同集合不同序被判 ${String(e?.code ?? e)} —— 跨来源比较没 canonical`);
       }
       pvOk++;
-      // ⑫ @kf-batch 50-WP15-airflow-serverless:开会话快照哈希对 components **序不敏感**(开会话 Update 会重排顶层 components;
+      // ⑫:开会话快照哈希对 components **序不敏感**(开会话 Update 会重排顶层 components;
       //    序敏感 ⇒ post-image 哈希必不等 ⇒ 「无法取得 exact post-image」保留 operation ⇒ 卡 2h15m。真环境撞到)
       {
         const a = { targetId: "tgt_usw2_a", region: "us-west-2", accountId: "123456789012", partition: "aws", version: 9, components: ["core", "redshift", "dms", "flink", "mwaa"], resources: { vpcId: "vpc-1" } };
@@ -2501,7 +2500,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
       globalThis.__planDeployOpenVectors = pvOk;
     }
 
-    // —— @kf-batch 50-WP30-decommission:planDestroyOpen 行为向量(原生 import 真执行)——
+    // planDestroyOpen 行为向量(原生 import 真执行)——
     {
       const now = "2026-10-11T00:00:00.000Z";
       const dReq = v.validateInput({ targetId: "tgt_usw2_a", operationId: "op_abcdef12", mode: "destroy" });
@@ -2557,57 +2556,57 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
     }
 
     // —— 判定(带防假绿护栏)——
-    if (cases.length < 18) fail(`E-49 用例只有 ${cases.length} 条(<18)—— 矩阵没跑全,别当绿`);
+    if (cases.length < 18) fail(`broker 入参用例只有 ${cases.length} 条(<18)—— 矩阵没跑全,别当绿`);
     const mustReject = cases.filter((c) => /拒|非法|空串|超长|不存在|缺 /.test(c.name));
     // 🔴 下限随用例增长上调(P0-E 加了 5 条负向):数量断言是防"筛选正则坏了导致全静默放过"
-    if (mustReject.length < 19) fail(`E-49 负向用例只筛出 ${mustReject.length} 条(<19)—— 筛选正则可能坏了`);
+    if (mustReject.length < 19) fail(`broker 入参负向用例只筛出 ${mustReject.length} 条(<19)—— 筛选正则可能坏了`);
     for (const c of mustReject) {
-      if (c.ok) fail(`E-49 用例「${c.name}」应当被拒,却通过了(值 ${JSON.stringify(c.value).slice(0, 120)})`);
+      if (c.ok) fail(`broker 入参用例「${c.name}」应当被拒,却通过了(值 ${JSON.stringify(c.value).slice(0, 120)})`);
     }
-    // @kf-batch 50-WP15-airflow-serverless:正向 —— 枚举里的每个组件 broker 都必须认(第三份名单漂移就在这里红)
+    // 正向 —— 枚举里的每个组件 broker 都必须认(第三份名单漂移就在这里红)
     for (const c of cases.filter((x) => /^合法组件 /.test(x.name))) {
-      if (!c.ok) fail(`E-49 用例「${c.name}」应当通过,却被拒:${c.msg}(broker 组件全集与 context.ts 枚举不同源)`);
+      if (!c.ok) fail(`broker 入参用例「${c.name}」应当通过,却被拒:${c.msg}(broker 组件全集与 context.ts 枚举不同源)`);
     }
     const expectCode = { "item 不存在 ⇒ not-registered": "not-registered", "缺 region ⇒ bad-descriptor": "bad-descriptor", "缺 accountId ⇒ bad-descriptor": "bad-descriptor" };
     for (const [name, code] of Object.entries(expectCode)) {
       const c = cases.find((x) => x.name === name);
-      if (c && c.code !== code) fail(`E-49「${name}」的 code=${c.code},应为 ${code}(平台侧按它映射 HTTP 状态)`);
+      if (c && c.code !== code) fail(`broker 入参校验「${name}」的 code=${c.code},应为 ${code}(平台侧按它映射 HTTP 状态)`);
     }
     for (const c of cases.filter((x) => /bad-status/.test(x.name))) {
-      if (c.code !== "bad-status") fail(`E-49「${c.name}」的 code=${c.code},应为 bad-status`);
+      if (c.code !== "bad-status") fail(`broker 入参校验「${c.name}」的 code=${c.code},应为 bad-status`);
     }
     // 🔴 P0-E 正向具名核对(只靠 mustReject 会漏掉"接受路径静默变形")
     const p0eOk = {
-      "WP-30:destroy 三参被接受": "destroy",
+      "destroy 三参被接受": "destroy",
       "P0-E:mode 缺省为 deploy(向后兼容,老三参照旧行为)": "deploy",
       "P0-E:mode=preview 被接受": "preview",
       "P0-E:合法 approvedPlanHash 被接受": "a".repeat(64),
     };
     for (const [name, want] of Object.entries(p0eOk)) {
       const c = cases.find((x) => x.name === name);
-      if (!c) fail(`E-49 少了 P0-E 用例「${name}」—— 用例被删掉 = 门禁失效`);
-      if (!c.ok) fail(`E-49「${name}」应当通过,却被拒:${c.msg}`);
-      if (c.value !== want) fail(`E-49「${name}」返回 ${JSON.stringify(c.value)},应为 ${JSON.stringify(want)}`);
+      if (!c) fail(`broker 入参校验少了 P0-E 用例「${name}」—— 用例被删掉 = 门禁失效`);
+      if (!c.ok) fail(`broker 入参校验「${name}」应当通过,却被拒:${c.msg}`);
+      if (c.value !== want) fail(`broker 入参校验「${name}」返回 ${JSON.stringify(c.value)},应为 ${JSON.stringify(want)}`);
     }
 
     const base = cases.find((c) => c.name === "合法基线");
     if (!base?.ok || base.value?.targetId !== "tgt_usw2_a" || JSON.stringify(base.value?.components) !== '["core"]') {
-      fail(`E-49 合法基线没通过(合法请求被拒 = 门禁把功能判死):${JSON.stringify(base)}`);
+      fail(`broker 入参校验合法基线没通过(合法请求被拒 = 门禁把功能判死):${JSON.stringify(base)}`);
     }
     const order = cases.find((c) => c.name === "组件顺序归一");
     if (JSON.stringify(order?.value?.components) !== '["core","redshift"]') {
-      fail(`E-49 组件顺序未归一(同一勾选应产生同一 build 入参):${JSON.stringify(order?.value?.components)}`);
+      fail(`broker 入参校验组件顺序未归一(同一勾选应产生同一 build 入参):${JSON.stringify(order?.value?.components)}`);
     }
     const pass = cases.find((c) => c.name === "合法 item 通过");
-    if (!pass?.ok) fail(`E-49 合法 item 被 assessTarget 拒了:${JSON.stringify(pass)}`);
+    if (!pass?.ok) fail(`broker 入参校验合法 item 被 assessTarget 拒了:${JSON.stringify(pass)}`);
     // 🔴 陈锁那 6 条是"内部断言式"用例:必须**具名**核对 ok,否则断言抛错只被记成 ok:false 而静默通过。
     const lockCases = cases.filter((c) => /^陈锁候选|^build 终态判定/.test(c.name));
-    if (lockCases.length !== 6) fail(`E-49 陈锁用例应 6 条,实际 ${lockCases.length} 条(改了名字就得改这里)`);
+    if (lockCases.length !== 6) fail(`陈锁用例应 6 条,实际 ${lockCases.length} 条(改了名字就得改这里)`);
     for (const c of lockCases) {
-      if (!c.ok) fail(`E-49 陈锁用例「${c.name}」不成立:${c.msg}`);
+      if (!c.ok) fail(`陈锁用例「${c.name}」不成立:${c.msg}`);
     }
   } catch (e) {
-    fail(`E-49:validate.mjs 加载失败(纯函数拆分被破坏?):${String(e?.message || e).slice(0, 300)}`);
+    fail(`broker 入参校验:validate.mjs 加载失败(纯函数拆分被破坏?):${String(e?.message || e).slice(0, 300)}`);
   }
 
   // —— 文本锚点:index.mjs 必须真的在用 validate.mjs(防"拆了但没接")——
@@ -2617,7 +2616,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
     .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
     .join("\n");
   if (!/import\s*\{[^}]*validateInput[^}]*\}\s*from\s*"\.\/validate\.mjs"/s.test(idx)) {
-    fail("index.mjs 没有从 ./validate.mjs import validateInput —— 纯函数拆分被绕开(E-49 测的就不是生产逻辑了)");
+    fail("index.mjs 没有从 ./validate.mjs import validateInput —— 纯函数拆分被绕开(门禁测的就不是生产逻辑了)");
   }
   if (!/import\s*\{[^}]*planDeployOpen[^}]*\}\s*from\s*"\.\/validate\.mjs"/s.test(idx)) {
     fail("index.mjs 没有 import planDeployOpen —— 写序 planner 没接线(v2 审核 §19)");
@@ -2625,7 +2624,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
   for (const fn of ["validateInput(", "validateTargetDescriptor(", "planDeployOpen(", "deployOpenSnapshotHash(", "translateLockError(", "staleLockCandidate(", "isTerminalBuildStatus("]) {
     if (!idx.includes(fn)) fail(`index.mjs 不再调用 ${fn.slice(0, -1)} —— 拆了但没接`);
   }
-  // 🔴 P50.3b 写序(v2 审核 §4.2/§19):operation 必须**先于** StartBuild 落库。
+  // 🔴 写序(v2 审核 §4.2/§19):operation 必须**先于** StartBuild 落库。
   //
   // 【为什么不是一句 `openIdx < startBuildIdx`】原版就是那样写的,而 P0-E 的 **preview 只读旁路**
   //   (刻意不开 operation、不上锁、不涨 epoch)在文本上排在前面 ⇒ 原断言当场误红。
@@ -2636,7 +2635,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
   if (openIdx < 0) fail("index.mjs 没有 openDeploySessionWithRecovery —— 开 operation 的写序缺失(§19)");
   const sbCalls = [...idx.matchAll(/await\s+startBuild\(([^)]*)\)/g)];
   if (sbCalls.length === 0) fail("index.mjs 没有 await startBuild( —— StartBuild 调用缺失");
-  // 🔴 数量断言:3 = 真部署 1 条 + preview 1 条 + @kf-batch 50-WP30-decommission 下线销毁 1 条。
+  // 🔴 数量断言:3 = 真部署 1 条 + preview 1 条 + 下线销毁 1 条。
   //    变了就必须回来重新推演写序,不许静默通过。
   if (sbCalls.length !== 3) {
     fail(
@@ -2644,7 +2643,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
         "新增 StartBuild 路径必须显式过写序推演(operation 先落库 / 或明确是只读预演)"
     );
   }
-  // @kf-batch 50-WP30-decommission —— 销毁调用点:必须在 openDestroySession( 之后、带 epoch、带最终快照名(第 4 参)
+  // 销毁调用点:必须在 openDestroySession(之后、带 epoch、带最终快照名(第 4 参)
   const destroyOpenIdx = idx.indexOf("await openDestroySession(");
   const destroyGuardIdx = idx.indexOf('req.mode === "destroy"');
   if (destroyOpenIdx < 0 || destroyGuardIdx < 0) fail("index.mjs 缺 destroy 分流(req.mode === \"destroy\")或 openDestroySession —— 销毁写序缺失");
@@ -2709,7 +2708,7 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
   globalThis.__e49Count = cases.length;
 }
 
-// 11) 🔴 buildspec 的 pre_build **真执行**(P50.2g;两个真跑事故的根治性钉法)
+// 11) 🔴 buildspec 的 pre_build **真执行**(两个真跑事故的根治性钉法)
 //
 // 【为什么必须真跑】切片 g 的 4 个 bug 里**两个**出在 buildspec 的 shell 逻辑,而它们的共同点是
 //   "只有让那段 shell 真的跑一遍才会露":
@@ -2749,24 +2748,24 @@ if (existsSync(CP_OUT)) rmSync(CP_OUT, { recursive: true, force: true });
   writeFileSync(resolve(dir, "pre_build.sh"), script);
   /**
    * aws stub:只答本段会问的问题;`STUB_AZS` 用 **TAB** 分隔 —— 真 CLI 的 `--output text` 就是这样。
-   * P50.3a 扩:孤儿表桶清理(bug #6)要问 CFN 与 S3Tables ⇒ 用 `STUB_*` 变量模拟四种世界状态,
+   * 扩:孤儿表桶清理(bug #6)要问 CFN 与 S3Tables ⇒ 用 `STUB_*` 变量模拟四种世界状态,
    * 并把**真的发出 delete** 记到 `$STUB_DELETE_LOG`(否则"删没删"只能靠读输出猜)。
    */
   const stub = `#!/bin/bash
 case "$1" in
   sts) printf '%s\\n' "\${STUB_ACCOUNT}"; exit 0;;
   ec2)
-    # @kf-batch 50-WP4sexies-home-region:第二层 AZ preflight 要问端点服务与子网 ⇒ 按子命令分派
+    # 第二层 AZ preflight 要问端点服务与子网 ⇒ 按子命令分派
     case "$2" in
       describe-availability-zones)   printf '%s\\n' "\${STUB_AZS}"; exit 0;;
       describe-vpc-endpoint-services) printf '%s\\n' "\${STUB_EP_AZS-\${STUB_AZS}}"; exit 0;;
       describe-subnets)              printf '%s\\n' "\${STUB_SUBNET_AZS:-}"; exit 0;;
-      # @kf-batch 50-WP23-xregion-peering:存量守卫要读现网 VPC 的 CidrBlock
+      # 存量守卫要读现网 VPC 的 CidrBlock
       describe-vpcs)                 printf '%s\\n' "\${STUB_VPC_CIDR:-10.128.0.0/16}"; exit 0;;
       *) printf '%s\\n' "\${STUB_AZS}"; exit 0;;
     esac;;
   cloudformation)
-    # @kf-batch 50-WP23-xregion-peering:主控区那三件事实从 BgpVpcStack 的 Outputs 读
+    # 主控区那三件事实从 BgpVpcStack 的 Outputs 读
     #   ⇒ 按 --query 里问的 OutputKey 分派(顺序要紧:XregionDdbEndpointId / VpcCidr 都含子串,先长后短)
     case "$*" in
       *BgpVpcStack*XregionDdbEndpointId*) printf '%s\\n' "\${STUB_HOME_DDB_EP-vpce-0123456789abcdef0}"; exit 0;;
@@ -2797,7 +2796,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     EXEC_ENV_COMPONENTS: "core",
     EXEC_ENV_OPERATION_ID: "op_abcdef12",
     EXEC_ENV_LOCK_EPOCH: "2",
-    // @kf-batch 50-WP23-xregion-peering:非 home 必须带段(缺了 pre_build 第 0 步就 fail-fast)
+    // 非 home 必须带段(缺了 pre_build 第 0 步就 fail-fast)
     EXEC_ENV_VPC_CIDR: "10.128.0.0/16",
     // 主控区 region(真环境由 CodeBuild 注入;第 1e 步用它判「是否跨区」并读 BgpVpcStack 的输出)
     AWS_REGION: HOME_REGION,
@@ -2832,11 +2831,11 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
   if (!good.ok) {
     fail(`§11 pre_build 正向用例失败(TAB 分隔的 AZ 表必须能匹配上;bug #4 回归):status=${good.status} ${String(good.out).slice(-400)}`);
   }
-  // @kf-batch 50-B29-az-auto —— 正向:该 region **没有 b**(ap-northeast-1 形态:只有 a/c/d)⇒ 必须通过,且第 1d 层挑出 a,c
+  // 正向:该 region **没有 b**(ap-northeast-1 形态:只有 a/c/d)⇒ 必须通过,且第 1d 层挑出 a,c
   {
     const azFile = resolve(REPO, ".exec-env-azs");
     const noB = run({ STUB_AZS: "us-west-2a\tus-west-2c\tus-west-2d" });
-    if (!noB.ok) fail(`§11 pre_build「region 没有 b」竟然被拒(B-29 回归:不许假设任何区一定有 a/b):${String(noB.out).slice(-300)}`);
+    if (!noB.ok) fail(`§11 pre_build「region 没有 b」竟然被拒(回归:不许假设任何区一定有 a/b):${String(noB.out).slice(-300)}`);
     else {
       const chosen = existsSync(azFile) ? readFileSync(azFile, "utf8").trim() : "";
       if (chosen !== "us-west-2a,us-west-2c") fail(`§11 pre_build「region 没有 b」挑出的 AZ 不对:${chosen || "(没写 .exec-env-azs)"}(应为 us-west-2a,us-west-2c)`);
@@ -2849,10 +2848,10 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     // 🔴 stub 值刻意**不写成 12 位数字**:红线扫描按"12 位数字串"判账号号,连假值也会被咬
     //    (记忆里的旧坑复发一次)。账号护栏只做字符串比较,任何不相等的值都能验到同一条分支。
     ["目标账号与 build 身份不同", { STUB_ACCOUNT: "some-other-account" }, /不支持跨账号/],
-    // @kf-batch 50-B29-az-auto —— 🔴 原来这条是「region 缺 a/b ⇒ 必须拒」:把 B-29 写成了门禁的期望(c/d 明明是两个可用 AZ)。
+    // 🔴 原来这条是「region 缺 a/b ⇒ 必须拒」:把写成了门禁的期望(c/d 明明是两个可用 AZ)。
     //   真约束是「可用 AZ ≥ 2」⇒ 负向改成只有 1 个可用 AZ;「没有 b」改成下面的**正向**用例。
     ["region 可用 AZ 不足 2 个", { STUB_AZS: "us-west-2c" }, /可用的 AZ 不足 2 个/],
-    // @kf-batch 50-WP23-xregion-peering:主控区读不到跨区端点(典型 = 主控区跑在**导入的现有 VPC** 上)
+    // 主控区读不到跨区端点(典型 = 主控区跑在**导入的现有 VPC** 上)
     //   ⇒ 必须停在这里,并把真正的原因说出来。带着不确定继续 = 建出一个回写不了台账的环境。
     ["主控区没有跨区端点输出", { STUB_HOME_DDB_EP: "None" }, /导入的现有 VPC/],
     ["主控区没有 VPC 网段输出", { STUB_HOME_VPC_CIDR: "None" }, /BgpVpcStack 没有输出 VpcCidr/],
@@ -2863,7 +2862,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     else if (!re.test(r.out)) fail(`§11 pre_build 负向用例「${name}」拒了但原因不对:${String(r.out).slice(-300)}`);
   }
 
-  // ── §11b @kf-batch 50-WP4sexies-home-region:**第二层** AZ preflight(端点服务 × AZ 交集)──
+  // ── §11b:**第二层** AZ preflight(端点服务 × AZ 交集)──
   // 起因(2026-09-11 全新账号首装真环境):`us-east-1a` 账号级可用 ⇒ 第一层放行,而
   //   `com.amazonaws.us-east-1.redshift-serverless` 在该账号只支持 1b/1c/1d
   //   ⇒ base 栈建端点时 400 `does not support the availability zone of the subnet` ⇒ **整栈回滚,首装失败**。
@@ -2898,7 +2897,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     });
     if (moved.ok) fail("§11b 存量 VPC 的 AZ 已不被端点服务支持时竟然继续 —— 那会静默替换子网/VPC");
     else if (!/已不被全部端点服务支持/.test(moved.out)) fail(`§11b 存量 AZ 守卫拒因不对:${String(moved.out).slice(-300)}`);
-    // 负向 ④ @kf-batch 50-WP23-xregion-peering:**存量 VPC 的网段不许被换掉**
+    // 负向 ④:**存量 VPC 的网段不许被换掉**
     //   (换网段 ⇒ 所有子网 CidrBlock 变化 ⇒ 子网被替换,与负向 ③ 同一条 N0-10 红线)
     rmSync(azFile, { force: true });
     const recidr = run({
@@ -2918,14 +2917,14 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     globalThis.__azPreflight2 = { cases: 6 };
   }
 
-  // ── §11d @kf-batch 50-WP4sexies-home-region:buildspec 里**每个 aws 调用都必须有授权** ──
+  // ── §11d:buildspec 里**每个 aws 调用都必须有授权** ──
   // 血的教训(2026-09-11 同日第二次犯同一类错):第二层 AZ preflight 加了
   //   `aws ec2 describe-vpc-endpoint-services` 却**没在同一笔提交里授权** ⇒ build 以
   //   `exit status 254`(CLI 服务错)中止,而报错离「preflight 逻辑」很远,看起来像交集算错。
   // 🔴 这条判据把「代码用了的动作、角色没给」这一整类挡在部署前(与 IAM 模拟门同一个思路:
   //    量具的覆盖面就是判据本身)。授权面读**单一作者** deploy-stack.ts 的源码字面量。
   {
-    // @kf-batch 50-WP30-decommission:buildspec **与它调用的销毁脚本**一起扫(脚本里的 aws 调用同样跑在 build 角色下;
+    // buildspec **与它调用的销毁脚本**一起扫(脚本里的 aws 调用同样跑在 build 角色下;
     //   只扫 buildspec = 把销毁那一整段的授权面放进盲区)。脚本先剥注释行(注释里的措辞会骗出假需求)。
     const stripSh = (t) => t.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
     const bs =
@@ -2970,7 +2969,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     globalThis.__buildspecActions = { needed: needed.size };
   }
 
-  // ── §11e 🔴🔴 @kf-batch 50-WP23:**build 段的 shell 也要真跑一遍**(2026-09-15 真环境死在这里)──
+  // ── §11e 🔴🔴 **build 段的 shell 也要真跑一遍**(2026-09-15 真环境死在这里)──
   //
   // 【为什么补这一节】§11 只把 **pre_build** 抽出来真跑,build 段一行都没执行过。
   //   真环境第一次建 us-west-2:`read -r a b c < file` 在文件**没有行尾换行**时返回非 0
@@ -3079,7 +3078,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     }
   }
 
-  // ── §11f 🔴🔴 @kf-batch 50-WP30-decommission:**销毁分支的 shell 真跑**(WP-30 施工序 4 的离线判据)──
+  // ── §11f 🔴🔴 **销毁分支的 shell 真跑**(离线判据)──
   //
   // 【为什么必须真跑】销毁是全平台最危险的动作,而它的承重全在 shell 的**顺序**与**认对象**上:
   //   托管服务没先走 ⇒ base 删 VPC 卡死(N-5);认错对象 ⇒ 删了同区别人的 Flink / Glue;
@@ -3333,7 +3332,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
       fail("§11c p0e-gate 的预演没传 exec-env-azs —— 预演与真部署 synth 出的子网不同,计划指纹必失配");
     }
     if (!/export EXEC_ENV_AZS/.test(bs)) fail("§11c buildspec 没把 EXEC_ENV_AZS export 给 p0e-gate");
-    // @kf-batch 50-WP23-xregion-peering:段决定 VPC 与所有子网的 CidrBlock ⇒ 两处 synth 必须同口径
+    // 段决定 VPC 与所有子网的 CidrBlock ⇒ 两处 synth 必须同口径
     if (!/exec-env-vpc-cidr=\$EXEC_ENV_VPC_CIDR/.test(bs)) {
       fail("§11c buildspec 的 cdk deploy 没传 exec-env-vpc-cidr —— 非 home 会在 synth 抛,或(若哪天默认值回来)静默建在 10.0.0.0/16 上");
     }
@@ -3376,7 +3375,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 12) @kf-batch 52-P52.5a-supply —— **资源 ARN 的 region 轴**门禁(50 DESIGN §12 bug #7/#8/#10 那一类)
+// 12) —— **资源 ARN 的 region 轴**门禁(50 DESIGN §12 bug #7/#8/#10 那一类)
 //
 // 为什么要这一节:那一类 bug 已经犯过三次,共同形状是「链路每一环都对、只有 IAM 静默拒」,
 // 且每次都要一整轮真部署才发现。根治手法是把 region 段收成唯一出口 `regionalStatement()`,
@@ -3456,7 +3455,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
 
   // ── (b)(c) 文本扫描:裸 region 段归零 / 每个调用点有 reason / execution 名单冻结 ──
   const OWNER = "lib/shared/execution-regions.ts";
-  // 🔴🔴 @kf-batch 50-WP27-9cap-matrix —— **从「枚举拼法」改成「结构判定」**。
+  // 🔴🔴 **从「枚举拼法」改成「结构判定」**。
   //   旧版把违规写成一张拼法名单:`${region}` / `${this.region}` / `${cdk.Aws.REGION}` / `${props…region}`。
   //   于是同一件事的**第五种拼法** `${cdk.Stack.of(this).region}` 整整 12 处**从来没被门禁看见过**
   //   (flink-stack 7 + platform-stack 5),其中两条正是「条件多区、ARN 单区」的分叉:实时计算的
@@ -3505,7 +3504,11 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
       // OWNER 里出现的是**函数定义**,不是调用点(第一版没排除,门禁当场咬到自己)
       if (!isComment && rel !== OWNER && /\bregionalStatement\s*\(/.test(ln)) {
         callSites += 1;
-        const win = lines.slice(i, i + 14).join("\n");
+        // 窗口只到**下一个调用点之前**(上限 14 行):固定 14 行会在两条语句之间的注释变短时探进邻居的 axis,
+        // 把一条 home 轴语句误计成 execution 轴(2026-11-04 注释清理时真撞)。
+        const ahead = lines.slice(i, i + 14);
+        const nextCall = ahead.findIndex((l, k) => k > 0 && !/^\s*(\/\/|\*|\/\*)/.test(l) && /\bregionalStatement\s*\(/.test(l));
+        const win = (nextCall > 0 ? ahead.slice(0, nextCall) : ahead).join("\n");
         if (!/\breason\s*:/.test(win)) fail(`§12 ${rel}:${i + 1} 的 regionalStatement 调用没写 reason`);
         if (!/\baxis\s*:/.test(win)) fail(`§12 ${rel}:${i + 1} 的 regionalStatement 调用没写 axis`);
         if (/axis\s*:\s*"execution"/.test(win)) execAxisSites.push(`${rel}:${i + 1}`);
@@ -3521,69 +3524,69 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     );
   }
   // 🔴 冻结名单:放开一条就必须改这里 + 说明理由,防"顺手放开一片"。
-  // @kf-batch 52-P52.5a-supply:1 → **2**。放开的第二条是 per-project secret 的**读**
+  // 1 → **2**。放开的第二条是 per-project secret 的**读**
   // (`DescribeSecret` / `GetSecretValue`,资源面只有 `bgp/project/*` —— 比第一条的 `bgp/*` 还窄)。
   // 为什么必须放:片① 只放开了写,于是"能给非 home 建 secret、但读不回来"。而读不回来会被
   // `lookupProjectSecretArn` 解释成"没有凭证" ⇒ 过渡窗口内**静默回落共享 admin**(比报错更坏)。
   // 🔴 两条都在 platform-stack、都只针对 per-project 凭证、都没放宽资源面。再加第三条请照此写清理由。
-  // @kf-batch 50-P50.3-engines:2 → **3**。放开的第三条是**Glue 作业的建/跑/查**
+  // 2 → **3**。放开的第三条是**Glue 作业的建/跑/查**
   // (CreateJob/UpdateJob/StartJobRun/GetJobRun/... 资源面仍是 `job/bgp-*`、`connection/bgp-*`,一个字没放宽)。
   // 为什么必须放:用户 2026-09-04 明确要求「三种任务类型(redshift / glue pyspark / emr serverless spark)
   // 都必须在**多个区域**都跑任务、并且全部跑成功」。Glue 作业是 **region 作用域**资源 ——
   // 要在 us-west-2 跑,平台就必须能在 us-west-2 里 CreateJob/StartJobRun;只放 home 的话
   // 非 home 的 Glue 下推在第一步就 AccessDenied(而且那是"绑得上、跑不了"的最难查形态)。
   // 🔴 EMR Serverless 那批**不在这里**:它用的是更早的 `requestedRegionCondition`(条件里已含执行 region)。
-  // @kf-batch 50-W5-seg1-WP10a:3 → **4**。放开的第四条是 **residency-api 片 1 的区域审计 / 结果表写**
+  // 3 → **4**。放开的第四条是 **residency-api 片 1 的区域审计 / 结果表写**
   // (PutItem / GetItem / Query / DescribeTable,资源面只有 `bgp-region-audit-*` 与 `bgp-region-results-*`)。
   // 为什么必须放:跨法域 target 的审计全量**必须留在该 target 所在 region**(DESIGN §18 决策 6quinquies ③ / SPEC §3.3);
   // 只放 home 的话 residencyAudit 对每个跨法域操作都写不成 ⇒ 按「写不成即拒」全部拒掉 = 跨法域 target 名存实亡。
-  // @kf-batch 50-WP13-mwaa-region:4 → **5**。放开的第五条是 **per-target MWAA 的 airflow 动作**(CreateCliToken / CreateWebLoginToken /
+  // 4 → **5**。放开的第五条是 **per-target MWAA 的 airflow 动作**(CreateCliToken / CreateWebLoginToken /
   // GetEnvironment / InvokeRestApi,资源面只有 `environment/bgp-mwaa-*` 与 `role/bgp-mwaa-*/Admin`,SSOT kind mwaaEnvName 的 target 模板)。
   // 为什么必须放:用户拍板「每个区域的定时任务都是自己区域的 MWAA 执行的」(DESIGN §18 决策 6sexies)⇒ 解挂 / 下线 / 探活都要在
   // 该 target 所在 region 拿 CLI token;只放 home 的话非 home 的 DAG 永远 paused、探活 `mwaa:environment` 必红 = 组件装了也用不了。
-  // @kf-batch 50-WP15-airflow-serverless(K-5):+1 = EIP 配额预检(ec2:DescribeAddresses + servicequotas:GetServiceQuota,只读,execution 轴;
+  // +1 = EIP 配额预检(ec2:DescribeAddresses + servicequotas:GetServiceQuota,只读,execution 轴;
 //    显式决定:预检必须在**目标 region** 读用量与配额,否则向导只能在部署回滚后才知道配额撞了)
-// @kf-batch 50-WP15-airflow-serverless:+3 = MWAA Serverless 控制(workflow 动作 / ListWorkflows / 任务日志读,均 execution 轴;显式决定:workflow 与 run 都建在各执行 region)
-// @kf-batch 50-WP15-airflow-serverless(T-8,2026-09-07 真环境 S-3):+1 = airflow-serverless:CreateWorkflow **单独一条** on workflow/*(execution 轴)。
+// +3 = MWAA Serverless 控制(workflow 动作 / ListWorkflows / 任务日志读,均 execution 轴;显式决定:workflow 与 run 都建在各执行 region)
+// +1 = airflow-serverless:CreateWorkflow **单独一条** on workflow/*(execution 轴)。
 //    显式决定:服务在创建时按 workflow/* 评估(名字尚不存在),与其余动作的 bgp* 名字限定不能同条;不放开则两区三引擎的发布全倒在第一步。
 //    资源面只有 workflow/*,动作只有 CreateWorkflow;其余动作仍限 workflow/bgp*。配 scripts/iam-simulate-gate.py 部署后离线模拟钉死。
-// @kf-batch 50-rebuild-384-gaps(K-7,2026-09-08):**−1 = EIP 配额预检移出 execution 轴**(10 → 9)。
+// **−1 = EIP 配额预检移出 execution 轴**(10 → 9)。
 //    显式决定:预检的两个只读动作(ec2:DescribeAddresses / servicequotas:GetServiceQuota)必须能打**尚未放行**的 region,
 //    否则「部署前先看配额够不够」在唯一需要它的场景(新区首次上线)里恒被自己的区域条件拒(真环境 I-0b 坐实)。
 //    它改为无区域条件的普通语句,并由 iam-simulate-gate 的 axis:"any-region" 用**放行集外**的探测 region 钉住。
-// @kf-batch 50-WP16-zero-egress:9 → 10。新增的那条 = 零出网探活的 ec2:Describe{RouteTables,NatGateways,VpcEndpoints}
+// 9 → 10。新增的那条 = 零出网探活的 ec2:Describe{RouteTables,NatGateways,VpcEndpoints}
 //   (SPEC §3.16-F:路由表 / NAT / 跨区端点都在**执行 region**,只读)。K-7 那条 EIP 预检语句本来不挂条件、不计入本数,
 //   已随 EIP 预检一起下线。
-// @kf-batch 50-WP4quinquies-pushdown:10 → **11**。新增的那条 = `DataSourceSecretRead`
+// 10 → **11**。新增的那条 = `DataSourceSecretRead`
 //   (secretsmanager:DescribeSecret / GetSecretValue,资源面只到 `bgp/datasource/*`)。
 //   显式决定的理由:建源的**写**那一半早就是 execution 轴(secret 建在该 target 的 region),
 //   而读那一半只有 home 轴的宽只读 + `bgp/project/*` 的窄读 ⇒ 非 home 建源「建得出、读不回」,
 //   真环境实测 HTTP 500 `not authorized ... GetSecretValue on ...:us-west-2:...secret:bgp/datasource/<id>`,
 //   并在那个区留下一个半截 secret。「能建就必须能读」是这类语句的成对不变式。
-// @kf-batch 50-WP27-9cap-matrix:11 → **13**。新增的两条都是**实时计算(模块 32)在非主控区**必需的,
+// 11 → **13**。新增的两条都是**实时计算在非主控区**必需的,
 //   而它们此前是「条件多区、ARN 单区」的分叉 —— 语句上挂着多区派生的 `aws:RequestedRegion`,ARN 的
 //   region 段却钉在部署区,于是第二个区静默无权(2026-09-19 SimulatePrincipalPolicy 坐实 us-west-2
 //   `kinesis:CreateStream` / `PutRecords` / `logs:CreateLogGroup` 全 implicitDeny,而 us-east-1 allowed):
 //   ⑫ **Kinesis 流**(PutRecord(s) / GetRecords / DescribeStream* / ListShards / GetShardIterator /
-//      CreateStream / AddTagsToStream on `stream/*`)—— 模块 32 的源流由「数据源」页 provision **按需新建**
+//      CreateStream / AddTagsToStream on `stream/*`)—— 源流由「数据源」页 provision **按需新建**
 //      (平台刻意不建固定流),只放 home ⇒ 第二个区连一条能消费的流都造不出来,实时计算从第一步就废;
 //   ⑬ **MSAF 应用日志组**(logs:CreateLogGroup / CreateLogStream / DeleteLogGroup / PutRetentionPolicy /
 //      DescribeLogStreams / FilterLogEvents on `/aws/kinesis-analytics/bgp-flink-*`)—— 日志组是**应用所在
 //      那个区**的资源;只放 home ⇒ 非 home 的流作业「起来了但看不到日志」,而崩溃循环/位点过期只在日志里。
 //   🔴 两条的资源面一个字都没放宽(仍是 stream/* 与 /aws/kinesis-analytics/bgp-flink-*)。
 //   🔴 为什么直到今天才发现:**实时计算根本不在「能力 × 区域 × 执行方式」矩阵里** ——
-//      矩阵里没有的那一类 = 默认豁免,hook 判据 ⑥ 再严也拦不住清单里没写的东西(WP-27 的立包理由)。
+//      矩阵里没有的那一类 = 默认豁免,hook 判据 ⑥ 再严也拦不住清单里没写的东西(立包理由)。
 //   🔴 同批还把这一族**整组搬进独立 ManagedPolicy `RealtimeComputeControl`**(TaskRole 内联策略实测
 //     10110/10240 字节,已被 CDK 拆出 `TaskRoleOverflowPolicy` —— 那条红在**线上已部署的栈里就存在**,
 //     一直没人看见,正是「只跑 --fast 收官」的代价)。搬的同时把原来两条**已带区域条件但没声明轴**的
 //     语句(kinesisanalytics 族 / kinesis:ListStreams)也收进 `regionalStatement` ⇒ 13 → **15**。
 //     这两条产物与改动前等价(资源都是 `*`、条件同一个派生值),收益是「轴 + 理由」进了代码、可审计。
-// @kf-batch 50-PROD-B-seq33 ③ 2026-10-10 15 → **16**:WP-11b `SharedWriterSecretRead` —— 非 home 建模落地的窄权写者 secret
+// ③ 2026-10-10 15 → **16**:`SharedWriterSecretRead` —— 非 home 建模落地的窄权写者 secret
 //     建在该 target 所在 region,按名 DescribeSecret 换 ARN + Data API 用 SecretArn 执行要 GetSecretValue;
 //     资源面只到 `bgp/shared-writer/*`(比同轴的写语句 `bgp/*` 更窄),region 仍由 requestedRegionCondition 收在已登记执行区内。
-// @kf-batch 52-s3-external-entry(序 52 / B-124,2026-10-26)16 → **17**:`DataSourceReadOnly` 里 S3 外部表的 Glue 目录语句
+// 16 → **17**:`DataSourceReadOnly` 里 S3 外部表的 Glue 目录语句
 //   (glue:CreateDatabase / CreateTable / DeleteTable / Get* on catalog · database/bgp_s3_ext · table/bgp_s3_ext/*)从 home 轴改 execution 轴。
-//   显式决定的理由:外部表现在建在**数据源所在区**的 Glue 目录(B-124 之前一律落主控区目录,主控区 Athena 跨区读桶);
+//   显式决定的理由:外部表现在建在**数据源所在区**的 Glue 目录(此前一律落主控区目录,主控区 Athena 跨区读桶);
 //   只放 home ⇒ 第二区的 S3 源「建外部表」必 AccessDenied。资源面一个字没放宽(仍只限 bgp_s3_ext 库),region 由 requestedRegionCondition 收在已登记执行区内。
 const EXEC_AXIS_EXPECTED = 17;
   if (execAxisSites.length !== EXEC_AXIS_EXPECTED) {
@@ -3593,7 +3596,7 @@ const EXEC_AXIS_EXPECTED = 17;
     );
   }
   if (!execAxisSites.every((x) => x.startsWith("lib/platform-stack.ts:"))) {
-    fail(`§12 execution 轴语句应全在 lib/platform-stack.ts(P52.5a 的 per-project secret 读/写),实际:${execAxisSites.join(", ")}`);
+    fail(`§12 execution 轴语句应全在 lib/platform-stack.ts(per-project secret 读/写),实际:${execAxisSites.join(", ")}`);
   }
   globalThis.__regionAxis = { cases: axisCases.length, callSites, exec: execAxisSites.length };
 }
@@ -3606,7 +3609,7 @@ if (!FAST && !globalThis.__iamMisnameScan.dirs.includes("控制面")) fail("§13
 if (existsSync(OUT)) rmSync(OUT, { recursive: true, force: true });
 if (existsSync(LS_OUT)) rmSync(LS_OUT, { recursive: true, force: true });
 
-// ── §14 @kf-batch 50-WP4sexies-home-region:CloudFront origin-facing 前缀列表的**单一作者** ──
+// ── §:CloudFront origin-facing 前缀列表的**单一作者** ──
 // 起因(2026-09-11 全新账号,主控区换区能力检验时抓到):这张「region → pl-xxxx」映射表原来**抄了两份**
 //   (`platform-stack.ts` 与 `om-service-stack.ts`),而且两处**失败语义不同**:
 //   platform 查不到就 throw(对);om-service 是 `if (id) { addIngressRule }` —— 查不到**静默跳过**
@@ -3641,7 +3644,7 @@ if (existsSync(LS_OUT)) rmSync(LS_OUT, { recursive: true, force: true });
 }
 
 console.log(
-  `exec-env synth-gate:context 用例 ${ctxCases.length} 条、broker E-49 用例 ${globalThis.__e49Count ?? 0} 条、` +
+  `exec-env synth-gate:context 用例 ${ctxCases.length} 条、broker 入参用例 ${globalThis.__e49Count ?? 0} 条、` +
     `buildspec pre_build 真执行 ${globalThis.__preBuildCases ?? 0} 条(含端点服务×AZ 交集 ${globalThis.__azPreflight2?.cases ?? 0} 条)、` +
     `region 轴用例 ${globalThis.__regionAxis?.cases ?? 0} 条/调用点 ${globalThis.__regionAxis?.callSites ?? 0} 个(execution 轴 ${globalThis.__regionAxis?.exec ?? 0} 条)、` +
     (FAST ? "" : `组件栈正向 ${globalThis.__componentStacks ?? 0} 个、`) +
@@ -3650,11 +3653,10 @@ console.log(
     `IAM 假动作名扫描 ${globalThis.__iamMisnameScan?.statements ?? 0} 条语句 / 命中 ${globalThis.__iamMisnameScan?.hits ?? 0}、` +
     `CloudFront 前缀列表单一作者 ${globalThis.__cfPrefixList?.callSites ?? 0} 个调用点、` +
     `buildspec aws 调用授权覆盖 ${globalThis.__buildspecActions?.needed ?? 0} 个、build 段 shell 真跑 ${globalThis.__buildPhaseShell?.cases ?? 0} 例、` +
-    // @kf-batch 50-WP30-decommission
     `销毁分支 shell 真跑 ${globalThis.__destroyShellCases ?? 0} 例、planDestroyOpen 向量 ${globalThis.__planDestroyOpenVectors ?? 0} 条` +
     (FAST ? "" : `、删栈顺序核对 ${globalThis.__destroyOrder ?? 0} 个栈`)
 );
-// @kf-batch 50-WP30-decommission —— 🔴 「本节没跑」不许当绿(段中断 ≠ 判据过,记忆 gate-must-separate-crash-from-fail)
+// 🔴 「本节没跑」不许当绿(段中断 ≠ 判据过,记忆 gate-must-separate-crash-from-fail)
 if ((globalThis.__destroyShellCases ?? 0) < 6) fail(`§11f 销毁分支 shell 只真跑了 ${globalThis.__destroyShellCases ?? 0} 例(<6)—— 那一节没跑完`);
 if (!FAST && (globalThis.__destroyOrder ?? 0) < 8) fail(`§7d 删栈顺序只核对了 ${globalThis.__destroyOrder ?? 0} 个栈(<8)—— 全组件 synth 那一节没跑到`);
 if (FAST) console.log("⚡ fast 模式:已跳过 §7(负向组件 synth)与 §9(控制面/部署权隔离)—— 提交前必须跑一次全量!");

@@ -4,11 +4,11 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { listCostDaily, scanAllCostRuns } from "@/lib/finops/store";
 import type { TaskCostSummary } from "@/lib/finops/types";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-11)。成本 run 行**已经有** `targetId`
-// (WP-0 T1 落的章),所以这里是纯读侧接线:A 类标量,内存过滤(这张表的唯一读法就是全表 Scan)。
+// 执行范围。成本 run 行**已经有** `targetId`
+// (T1 落的章),所以这里是纯读侧接线:A 类标量,内存过滤(这张表的唯一读法就是全表 Scan)。
 // 🔴 计数**随本响应回**,不走 `/api/scope/counts`:那个端点不带天窗,数字会与列表打架(台账 N-7)。
 import { requireScope, filterRowsByScalar, countRowsByScalar, scalarTargetOf } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP6-cost-by-region(WP-6 施工序 3,O3b)—— 排行按 (task, target) 分组 + 「已归因 / 未分摊」按 region 对账
+// (O3b)—— 排行按 (task, target) 分组 + 「已归因 / 未分摊」按 region 对账
 import { regionOfTargets, regionsInViewOf } from "@/lib/finops/cost-region";
 import { monthsCovering, reconcileByRegion } from "@/lib/finops/region-cost";
 import { scopeTargets } from "@/lib/scope/scope";
@@ -18,7 +18,6 @@ import { scopeTargets } from "@/lib/scope/scope";
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
-  // @kf-batch 50-WP4ter-coverage
   const scope = await requireScope(req, ctx.projectId);
   if (scope instanceof NextResponse) return scope;
 
@@ -27,7 +26,7 @@ export async function GET(req: NextRequest) {
   const days = parseInt(sp.get("days") || "30", 10) || 30;
 
   try {
-    // @kf-batch 50-WP6-cost-by-region —— 天窗对齐到 **UTC 日界**:账单是按日的,run 窗口若从「此刻 − N 天」起,
+    // 天窗对齐到 **UTC 日界**:账单是按日的,run 窗口若从「此刻 − N 天」起,
     // 对账时首日的账单整天算进来而 run 只算半天 ⇒ 未分摊凭空多出半天。两边用同一个 windowFrom。
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
@@ -52,12 +51,12 @@ export async function GET(req: NextRequest) {
 
     let runs = windowRuns;
     if (engine) runs = runs.filter((r) => r.engine === engine);
-    // @kf-batch 50-WP4ter-coverage —— 🔴 先算「按区计数」(同一天窗、同一引擎筛选下的口径),再过滤:
+    // 🔴 先算「按区计数」(同一天窗、同一引擎筛选下的口径),再过滤
     // 反了的话计数就只剩当前区,护栏 1 的「别处还有 N 条」永远是 0(= 撒谎说别处没有)。
     const countsByTarget = countRowsByScalar(runs as unknown as Array<Record<string, unknown>>, "cost");
     runs = filterRowsByScalar(runs as unknown as Array<Record<string, unknown>>, scope, "cost") as unknown as typeof runs;
 
-    // @kf-batch 50-WP6-cost-by-region —— 🔴 按 (taskId, targetId) 分组:同一任务扇出到两个区是两行。
+    // 🔴 按 (taskId, targetId) 分组:同一任务扇出到两个区是两行。
     const byTaskTarget = new Map<string, TaskCostSummary>();
     for (const r of runs) {
       const targetId = scalarTargetOf(r as unknown as Record<string, unknown>, "cost");

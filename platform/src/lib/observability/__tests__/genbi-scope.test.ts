@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4ter-coverage
-// 可观测看板按区(工单 SC-6)。🔴 这条判据同时钉住**写侧**:历史行必须带 `targetId`,
+// 可观测看板按区。🔴 这条判据同时钉住**写侧**:历史行必须带 `targetId`,
 // 否则读侧再怎么过滤都只会得到「全都在主控区」——那正是这一刀之前的状态。
 import { describe, it, expect, vi } from "vitest";
 

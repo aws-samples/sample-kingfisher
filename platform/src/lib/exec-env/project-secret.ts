@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // per-project 凭证 secret 的**查找**(50 SPEC §3.9 case "project-context" 第 3 行)。
 //
 // ── 为什么单独一个文件(不是塞进 privileged-cred 或 project-cred-supply)──────────
@@ -30,7 +29,7 @@ import { deleteSecretByName, describeSecretArnByName, resolveTargetWarehouse } f
 export async function lookupProjectSecretArn(t: ExecutionTarget, projectId: string): Promise<string | undefined> {
   const pid = assertProjectId(projectId);
   const name = projectSecretName(t.targetId, pid);
-  // region 必须是**该 target 的** region:secret 与 target 同区(P52.5a 把写语句翻成 execution 轴
+  // region 必须是**该 target 的** region:secret 与 target 同区(把写语句翻成 execution 轴
   // 就是为了这件事)。用 `process.env.AWS_REGION` 查非 home 的 secret 会稳定查不到 ⇒
   // 被上面那条语义解释成"没有凭证" ⇒ 静默回落 admin。
   const { region } = resolveTargetWarehouse(t);
@@ -38,7 +37,6 @@ export async function lookupProjectSecretArn(t: ExecutionTarget, projectId: stri
 }
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 删掉某个项目在某个 target 上的 per-project 凭证 secret(删项目后的**回收**作业用)。
  *
  * 🔴 名字与 region 的派生和 `lookupProjectSecretArn` **逐字同一份**(同一个文件、同两行):

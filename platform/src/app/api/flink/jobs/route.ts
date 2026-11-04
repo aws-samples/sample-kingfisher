@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { PutCommand, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
@@ -10,7 +9,7 @@ import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/pr
 import { recordAudit } from "@/lib/audit";
 import { defaultFlinkSql, mysqlSinkSql, s3TableSinkSql, customSinkSql, reconcileFlinkJobs, normalizeFlinkSql, resolveKinesisStreamName } from "@/lib/realtime/flink-service";
 import { guardCode } from "@/lib/cookbook";
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— 🔴 实时作业的执行区。用户 2026-09-10:
+// 🔴 实时作业的执行区。用户 2026-09-10:
 // 「一定要加这个维度,不然白干了,所有任务都在自己的区域跑,不然没有意义。」
 // 读侧按 `targets[]` 过滤(B 类绑定,三级回落归主控区);写侧在**新建那一刻**盖章,
 // 并且**在盖章前先真解析一遍落点**(`resolveFlinkPlace` 会核 flink 组件 + 角色 + 三个桶,主控区也一样)——
@@ -18,7 +17,7 @@ import { guardCode } from "@/lib/cookbook";
 import { readScope, filterRowsByScope } from "@/lib/exec-env/scope";
 import { assertBindableTargets } from "@/lib/exec-env/data-plane-target";
 import { resolveFlinkPlace } from "@/lib/realtime/flink-place";
-// 序 72 B-139(模块 56):执行角色 ARN 形态 / 保存期预检的唯一作者
+// 执行角色 ARN 形态 / 保存期预检的唯一作者
 import { roleArnShapeRejection } from "@/lib/execution-role/resolve";
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
 import { isValidTargetId, HOME_TARGET_ID } from "@/lib/exec-env/target-id";
@@ -49,9 +48,8 @@ export async function GET(req: NextRequest) {
       : Items;
     rows.sort((a: any, b: any) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     // 并发对账(仅非终态作业会真正查后端;终态直接返回,省调用)。失败不阻塞列表。
-    // @kf-batch 50-WP31-place-first-class —— 全局列表 = 一次请求碰多个区 ⇒ 按区扇出走唯一写法(reconcileFlinkJobs → forEachTargetPlace)
+    // 全局列表 = 一次请求碰多个区 ⇒ 按区扇出走唯一写法(reconcileFlinkJobs → forEachTargetPlace)
     await reconcileFlinkJobs(rows as Array<Record<string, any>>);
-    // @kf-batch 50-WP27-9cap-matrix
     // 🔴 **「源流」这一列必须是它真正消费的那条流**,不能是建作业时存下来的快照。
     //   落库的 `sourceStream` 取的是 `process.env.FLINK_SOURCE_STREAM || "bgp-flink-source"` ——
     //   而平台**刻意不建固定流**(2026-07-26 拍板:流由数据源 provision 按需新建)⇒ 那个默认名
@@ -90,10 +88,10 @@ export async function POST(req: NextRequest) {
   if (sinkType === "custom" && (!Array.isArray(body.connectorIds) || body.connectorIds.length === 0)) {
     return apiError("自定义 sink 需选择至少一个已上传的连接器 JAR(在「连接器管理」上传)", 400);
   }
-  // 模块32/42 多 source:数据源类型(kinesis 默认 / mysql-cdc 直读 binlog / msk Kafka 流)。
+  // 多 source:数据源类型(kinesis 默认 / mysql-cdc 直读 binlog / msk Kafka 流)。
   const sourceType = ["mysql-cdc", "msk", "kinesis"].includes(body.sourceType) ? body.sourceType : "kinesis";
   const isCdc = sourceType === "mysql-cdc";
-  const isMsk = sourceType === "msk"; // P42.6c:MSK/Kafka 源(broker 在私有 VPC,同 CDC 要选源数据源+网络)
+  const isMsk = sourceType === "msk"; // MSK/Kafka 源(broker 在私有 VPC,同 CDC 要选源数据源+网络)
   const isVpcSource = isCdc || isMsk; // 源在私有 VPC 的流源(CDC 读 RDS binlog / MSK 连 broker)
   if (isCdc && !body.sourceDatasourceId) {
     return apiError("MySQL CDC 源需选择源数据源(binlog 账密由其安全注入,不入库)", 400);
@@ -122,7 +120,7 @@ export async function POST(req: NextRequest) {
   const metricsLevel = ["APPLICATION", "TASK", "OPERATOR", "PARALLELISM"].includes(body.metricsLevel) ? body.metricsLevel : "APPLICATION";
   const snapshotsEnabled = body.snapshotsEnabled === true;
   // 自定义执行角色 ARN(可选):留空=启动时回退该落点的平台 Flink 运行角色。形态校验走单一作者;
-  // 序 72 B-139:账号内任何 kinesisanalytics 可承担的角色都能绑(平台任务角色 PassRole role/* + PassedToService),
+  // 账号内任何 kinesisanalytics 可承担的角色都能绑(平台任务角色 PassRole role/* + PassedToService),
   //   在落点校验之后按每个区**预检**(信任策略 + 引擎基线),缺 ⇒ 400 指路、不落库。
   const execRoleRaw = (body.executionRoleArn || "").trim();
   {
@@ -133,16 +131,15 @@ export async function POST(req: NextRequest) {
   const runtimeProperties = Array.isArray(body.runtimeProperties)
     ? body.runtimeProperties.filter((g: any) => g && typeof g.groupId === "string" && g.groupId.trim() && g.groupId !== "bgp" && g.properties && typeof g.properties === "object")
     : [];
-  // @kf-batch 50-WP4quater-reads(工单 SC-5)—— 执行落点。
+  // 执行落点。
   // 🔴 不从 `...body` 裸抄:那等于让前端往权威字段里写任意字符串。只认合法 targetId,
   //    并且**当场真解析一遍**(缺 flink 组件 / 角色不是本 target 的 / 桶缺项 ⇒ 400 可修),
   //    而不是先存下来、等启动时才炸。
-  // @kf-batch 50-WP18-flink-multi-region
   // 🔴🔴 用户 2026-09-15:「实时计算…我不是让你在美东1 发布执行多个区域吗?」
   //    流式作业**天生一区一个应用**(MSAF application 是区域资源),所以「一次发布多区」的正确语义是
   //    **一次提交 → 每个区各建一个作业**(而不是一个作业跑两区)。这里接 `targets` 多值:
   //    逐个校验(可绑 + flink 组件 + 角色/桶真解析得开),**任一个不合格就整体拒**(不许先建一半)。
-  // @kf-batch 50-WP31-place-first-class —— 🔴 绑定区必须点名(缺 / 非法 ⇒ 400),不再「没给 = 主控区」(B-32 同类)
+  // 🔴 绑定区必须点名(缺 / 非法 ⇒ 400),不再「没给 = 主控区」
   let wantTargets: string[];
   try {
     wantTargets = requestedTargets(body, "新建实时作业");
@@ -151,12 +148,12 @@ export async function POST(req: NextRequest) {
     if (pr) return pr;
     throw e;
   }
-  // @kf-batch 50-WP31-place-first-class —— 序 3 收尾:🔴 **主控区也过同一道校验**(原来 `if (t === HOME_TARGET_ID) continue;`
+  // 收尾:🔴 **主控区也过同一道校验**(原来 `if (t === HOME_TARGET_ID) continue;`
   //   ⇒ 主控区从来不核「装没装 flink / 角色与三个桶在不在描述符里」,建得出、启动才炸)。
   //   真解析改走启动侧同一个作者 `resolveFlinkPlace`(主控区也读描述符),建与跑不再是两套口径。
   for (const t of wantTargets) {
     try {
-      // @kf-batch 50-WP11b-shared-writer —— scope 必填后 tsc 逼出来的一处:原来不传 ⇒ projectId 缺省 undefined
+      // scope 必填后 tsc 逼出来的一处:原来不传 ⇒ projectId 缺省 undefined
       //   ⇒ 设了「授权项目」白名单的区**永远**建不了实时作业(本项目在白名单里也不行)。现在带本请求的项目。
       await assertBindableTargets([t], "flink", { scope: "per-project", projectId: ctx.projectId });
       await resolveFlinkPlace(t);
@@ -168,7 +165,7 @@ export async function POST(req: NextRequest) {
       );
     }
   }
-  // 序 72 B-139:自定义执行角色在建作业那一刻就按每个落点预检,缺 ⇒ 400(文案逐条列动作 → 资源 → 为什么要 + 出路)
+  // 自定义执行角色在建作业那一刻就按每个落点预检,缺 ⇒ 400(文案逐条列动作 → 资源 → 为什么要 + 出路)
   {
     const pfRes = await preflightCustomRoleForTargets({ engine: "flink", customRoleArn: execRoleRaw, targets: wantTargets });
     if (pfRes) return pfRes;

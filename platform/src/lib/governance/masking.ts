@@ -1,11 +1,11 @@
-// 模块 18 — 字段脱敏 (v1.9.0;B-119 2026-10-23 结果列按物理列对分级)
+// 字段脱敏 (v1.9.0;2026-10-23 结果列按物理列对分级)
 //
 // Server-side value masking applied to QUERY RESULTS only (never alters stored data).
 // Used by the Redshift result path and GenBI. Platform admins bypass; users with an
 // approved grant on a table see its columns unmasked. Best-effort: never throws (a failure
 // returns the rows unchanged rather than breaking the query path).
 //
-// 🔴 B-119(序 41 页面驱动 gbc GC-11 真撞):分级落在**物理列**上,而结果列名是 SQL 给的 —— 问数模型几乎总写
+// 🔴 (页面驱动 gbc GC-11 真撞):分级落在**物理列**上,而结果列名是 SQL 给的 —— 问数模型几乎总写
 //   `country AS 地区`,直查 / BI 里 `AS` 改名也是常态 ⇒ 只按结果列名匹配就永远对不上,L3 字段明文给非授权用户
 //   (设计稿 18 §9 第 1 条自 v1.9.0 起一直「记入局限」)。现在每个结果列先经 `parseSelectOutputs` 解析成「它引用的
 //   物理列」(别名链 / 表达式 / CTE / 子查询逐层展开),分级按**结果列名 ∪ 物理列**的任一命中取最强策略;
@@ -120,7 +120,7 @@ export async function maskRows(input: MaskRowsInput): Promise<MaskRowsOutput> {
 
     const grants = identity ? await getUserGrantSet(identity.username) : new Set<string>();
 
-    // B-119:结果列 → 它引用的物理列。按位置对(结果集列序 = select 列表序,两边列数相等时)再按名对;
+    // 结果列 → 它引用的物理列。按位置对(结果集列序 = select 列表序,两边列数相等时)再按名对;
     //   候选 = 结果列名本身 ∪ 解析出的物理列(别名链展开)。没有 SQL / 解析不出 ⇒ 候选只剩结果列名(修前行为)。
     const outputs = input.sql ? parseSelectOutputs(input.sql) : null;
     const candidatesOf = (idx: number, cname: string): string[] => {

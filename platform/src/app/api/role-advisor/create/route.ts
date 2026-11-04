@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const result = await provisionRole({
       ...body,
       accountId: body.accountId || process.env.AWS_ACCOUNT_ID || undefined,
-      // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+      // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
       region: body.region || homeRegion(),
     });
     recordAudit(req, "role-advisor.create", {

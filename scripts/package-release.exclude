@@ -20,7 +20,7 @@ scripts/34-add-region-headless.py       # 用页面向导加区的无头脚本(�
 scripts/35-rebuild-account.sh           # 换测试账号「一条命令」重建(非生产步骤)
 scripts/36-fixture-ledger.py            # 验收夹具台账与清理(import 上面被剔的无头底座,单独留下也跑不起来)
 scripts/37-fixture-reseal.py            # 验收夹具收口工具(Playwright)
-scripts/38-b09-drift-discrim.py         # 判据判别力自检工具(Playwright + 直写表)
+scripts/38-drift-discrim.py             # 判据判别力自检工具(Playwright + 直写表)
 scripts/mr-gate.sh                      # 多区域硬门入口(开发机)
 scripts/kf_headless_lib.py              # 无头脚本共用底座
 

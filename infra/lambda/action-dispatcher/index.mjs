@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 平台动作命令的**分发 Lambda**(主控区,平台 VPC 内)。用户 2026-09-20 拍板:消费端 = 主控区 Lambda。
 //
 // 链路:执行区 DAG 的 platform-action 节点 → 主控区 DDB 表 bgp-action-commands(INSERT, status=pending)

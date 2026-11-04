@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // 故障注入 seam 单测:运行期 env 门 + 仅非生产标记下生效(51 SPEC §3.4a③ / 50 ACCEPTANCE §8ter.2)。
 import { describe, it, expect } from "vitest";
 import { faultSeamStatus, isThrottleInjected, injectedThrottleError, isNonProdTarget } from "../fault-seam";

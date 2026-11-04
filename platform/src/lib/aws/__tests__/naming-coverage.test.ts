@@ -1,9 +1,8 @@
-// @kf-batch 50-P50.1a-naming-ssot
 // 命名 SSOT **反向覆盖**门禁。
 //
 // 【为什么必须有反向门禁】
 //   正向测试只能证明"我登记的这些 kind 名字对"。它永远证明不了"我没漏登记资源" ——
-//   而漏登记的后果正是本模块要解决的病:P50.2 建第二个 region 时,某个资源名没经 SSOT、
+//   而漏登记的后果正是本模块要解决的病:建第二个 region 时,某个资源名没经 SSOT、
 //   在栈里被硬编码成 home 的固定名 ⇒ 要么撞名建不出来,要么两个 target 共用一个资源(跨 target 串数据)。
 //   所以这里反过来扫:**infra/lib 里每一个 `bgp-*` 名字面量,都必须有归属** ——
 //   要么被某个 kind 以 isHome:true 复现,要么进 naming.json 的 notCovered 并写明原因。
@@ -27,7 +26,7 @@ const KINDS = namingConfig.kinds as unknown as Record<string, Rule>;
 const NOT_COVERED = namingConfig.notCovered as unknown as {
   ddbTables: { reason: string; outsideTablesConstant: { absorbedBy: string; names: string[] } };
   controlPlaneOnly: { reason: string; names: string[] };
-  // @kf-batch 50-W5-seg2-WP1 — 已下线能力留在 infra 的 RETAIN 表(数据服务三张,50 SPEC §3.9c)
+  // 已下线能力留在 infra 的 RETAIN 表(数据服务三张,50 SPEC §3.9c)
   retired: { reason: string; names: string[]; retiredOn: string };
   agentcore: { reason: string; pattern: string };
   prose: { tokens: string[]; reasons: Record<string, string> };
@@ -139,7 +138,7 @@ function collectNames(): {
       templates.set(m[1], arr);
     }
     // 🔴 v2:`bgp-` 不在开头的字面量 —— v1 只扫 /"(bgp-…)"/,于是 `"alias/bgp-data"`(KMS 别名,
-    //    region 级唯一名、同区两 target 必撞)整条溜过去。P50.2 切片 a 自建 KMS 时才发现,已补登记。
+    //    region 级唯一名、同区两 target 必撞)整条溜过去。切片 a 自建 KMS 时才发现,已补登记。
     for (const m of Array.from(text.matchAll(/"([^"\n]*bgp-[^"\n]*)"/g))) {
       const arr = midString.get(m[1]) ?? [];
       if (!arr.includes(rel)) arr.push(rel);
@@ -174,7 +173,7 @@ const DDB_NAMES = new Set<string>([
   ...NOT_COVERED.ddbTables.outsideTablesConstant.names,
 ]);
 const CONTROL_PLANE = new Set(NOT_COVERED.controlPlaneOnly.names);
-// @kf-batch 50-W5-seg2-WP1 — 已下线能力的 RETAIN 表:infra 保留定义、platform 已不再认识(TABLES 常量删了),归属由这里给。
+// 已下线能力的 RETAIN 表:infra 保留定义、platform 已不再认识(TABLES 常量删了),归属由这里给。
 const RETIRED = new Set(NOT_COVERED.retired.names);
 /** 将来要带 target 维、只是排在后面批次的名字(推迟 ≠ 免除:必须写明由哪一批吸收)。 */
 const PENDING = new Set(NOT_COVERED.pendingRegionalization.items.map((i) => i.name));
@@ -253,10 +252,9 @@ describe("🔴 反向覆盖:infra/lib 里每个 bgp-* 名字面量都必须有�
     for (const kind of RESOURCE_KINDS) {
       const rule = KINDS[kind];
       if (rule.home.includes("{")) continue; // 带变量的另有 naming.test.ts 的出处断言
-      if (kind === "stackName") continue; // 执行环境栈组是全新栈,infra 里还没有(P50.2 才建)
+      if (kind === "stackName") continue; // 执行环境栈组是全新栈,infra 里还没有(才建)
       const name = resourceName(kind, { targetId: HOME_TARGET_ID });
       // 不是 `bgp-` 开头的名字(如 Redshift 默认库 `dev`)不在 literals 索引里 —— 单独去它登记的出处文件里找。
-      // @kf-batch 50-P50.1-workgroup-ssot
       // infra 侧若已改为**从命名 SSOT 派生**(resourceName("<kind>", …)),则"名字存在"由构造保证,
       // 不该再要求源码里出现字面量(要求字面量反而会逼人把刚收编掉的硬编码写回去)。
       const homeSrc = (namingConfig.kinds as never as Record<string, { homeSource?: string }>)[kind]?.homeSource;
@@ -325,20 +323,20 @@ describe("🔴 反向覆盖:infra/lib 里每个 bgp-* 名字面量都必须有�
     expect(NOT_COVERED.agentcore.reason.length).toBeGreaterThan(10);
   });
 
-  it("🔴 既有缺口不许悄悄变长:不在 TABLES 常量里的表名,名单必须与实测一致且写明吸收批次", () => {
+  it("🔴 既有缺口不许悄悄变长:不在 TABLES 常量里的表名,名单必须与实测一致且写明吸收去向", () => {
     const gap = NOT_COVERED.ddbTables.outsideTablesConstant;
-    expect(gap.absorbedBy).toMatch(/^P5[0-2]\.[0-9][a-z]?$/);
+    expect(gap.absorbedBy).toMatch(/^multi-region-execution\/[a-z-]+$/);
     // 实测:名单里的每一张,现在确实不在 TABLES 里(修好了就该从名单里删,而不是留着当免罪符)。
     const inTables = gap.names.filter((n) => (Object.values(TABLES) as string[]).includes(n));
     expect(inTables, "这些已经进 TABLES 了,请从 outsideTablesConstant 名单里删掉").toEqual([]);
     expect(gap.names.length, "缺口只许缩短").toBeLessThanOrEqual(6);
   });
 
-  it("🔴 推迟 ≠ 免除:pendingRegionalization 每条都必须写明由哪一批吸收 + 原因 + 出处", () => {
+  it("🔴 推迟 ≠ 免除:pendingRegionalization 每条都必须写明由哪一项吸收 + 原因 + 出处", () => {
     const items = NOT_COVERED.pendingRegionalization.items;
     expect(items.length).toBeGreaterThan(0);
     for (const it of items) {
-      expect(it.absorbedBy, `${it.name} 没写吸收批次`).toMatch(/^P5[0-2]\.[0-9][a-z]?$/);
+      expect(it.absorbedBy, `${it.name} 没写吸收去向`).toMatch(/^multi-region-execution\/[a-z-]+$/);
       expect(it.reason.length, `${it.name} 没写原因`).toBeGreaterThan(10);
       expect(it.source.startsWith("infra/"), `${it.name} 没写出处`).toBe(true);
     }

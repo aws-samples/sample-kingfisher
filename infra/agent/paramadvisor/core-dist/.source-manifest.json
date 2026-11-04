@@ -3,8 +3,8 @@
   "capability": "paramadvisor",
   "tsconfig": "platform/tsconfig.paramadvisor-core.json",
   "sources": {
-    "platform/src/lib/param-advisor/core/catalog.ts": "1c232f15f892a0aa2110498933d3dd49f7f55ecb700fcfdeda2bdaf49256b80d",
+    "platform/src/lib/param-advisor/core/catalog.ts": "26a9fdf30d0d543726cac7a7b8f1730dd4c833ddebccfbc50ee84c9b9bb59077",
     "platform/src/lib/param-advisor/core/prompt.ts": "50c665b60974a50b8df08279a2f9e0d01ceb9b5c47c8f2170aa6fcc9cfcbfe3a",
-    "platform/src/lib/param-advisor/core/types.ts": "4b918418c32ae18834ec61d13e2cc8bcb59b32b442ee62bc4a32aba054947936"
+    "platform/src/lib/param-advisor/core/types.ts": "2b8484c1a84682d4b946806ab35b7057a07979f5e348d603606ecf706d89f670"
   }
 }

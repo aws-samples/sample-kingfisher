@@ -1,4 +1,4 @@
-// 模块 55 长操作统一框架 —— 等待上下文(AsyncLocalStorage)。
+// 长操作统一框架 —— 等待上下文(AsyncLocalStorage)。
 //
 // 两种帧,同一个存储:
 //  · `op` 帧:由驱动器 `driveExecution` 在跑某个长操作的执行体时建立(`runInLongOp`);
@@ -59,7 +59,7 @@ export class LongOpContextMissing extends Error {
   constructor(what: string) {
     super(
       `「${what}」要同步等待外部系统到终态,但当前既不在长操作执行上下文(submitLongOp)里,也不在登记过的后台等待者里 —— ` +
-        "请求路径不许同步等终态(模块 55):路由请改经 submitLongOp,请求外的循环请在入口包 runAsBackgroundWaiter",
+        "请求路径不许同步等终态:路由请改经 submitLongOp,请求外的循环请在入口包 runAsBackgroundWaiter",
     );
     this.name = "LongOpContextMissing";
     this.what = what;

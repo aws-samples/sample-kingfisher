@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-B51-backfill-pump
 // POST /api/internal/backfill/tick  { projectId, planId } —— **平台内部端点**(唯一调用方:本进程的补数推进泵,回环)。
 //
 // 推进 = `backfill/runner.ts#tick`,与补数页的 `/api/backfill/[planId]/tick` **同一个函数**(幂等:领取实例是条件写,

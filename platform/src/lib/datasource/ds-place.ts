@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-2)
 /**
  * **建源落点** —— 「这条数据源建在哪个区、用那个区的哪个子网 / VPC / 可用区 / Glue 角色」。
  *
@@ -19,7 +18,7 @@ import { HOME_TARGET_ID, isHome, isValidTargetId } from "@/lib/exec-env/target-i
 import { resolveGlueBinding } from "@/lib/exec-env/data-plane-target";
 import { requireReadyTarget } from "@/lib/exec-env/registry";
 import { ec2ClientFor } from "@/lib/exec-env/target-clients";
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤:数据源的区解析就是落点决策 ⇒ 在唯一作者这里记账(观测器据此归因)
+// 数据源的区解析就是落点决策 ⇒ 在唯一作者这里记账(观测器据此归因)
 import { notePlaceDecision } from "@/lib/place/context";
 import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 
@@ -28,7 +27,7 @@ export const DS_PLACE_VIA = "resolveDsPlace";
 export const DS_ROW_PLACE_VIA = "datasourceRowPlace";
 
 /**
- * 序 31 二刀 ⑤:**按数据源行**记落点决策 —— 浏览表 / 心跳 / 发现 / S3 外表 / 改删源等路径拿到的是 `bgp-datasources` 的一行,
+ * **按数据源行**记落点决策 —— 浏览表 / 心跳 / 发现 / S3 外表 / 改删源等路径拿到的是 `bgp-datasources` 的一行,
  * 区从行上的章(`ownerTargetId`,唯一读法 `datasourceOwnerTarget`)或 secret ARN 派生,从不经 `resolveDsPlace`
  * ⇒ 测试账号 observe 未归因榜里 `secretsmanager.GetSecretValue /api/datasources/<id>/tables`、`glue.GetJobRun /api/datasources`、
  * `s3 … /s3-external` 全是这一类:客户端建对了区,账本上却一笔都没有。
@@ -53,13 +52,13 @@ export interface DsPlaceResolved {
   availabilityZone?: string;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = 主控区);存量行的章由调用方经 targetOfStamp 显式给
+// 落点必填(原来缺省 = 主控区);存量行的章由调用方经 targetOfStamp 显式给
 export async function resolveDsPlace(targetId: string): Promise<DsPlaceResolved> {
   const tid = targetId;
   if (!isValidTargetId(tid)) {
     throw new Error(`非法 targetId:${JSON.stringify(targetId)}`);
   }
-  // 序 31 二刀 ⑤:建源 / 改源 / 删源 / 发现实例的区解析就是落点决策 ⇒ 在这里记(第一个 await 之前;请求外无账本则 no-op)。
+  // 建源 / 改源 / 删源 / 发现实例的区解析就是落点决策 ⇒ 在这里记(第一个 await 之前;请求外无账本则 no-op)。
   //   测试账号 observe 未归因榜:`ec2 / secretsmanager / glue / rds … /api/datasources` 全是「经本函数拿到了正确的区、客户端也建对了,
   //   却没有一笔决策」—— 主控区源在下面的早退分支里连 resolveGlueBinding 的那笔都没有。非法 id 抛在记账之前(它不是一个落点)。
   notePlaceDecision({ targetId: tid, via: DS_PLACE_VIA });

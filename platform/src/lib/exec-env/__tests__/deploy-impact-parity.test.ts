@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-3-p0e-baseline
 // 🔴 **P0-E 判据的跨边界 parity 门禁**:平台侧 `deploy-impact.ts` 与 build 侧 `infra/scripts/deploy-impact.mjs`
 //    必须在**全交叉积**上逐格一致(含 planHash 逐字节相同)。
 //

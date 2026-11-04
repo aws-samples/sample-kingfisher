@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 前端结构性门禁:把 50 INTERACTION v2.30 §9.7(护栏 7)那七条里**最容易做错的**几条钉在源码上。
 // 🔴 为什么用源码断言而不是渲染测试:这几条的本质是「有没有接上」(wiring),而渲染测试很容易
 //    因为 antd 版本 / locale 变化假红 —— 本仓已为此栽过多次(见 verify-script-quality-lesson)。

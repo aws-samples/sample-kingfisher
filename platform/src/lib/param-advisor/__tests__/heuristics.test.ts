@@ -51,7 +51,7 @@ describe("glue-etl 档位规则", () => {
     const r2 = rec({ channel: "glue-etl", workload: { estimatedDataGB: 2000 } });
     expect(valOf(r2, "glueConfig.numberOfWorkers")).toBe(50); // ceil(2000/40)=50(上限已放开到 1000)
   });
-  it("Glue 版本推平台缺省(清单最高,序 53;用户可降版)", () => {
+  it("Glue 版本推平台缺省(清单最高,;用户可降版)", () => {
     const r = rec({ channel: "glue-etl", workload: { estimatedDataGB: 50 } });
     expect(valOf(r, "glueConfig.glueVersion")).toBe(GLUE_VERSION_DEFAULT);
   });

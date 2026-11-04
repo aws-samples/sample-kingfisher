@@ -1,8 +1,8 @@
-// 序 73 模块 57(57 DESIGN §4)—— 离线作业节点的**发布期解析**判据:
+// 离线作业节点的**发布期解析**判据
 //   ① 三拒:作业不存在 / 项目不符 / 不绑该区 ⇒ JobNodeUnbound(code JOB_NODE_UNBOUND,点名节点与作业);
 //   ② spec 与单作业载体**逐字段相等**:resolveJobNodeSpec 的产物 === 唯一作者 serverlessJobSpecFor / emrJobSpecFor 用同一组事实算出的那份
 //      (dag-fanout / schedule-fanout 调的也是这两个作者 —— 源码字面钉住),字段集合闭合;
-//   ③ 同步节点落点一致性(R5 / B-141 ①):任务绑在别的区 ⇒ 拒;任务不存在 ⇒ 拒;
+//   ③ 同步节点落点一致性:任务绑在别的区 ⇒ 拒;任务不存在 ⇒ 拒;
 //   ④ 零作业节点 ⇒ 零次 DDB 读、工作流对象原样返回(存量工作流产物不变)。
 // 只 mock 真外部(DynamoDB 文档客户端 / 落点解析器 / 主控区 / EMR 环境常量);spec 作者、锁名、Glue 作业名、PlaceWire 全是真实现。
 import { describe, it, expect, vi, beforeEach } from "vitest";

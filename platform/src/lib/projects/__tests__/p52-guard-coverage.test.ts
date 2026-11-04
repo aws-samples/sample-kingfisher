@@ -1,5 +1,4 @@
-// @kf-batch 52-P52.1-guards
-// P52.1 越权面**守卫覆盖**门禁(52 SPEC §2 缺口B 的 13 面 + 缺口A 的 monitor/runs)。
+// 越权面**守卫覆盖**门禁(52 SPEC §2 缺口B 的 13 面 + 缺口A 的 monitor/runs)。
 //
 // 【为什么是文本级】route 是 Next.js 薄层,仓内没有单测 Next route 的先例(要造 NextRequest /
 // app-router 上下文);真实 403 行为归无头页面级验收。但"**某个越权面的守卫被删了/忘了**"
@@ -48,11 +47,11 @@ interface Face {
 }
 
 /**
- * 🔴 **13 面 + 1**(SPEC §2 缺口B 13 面;`monitor/runs` 属缺口A,**刻意归 P52.2**,见 §11.3)。
+ * 🔴 **13 面 + 1**(SPEC §2 缺口B 13 面;`monitor/runs` 属缺口A,**刻意**,见 §11.3)。
  * 这张表就是"哪些面必须有守卫"的机器可读版本。删一行 = 放弃一个面,必须在这里显式发生。
  */
 const FACES: Face[] = [
-  // ── 本批(P52.1)补上的 10 面 ──────────────────────────────────────────
+  // ── 本批补上的 10 面 ──────────────────────────────────────────
   {
     route: "workflow/airflow/route.ts",
     guards: ["isPlatformAdmin"],
@@ -83,7 +82,7 @@ const FACES: Face[] = [
 const DEFERRED = [
   {
     route: "monitor/runs/route.ts",
-    to: "P52.2",
+    to: "runs-carry-project-id",
     why: "bgp-task-runs 现无 projectId 字段;现在加项目过滤会让非默认项目的存量 run 全部消失(监控页空白)",
   },
 ];
@@ -121,7 +120,7 @@ export async function POST(req: NextRequest) { return apiOk({}); }
   });
 });
 
-describe("🔴 P52.1:越权面守卫覆盖", () => {
+describe("🔴 越权面守卫覆盖", () => {
   it("面数与台账一致(改动这个数字必须同步改 52 DESIGN §11)", () => {
     // 13 面(SPEC §2 缺口B)= 本批 10 + 此前已关闭 5 ⇒ 15?不:已关闭的 5 面里
     // `redshift/schemas` 是 SPEC v1.2 补的第 13 面,`result/[id]` 归 S0 ⇒ 表里共 15 行,
@@ -182,7 +181,7 @@ describe("🔴 P52.1:越权面守卫覆盖", () => {
   it("刻意推迟的面显式登记(不许静默消失)", () => {
     for (const d of DEFERRED) {
       expect(existsSync(resolve(API, d.route)), `${d.route} 不存在`).toBe(true);
-      expect(d.to).toBe("P52.2");
+      expect(d.to).toBe("runs-carry-project-id");
       expect(d.why.length).toBeGreaterThan(10);
     }
   });

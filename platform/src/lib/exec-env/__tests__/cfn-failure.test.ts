@@ -1,4 +1,3 @@
-// @kf-batch 50-WP16-zero-egress
 // `eip-preflight.test.ts` 的继任者:EIP 预检随零出网下线,但 CFN 失败原因翻译器留了下来(见 cfn-failure.ts 的说明)。
 import { describe, it, expect } from "vitest";
 import { explainCfnFailure, EIP_QUOTA_CODE } from "@/lib/exec-env/cfn-failure";

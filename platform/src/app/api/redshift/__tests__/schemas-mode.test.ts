@@ -1,4 +1,4 @@
-// 序 49 ⑦ UX ③ —— `GET /api/redshift/schemas?mode=schemas`:只列 schema 名(含空 schema),给「新建表」向导的 schema 下拉用。
+// UX ③ —— `GET /api/redshift/schemas?mode=schemas`:只列 schema 名(含空 schema),给「新建表」向导的 schema 下拉用。
 // 只 mock 真外部:项目守卫、直查落点解析、Redshift Data(directQueryRaw)。路由本体 ↔ 两种 SQL ↔ 响应形状真装配。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";

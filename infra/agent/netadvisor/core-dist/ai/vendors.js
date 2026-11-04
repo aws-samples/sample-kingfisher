@@ -1,6 +1,5 @@
 "use strict";
-// @kf-batch 51-v2-multi-vendor
-// 模块 51 v2.0 — **厂商档案(唯一作者)**:系列 / 地理前缀 / 可选判定 / inferenceConfig 字段支持 / 推理块 / maxTokens 系数
+// **厂商档案(唯一作者)**:系列 / 地理前缀 / 可选判定 / inferenceConfig 字段支持 / 推理块 / maxTokens 系数
 // (51 DESIGN §12 D3′ / D10;SPEC §7.1)。
 //
 // 🔴 零 `@/` 依赖、零 AWS SDK 依赖:本目录由 scripts/core-prebuild.sh(能力 `ai`)编成 CJS 分发到三个 AgentCore 容器的
@@ -13,7 +12,7 @@
 //   · zai(GLM 5,以 zai.glm-5 实测;glm-5.3 本体账号级未开放):temperature / topP 收,stopSequences 拒;无推理块
 //   · anthropic / openai:三字段都收(现状)
 // 运行期若遇到档案没记的「不支持字段」,converse-shape.ts 会学下来并同层重试一次 —— 档案是底线,不是天花板。
-// 探测预算来自 2026-10-20 临时账号真 converse(序 46 / B-106):Kimi K3 tiny invoke(maxTokens 24)与 tool-use 探测各 8 次采样 3.0–39.4s,
+// 探测预算来自 2026-10-20 临时账号真 converse:Kimi K3 tiny invoke(maxTokens 24)与 tool-use 探测各 8 次采样 3.0–39.4s,
 //   10s 预算下 5 次超时且被归成「限流」⇒ 页面保存随机失败 ⇒ 预算按系列给(probeTimeoutMs),超时单列 Timeout 类。
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GEO_PREFIX_RE = exports.FAMILIES = exports.VENDORS = exports.INFERENCE_FIELDS = void 0;

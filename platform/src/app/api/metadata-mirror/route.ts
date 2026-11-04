@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3-mirror
 // GET /api/metadata-mirror —— 跨地域一屏只读元数据总览的**读端点**(50 SPEC §3.13 / INTERACTION §4quater)。
 //
 // 🔴 **为什么不在 `/api/admin/` 下**(与 50 SPEC §2.1 原写法的订正,已回灌合同):

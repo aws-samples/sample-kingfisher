@@ -11,7 +11,6 @@ import { pushSqlLineageToOpenMetadata } from "@/lib/openmetadata/om-push";
 import { recordComputeLineage } from "@/lib/governance/lineage-service";
 import { parseSqlLineage } from "@/lib/lineage/sql-lineage";
 import { availableActions, getRequirement, isAssignee, linkEtlJob } from "@/lib/requirements/service";
-// @kf-batch 50-WP31-place-first-class(B-36)
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { assertBindableTargetsForEngine, TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
@@ -37,13 +36,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   const body = await req.json().catch(() => ({}));
   const name = String(body?.name || `需求-${r.title}`).slice(0, 120);
-  // @kf-batch 50-WP31-place-first-class(B-36)—— 🔴 绑定区必须点名,且走与 `/api/etl-jobs` **同一套**绑定校验
+  // 🔴 绑定区必须点名,且走与 `/api/etl-jobs` **同一套**绑定校验
   //   (准入 / 组件 / 项目白名单 / Glue 只许主控区)。原来直写 DDB、不带区、工作组写死主控区 ⇒ 需求建出的作业永远是主控区的。
   //   并且绑定区必须含「这份代码是按哪个区生成的」:否则 = 按 A 区的表生成、却建成 B 区作业(表在 B 区根本不存在)。
   let boundTargets: string[];
   try {
     boundTargets = await assertBindableTargetsForEngine(targetType, requestedTargets(body, "需求创建作业"), "redshift", {
-      scope: "per-project", // @kf-batch 50-WP11b-shared-writer —— scope 必填(无默认值)
+      scope: "per-project", // scope 必填(无默认值)
       projectId: r.projectId,
     });
   } catch (e) {

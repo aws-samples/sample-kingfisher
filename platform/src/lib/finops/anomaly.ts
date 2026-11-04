@@ -1,4 +1,4 @@
-// 模块 40 — 成本异常检测 + 双路闭环(34 通道推送 + 43-A 知识库沉淀)。
+// 成本异常检测 + 双路闭环(34 通道推送 + 43-A 知识库沉淀)。
 // 隔离红线:只 import 现有稳定导出(alerting dispatch/putEventIfNew、incidents store),
 // 不改其任何代码;写 bgp-incidents 走数据面(/incidents 页与诊断 grounding 自然可见)。
 
@@ -11,12 +11,10 @@ import { DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 import { detectSpike } from "./anomaly-core";
 import { costSignature } from "./cost-signature";
 import { listCostDaily, scanAllCostRuns } from "./store";
-// @kf-batch 50-WP4ter-coverage
 import { filterRowsByScalar, scalarTargetOf, type TargetScope } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP6-cost-by-region
 import { isRegionlessCost } from "./types";
 import type { CostAnomaly } from "./types";
-// 模块47 P4.0:在线隔离标常量(单一定义,与 baseline/learn.ts 同源 copilot/plan/types.ts)。
+// P4.0:在线隔离标常量(单一定义,与 baseline/learn.ts 同源 copilot/plan/types.ts)。
 import { COPILOT_TRIGGERED_BY } from "@/lib/copilot/plan/types";
 
 // 成本是账号级横切数据,固定落默认工作区分区("proj-default"——务必用常量,
@@ -36,9 +34,9 @@ function prevMonthOf(date: Date): string {
 // ── 检测(纯读)────────────────────────────────────────────────
 
 // 任务级:每任务最新一次 run 成本 vs 该任务历史 run 成本(排除 backfill 与 copilot 触发,43-B 硬约束同款)。
-// 模块47 P4.0:补 copilot 排除——补数与 Copilot 代执行都是非常规触发,会污染成本异常检测基线。
+// P4.0:补 copilot 排除——补数与 Copilot 代执行都是非常规触发,会污染成本异常检测基线。
 /**
- * @kf-batch 50-WP4ter-coverage —— 🔴 **按区检测**(工单 SC-11)。
+ * 🔴 **按区检测**。
  *
  * 为什么过滤要发生在**算基线之前**:这与告警 `evaluate.ts` 的池化病是同一个 ——
  * 把两个区的历史成本混在一个基线里,一个区的突增会被另一个区的均值稀释,结果是**不报异常**。
@@ -49,7 +47,7 @@ export async function detectTaskAnomalies(opts?: { scope?: TargetScope }): Promi
   if (opts?.scope) {
     all = filterRowsByScalar(all as unknown as Array<Record<string, unknown>>, opts.scope, "cost") as unknown as typeof all;
   }
-  // @kf-batch 50-WP6-cost-by-region(WP-6 施工序 4,E-174)—— 🔴 基线按 **(task, target)** 分组,不是按 task。
+  // 🔴 基线按 **(task, target)** 分组,不是按 task。
   // 不带 target 维的后果(本包的变异用例钉住):同一个任务扇出到两个区,两区的 run 并进同一条基线 ——
   //   · A 区每次 $1、B 区每次 $10 ⇒ 池化中位数落在 $1 附近,B 区一次**完全正常**的 $10 被报成 10× 突增;
   //   · 反过来 A 区真的从 $1 涨到 $5,却因为「最新一条」恰好是 B 区的 run 而根本没被检查。
@@ -93,7 +91,7 @@ export async function detectTaskAnomalies(opts?: { scope?: TargetScope }): Promi
 
 // 服务级:昨日服务成本 vs 近 30 日该服务日成本分布。
 /**
- * @kf-batch 50-WP6-cost-by-region —— 🔴 基线按 **(service, region)** 分组(与任务级按 target 同一条道理):
+ * 🔴 基线按 **(service, region)** 分组(与任务级按 target 同一条道理):
  * 账单已按区采(v2),把两个区的同一服务并成一条基线,一个区的突增会被另一个区稀释。
  * `regions` 给了就只检这些区(单区视角);无区域归属的全局服务只在全部视角(`regions` 缺省)下检 ——
  * 它们不属于任何区,不许挂到某个区的视角里。
@@ -148,7 +146,7 @@ export async function settleAnomalies(anomalies: CostAnomaly[]): Promise<CostAno
   for (const a of anomalies) {
     const engine = a.scope === "task" ? a.engine || "unknown" : "finops";
     const sig = costSignature(a, engine);
-    // @kf-batch 50-WP6-cost-by-region —— 🔴 去重键带「属于哪里」:不带的话 A 区先报了,同一天 B 区
+    // 🔴 去重键带「属于哪里」:不带的话 A 区先报了,同一天 B 区
     // 同一任务的突增会被当成「已推过」吞掉(与告警窗口桶键不带 targetId 是同一个病)。
     const where = a.scope === "task" ? a.targetId : a.region;
     const dedupeKey = `cost#${a.scope}#${a.key}#${where}#${a.date}`;

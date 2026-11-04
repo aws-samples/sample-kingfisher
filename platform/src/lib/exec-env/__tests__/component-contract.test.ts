@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // component-contract.ts —— 探活项↔组件归属 + 「精确 green 覆盖」判定的单测。
 // 🔴 SSOT 钉:这里列的 green 态 item 名必须与 probe-runner.ts runProbe() 的产物一致(改 probe-runner 命名必同步)。
 import { describe, it, expect } from "vitest";
@@ -8,8 +7,8 @@ import { fileURLToPath } from "node:url";
 import { componentForProbeItem, isGreenProbeForComponents } from "@/lib/exec-env/component-contract";
 
 // probe-runner.ts runProbe() 的 **green 态** item 名(逐项对照该文件):
-// @kf-batch 50-W5-seg1-WP3:+emrExecutionRoleArn(core 键,描述符有才出项)
-// 序 48 / B-105:+lake:s3tablescatalog(区级 S3 Tables 联邦目录,core 袋)
+// +emrExecutionRoleArn(core 键,描述符有才出项)
+// +lake:s3tablescatalog(区级 S3 Tables 联邦目录,core 袋)
 const CORE_ITEMS = ["datalakeBucket", "scriptsBucket", "tableBucket", "athenaWorkgroup", "emrSecurityGroupId", "glueRoleArn", "emrExecutionRoleArn", "lake:s3tablescatalog"];
 const NON_CORE = {
   redshift: ["redshift:workgroup", "redshift:copy-role"],
@@ -17,7 +16,6 @@ const NON_CORE = {
   dms: ["dms:subnet-group", "dms:kinesis-role"],
   flink: ["flink:role"],
   agentcore: ["agentcore:runtime", "agentcore:memory", "agentcore:gateway"],
-  // @kf-batch 50-W5-seg1-WP10a
   "residency-api": ["residency-api:audit-table", "residency-api:results-table", "residency-api:bucket"],
 };
 const ok = (name: string) => ({ name, ok: true });
@@ -65,11 +63,11 @@ describe("isGreenProbeForComponents(精确 green 覆盖)", () => {
   });
 });
 
-// 🔴 B-105 棘轮(2026-10-19 …7237 序 48 演练抓到):上面手抄的项名清单本身就是漂移源 —— 探活器加了 `lake:s3tablescatalog`,
+// 🔴 棘轮(2026-10-19 …7237 演练抓到):上面手抄的项名清单本身就是漂移源 —— 探活器加了 `lake:s3tablescatalog`,
 //   这里没人补,两侧单测照旧全绿,而真环境里所有执行环境的「精确 green 覆盖」恒 false(新区永远进不了 testing、存量区全降级)。
 //   ⇒ 不再只靠手抄:直接读 probe-runner.ts 源码,把每个探活项名字面量逐个过 componentForProbeItem;装配层另有
-//   probe-runner.test.ts「B-105 装配」用真跑的产物再钉一次(两道网:源码字面量 + 运行时产物)。
-describe("🔴 B-105 棘轮:probe-runner.ts 里每个探活项名字面量都必须归属到某个组件", () => {
+//   probe-runner.test.ts「装配」用真跑的产物再钉一次(两道网:源码字面量 + 运行时产物)。
+describe("🔴 棘轮:probe-runner.ts 里每个探活项名字面量都必须归属到某个组件", () => {
   const HERE = dirname(fileURLToPath(import.meta.url));
   const RUNNER_SRC = readFileSync(resolve(HERE, "../probe-runner.ts"), "utf8");
   // sdkClient("<plane>", …) 的第一个参数也是 `x:y` 形(如 central:agentcore),不是探活项 ⇒ 按调用位置排除,不按名字排除

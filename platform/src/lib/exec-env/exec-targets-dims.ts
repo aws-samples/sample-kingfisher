@@ -1,9 +1,8 @@
-// @kf-batch 50-B109-exec-target-dims
 // `GET /api/exec-targets?component=` 认的**组件维度闭合清单** —— 路由校验与页面传参的单一作者。
 // 零依赖叶子模块(没有 "use client",服务端路由与客户端读法都从这里 import;客户端文件带 "use client",
 // 服务端若从它 import 常量会拿到客户端引用代理,所以清单不能放在 exec-targets-client.ts 里)。
 //
-// 🔴 B-109(2026-10-20 测试账号 contract-guard 定性时抓到;2026-09-16 接线那一刻就坏):
+// 🔴 (2026-10-20 测试账号 contract-guard 定性时抓到;2026-09-16 接线那一刻就坏):
 //   编排页传 "airflow"、治理目录「新建表」向导的 S3 Tables 分支传 "core",而路由只认 redshift / any
 //   ⇒ 每次 400 VALIDATION_FAILED 被页面 `.catch(() => [])` 吞成空列表 ⇒ 「执行区域(可多选)」永远空、
 //   「全选当前活跃区(0)」灰 ⇒ 多区扇出入口在页面上不可用;建表向导则在切到 S3 Tables 后挂一条红告警。

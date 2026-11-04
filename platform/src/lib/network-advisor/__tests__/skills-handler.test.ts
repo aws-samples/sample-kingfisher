@@ -37,7 +37,7 @@ function facts(v: VpcFact[], degraded = false): EnvironmentFacts {
     degraded, missing: [], capturedAt: "2026-07-01T00:00:00Z",
   };
 }
-// @kf-batch 41-B115-netadvisor-place —— 技能 Lambda 只收**已落点**的请求(targetId + 描述符解析出的 region)
+// 技能 Lambda 只收**已落点**的请求(targetId + 描述符解析出的 region)
 const req: PlacedConnectivityRequest = { computeKind: "glue", targets: [{ kind: "rds", instanceId: "db1" }], targetId: "tgt_home", region: "us-east-1" };
 
 // Gateway 编码工具名 "<target>___<tool>" 的 context。

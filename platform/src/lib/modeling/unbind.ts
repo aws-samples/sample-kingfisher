@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP11a
 // 建模产物「解绑 / 解绑并清理」的**服务端编排**(50 SPEC v3.20 §3.8)—— 唯一作者。
 //
 // 🔴🔴 顺序即语义:**先 DROP、观测为空、再去记录**。
@@ -20,7 +19,7 @@ export interface PerformUnbindArgs<TRow> {
   confirm?: string | null;
   schema: string;
   table: string;
-  // @kf-batch 50-WP11b-shared-writer —— 原 `projectId?` 已删(建模没有项目维,所有调用点都是 undefined);
+  // 原 `projectId?` 已删(建模没有项目维,所有调用点都是 undefined);
   //   非主控区的 DROP 走 admin 模板 `drop-landed-table`,它只收台账 id + 具名操作者。
   kind: ModelingObjectKind;
   objectId: string;

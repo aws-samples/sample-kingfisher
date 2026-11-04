@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 54-genbi-session-cards
 // POST /api/genbi/cards        保存 / 更新一段对话为卡片(54 DESIGN v1.3 §5.1)
 // GET  /api/genbi/cards?scope= 我的卡片列表(§5.2)
 //
@@ -13,7 +12,6 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { readScope, filterRowsByScalar } from "@/lib/exec-env/scope";
 import { attachTitles, listCards, saveCard } from "@/lib/genbi/cards-service";
 import { cardsError } from "@/lib/genbi/cards-http";
-// @kf-batch 50-WP31-place-first-class
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 
@@ -60,7 +58,7 @@ export async function POST(req: NextRequest) {
       projectId: pctx.projectId,
       // 🔴 落点从 body 显式来(写/执行路由不读 `?scope=`,SPEC §2.6.3);**不缺省 home** ——
       //    这段对话的数据来自哪个区,正文就只能存在那个区。
-      // @kf-batch 50-WP31-place-first-class —— 经点名作者(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+      // 经点名作者(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
       targetId: requestedTargetId(body.targetId, "保存问数卡片"),
       engine: body.engine === "athena" ? "athena" : "redshift",
       // 🔴 库名要随正文存下来 —— 打开卡片时的**重脱敏**靠它拼 FQN(缺了会让重脱敏变 no-op)。

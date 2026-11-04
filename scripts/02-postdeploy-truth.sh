@@ -5,7 +5,7 @@
 #   ./scripts/02-postdeploy-truth.sh <aws-profile> [region]
 #
 # 🔴 为什么(docs/DEPLOY-RUNBOOK.md §5):`deploy-all` 退出 0 只覆盖它自己想到的判据 ——
-#   「绿的只是当时想到的东西」。这 10 条是真值查询(序 43 B-91 加到 10),哪一条红就说明平台**装好了但不可用**。
+#   「绿的只是当时想到的东西」。这 10 条是真值查询(加到 10),哪一条红就说明平台**装好了但不可用**。
 #   这一串命令以前只写在手册里 ⇒ 换账号就得人肉敲(而人肉会漏)。
 #
 # 🔴 这**不是**无头页面验收的替代品:它查的是基础设施与接线的真值;
@@ -111,7 +111,7 @@ HS=$(aws dynamodb get-item $P --table-name bgp-execution-envs \
        --query 'Item.status.S' --output text 2>/dev/null || true)
 [ "$HS" = "active" ] && ok "tgt_home = active" || bad "tgt_home 状态 = ${HS:-没有这一行}(应为 active)"
 
-sec "10) S3 Tables 联邦目录 s3tablescatalog 在(没有它数据湖直查 / 问数一律 CATALOG_NOT_FOUND;序 43 B-91)"
+sec "10) S3 Tables 联邦目录 s3tablescatalog 在(没有它数据湖直查 / 问数一律 CATALOG_NOT_FOUND)"
 # 🔴 不是 CDK 资源:由 deploy-all 6.3 / redeploy-platform 3c 开通。读不到与不存在这里都算不过(都得先修才可用)。
 CAT=$(aws glue get-catalog $P --catalog-id s3tablescatalog --query 'Catalog.FederatedCatalog.ConnectionName' --output text 2>/dev/null || true)
 [ "$CAT" = "aws:s3tables" ] && ok "s3tablescatalog 在(FederatedCatalog aws:s3tables)" \

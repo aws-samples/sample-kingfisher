@@ -1,4 +1,4 @@
-// 模块 37 v4 — 分析看板筛选器注入(纯函数,零副作用,可单测)。整合的核心抽象。
+// 分析看板筛选器注入(纯函数,零副作用,可单测)。整合的核心抽象。
 //
 // 根治"筛选没生效":旧仪表盘筛选器靠 SQL 里 {{key}} 占位符注入,而可视化配置(不写 SQL)编译出的
 // SQL 无占位符 → 过滤无效。这里对「可视化配置」的视觉对象,把命中作用域的筛选器 (field, value)
@@ -104,6 +104,6 @@ export function resolveWidgetSource(
     return { source, passthroughFilters: pf, passthroughValues: pv };
   }
 
-  // ── dataapi:原样透传(能力已于 2026-09-05 下线,@kf-batch 50-W5-seg2-WP1;路由里 executeBiDataApi 会抛 410 同一句)──
+  // ── dataapi:原样透传(能力已于 2026-09-05 下线,;路由里 executeBiDataApi 会抛 410 同一句)──
   return { source, passthroughFilters: [], passthroughValues: {} };
 }

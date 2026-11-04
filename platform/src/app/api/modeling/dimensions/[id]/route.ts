@@ -7,13 +7,13 @@ import { recordAudit } from "@/lib/audit";
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
 import { resourceKey } from "@/lib/long-ops/kinds";
 
-// 模块 35 P1 D3: 维度/事实表 改 / 删(仅平台管理员)。
+// D3: 维度/事实表 改 / 删(仅平台管理员)。
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   if (!identity.isPlatformAdmin) return apiError("仅平台管理员可管理维度/事实表", 403);
-  // 模块 55 §2.8 对象租约:应用 / 解绑进行中不许改定义
+  // §2.8 对象租约:应用 / 解绑进行中不许改定义
   const busy = await resourceBusyResponse([resourceKey("dimension", params.id)]);
   if (busy) return busy;
   const body = await req.json().catch(() => ({}));
@@ -32,8 +32,8 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);
   if (!identity.isPlatformAdmin) return apiError("仅平台管理员可管理维度/事实表", 403);
-  // @kf-batch 50-W5-seg1-WP11a —— 删定义受控(与码表同一条;确认串 = 物理表名)。
-  // 模块 55 §2.8 对象租约:应用 / 解绑进行中不许删定义(与码表同一条)
+  // 删定义受控(与码表同一条;确认串 = 物理表名)。
+  // §2.8 对象租约:应用 / 解绑进行中不许删定义(与码表同一条)
   const busy = await resourceBusyResponse([resourceKey("dimension", params.id)]);
   if (busy) return busy;
   const sp = req.nextUrl.searchParams;

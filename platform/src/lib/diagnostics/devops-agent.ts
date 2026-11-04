@@ -1,11 +1,11 @@
-// 模块 25 — AWS DevOps Agent（signingName: aidevops）封装。
+// AWS DevOps Agent（signingName: aidevops）封装。
 // 用真实 AWS 托管服务做故障诊断：发现/创建 Agent Space → 建会话 → 发送故障证据 →
 // 收集 Agent 的调查回复文本，作为诊断报告。Agent 会自主关联 CloudWatch 日志/指标等。
 //
 // 注意：不硬编码 Agent Space id（按名 bgp-devops-agent 发现/创建），临时账号回收后自愈。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   DevOpsAgentClient,

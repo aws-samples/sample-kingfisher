@@ -1,11 +1,10 @@
-// @kf-batch 50-W5-seg1-WP10a
 // Glue 作业名的**唯一作者**(per-target)。
 //
-// 【为什么要有这个文件(2026-09-05 真环境 E-142 抓到的隔离洞)】原来作业名 = `bgp-etl-<jobId 尾 12 位>`,并刻意「跨区同名」:
+// 【为什么要有这个文件(2026-09-05 真环境抓到的隔离洞)】原来作业名 = `bgp-etl-<jobId 尾 12 位>`,并刻意「跨区同名」:
 //   Glue 作业是 region 作用域,不同 region 同名不冲突 ⇒ home 存量不变、DAG 不必按区改名、作业行只存一个名字。
 //   这个前提在**同一 region 有两个 target**(tgt_usw2_a / tgt_usw2_b)时就破了:扇出逐 target `ensureGlueJob`
 //   对**同一个** Glue 作业名 Create/Update,后写的 target 把前一个 target 的 Role / 脚本桶 / `--bgp_*` 参数**整个盖掉**
-//   ⇒ tgt_usw2_a 的 run 实际用 tgt_usw2_b 的执行角色跑(w3i E-142 当场红)。这是跨 target 的 IAM / 数据面边界被静默打穿,
+//   ⇒ tgt_usw2_a 的 run 实际用 tgt_usw2_b 的执行角色跑(w3i 当场红)。这是跨 target 的 IAM / 数据面边界被静默打穿,
 //   与 SPEC §6.1「资源面限本 target」直接冲突。
 //
 // 【修法】非 home 的作业名带 target slug:`bgp-etl-<id12>-<slug>`;home 保持 `bgp-etl-<id12>`(存量逐字节不变)。

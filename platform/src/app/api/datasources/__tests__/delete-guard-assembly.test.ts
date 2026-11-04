@@ -1,10 +1,10 @@
-// 序 58 B-130 / 序 59 B-131 —— 删数据源路由的装配层判据
+// 删数据源路由的装配层判据
 //   (路由 ↔ lib/datasource/references ↔ lib/datasource/sg-cleanup-job ↔ dataplane-jobs store / runner ↔ datasource-service ↔ SDK)。
 // 🔴 只 mock 真外部:DDB(内存假表,真求值条件写)、EC2 / Glue / RDS / Secrets / S3 客户端工厂、项目守卫、审计。平台模块之间一律不 mock。
 //
 // 判据:
-//   B-131 ① 仍被同步任务引用 ⇒ 409 DATASOURCE_IN_USE,文案点名任务,源行还在,一个 AWS 删除调用都没发、没有入队;② 实时计算作业引用同理;
-//   B-130 ③ 无引用、平台自建组、同步删组成功 ⇒ 200 deleted 无 pendingCleanup;**入队发生在动任何资源之前**;作业行 kind=sg-cleanup / queued /
+//   ① 仍被同步任务引用 ⇒ 409 DATASOURCE_IN_USE,文案点名任务,源行还在,一个 AWS 删除调用都没发、没有入队;② 实时计算作业引用同理;
+//   ③ 无引用、平台自建组、同步删组成功 ⇒ 200 deleted 无 pendingCleanup;**入队发生在动任何资源之前**;作业行 kind=sg-cleanup / queued /
 //            state 带 sgId · region · datasourceId;审计 securityGroupCleanup=deleted;泵推进一步 ⇒ 组已不在 ⇒ succeeded(gone);
 //         ④ 同步删组撞 DependencyViolation ⇒ 200 带 pendingCleanup + cleanupJobIds,审计 scheduled;泵:网卡 1 ⇒ waiting(eniCount=1),
 //            网卡 0 ⇒ Delete ⇒ succeeded(deleted);
@@ -44,7 +44,7 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
     docClient: {
       send: async (c: any) => {
         const table = c.input?.TableName;
-        if (table === "bgp-long-ops") return {}; // 模块 55 对象租约:没有租约 = 空
+        if (table === "bgp-long-ops") return {}; // 对象租约:没有租约 = 空
         if (table === "bgp-dataplane-jobs" && c.constructor.name === "PutCommand") {
           if (h.failEnqueue) throw Object.assign(new Error("ddb down"), { name: "InternalServerError" });
           h.events.push("enqueue");
@@ -135,7 +135,7 @@ beforeEach(() => {
   h.depFail = false; h.enis = 0; h.failEnqueue = false;
 });
 
-describe("🔴 B-131 删源前核引用", () => {
+describe("🔴 删源前核引用", () => {
   it("① 仍被同步任务引用 ⇒ 409 DATASOURCE_IN_USE 点名任务;源行还在;零 AWS 删除调用;不入队", async () => {
     seedDatasource(PLATFORM_NET);
     h.ddb.put("bgp-sync-tasks", { userId: USER, taskId: "t1", name: "orders 日同步", datasourceId: DSID, channel: "glue", status: "idle" });
@@ -163,7 +163,7 @@ describe("🔴 B-131 删源前核引用", () => {
   });
 });
 
-describe("🔴 B-130 平台自建安全组:入队在前,按网卡事实收口", () => {
+describe("🔴 平台自建安全组:入队在前,按网卡事实收口", () => {
   it("③ 同步删组成功 ⇒ 200 无 pendingCleanup;入队先于任何资源删除;作业 queued 带 state;审计 deleted;泵推进 ⇒ gone ⇒ succeeded", async () => {
     seedDatasource(PLATFORM_NET);
     const res = await del();

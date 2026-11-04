@@ -1,4 +1,4 @@
-// 序 38 B-68 —— 「按名字建 / 更新一个 Glue 作业」的唯一作者(同步作业 start-run.ts、数据源发现作业 glue-reach.ts 都走这里;
+// 「按名字建 / 更新一个 Glue 作业」的唯一作者(同步作业 start-run.ts、数据源发现作业 glue-reach.ts 都走这里;
 //   离线作业 etl/job-service.ts 早已是同一形状,本文件把它抽成可复用的函数)。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】同步作业原来「先 CreateJob,报 already exists 才 UpdateJob」:
@@ -54,7 +54,7 @@ export function isGlueEntityNotFound(e: unknown): boolean {
 /**
  * CreateJob 回「作业已经在了」的两种说法:AlreadyExistsException「already exists」(定义相同)与
  * IdempotentParameterMismatchException「Job already submitted with different configuration」(定义不同)。
- * 两种都意味着「存在 ⇒ 该走 UpdateJob」;后者正是 B-68 原来漏掉的那一种。导出供判据钉住这张清单。
+ * 两种都意味着「存在 ⇒ 该走 UpdateJob」;后者正是原来漏掉的那一种。导出供判据钉住这张清单。
  */
 export function isGlueJobAlreadyThere(e: unknown): boolean {
   const err = (e ?? {}) as { name?: string; message?: string };

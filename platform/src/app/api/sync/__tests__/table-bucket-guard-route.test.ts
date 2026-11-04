@@ -1,7 +1,7 @@
-// @kf-batch 56-B127-exec-env-own-table-bucket —— 建任务 / 改任务对「自带 Table Bucket」的准入(路由层行为判据)。
+// 建任务 / 改任务对「自带 Table Bucket」的准入(路由层行为判据)。
 //   mock 形态照抄 s3-overwrite-guard-route.test.ts 的真外部边界(DDB、身份、注册表、审计 / 版本 / 血缘);**不** mock lib/sync/table-bucket
 //   与 data-plane-target(落点从注册表描述符真解析)—— 要钉的就是「保存路由真接上了这份判定」。
-//   任务都用 writeMode=append(不整表清空 ⇒ 不走 S3 Tables 探表,免得把 B-60 的夹具再搬一份)。
+//   任务都用 writeMode=append(不整表清空 ⇒ 不走 S3 Tables 探表,免得把该缺陷的夹具再搬一份)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.setConfig({ testTimeout: 30_000 });
@@ -94,7 +94,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("🔴 B-127 建任务 POST /api/sync:非主控区自带 Table Bucket 的准入", () => {
+describe("🔴 建任务 POST /api/sync:非主控区自带 Table Bucket 的准入", () => {
   it("未登记的自有桶 ⇒ 400 VALIDATION_FAILED,文案点名桶 / 平台表桶 / 去登记;零落库", async () => {
     const r = await req("../route", { ...base, s3Config: { tableBucket: "cust-own" } });
     expect(r.status, JSON.stringify(r.body)).toBe(400);
@@ -139,7 +139,7 @@ describe("🔴 B-127 建任务 POST /api/sync:非主控区自带 Table Bucket �
   });
 });
 
-describe("🔴 B-127 改任务 PUT /api/sync/[id]", () => {
+describe("🔴 改任务 PUT /api/sync/[id]", () => {
   it("把 Table Bucket 改成未登记的自有桶 ⇒ 400,不写库;改成已登记 ⇒ 200", async () => {
     h.task = { ...base, taskId: "T1", projectId: "p1", targets: [USW2] };
     const bad = await req("../[id]/route", { s3Config: { tableBucket: "cust-own" } }, "PUT", { id: "T1" });

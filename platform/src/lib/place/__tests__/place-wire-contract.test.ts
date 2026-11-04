@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 4(L6)—— **PlaceWire 五运行时契约**:同一组夹具喂给五个运行时的读取函数,结果必须逐条相同。
+// **PlaceWire 五运行时契约**:同一组夹具喂给五个运行时的读取函数,结果必须逐条相同。
 //
 //   ① Node 平台             lib/genbi/core/place-wire.ts(经 lib/place/wire.ts 用)
 //   ② AgentCore 容器        infra/agent/genbi/core-dist/place-wire.js(core-prebuild 编出来的**提交入库的产物**)
@@ -186,7 +185,7 @@ beforeAll(() => {
   };
 });
 
-describe("🔴🔴 WP-31 L6:PlaceWire 五运行时同夹具同结果", () => {
+describe("🔴🔴 L6:PlaceWire 五运行时同夹具同结果", () => {
   it("夹具面成立(派生夹具覆盖 schema 的每个必填 / 模式 / 未知字段;正反例都有)", () => {
     expect(CASES.length).toBeGreaterThan(40);
     const ref = RESULTS["① Node 平台"];
@@ -278,7 +277,7 @@ describe("🔴 接线:跨运行时传落点的生产者都经 buildPlaceWire(只
       .replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1")
       .replace(/^import [\s\S]*?;$/gm, "");
   it("调度 spec:ETL / EMR 两个生产者都写 place,且 spec 类型里没有旧的平面落点字段", () => {
-    // 序 73 模块 57:spec 字面量(含 place)搬进两个 spec 单一作者 lib/etl/job-spec.ts / lib/engines/emr/job-spec.ts;
+    // spec 字面量(含 place)搬进两个 spec 单一作者 lib/etl/job-spec.ts / lib/engines/emr/job-spec.ts;
     //   扇出(dag-fanout / schedule-fanout)与工作流离线作业节点都只调它们 ⇒ 判据钉到作者 + 调用点两头
     expect(code("lib/etl/dag-fanout.ts")).toMatch(/serverlessJobSpecFor\(job, targetId, \{/);
     expect(code("lib/etl/job-spec.ts")).toMatch(/place: serverlessPlaceOf\(targetId, facts\.endpointRegion, job\.type === "redshift" \? facts\.binding : undefined\)/);

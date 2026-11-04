@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-decommission
 // POST /api/admin/exec-envs/[targetId]/drain —— 删除流程第一步「停止承接」(SPEC §2.1 `drain {reason}`)。
 //
 // 🔴 与 `.../intent {intent:"drain"}` 是**同一个写通道**(`lifecycle.setSpecIntent`):本路由只多收一个 `reason`
 //   并把它留进审计(删除流程要回放「为什么停的」)。停接新活是同步生效的 —— 准入内核读 spec.intent,
-//   此后新绑定 / 新调度 / 新 run 一律 409 且拒因以「该执行环境已停止承接」开头(WP-30 ED-B1)。
+//   此后新绑定 / 新调度 / 新 run 一律 409 且拒因以「该执行环境已停止承接」开头(ED-B1)。
 // 🔴 home 不许(自断双腿,与 intent 路由同一口径);已批准删除(intent=delete)的不许改回(写通道里拒)。
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";

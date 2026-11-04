@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— 同步任务向导本地草稿(用户 2026-10-15:「任务配置失败了…退出后需要重新从头配置,最好增加一个临时保存」)。
+// 同步任务向导本地草稿(用户 2026-10-15:「任务配置失败了…退出后需要重新从头配置,最好增加一个临时保存」)。
 // 钉:① 空壳不存、有内容才存;② 读回逐键一致;③ 坏形状 / 过期 ⇒ null 且清掉;④ 新建与某 taskId 的草稿互不覆盖;⑤ storage 拿不到 / 抛错不打断。
 import { describe, it, expect } from "vitest";
 import { SYNC_DRAFT_TTL_MS, clearSyncDraft, describeDraftAge, isDraftWorthSaving, loadSyncDraft, saveSyncDraft, syncDraftKey, type DraftStorage } from "../wizard-draft";

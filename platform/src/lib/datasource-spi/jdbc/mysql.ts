@@ -1,4 +1,4 @@
-// 模块 42 — MySQL provider(JDBC 范式)。
+// MySQL provider(JDBC 范式)。
 //
 // 【行为保持重构】introspect/ping 的 SQL 与建连参数逐字收编自现有实现:
 //   introspect ← lib/datasource/schema-reader.ts:47-71(同一 INFORMATION_SCHEMA.COLUMNS 查询)
@@ -89,7 +89,7 @@ export const mysqlProvider = makeJdbcProvider(
     defaultPort: 3306,
     jdbcUrl: (h, p, d) => `jdbc:mysql://${h}:${p}/${d}`,
     paramStyle: "query",
-    // @kf-batch 44-jdbc-params(用户 2026-10-15 反馈 ①「同步遇到空时间戳脏数据报错」)—— 老业务库常见 `0000-00-00 00:00:00` 零值
+    // (用户 2026-10-15 反馈 ①「同步遇到空时间戳脏数据报错」)—— 老业务库常见 `0000-00-00 00:00:00` 零值
     //   日期 / 时间戳,Connector/J 默认 zeroDateTimeBehavior=EXCEPTION ⇒ Spark JDBC 读到这一行整个作业抛 `Zero date value prohibited`
     //   (…7698 p44a 真跑坐实)。按 NULL 读入:不丢行、不改好数据;目标表列本就可空(target-ddl 不写 NOT NULL)。用户填同名参数可覆盖。
     defaultParams: { zeroDateTimeBehavior: "CONVERT_TO_NULL" },

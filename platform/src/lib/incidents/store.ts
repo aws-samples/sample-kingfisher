@@ -1,4 +1,4 @@
-// 模块 43-A — 运维知识库存储层。bgp-incidents 单表两类 item 的读写:
+// 运维知识库存储层。bgp-incidents 单表两类 item 的读写
 //   · 归并 upsert 主档(条件建 + ADD occurrenceCount 幂等累加)
 //   · 条件写发生记录(attribute_not_exists 幂等去重,键含 diagnosticId)
 //   · 列表/详情查询(Query by pk,内存分类过滤)
@@ -25,7 +25,7 @@ export async function upsertMaster(input: {
   taskName: string;
   occurredAt: string;
   rootCauseSummary?: string;
-  // @kf-batch 50-WP4quater-reads(工单 SC-20)—— 这次发生在哪个区(从 run 行的章读来;取不到就 undefined)
+  // 这次发生在哪个区(从 run 行的章读来;取不到就 undefined)
   targetId?: string;
 }): Promise<void> {
   const pk = incidentPk(input.projectId);
@@ -47,7 +47,7 @@ export async function upsertMaster(input: {
         "    #version = if_not_exists(#version, :zero),",
         "    rootCauseSummary = :rc,",
         "    affectedTasks = :tasks,",
-        // @kf-batch 50-WP4quater-reads —— 这类故障发生过的区集合(与 affectedTasks 同一次读写合并)
+        // 这类故障发生过的区集合(与 affectedTasks 同一次读写合并)
         "    #targets = :targets",
         "ADD occurrenceCount :one",
       ].join(" "),
@@ -71,7 +71,7 @@ export async function upsertMaster(input: {
 // 读当前 affectedTasks + targets,各自合并去重(上限 50,防膨胀)。与 upsert 同事务窗口内的小竞态可接受
 // (低频写:诊断完成才触发),最终一致即可。
 //
-// @kf-batch 50-WP4quater-reads(工单 SC-20)—— 🔴 两个集合**必须在同一次 Get 里读**:
+// 🔴 两个集合**必须在同一次 Get 里读**:
 // 拆成两次读会多一个往返,而且两次读之间若有并发写,合出来的 affectedTasks 与 targets 会来自
 // 不同的快照(任务名列表与区列表对不上)。
 async function mergeMerged(

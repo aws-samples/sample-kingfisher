@@ -1,4 +1,3 @@
-// @kf-batch 50-WP5-rungroup
 // 步 5 接线门禁:定时确定性组键**真的被注进产物、算在正确的时刻、且 Python 语法是对的**
 // (50 SPEC v3.44 §3.17.2;ACCEPTANCE 段 `o2` ② 的三条门禁)。
 import { describe, it, expect } from "vitest";
@@ -17,7 +16,7 @@ const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const read = (rel: string) => readFileSync(resolve(SRC, rel), "utf8");
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1 ");
 
-describe("🔴🔴 注入的 Python 必须真的能编译(WP-17 那一批缺陷全是「产物到了服务侧才炸」)", () => {
+describe("🔴🔴 注入的 Python 必须真的能编译(那一批缺陷全是「产物到了服务侧才炸」)", () => {
   it("BGP_RUNTIME_PY 过 python3 -m py_compile", () => {
     const dir = mkdtempSync(join(tmpdir(), "kf-rt-compile-"));
     const f = join(dir, "bgp_runtime.py");
@@ -27,7 +26,7 @@ describe("🔴🔴 注入的 Python 必须真的能编译(WP-17 那一批缺陷�
   });
 
   it("模块里 import 了 hashlib(确定性键要用;漏了它是运行期 NameError,本地一个字看不出来)", () => {
-    // @kf-batch 37-emr-run-date —— 判据钉事实(hashlib 在模块级 import 行里)而不钉整行形状:序 37 给这行追加了 re, sys
+    // 判据钉事实(hashlib 在模块级 import 行里)而不钉整行形状:给这行追加了 re, sys
     expect(BGP_RUNTIME_PY).toMatch(/^import os, time, uuid, random, hashlib(, [a-z_, ]+)?$/m);
   });
 
@@ -80,7 +79,7 @@ describe("🔴 算键的时刻:必须在**抢锁之前**", () => {
     const withRg = src.match(/_record\(spec, run_id, "(succeeded|failed)"[^\n]*run_group_id=run_group_id\)/g) ?? [];
     expect(withRg.length).toBe(2);
   });
-  it("🔴 定时那条路径也要记 accepted(否则定时组的「定义版本」永远是「-」= E-168 的载体缺一半)", () => {
+  it("🔴 定时那条路径也要记 accepted(否则定时组的「定义版本」永远是「-」= 载体缺一半)", () => {
     // 🔴 **断计数,不断存在**:`def _run_group_accept(spec, run_group_id, run_id):` 这行定义
     //    本身就含同样的子串 ⇒ 只写 toContain 时把调用删掉照样绿(变异 V4 实测存活)。
     const occ = src.match(/_run_group_accept\(spec, run_group_id, run_id\)/g) ?? [];
@@ -92,8 +91,8 @@ describe("🔴 算键的时刻:必须在**抢锁之前**", () => {
   });
 
   it("`runGroupId` 只在算出来时才落到 run 行上(单区定时不许落一个空属性)", () => {
-    expect(src).toContain('if run_group_id:\n        # @kf-batch 50-WP5-rungroup');
-    expect(src).toContain('item["runGroupId"] = run_group_id');
+    // 钉事实:赋值必须在 `if run_group_id:` 分支体内(中间只许是注释行),不钉注释文字
+    expect(src).toMatch(/if run_group_id:\n(?: {8}#[^\n]*\n)* {8}item\["runGroupId"\] = run_group_id\n/);
   });
 });
 
@@ -105,7 +104,7 @@ describe("🔴 两个 fanout 生成器:分组判据是**全部绑定**而不是�
   for (const [rel, kind] of FANOUTS) {
     it(`${rel}(definitionKind = ${kind})`, () => {
       const src = strip(read(rel));
-      expect(isResourceType(kind), "definitionKind 必须落在模块 14 的 ResourceType 值域里").toBe(true);
+      expect(isResourceType(kind), "definitionKind 必须落在 ResourceType 值域里").toBe(true);
       expect(src).toContain(`const DEFINITION_KIND = "${kind}";`);
       expect(src).toContain("scheduledGroup: {");
       expect(src).toContain("definitionKind: DEFINITION_KIND,");

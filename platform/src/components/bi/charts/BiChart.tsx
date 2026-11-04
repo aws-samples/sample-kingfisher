@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 37 v2 — 统一图表入口 <BiChart>(ECharts 实现,屏蔽底层库)。
+// 统一图表入口 <BiChart>(ECharts 实现,屏蔽底层库)。
 // 只在 BI 模块内使用;不碰共享 charts.tsx。换肤:读 --bgp-* 编译 theme,监听 bgp-skin 变化重绘。
 // 支持 bar / line / pie / gauge / scatter;table/metric 由 WidgetRenderer 用 antd/自绘处理(不进这里)。
 

@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-3-p0e-baseline
 // 🔴 **真环境 P0 回归**(2026-09-03,用户实测报的那个):
 //    页面「检测初始化」报 `legacyCompletionFence 的 probe/desired/observed/input 非法或未精确覆盖组件`,
 //    且周期收养永远写不进 `observed`。
@@ -39,7 +38,7 @@ function permutations<T>(xs: T[]): T[][] {
 describe("🔴 组件清单是【集合】不是【序列】(真环境 P0 回归)", () => {
   it("真环境 home 清单的规范序 ≠ 原始序 —— 这正是原缺陷的触发条件(先把前提钉住)", () => {
     const canonical = orderComponents(REAL_HOME_COMPONENTS);
-    expect(canonical).toEqual(["core", "redshift", "dms", "flink", "mwaa", "agentcore"]); // WP-13:mwaa 已实现,进已实现序;agentcore 仍排尾
+    expect(canonical).toEqual(["core", "redshift", "dms", "flink", "mwaa", "agentcore"]); // mwaa 已实现,进已实现序;agentcore 仍排尾
     // 🔴 若哪天这两者变成同序,本文件其余断言就失去意义 ⇒ 这条断言是"测试仍有效"的守卫。
     expect(JSON.stringify(canonical)).not.toBe(JSON.stringify(REAL_HOME_COMPONENTS));
   });

@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP27b-n-region-auto
 // GET /api/admin/exec-envs/candidate-regions —— **新建执行环境时可选的 region**,从账号真值派生。
 //
 // 【为什么有这个路由 —— 用户 2026-09-20 原话】
@@ -26,11 +25,11 @@ import { EC2Client, DescribeRegionsCommand } from "@aws-sdk/client-ec2";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireExecEnvAdmin } from "@/lib/exec-env/admin-guard";
 import { listTargetsRaw } from "@/lib/exec-env/registry";
-// 序 48 —— 控制面已放行(含安装 / 升级时预授权的候选区)的区:向导在选区那一刻就标出「建完即可用」还是「构建后还要运维放行」
+// 控制面已放行(含安装 / 升级时预授权的候选区)的区:向导在选区那一刻就标出「建完即可用」还是「构建后还要运维放行」
 import { controlPlaneRegions } from "@/lib/exec-env/control-plane-regions";
-// @kf-batch 50-B40-candidate-blocked —— 被组织 SCP 拦住部署必需动作的区:列出但禁用,写明被拦的动作与拒因层
+// 被组织 SCP 拦住部署必需动作的区:列出但禁用,写明被拦的动作与拒因层
 import { classifyRegionsByOrgPolicy } from "@/lib/exec-env/region-org-block";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
 
 /** 已删除 / 正在删的描述符**不占位**(它们腾出来的区可以再建)。 */
@@ -54,11 +53,11 @@ export async function GET(req: NextRequest) {
       .map((t) => ({ region: String(t.region), targetId: String(t.targetId), status: String(t.status) }))
       .sort((a, b) => a.region.localeCompare(b.region));
     const occupiedSet = new Set(occupied.map((o) => o.region));
-    // @kf-batch 50-B40-candidate-blocked —— 🔴 「已启用」是必要不充分:组织 SCP 拦住的区,部署必在 PRE_BUILD 被显式拒(B-40)。
+    // 🔴 「已启用」是必要不充分:组织 SCP 拦住的区,部署必在 PRE_BUILD 被显式拒。
     //   只量**还没被占**的区(已占的本来就不可选,不必为它们多打模拟)。量不了的区进 unverified、仍可选但照实标注。
     const org = await classifyRegionsByOrgPolicy(regions.filter((r) => !occupiedSet.has(r)));
     const blockedSet = new Set(org.blocked.map((b) => b.region));
-    // 序 48:控制面放行清单(env EXECUTION_REGIONS = IAM 区域条件烘入的那份;含 home 与预授权候选区)。只读视图,这里不做任何放行。
+    // 控制面放行清单(env EXECUTION_REGIONS = IAM 区域条件烘入的那份;含 home 与预授权候选区)。只读视图,这里不做任何放行。
     const enabledSet = new Set(controlPlaneRegions());
     const res = apiOk({
       regions,

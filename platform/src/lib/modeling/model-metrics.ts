@@ -1,6 +1,6 @@
-// 模块 35 P1 — D4 指标体系服务层(原子/派生指标 CRUD + 安全聚合计算)。
+// D4 指标体系服务层(原子/派生指标 CRUD + 安全聚合计算)。
 //
-// 模块20(bgp-metrics)之上的治理建模层,独立表 bgp-model-metrics,不动模块20:
+// (bgp-metrics)之上的治理建模层,独立表 bgp-model-metrics,不动
 //  - 原子指标:绑定表(fqn)+ 聚合(agg)+ 度量列;归属数据域;业务口径。
 //  - 派生指标:引用原子指标 + 修饰词(过滤)+ 时间周期 → 安全 WHERE 谓词。
 // 计算复用 ./metric-sql(安全 SQL 构造)+ ./redshift execScalar(只读执行)。OM Glossary 推送 best-effort。
@@ -10,7 +10,7 @@ import { ulid } from "ulid";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { buildMetricSql, isAgg, isTimeWindow, isOp, quoteTable } from "./metric-sql";
-// @kf-batch 50-WP4quater-reads(工单 SC-37)—— 指标计算按区(只读标量,与 DDL 的 home-only 无关)
+// 指标计算按区(只读标量,与 DDL 的 home-only 无关)
 import { execScalarAt, safeIdent } from "./redshift";
 import { pushMetricGlossary } from "@/lib/openmetadata/om-glossary";
 import type { ModelMetric, MetricModifier, MetricAgg, TimeWindow, MetricFormat } from "./types";
@@ -82,7 +82,6 @@ function validateModelMetric(input: any): ModelMetricCore {
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────────
-// @kf-batch 50-WP4quater-reads(工单 SC-37)
 /**
  * 「这个指标**在这个区**的值」的唯一读法。
  *
@@ -168,7 +167,7 @@ async function resolveQuerySpec(m: ModelMetric) {
 }
 
 export interface ComputeResult {
-  /** @kf-batch 50-WP4quater-reads(工单 SC-37)—— 这个值是在哪个区算出来的 */
+  /** 这个值是在哪个区算出来的 */
   targetId?: string;
   modelMetricId: string;
   value: number;
@@ -181,8 +180,8 @@ export async function computeModelMetric(modelMetricId: string, targetId: string
   if (!m) throw new Error("指标不存在");
   const spec = await resolveQuerySpec(m);
   const sql = buildMetricSql(spec);
-  // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 🔴 在**指定的那个区**算,并把结果按区存。
-  // 落点必填(WP-31 序 3)。`resolveRedshiftBinding` 会核准入 / 组件 / 落点 / 凭证,
+  // 🔴 在**指定的那个区**算,并把结果按区存。
+  // 落点必填。`resolveRedshiftBinding` 会核准入 / 组件 / 落点 / 凭证,
   // 解析不出来就抛 —— 绝不静默改到主控区算一个数再标成那个区的(那才是最坏的错数字)。
   const tid = targetId;
   const value = await execScalarAt(sql, tid, projectId);

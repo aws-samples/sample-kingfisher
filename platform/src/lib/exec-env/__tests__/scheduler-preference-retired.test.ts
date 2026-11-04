@@ -1,15 +1,14 @@
-// @kf-batch 50-WP20b-retire-mwaa-preference
 // 🔴🔴 **「经典 MWAA 下线」不许只做一半:入口关了,`schedulerPreference` 这条旁路也必须关。**
 //
 // 【缺陷怎么现形的】2026-09-20 我把硬门里一条「⚠️ 登记(双装载体造不出来)」改判成**真跑的负向判据**,
 //   它当场逮到:往一个**只装了 airflow-serverless** 的 target 写 `schedulerPreference="mwaa"`
 //   ⇒ **HTTP 200**,描述符真写成 `mwaa`。承重行为当时还是对的(发布仍走 serverless、绝不往 MWAA 桶
 //   落 DAG —— 同一条判据一起断了),但描述符从此**宣称一个不存在的调度器**,
-//   与同步任务「启用调度」空壳(WP-26)是同一类「宣称了没有载体的东西」。
+//   与同步任务「启用调度」空壳是同一类「宣称了没有载体的东西」。
 //   用户 2026-09-20 原话:「我们后面所有的调度都走 mwaa serverless」。
 //
 // 【根因】不是「少了一条『装了没有』的校验」,而是**值域没拆**:`SCHEDULER_PREFERENCES` 一份清单
-//   同时当「能读到什么」和「能写进什么」用。WP-20 关掉了注册 / 补装 / 向导三个入口,唯独漏了这条。
+//   同时当「能读到什么」和「能写进什么」用。关掉了注册 / 补装 / 向导三个入口,唯独漏了这条。
 //
 // 【这组判据钉四件事】
 //   ① 可写值域**从组件停供派生**,不是第二份手写清单(哪天再停供一个调度器,两边自动一起变);
@@ -33,7 +32,7 @@ import { RETIRED_COMPONENTS, isComponentRetired } from "@/lib/exec-env/implement
 const SRC = resolve(__dirname, "../../..");   // → platform/src
 const read = (rel: string) => readFileSync(resolve(SRC, rel), "utf8");
 
-describe("调度器偏好:停供取值读得到、写不进(WP-20b)", () => {
+describe("调度器偏好:停供取值读得到、写不进", () => {
   it("① 可写值域从**组件停供**派生 —— 不许是第二份手写清单", () => {
     // 每个偏好取值都必须声明它依赖哪个组件(缺映射 ⇒ 派生不出来)
     for (const p of SCHEDULER_PREFERENCES) {

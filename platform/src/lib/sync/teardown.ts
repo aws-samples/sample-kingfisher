@@ -1,4 +1,3 @@
-// @kf-batch 50-WP24-sync-teardown
 // 同步任务的**下线单一作者**:按 `channel` 把「真停 + 真撤」做掉,并如实报「有没有停下来」。
 //
 // 🔴🔴 【为什么存在(2026-09-16 全仓核实的三个洞)】
@@ -6,16 +5,16 @@
 //      identifier / integrationArn 都随行消失 ⇒ 永久孤儿(计费 + 数据继续流动);
 //   ② 全仓**没有** `StopReplicationTaskCommand` ⇒ DMS 通道(全量/增量/实时 CDC)**从来没被真正停过**:
 //      「停止」只把 `status` 改成 `stopped`,复制任务照搬数据、复制实例照计费。
-//      多法域下这是**停不下来的跨境数据流动**(模块 50 的核心承诺被击穿);
+//      多法域下这是**停不下来的跨境数据流动**(核心承诺被击穿);
 //   ③ `stop` 路由里 Glue 用 `BatchStopJobRun({ JobRunIds: [] })` —— **空数组停不了任何 run**,
 //      而页面显示「已停止」。
-// 🔴 与 WP-18d 同一条不变量:**撤不下来就不许把记录改成「已停止」/ 不许删记录**。
-// 🔴 客户端一律用**创建时那一套**:@kf-batch 50-WP7-sync-pushdown 起 sync 是 per-target 的,
+// 🔴 与同一条不变量:**撤不下来就不许把记录改成「已停止」/ 不许删记录**。
+// 🔴 客户端一律用**创建时那一套**:起 sync 是 per-target 的,
 //   创建(start 路由)与下线(本文件)同用「任务章 → 区」这一个解析(bindingTargets + regionOfTarget);
 //   下线必须打在创建它的地方 —— 用 home 客户端去停非 home 的 run,GetJobRuns 直接 EntityNotFound,
 //   改动前的行为等于把「Glue 里没有这个作业」当成「已停」(孤儿 run 继续跑继续计费)。
 //   区解析不出来 = 不知道它在哪跑 ⇒ hardFailure(绝不当成「没东西可停」)。
-// zero-etl / DMS 仍是主控区托管通道(WP-7 原则 3),它们的服务层照旧打 home。
+// zero-etl / DMS 仍是主控区托管通道(原则 3),它们的服务层照旧打 home。
 import { GetJobRunsCommand, BatchStopJobRunCommand, DeleteJobCommand } from "@aws-sdk/client-glue";
 import { teardownReplicationTask } from "@/lib/realtime/dms-service";
 import { deleteZeroEtlIntegration, dropDestinationDatabase } from "@/lib/realtime/zeroetl-service";
@@ -115,7 +114,7 @@ export async function teardownSyncChannel(
     out.skipped = "没有 glueJobName(批同步作业从未创建)";
     return out;
   }
-  // @kf-batch 50-WP7-sync-pushdown —— 停/删打在任务章说的那个区。解析不出区 = 不知道它在哪跑,
+  // 停/删打在任务章说的那个区。解析不出区 = 不知道它在哪跑,
   // 按硬失败报(绝不回落 home 去停:那会「没找到 ⇒ 当已停」,孤儿 run 在别的区继续跑继续计费)。
   let glue: Awaited<ReturnType<typeof glueClientFor>>;
   try {

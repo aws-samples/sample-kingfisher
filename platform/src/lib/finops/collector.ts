@@ -1,9 +1,9 @@
-// 模块 40 — L1 成本采集器:Cost Explorer 按服务 × 区 × 日 → bgp-cost-daily(v2 分区)。
+// L1 成本采集器:Cost Explorer 按服务 × 区 × 日 → bgp-cost-daily(v2 分区)。
 // CE 数据 T+1 且账单可能迟到,故每次采集近 N 日滚动重采(幂等 upsert 覆盖旧值)。
 // 触发:页面 stale 检测 detached + 手动「立即采集」;绝不在读路径同步跑(43-A 二期教训)。
 //
-// @kf-batch 50-WP6-cost-by-region(WP-6 施工序 2)—— 写 v2 分区 `costv2#<month>`、sk `<date>#<service>#<region>`。
-// 🔴 **不再删除任何旧行**(合同 WORK-PACKAGES §WP-6 ④「旧行留待 TTL」):旧分区 `cost#<month>`
+// 写 v2 分区 `costv2#<month>`、sk `<date>#<service>#<region>`。
+// 🔴 **不再删除任何旧行**(合同 §④「旧行留待 TTL」):旧分区 `cost#<month>`
 //    已不在任何读路径上,删不删都不影响合计;删除反而让「读侧切回 v1」这条回滚路径失效。
 // 🔴 **v2 首次采集自动回填**:v2 水位缺失 ⇒ 本次按回填窗口采(≥30 天且回到上月 1 日),
 //    否则升级后大盘只有最近 3 天、区卡片环比全是空的。手动回填仍走 `POST /api/finops/collect?backfill=1`。
@@ -11,7 +11,7 @@
 import { CostExplorerClient, GetCostAndUsageCommand } from "@aws-sdk/client-cost-explorer";
 import { BACKFILL_MIN_DAYS, categorizeService, WATERMARK_SK } from "./constants";
 import { getWatermark, setWatermark, upsertCostDaily } from "./store";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
 
 const ce = sdkClient("control-plane", CostExplorerClient, { region: "us-east-1" }); // CE 是全局服务,endpoint 固定 us-east-1
@@ -65,7 +65,7 @@ export async function collectDailyCosts(opts?: { backfill?: boolean }): Promise<
         TimePeriod: { Start: isoDate(start), End: isoDate(end) },
         Granularity: "DAILY",
         Metrics: ["UnblendedCost"],
-        // @kf-batch 50-WP4quater-reads(工单 SC-24)—— SERVICE + REGION 两个分组(CE 上限正好两个)。
+        // SERVICE + REGION 两个分组(CE 上限正好两个)。
         // 🔴 采不到 REGION 的行(全局服务)CE 会回 `NoRegion` / `global` —— 那是**真实的**
         // 「不属于任何区」,原样存下来,不硬塞给某个区。
         GroupBy: [

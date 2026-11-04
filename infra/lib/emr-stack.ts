@@ -5,7 +5,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
 
-// 模块 33-A (离线多引擎 EMR Serverless) — 门控「共享底座」栈。
+// (离线多引擎 EMR Serverless) — 门控「共享底座」栈。
 //
 // ⚠️ 门控创建:仅当 `-c enable-emr=1` 时在 bin/app.ts 实例化。
 // 本栈只建「可被所有 per-作业 application 复用的底座」:EMR 执行角色 + 默认 SG。
@@ -46,11 +46,11 @@ export class EmrStack extends cdk.Stack {
     props.dataKey.grant(role, "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey");
 
     // 读 PySpark 脚本 / 依赖 JAR(Glue 脚本桶 emr-scripts/ 前缀,与 Flink 共桶不同前缀)。
-    // @kf-batch 50-W5-seg1-WP3 —— 🔴 **W3-g 的放宽已撤销**:W3-g 曾把这两条的资源面从 home 两桶全名放宽到
+    // 🔴 **W3-g 的放宽已撤销**:W3-g 曾把这两条的资源面从 home 两桶全名放宽到
     // `bgp-glue-scripts-<acct>-*` / `bgp-datalake-<acct>-*`,好让非 home 的 EMR run 用**这一个 home 角色**去拉别的区的
-    // 桶(IR-P1-03 的横移形状,当时如实登记)。WP-3 起非 home 的 EMR 用 exec-env core 栈里**本 target 自己的**角色
+    // 桶(IR-P1-03 的横移形状,当时如实登记)。非 home 的 EMR 用 exec-env core 栈里**本 target 自己的**角色
     // (`BgpExecEnv-<slug>-emr-role`,见 infra/lib/exec-env/core-stack.ts),本角色只剩 home 一份 ⇒ 资源面**收回**到
-    // home 两桶的全名。synth-gate §9 钉:S3 语句里不许再出现 `-*` 通配(ACCEPTANCE E-144)。
+    // home 两桶的全名。synth-gate §9 钉:S3 语句里不许再出现 `-*` 通配(ACCEPTANCE)。
     role.addToPolicy(new iam.PolicyStatement({
       actions: ["s3:GetObject", "s3:GetObjectVersion", "s3:ListBucket", "s3:GetBucketLocation"],
       resources: [`arn:aws:s3:::bgp-glue-scripts-${acct}`, `arn:aws:s3:::bgp-glue-scripts-${acct}/*`],
@@ -93,7 +93,7 @@ export class EmrStack extends cdk.Stack {
     // S3 Tables(托管 Iceberg)+ Glue Catalog / Lake Formation 联邦(Spark SQL 读写表)。
     role.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "表桶名按命名 SSOT 逐 target 不同(非 home 带 targetSlug 后缀,见 naming.json 的 tableBucket)⇒ 光放 region 段也访问不到别的 target,必须连资源名一起改,随 P50.3",
+      reason: "表桶名按命名 SSOT 逐 target 不同(非 home 带 targetSlug 后缀,见 naming.json 的 tableBucket)⇒ 光放 region 段也访问不到别的 target,必须连资源名一起改",
       actions: ["s3tables:*"],
       resources: (r) => [
         `arn:aws:s3tables:${r}:${acct}:bucket/bgp-table-bucket`,

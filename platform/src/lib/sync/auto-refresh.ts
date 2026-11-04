@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— /sync 列表自动刷新的两个事实(用户 2026-10-15:「数据同步页面增加定时刷新」)。
+// /sync 列表自动刷新的两个事实(用户 2026-10-15:「数据同步页面增加定时刷新」)。
 //
 // 🔴 为什么是独立模块而不是写在 `app/sync/page.tsx` 里:Next.js 的 page 文件只许标准导出
 //   (default / metadata / dynamic …),多 `export const` 一个常量 ⇒ `next build` 直接失败

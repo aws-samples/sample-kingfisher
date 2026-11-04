@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // 类型级门禁靶(51 SPEC §6.1① / §6.4(b);ACCEPTANCE M15):探测**失败**的结果不能进 putGlobalModel。
 // 本文件由 model-config-guard.test.ts 用 TypeScript 编译器 API 真编译:
 //   · 带 @ts-expect-error 的这一版必须 **0 诊断**(= 该行确实报了错,指令被消费掉);

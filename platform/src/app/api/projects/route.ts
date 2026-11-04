@@ -1,12 +1,11 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-D4
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { canCreateProject, CREATE_PROJECT_DENY_MESSAGE } from "@/lib/projects/config-permissions";
 import { createProject, listVisibleProjects, listDiscoverableProjects } from "@/lib/projects/project-service";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-21)。
+// 执行范围。
 // 🔴 项目本身是全局对象,但它有**按执行环境的白名单**(`ExecutionTarget.access`);
 // 「本项目在这个区能不能用」是数据驻留最关键的一格,而这一页原来一个字都不说。
 // ⇒ 单区视角 = 只列**在该区获授权**的项目,并随响应回按区计数(护栏 1 的 N 由页面显示)。
@@ -25,7 +24,6 @@ export async function GET(req: NextRequest) {
       return apiOk(await listDiscoverableProjects(identity));
     }
     const projects = await listVisibleProjects(identity);
-    // @kf-batch 50-WP4ter-coverage
     const scope = await requireScope(req, null);
     if (scope instanceof Response) return scope as never;
     const ids = scopeTargets(scope);

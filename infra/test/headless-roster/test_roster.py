@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @kf-batch 50-WP27-roster-and-serviceable
 """无头验收底座的**口令表 / 名册 / 「能承接」口径**离线判据(`scripts/kf_headless_lib.py` 的纯函数)。
 
     python3 infra/test/headless-roster/test_roster.py     # 退出码 0 = 全过

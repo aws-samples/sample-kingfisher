@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 判据 ACCEPTANCE v1.43 段 `slsw` **SW-1**(节点语义单一作者)+ SW-2b / SW-2d(台账三写点的写法)。
 //
 // 🔴 为什么这组判据值钱:两份运行时产物(经典 MWAA 的 `bgp_workflow_runtime_v7.py` 与 serverless 代码包
@@ -26,13 +25,13 @@ const SHARED_DEFS = [
   "_release_wf_lock",
   "_exec_sql_once",
   "_exec_sql",
-  // 序 73 模块 57:离线作业节点执行器 + 同步节点运行行回链(在 NODE_EXEC_PY)
+  // 离线作业节点执行器 + 同步节点运行行回链(在 NODE_EXEC_PY)
   "_node_run_id",
   "_sync_node_record",
   "_exec_job",
 ];
 
-/** 序 73 模块 57:作业族(单作业载体 run_job 与工作流 _exec_job 共用)—— 在第二份共享块 JOB_EXEC_PY,两载体也都必须拼同一份字节。 */
+/** 作业族(单作业载体 run_job 与工作流 _exec_job 共用)—— 在第二份共享块 JOB_EXEC_PY,两载体也都必须拼同一份字节。 */
 const JOB_FAMILY_DEFS = [
   "_now",
   "_iso",
@@ -113,7 +112,6 @@ describe("SW-1 节点语义单一作者", () => {
     }
   });
 
-  // 序 73 模块 57(57 DESIGN §3.3 / §3.4)
   it("🔴🔴 作业族共享块 JOB_EXEC_PY 两份产物逐字节相同,且不依赖 Airflow;两载体的 job 分派都指向同一个 _exec_job", () => {
     expect(JOB_EXEC_PY.length, "作业族共享块空了 ⇒ 判据空转").toBeGreaterThan(3000);
     for (const d of JOB_FAMILY_DEFS) expect(JOB_EXEC_PY, `作业族共享块漏了 ${d}`).toContain(`def ${d}(`);
@@ -152,7 +150,7 @@ describe("SW-1 节点语义单一作者", () => {
   });
 
   it("改共享块必须升经典 runtime-lib 的版本号(模块名带版本;不升 = 存量 DAG 仍 import 旧文件)", () => {
-    // 序 73 模块 57:v10 → v11(拼入作业族共享块 + _exec_job)
+    // v10 → v11(拼入作业族共享块 + _exec_job)
     expect(RUNTIME_LIB_VERSION).toBeGreaterThanOrEqual(11);
     expect(RUNTIME_LIB_MODULE).toBe(`bgp_workflow_runtime_v${RUNTIME_LIB_VERSION}`);
   });
@@ -213,7 +211,7 @@ describe("SW-2b / SW-2d 台账三写点的写法", () => {
     }
     expect(body, "未知类型必须抛(不许当 no-op 跑过去)").toMatch(/raise Exception\("unknown node type/);
     const fe = body.slice(body.indexOf('if ntype == "foreach"'));
-    // B-66:子任务同时透传预切的多语句 sqls(每条都替换 {{item}}),与 sql 节点同口径
+    // 子任务同时透传预切的多语句 sqls(每条都替换 {{item}}),与 sql 节点同口径
     expect(fe).toContain('_exec_sql(e, str(sub_data.get("sql", "SELECT 1")).replace("{{item}}", str(item)),');
     expect(fe).toContain('sqls=[str(s).replace("{{item}}", str(item)) for s in (sub_data.get("sqls") or [])] or None)');
     expect(fe, "foreach 子任务传了 node_id ⇒ N 个子任务串成一队,与经典分叉").not.toContain("node_id=");

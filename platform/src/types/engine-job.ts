@@ -1,4 +1,4 @@
-// 模块 33-A — 多引擎作业前端类型 + 模板（独立文件，不碰 types/etl-job.ts 老类型）。
+// 多引擎作业前端类型 + 模板（独立文件，不碰 types/etl-job.ts 老类型）。
 
 import type { EmrSpec } from "@/lib/engines/emr/spec";
 import type { EmrNetwork } from "@/lib/engines/emr/network";
@@ -20,7 +20,7 @@ export interface EngineJobView {
   lastRunId?: string;
   lastRunStatus?: string;
   lastRunAt?: string;
-  // 模块 33-A 补齐:MWAA 周期调度。
+  // 补齐:MWAA 周期调度。
   cronExpression?: string;
   scheduleEnabled?: boolean;
   airflowDagId?: string;

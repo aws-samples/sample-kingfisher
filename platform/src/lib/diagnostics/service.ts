@@ -1,4 +1,4 @@
-// 模块 25 — 故障诊断服务：诊断记录 CRUD + 后台编排（构造证据 → 调 DevOps Agent → 存报告）。
+// 故障诊断服务：诊断记录 CRUD + 后台编排（构造证据 → 调 DevOps Agent → 存报告）。
 // 异步：API 立即创建 running 记录并触发后台调查（fire-and-forget），前端轮询结果。
 
 import { PutCommand, GetCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
@@ -23,7 +23,7 @@ export interface Diagnostic {
   error?: string;
   agentSpaceId?: string;
   executionId?: string;
-  // 模块 43-A.2 — 本次诊断是否注入了知识库【人工已验证】的历史修复(复利闭环"读"半环留痕)。
+  // 本次诊断是否注入了知识库【人工已验证】的历史修复(复利闭环"读"半环留痕)。
   usedIncidentHistory?: boolean;
   // 命中的故障签名(关联 bgp-incidents 主档;未命中为空)。
   incidentSignature?: string;
@@ -87,7 +87,7 @@ async function createAndRun(
         new UpdateCommand({
           TableName: TABLES.DIAGNOSTICS,
           Key: { pk: PK, diagnosticId },
-          // 模块 43-A.2 — 落库 usedIncidentHistory/incidentSignature(证据构造时算出,复利闭环留痕)。
+          // 落库 usedIncidentHistory/incidentSignature(证据构造时算出,复利闭环留痕)。
           UpdateExpression:
             "SET #s = :s, report = :r, taskType = :tt, resourceName = :rn, agentSpaceId = :a, executionId = :e, usedIncidentHistory = :uih, incidentSignature = :isig, updatedAt = :t",
           ExpressionAttributeNames: { "#s": "status" },
@@ -104,7 +104,7 @@ async function createAndRun(
           },
         })
       );
-      // 模块 43-A.2 — 诊断落 done 即时沉淀 hook(复利闭环"写"半环):把这条诊断归一成结构化事件
+      // 诊断落 done 即时沉淀 hook(复利闭环"写"半环):把这条诊断归一成结构化事件
       // 写 bgp-incidents。幂等(occ 条件写去重),与 reconcile-on-read 兜底路径共存不冲突;
       // best-effort,沉淀失败绝不影响诊断结果对用户可见。
       if (finalStatus === "done") {
@@ -141,7 +141,7 @@ export async function startDiagnosis(input: {
   return createAndRun(input, () => buildIncidentContext(input.taskId, input.runId, input.projectId));
 }
 
-// 模块 32 — 对 Flink(MSAF)流作业发起诊断(无 run 记录,按 jobId 取证)。复用同一留痕/编排。
+// 对 Flink(MSAF)流作业发起诊断(无 run 记录,按 jobId 取证)。复用同一留痕/编排。
 export async function startFlinkDiagnosis(input: {
   jobId: string;
   projectId: string;

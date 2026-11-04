@@ -1,4 +1,4 @@
-// 模块 45 P45.5b — 方言校验【纯核】(inprocess + AgentCore 容器共用的唯一逻辑源)。
+// 方言校验【纯核】(inprocess + AgentCore 容器共用的唯一逻辑源)。
 //
 // 【为什么抽这一层】guard.ts 原本 `import { dialectRulesFor } from "./registry"`,而 registry 顶层
 // `import store`→`@/lib/aws/dynamodb`。tsc 无 tree-shaking,这条静态边会把 DynamoDB SDK/@/ alias

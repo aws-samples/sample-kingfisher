@@ -1,4 +1,4 @@
-// 模块 32-CR — connector-modules 单测(CR.1)。
+// connector-modules 单测(CR.1)。
 //
 // 锁死 DESIGN §2.1 注册表映射:SQL token → 模块 id 集合。
 // 🔴 用【平台真实 SQL 样板】(flink-service.ts 的 defaultFlinkSql/s3TableSinkSql 等)验证,

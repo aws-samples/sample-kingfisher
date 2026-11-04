@@ -23,11 +23,11 @@ export interface GenBiResult {
   chart: ChartSpec;
   steps: GenBiStep[];
   usage: { inputTokens: number; outputTokens: number };
-  maskedColumns?: string[]; // 模块 18: columns masked for this caller (governance)
-  matchedTables?: MatchedTable[]; // 模块 23: 语义检索命中的表 + 理由
+  maskedColumns?: string[]; // columns masked for this caller (governance)
+  matchedTables?: MatchedTable[]; // 语义检索命中的表 + 理由
   usedContext?: UsedContextEntry[]; // 语义层: 本次参考的业务口径(可观测,让口径生效可见)
   retrievalNote?: string;
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 SPEC §3.3a:模型回显块。同步分支随 apiOk 第三参回显,
+  // SPEC §3.3a:模型回显块。同步分支随 apiOk 第三参回显,
   // 异步分支随 GenBiResult 持久化进任务项 ⇒ 轮询 GET /api/genbi/tasks/[taskId] 的 result._meta 自动带上。
   // invocations[] 覆盖无独立端点的 retrieval / memory 两条腿(memory 标 deferred:响应后才触发)。
   _meta?: AiMeta;

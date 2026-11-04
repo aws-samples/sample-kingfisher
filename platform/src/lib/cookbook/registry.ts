@@ -1,4 +1,4 @@
-// 模块 45 — 配方库注册表(统一数据入口)。合并【系统内嵌配方(seed,只读基座)】+【管理员动态配方(store,DynamoDB)】。
+// 配方库注册表(统一数据入口)。合并【系统内嵌配方(seed,只读基座)】+【管理员动态配方(store,DynamoDB)】。
 // 系统配方永远在、不可删;管理员只能在其上新增(带 isPlatformAdmin 鉴权,见 cookbook API)。
 // 是 retrieve(检索)、guard(校验)、planner 提示词注入的统一数据源。
 //

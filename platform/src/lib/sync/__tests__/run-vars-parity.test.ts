@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 日期变量两个作者(TS syncRunVars / 脚本里的 Python)逐日同值。
+// 日期变量两个作者(TS syncRunVars / 脚本里的 Python)逐日同值。
 // 用真 python3 跑生成进脚本的那段代码(不是另写一份),跨月 / 跨年 / 闰年 / 月末都覆盖。
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -11,7 +11,7 @@ function py(code: string, argv: string[] = []): string {
   return execFileSync("python3", ["-c", `import re, sys, json\n${SYNC_RUN_VARS_PY}\n${code}`, ...argv], { encoding: "utf8" });
 }
 
-describe("序 37:日期变量 TS / Python 同源", () => {
+describe("日期变量 TS / Python 同源", () => {
   it("每个日期的全部变量逐项相等", () => {
     const out = py(`
 res = {}
@@ -63,7 +63,7 @@ print(bgp_sync_run_date("Asia/Singapore") == _bgp_dt.now(ZoneInfo("Asia/Singapor
   });
 });
 
-describe("序 37:新字段校验(存量任务恒放行)", () => {
+describe("新字段校验(存量任务恒放行)", () => {
   const legacy = { sourceTables: ["a", "b"], writeMode: "overwrite", syncMode: "full", targetType: "both" };
   it("不带新字段 ⇒ null(含 whereClause 空串 / 空白)", () => {
     expect(validateSyncCapabilityFields(legacy)).toBeNull();

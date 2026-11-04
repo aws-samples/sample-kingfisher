@@ -22,11 +22,11 @@ interface Overview {
   dailyTrend: { date: string; total: number }[];
   watermark: string | null;
   stale: boolean;
-  // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 按区视角下服务端补的字段
+  // 按区视角下服务端补的字段
   scopedRegions?: string[];
   unattributedUsd?: number;
   unattributedNote?: string;
-  // @kf-batch 50-WP6-cost-by-region —— 第一层 region 卡片(O3a)
+  // 第一层 region 卡片(O3a)
   byRegion?: RegionCard[];
   regionlessMonthToDateUsd?: number;
 }
@@ -39,7 +39,7 @@ interface RegionCard {
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region(WP-6 施工序 5,INTERACTION §3.2)—— 大盘第一层:按 **AWS region** 的卡片。
+ * (INTERACTION §3.2)—— 大盘第一层:按 **AWS region** 的卡片。
  * 🔴 标题旁必须写明「按 AWS region 分组,非 target 归因」:CE 只给到 region,同区两套执行环境的钱分不开,
  *    不写出来用户会把卡片金额当成某个执行环境的花费。
  * 点卡下钻 = 把顶栏视角切到该区的执行环境(同区多个 ⇒ 列出来让用户选;该区没有执行环境 ⇒ 不可点,如实标注)。
@@ -121,7 +121,7 @@ function RegionCards({ cards, regionlessUsd }: { cards: RegionCard[]; regionless
 
 export default function OverviewTab() {
   const t = useT();
-  // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 大盘按执行范围。
+  // 大盘按执行范围。
   // 🔴 单区视角的「本月累计」是**那个区的**钱,不含无区域归属的部分(存量行 + 全局服务)⇒
   // 上面那条 Alert 必须把这件事说出来,否则用户会拿它去核对 AWS 账单总额然后怀疑平台算错了。
   const { scope } = useScope();
@@ -181,7 +181,7 @@ export default function OverviewTab() {
         <Empty description={t("暂无成本数据")} />
       ) : (
         <>
-          {/* @kf-batch 50-WP4quater-reads(工单 SC-24)—— 🔴 把「哪些钱没算进这个合计」说清楚。
+          {/* 🔴 把「哪些钱没算进这个合计」说清楚。
               不说的话用户会拿上面的数字去对 AWS 账单总额,对不上,然后怀疑平台算错了。 */}
           {typeof data?.unattributedUsd === "number" && data.unattributedUsd > 0 && (
             <Alert

@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 37 v4 — 分析看板工作台(QuickSight 式:一个画布 N 个视觉对象 + 绑字段·作用域筛选器)。
+// 分析看板工作台(QuickSight 式:一个画布 N 个视觉对象 + 绑字段·作用域筛选器)。
 // 隔离红线:BI 私有组件;复用 FieldConfigurator / WidgetRenderer / DashboardGrid(全不改);
 // 取数走 /api/bi/analysis-query(筛选器按字段+作用域注入,根治"没生效");CRUD 走 /api/bi/analyses。
 // 旧报表库/仪表盘的 lib/API/表完全保留,本面板可「从报表库导入」复用旧报表。
@@ -21,7 +21,7 @@ import WidgetRenderer from "@/components/bi/WidgetRenderer";
 import DashboardGrid from "@/components/bi/DashboardGrid";
 import FieldConfigurator from "@/components/bi/FieldConfigurator";
 import type { BiWidget, AnalysisFilter, WidgetViz } from "@/lib/bi/types";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-7):BI 取数落点按区。
+// 执行范围:BI 取数落点按区。
 // 🔴 落点是 **widget 级**(SPEC §8.3:一张仪表盘可以并排放两个区的图),页面范围只作**新建默认值**。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
@@ -41,7 +41,7 @@ function newId(prefix: string) {
 // ═══════════════════════════ 顶层:分析看板库 + 路由到画布 ═══════════════════════════
 export default function AnalysisWorkbench() {
   const t = useT();
-  // @kf-batch 50-WP4quater-reads(工单 SC-28)—— 顶层看板库的当前范围(供**默认关**的过滤开关用)
+  // 顶层看板库的当前范围(供**默认关**的过滤开关用)
   const { scope, targets: scopeTargetList } = useScope();
   const scopeParam = toScopeParam(scope);
   const [list, setList] = useState<any[]>([]);
@@ -49,7 +49,7 @@ export default function AnalysisWorkbench() {
   const [editing, setEditing] = useState<any>(null); // 当前编辑的 analysis(null=不在编辑)
   const [open, setOpen] = useState(false);
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-28)—— 🔴 用户 2026-09-10 定案:「**增加一个过滤能力,
+  // 🔴 用户 2026-09-10 定案:「**增加一个过滤能力,
   // 默认不过滤**」。所以这是一个**默认关**的开关:关着时列表原样(顶栏切区不会悄悄藏掉别区的看板,
   // 那才是「丢东西」);开了才按当前范围筛。每行显示它涉及哪些区,用户自己判断。
   const [scopeFilterOn, setScopeFilterOn] = useState(false);
@@ -89,7 +89,7 @@ export default function AnalysisWorkbench() {
     { title: t("名称"), dataIndex: "name", key: "name" },
     { title: t("视觉对象"), dataIndex: "widgets", key: "widgets", render: (w: any[]) => (w || []).length },
     {
-      // @kf-batch 50-WP4quater-reads(工单 SC-28)—— 这个看板**取了哪些区的数**(从 widget 落点派生)。
+      // 这个看板**取了哪些区的数**(从 widget 落点派生)。
       // 🔴 一张看板可以并排放多个区的图(SPEC §8.3)⇒ 这里是**多个**标签,不是一个。
       // 空看板显示「—」而不是「主控区」:它还没取任何区的数,标成主控区是编造。
       title: t("涉及区域"), dataIndex: "regions", key: "regions", width: 190,
@@ -133,7 +133,7 @@ export default function AnalysisWorkbench() {
         title={t("分析看板库")}
         extra={
           <Space>
-            {/* @kf-batch 50-WP4quater-reads(工单 SC-28)—— 🔴 **默认关**的按区过滤(用户 2026-09-10 原话:
+            {/* 🔴 **默认关**的按区过滤(用户 2026-09-10 原话
                 「我觉得可以增加一个过滤能力,默认不过滤」)。关着时列表原样 —— 顶栏切区不会悄悄
                 藏掉别区的看板;需要时自己打开。 */}
             <Tooltip title={t("默认不过滤:顶栏切换执行范围不会藏掉别区的看板。打开后只看涉及当前范围的看板。")}>
@@ -164,7 +164,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
   const [saving, setSaving] = useState(false);
 
   // 每个视觉对象的取数结果 + 加载态 + 列(列用于筛选器绑字段下拉)。
-  // gone=true:服务端返回 code GONE(数据服务已下线,@kf-batch 50-W5-seg2-WP1)⇒ 该卡渲染「已下线」占位而不是红字报错。
+  // gone=true:服务端返回 code GONE(数据服务已下线)⇒ 该卡渲染「已下线」占位而不是红字报错。
   const [cells, setCells] = useState<Record<string, { loading?: boolean; data?: any; error?: string; gone?: boolean; columns?: string[] }>>({});
   const [filterValues, setFilterValues] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
@@ -176,7 +176,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
   const [editingWidget, setEditingWidget] = useState<BiWidget | null>(null);
   const [filterEditorOpen, setFilterEditorOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<AnalysisFilter | null>(null);
-  // @kf-batch 50-WP4ter-coverage —— 当前视角(新建视觉对象的默认落点;已保存的 widget 用它自己的)
+  // 当前视角(新建视觉对象的默认落点;已保存的 widget 用它自己的)
   const { scope } = useScope();
   const defaultTargetId = scope.kind === "target" ? scope.targetId : undefined;
 
@@ -192,7 +192,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
       if (r?.success) {
         setCells((prev) => ({ ...prev, [w.widgetId]: { loading: false, data: { columns: r.data.columns, rows: r.data.rows }, columns: r.data.columns } }));
       } else {
-        // @kf-batch 50-W5-seg2-WP1 — 按错误信封渲染:GONE = 数据服务已下线(存量 dataapi 视觉对象),不白屏、不当成取数失败。
+        // 按错误信封渲染:GONE = 数据服务已下线(存量 dataapi 视觉对象),不白屏、不当成取数失败。
         setCells((prev) => ({ ...prev, [w.widgetId]: { loading: false, error: r?.error?.message || t("取数失败"), gone: r?.error?.code === "GONE" } }));
       }
     } catch (e: any) {
@@ -368,7 +368,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
               >
                 {cell?.loading ? <div style={{ textAlign: "center", padding: 40 }}><Spin /></div>
                   : cell?.gone ? (
-                    // @kf-batch 50-W5-seg2-WP1 — 存量 dataapi 视觉对象:「数据服务已下线」占位(ACCEPTANCE E-135),文案取服务端同一句。
+                    // 存量 dataapi 视觉对象:「数据服务已下线」占位(ACCEPTANCE),文案取服务端同一句。
                     <Empty
                       image={Empty.PRESENTED_IMAGE_SIMPLE}
                       description={<span><Text strong>{t("数据服务已下线")}</Text><br /><Text type="secondary" style={{ fontSize: 12 }}>{cell.error}</Text></span>}
@@ -407,7 +407,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
 // ═══════════════════════════ 视觉对象编辑器(Modal) ═══════════════════════════
 // 复用 FieldConfigurator(可视化配置,不写 SQL)+ 自由 SQL + 从报表库导入。产出 BiWidget。
 function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; onClose: () => void; onSave: (w: BiWidget) => void }) {
-  // @kf-batch 50-WP4ter-coverage —— 预览与编译在**当前视角那个区**执行;保存时把落点写进 widget
+  // 预览与编译在**当前视角那个区**执行;保存时把落点写进 widget
   // (widget 级落点 = SPEC §8.3;不写进去的话切一次区这张图就换了数据源而没人知道)。
   // 🔴 编辑既有 widget 时优先沿用它自己的落点,别被当前视角悄悄改掉。
   const t = useT();
@@ -438,8 +438,8 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
   const [reports, setReports] = useState<any[]>([]);
   const [reportId, setReportId] = useState("");
   useEffect(() => {
-    // @kf-batch 50-W5-seg2-WP1 — 报表库里 dataapi 来源的旧报表不再提供导入(数据服务已下线;导入即选了一个只会 410 的取数源)。
-    // @kf-batch 50-WP4quater-reads(工单 SC-28)—— 🔴 导入候选**刻意不按范围筛**:
+    // 报表库里 dataapi 来源的旧报表不再提供导入(数据服务已下线;导入即选了一个只会 410 的取数源)。
+    // 🔴 导入候选**刻意不按范围筛**:
     // 把别区的报表导进当前看板是合法用法(一张仪表盘可以并排放不同区的图,SPEC §8.3)。
     // 每个候选后面标出它取哪个区的数,选的时候看得见。
     if (mode === "import") fetch("/api/bi/reports").then((x) => x.json()).then((d) => setReports(d?.success ? (d.data || []).filter((r: any) => r?.source?.kind !== "dataapi") : [])).catch(() => {});
@@ -450,7 +450,7 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
     try {
       const r = await fetch("/api/bi/query", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-WP31-place-first-class —— 预览取数恒带落点(未保存的视觉对象:自带的 > 视角;保存进定义的仍是条件写法)
+        // 预览取数恒带落点(未保存的视觉对象:自带的 > 视角;保存进定义的仍是条件写法)
         body: JSON.stringify({ source: { kind: "sql", engine, sql }, targetId: widgetTarget || landingOfScope(wScope) }),
       }).then((x) => x.json());
       if (r?.success) setPreview({ columns: r.data.columns, rows: r.data.rows });
@@ -478,7 +478,7 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
     }
     if (mode === "sql") {
       if (!/^(select|with)\b/i.test(sql.trim())) { message.warning(t("SQL 必须是 SELECT / WITH 只读查询")); return; }
-      // @kf-batch 50-WP4ter-coverage —— 自由 SQL 模式同样把落点写进 widget
+      // 自由 SQL 模式同样把落点写进 widget
       onSave({ widgetId, name: nm || t("视觉对象"), source: { kind: "sql", engine, sql: sql.trim(), ...(widgetTarget ? { targetId: widgetTarget } : {}) }, viz: { chart, auto: false } });
       return;
     }

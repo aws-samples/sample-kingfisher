@@ -4,14 +4,14 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as mwaa from "aws-cdk-lib/aws-mwaa";
 import { Construct } from "constructs";
-// @kf-batch 52-P52.5a-supply — 资源 ARN 的 region 段唯一出口 + 显式轴声明。
+// 资源 ARN 的 region 段唯一出口 + 显式轴声明。
 import { regionalStatement } from "./shared/execution-regions";
 
 interface MwaaStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
   dagBucketArn: string;
   albSecurityGroup: ec2.ISecurityGroup;
-  dataKey: kms.IKey; // 模块 27 (WS1) — DAG 回写 bgp-* 加密表需解密权限
+  dataKey: kms.IKey; // DAG 回写 bgp-* 加密表需解密权限
 }
 
 export class MwaaStack extends cdk.Stack {
@@ -47,7 +47,7 @@ export class MwaaStack extends cdk.Stack {
 
     role.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "本角色是 home 的 MWAA 执行角色(环境本身建在 home);per-target MWAA 随 P50.3 由 exec-env 栈在目标 region 各建一套,那时 region 段天然=目标 region" ,
+      reason: "本角色是 home 的 MWAA 执行角色(环境本身建在 home);per-target MWAA 由 exec-env 栈在目标 region 各建一套,那时 region 段天然=目标 region" ,
       actions: ["airflow:PublishMetrics"],
       resources: (r) => [`arn:aws:airflow:${r}:${this.account}:environment/${this.environmentName}`],
     }));
@@ -81,7 +81,7 @@ export class MwaaStack extends cdk.Stack {
       actions: ["glue:StartJobRun", "glue:GetJobRun", "glue:GetJob"],
       resources: ["*"],
     }));
-    // 模块 33-A 补齐:EMR Serverless 引擎作业的周期调度 DAG 需要用 boto3 确保 application 启动、
+    // 补齐:EMR Serverless 引擎作业的周期调度 DAG 需要用 boto3 确保 application 启动、
     // 提交 job-run 并轮询终态(见 lib/engines/emr/dag-generator.ts)。缺这些权限时 run_job 会在
     // get_application 第一步即 AccessDenied 秒失败(与 Glue DAG 对称:Glue 有权限、EMR 之前漏了)。
     role.addToPolicy(new iam.PolicyStatement({
@@ -103,7 +103,7 @@ export class MwaaStack extends cdk.Stack {
       actions: ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:UpdateItem", "dynamodb:PutItem"],
       resources: (r) => [`arn:aws:dynamodb:${r}:${this.account}:table/bgp-*`],
     }));
-    // 模块 27 (WS1): bgp-* 表用数据域 CMK 加密,DAG 回写状态需用该 key 解密/生成数据密钥。
+    // bgp-* 表用数据域 CMK 加密,DAG 回写状态需用该 key 解密/生成数据密钥。
     props.dataKey.grant(role, "kms:Decrypt", "kms:GenerateDataKey", "kms:DescribeKey");
     role.addToPolicy(new iam.PolicyStatement({
       actions: ["redshift-data:ExecuteStatement", "redshift-data:BatchExecuteStatement", "redshift-data:DescribeStatement", "redshift-data:GetStatementResult", "redshift-data:CancelStatement", "redshift-serverless:GetCredentials"],
@@ -114,7 +114,7 @@ export class MwaaStack extends cdk.Stack {
     // cross-identity table-owner failure). The Data API needs the caller to read that secret.
     role.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "本 MWAA 在 home,其 DAG 打的是 home 数仓;跨 region 调度随 P50.3 的 per-target MWAA 一起做",
+      reason: "本 MWAA 在 home,其 DAG 打的是 home 数仓;跨 region 调度随 per-target MWAA 一起做",
       actions: ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
       resources: (r) => [`arn:aws:secretsmanager:${r}:${this.account}:secret:redshift!*`],
     }));

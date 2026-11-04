@@ -3,7 +3,7 @@
 // ALL arithmetic is done by Redshift. The conversation loops until the model stops asking
 // for tools or the iteration cap is reached.
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   BedrockRuntimeClient,
@@ -28,7 +28,7 @@ import {
   type RetrievalResult,
 } from "./retrieval";
 import type { GenBiStep } from "@/types/genbi";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:主循环 modelId 改为调用处求值(循环外解析一次候选层,循环内每次 Converse 经
+// 主循环 modelId 改为调用处求值(循环外解析一次候选层,循环内每次 Converse 经
 // invokeConverse 退避/降级);不再读模块加载期常量 GENBI.modelId。实际用的模型随 AgentOutput.model 回给 _meta。
 import { resolveLayered } from "@/lib/ai/model";
 import { invokeConverse } from "@/lib/ai/invoke";
@@ -36,7 +36,7 @@ import { mergeRanIn, type AiInvocationMeta, type AiModelUse, type RanInMeta } fr
 
 const bedrock = sdkClient("model", BedrockRuntimeClient, { region: GENBI.region });
 
-// 模块 38 — 异步化强制结束：执行体到达 300s 天花板时 abort。inprocess 循环在每轮迭代前
+// 异步化强制结束：执行体到达 300s 天花板时 abort。inprocess 循环在每轮迭代前
 // 与每次 SQL 执行前检查此信号 → 抛可识别的 AbortError → 立即停止消耗算力(不再进下一轮、
 // 不再发 Bedrock/查询)。**同步路径(flag 关)不传 signal，signal?.aborted 恒 false，行为逐字节不变。**
 function throwIfAborted(signal?: AbortSignal) {
@@ -49,7 +49,7 @@ function throwIfAborted(signal?: AbortSignal) {
 
 // 目录文本渲染已收敛进 @genbi/core buildCatalogText（阶段3 归一,容器/inprocess/codegen 共用）。
 // 此处按 inprocess 场景包一层:检索命中表(retrievalHeader)+ Athena 用**该区**的联邦目录引用。
-// 🔴 B-26:原来写死平台常量 ATHENA_CATALOG_REF(主控区表桶)⇒ 别的区问数据湖,目录里每张表都是主控区的名字。
+// 🔴 原来写死平台常量 ATHENA_CATALOG_REF(主控区表桶)⇒ 别的区问数据湖,目录里每张表都是主控区的名字。
 function catalogText(entries: CatalogEntry[], database: string, engine: GenBiEngine, athenaRef: string): string {
   return buildCatalogText(entries, database, { engine, athenaRef, retrievalHeader: true });
 }
@@ -87,10 +87,10 @@ export interface AgentOutput {
   usage: { inputTokens: number; outputTokens: number };
   matchedTables: TableMatch[]; // 检索命中的表 + 理由（可解释）
   retrievalNote?: string;
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显:主循环实际用的模型(降级则为回落层)+ 子调用(检索)明细。
+  // `_meta` 回显:主循环实际用的模型(降级则为回落层)+ 子调用(检索)明细。
   model: AiModelUse;
   invocations: AiInvocationMeta[];
-  /** @kf-batch 50-B26-lake-place —— 本次每条 SQL 真发出去的落点(执行层回报,去重) */
+  /** 本次每条 SQL 真发出去的落点(执行层回报,去重) */
   ranIn: RanInMeta[];
 }
 
@@ -100,10 +100,10 @@ export async function runGenBiAgent(
   database: string,
   published: PublishedHint[] = [],
   engine: GenBiEngine = "redshift",
-  // @kf-batch 52-P52.5a-supply — 加 `project` 位:问数是**项目上下文**取数(静态归类 project-context)。
-  // @kf-batch 50-WP2-directquery —— `targetId` = 取数落点(缺省 home);两个原子都要收到它,
+  // 加 `project` 位:问数是**项目上下文**取数(静态归类 project-context)。
+  // `targetId` = 取数落点(缺省 home);两个原子都要收到它,
   // 少给一个就会出现「schema 探的是这个区、SQL 跑在另一个区」这种最难查的错位。
-  // @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 home)
+  // 落点必填(原来缺省 home)
   opts: { abortSignal?: AbortSignal; businessContext?: string; project?: string; targetId: string }
 ): Promise<AgentOutput> {
   const { abortSignal, businessContext, project, targetId } = opts;
@@ -114,9 +114,9 @@ export async function runGenBiAgent(
   const effectiveDb = isAthena ? (database || S3TABLES_NAMESPACE) : database;
   const steps: GenBiStep[] = [];
   const tIntrospect = Date.now();
-  // 🔴🔴 B-26:Athena 两处原来都没传 targetId ⇒ 非主控区视角的数据湖问数整条落回主控区(无头实测 10/10 条)。
+  // 🔴🔴 Athena 两处原来都没传 targetId ⇒ 非主控区视角的数据湖问数整条落回主控区(无头实测 10/10 条)。
   //   现在两个原子 + 目录引用都取同一个 targetId;`introspectS3Tables`/`runSelectAthena` 的落点已是必填键。
-  // 序 38 B-71:目录引用按**用户选的命名空间**找所在表桶(平台表桶 / 已登记外部表桶),不再恒取平台表桶
+  // 目录引用按**用户选的命名空间**找所在表桶(平台表桶 / 已登记外部表桶),不再恒取平台表桶
   const athenaRef = isAthena ? (await resolveS3TablesPlaceForNamespace(targetId, effectiveDb)).catalogRef : "";
   const tables = isAthena
     ? await introspectS3Tables(effectiveDb, { targetId })
@@ -132,7 +132,7 @@ export async function runGenBiAgent(
   const omDesc = await fetchOmDescriptions().catch(() => ({}));
   const pubHints = isAthena ? [] : published;
   const tRetrieval = Date.now();
-  // @kf-batch 50-W5-seg2-WP8:子调用(检索重排)实际用的模型经 sink 收进 invocations(_meta.invocations[] 的第二条腿)。
+  // 子调用(检索重排)实际用的模型经 sink 收进 invocations(_meta.invocations[] 的第二条腿)。
   const invocations: AiInvocationMeta[] = [];
   const retrieval = await selectRelevantTables(question, tables, pubHints, omDesc, { onInvocation: (inv) => invocations.push(inv) }).catch(
     (): RetrievalResult => ({ selected: [], matches: [], usedFallback: true })
@@ -173,13 +173,13 @@ export async function runGenBiAgent(
   let inTok = 0;
   let outTok = 0;
 
-  // @kf-batch 50-W5-seg2-WP8:循环外求值一次候选层(51 SPEC §3.3「非每轮迭代求值」);循环内每次 Converse 经
+  // 循环外求值一次候选层(51 SPEC §3.3「非每轮迭代求值」);循环内每次 Converse 经
   // invokeConverse 走同一份候选层做退避/降级。`used` 记录最近一次实际用的模型(降级后为回落层,M14)。
   const layers = await resolveLayered("genbi");
   let used: AiModelUse = { modelId: layers[0].modelId, modelSource: layers[0].source };
 
   for (let iter = 0; iter < GENBI.maxIters; iter++) {
-    // 模块 38：到达 300s 天花板则本轮开始前即停(不再发 Bedrock 推理)。
+    // ：到达 300s 天花板则本轮开始前即停(不再发 Bedrock 推理)。
     throwIfAborted(abortSignal);
     const inv = await invokeConverse(
       "genbi",
@@ -221,11 +221,11 @@ export async function runGenBiAgent(
       if (tu.name === "run_sql") {
         const input = (tu.input || {}) as { sql?: string };
         const rawSql = input.sql || "";
-        // 模块45(生成后方言校验):用 cookbook 同源方言规则纠正模型偶发违规(GenBI 产 SELECT,
+        // (生成后方言校验):用 cookbook 同源方言规则纠正模型偶发违规(GenBI 产 SELECT,
         // 主要命中反引号→双引号:Redshift/Trino 都拒反引号)。纯 CPU、幂等;不改语义只纠方言语法。
         // 与执行器内既有只读守卫(sanitizeSelect/sanitizeReadOnly,拒非SELECT+限行)并存:此处先纠方言、执行前再兜只读安全。
         const sql = cookbookGuard(isAthena ? "athena" : "redshift", rawSql).code;
-        // 模块 38：到达天花板则不再发起新查询(避免长查询继续占用连接/算力)。
+        // ：到达天花板则不再发起新查询(避免长查询继续占用连接/算力)。
         throwIfAborted(abortSignal);
         const tRun = Date.now();
         const res = isAthena ? await runSelectAthena(sql, { targetId }) : await runSelect(sql, workgroup, database, { project: project ?? null, targetId });

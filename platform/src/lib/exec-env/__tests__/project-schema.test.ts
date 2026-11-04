@@ -1,4 +1,3 @@
-// @kf-batch 50-G2R
 // G4(提前并入 G2R)—— 项目 schema / role 命名 SSOT 单测(52 SPEC §3.0)。
 //
 // 【为什么必须钉住】现状有**三套互不兼容**的 sanitize(s3tables / modeling.safeIdent / glue python)。
@@ -91,8 +90,7 @@ describe("projectRoleName", () => {
   });
 });
 
-// @kf-batch 52-P52.5a-supply
-describe("🔴 per-project 凭证的派生名(P52.5a 供给层要用)", () => {
+describe("🔴 per-project 凭证的派生名(供给层要用)", () => {
   const PID = "proj-01M1KP594D2E6DJQC8EZ8CRAES";
 
   it("secret 名形态 = bgp/project/<targetSlug>/<原样 projectId>", () => {

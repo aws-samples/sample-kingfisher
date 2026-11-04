@@ -1,12 +1,11 @@
-// @kf-batch 50-WP15-airflow-serverless
 // serverless 发布 / 下线的**唯一**入口(扇出分路调它;SPEC v3.27 §3.15)。产物落该 target 的 workflowBucket:
 //   dags/<dagId>.yaml(定义)+ code/bgp_runtime-<ver>.zip(运行时 Code 包 = **zip,模块 bgp_runtime.py 在根**;版本哈希进 key ⇒ 改运行时 = 新对象)。
-//   🔴 T-11:裸 .py 会让 CreateWorkflow 成功、cron 照触发,而每个 run 死于 ModuleNotFoundError(见 code-package.ts 文件头)。
+//   🔴 裸 .py 会让 CreateWorkflow 成功、cron 照触发,而每个 run 死于 ModuleNotFoundError(见 code-package.ts 文件头)。
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { s3ClientFor } from "@/lib/exec-env/target-clients";
 import type { ServerlessEndpoint } from "@/lib/scheduler/mwaa-endpoint";
 import { BGP_RUNTIME_VERSION } from "./runtime-py";
-// @kf-batch 50-WP15-airflow-serverless(T-11):Code 包 = zip(模块在根)—— 唯一作者 code-package.ts
+// Code 包 = zip(模块在根)—— 唯一作者 code-package.ts
 import { BGP_RUNTIME_S3_KEY, BGP_RUNTIME_ZIP } from "./code-package";
 import { buildWorkflowYaml, type ServerlessJobSpec } from "./yaml-generator";
 import { deleteWorkflow, ensureWorkflow } from "./workflow-client";
@@ -32,7 +31,6 @@ export async function publishServerlessWorkflow(args: {
   cron?: string;
   spec?: ServerlessJobSpec;
   /**
-   * @kf-batch 50-WP17-serverless-workflow
    * 多节点编排路径:YAML **已经建好**(`buildWorkflowTasksYaml`)。
    * 🔴 与 `spec` 二选一:两个都给 = 调用方自己都不知道发的是哪一份 ⇒ 直接抛。
    */

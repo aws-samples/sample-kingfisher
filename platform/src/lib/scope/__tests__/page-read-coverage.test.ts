@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads
 /**
  * 门禁 `page-read-coverage` —— **页内每一次取数**都要按执行范围过滤,漏一处就红。
  *
@@ -30,10 +29,10 @@ const SRC = resolve(REPO, "platform/src");
 /** 天然跨范围 / 与执行区无关的基础设施调用(这三条是**机制自身**要用的,不是业务取数)。 */
 const INFRA_APIS = [
   "/api/public/config", // 平台引导配置(Cognito 池 id 等)
-  "/api/public/version", // 平台版本(序 39 第二刀;镜像构建信息,与执行区无关)
+  "/api/public/version", // 平台版本(镜像构建信息,与执行区无关)
   "/api/exec-targets", // 范围切换器自己的数据源:它就是「有哪些区」的来源
   "/api/scope/counts", // 「其他范围里还有 N 条」提示器,按设计要跨范围数
-  "/api/long-ops", // 模块 55 长操作统一框架的轮询端点:全局 fetch 拦截器按 taskId 取一行(落点在提交时已落在任务行上),不属于任何一页的取数
+  "/api/long-ops", // 长操作统一框架的轮询端点:全局 fetch 拦截器按 taskId 取一行(落点在提交时已落在任务行上),不属于任何一页的取数
 ];
 
 const read = (f: string) => readFileSync(f, "utf8");
@@ -214,15 +213,6 @@ describe("page-read-coverage", () => {
       UNSCOPED_READ_LIMIT
     );
     expect(UNSCOPED_READ_LIMIT, "棘轮只许改小,开工基线是 31").toBeLessThanOrEqual(31);
-  });
-
-  it("🔴 每条欠账都要有工单号(SC-<n>);工单台账在内部工程仓,不在本仓核对", () => {
-    const bad: string[] = [];
-    for (const r of UNSCOPED_READS) {
-      if (r.reason !== "not-wired-yet") continue;
-      if (!/^SC-\d+$/.test(r.ticket)) bad.push(`${key(r)}: 工单号形态不对(${r.ticket})`);
-    }
-    expect(bad, `欠账必须带工单号:${bad.join(" / ")}`).toEqual([]);
   });
 
   it("🔴 理由不许同义反复:每条 note 至少 12 字,且不得只是把接口名重复一遍", () => {

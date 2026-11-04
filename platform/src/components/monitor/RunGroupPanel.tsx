@@ -1,8 +1,7 @@
 "use client";
 
-// @kf-batch 50-WP5-rungroup
 // O2 前端:①「在哪些区跑」运行对话框(默认跟随执行范围视角) ②「多区联动运行」组行列表。
-// 合同 50 SPEC v3.44 §2.7 / INTERACTION §9.4;判据 ACCEPTANCE 段 `o2`(E-160/E-162/E-163/E-165/E-166/E-168)。
+// 合同 50 SPEC v3.44 §2.7 / INTERACTION §9.4;判据 ACCEPTANCE 段 `o2`。
 //
 // 🔴 护栏(与 INTERACTION §9 六条同源):
 //   · **绝不静默切顶栏的执行范围** —— 这里只决定「这次在哪些区跑」,不动视角;
@@ -172,7 +171,7 @@ export function RunGroupsPanel({
                             </Space>
                           ) },
                           { title: t("状态"), dataIndex: "status", width: 100, render: (v: string) => <Tag data-testid={`rg-child-status-${v}`}>{v}</Tag> },
-                          // 🔴 E-168:跨区定义版本差要**看得见**(它刻意不进分组键)
+                          // 🔴 跨区定义版本差要**看得见**(它刻意不进分组键)
                           { title: t("定义版本"), dataIndex: "definitionVersion", width: 90,
                             render: (v?: number) => (typeof v === "number" ? <Tag data-testid="rg-child-defver">v{v}</Tag> : "-") },
                           { title: t("开始"), dataIndex: "startedAt", width: 170, render: (v?: string) => v?.slice(0, 19).replace("T", " ") || "-" },

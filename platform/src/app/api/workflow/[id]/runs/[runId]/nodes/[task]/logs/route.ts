@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
-// @kf-batch 50-WP4quater-reads(工单 SC-3)—— 🔴 任务日志要去**这个工作流自己那个区**的 Airflow 取。
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
+// 🔴 任务日志要去**这个工作流自己那个区**的 Airflow 取。
 // 打主控区环境取一个别区的 DAG 日志,回的是 404 ⇒ 界面显示「暂无日志」,与「任务没输出」长得一样。
 import { schedulerEndpointFor, isServerlessEndpoint } from "@/lib/scheduler/mwaa-endpoint";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
@@ -11,7 +11,6 @@ import { MWAAClient, InvokeRestApiCommand } from "@aws-sdk/client-mwaa";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP17-serverless-workflow
 import { readServerlessTaskLogs } from "@/lib/scheduler/serverless/task-logs";
 import { serverlessWorkflowArnOf } from "@/lib/workflow/publish-dag";
 
@@ -52,7 +51,7 @@ export async function GET(
     let content = "";
     try {
       const ep = await schedulerEndpointFor(bindingTargets(wf as { targets?: unknown; targetId?: unknown })[0] || "tgt_home");
-      // @kf-batch 50-WP17-serverless-workflow —— serverless 侧的任务日志走服务 API + CloudWatch:
+      // serverless 侧的任务日志走服务 API + CloudWatch:
       //   台账行 → 服务侧 run(**精确**对:任务实例 id 前缀 = 台账 runId 的 raw 段)→ 该节点的
       //   任务实例(按 `_<task_id>_<attempt>` 尾缀,取最大 attempt)→ LogStream → 日志组。
       if (isServerlessEndpoint(ep)) {

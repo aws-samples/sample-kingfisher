@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // 🔴 W3e-12 真撞(2026-09-06):`/api/exec-targets` 回 `{targets}`,EMR 面板仍按数组读 ⇒「全选当前活跃区(0)」灰掉,作业只能绑 home。
 // 修法 = 读法单一作者 + 本守卫:页面不许再自己 fetch 这条路由;形状归一化有单测。
 import { describe, it, expect } from "vitest";
@@ -10,7 +9,7 @@ import { EXEC_TARGET_COMPONENT_DIMS } from "@/lib/exec-env/exec-targets-dims";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SRC = resolve(HERE, "../../..");
-/** 六个消费者(B-109 补进编排页与治理建表向导 —— 它们当时漏在名单外,传的维度路由不认也没人看见)。 */
+/** 六个消费者(补进编排页与治理建表向导 —— 它们当时漏在名单外,传的维度路由不认也没人看见)。 */
 const CONSUMERS = [
   "app/etl-jobs/page.tsx",
   "app/redshift/page.tsx",
@@ -58,12 +57,11 @@ describe("🔴 接线守卫:/api/exec-targets 只许在 exec-targets-client.ts �
     }
   });
 
-  // @kf-batch 50-B109-exec-target-dims
-  // 🔴 「经 fetchExecTargets 调」还不够:传的维度路由不认 ⇒ 400 被页面吞成空列表(B-109:编排页 "airflow" /
+  // 🔴 「经 fetchExecTargets 调」还不够:传的维度路由不认 ⇒ 400 被页面吞成空列表(编排页 "airflow" /
   //   建表向导 "core" 坏了一个月,本守卫当时全绿)。门禁写成「枚举违规写法」就漏第 N+1 种 ⇒ 改钉唯一合法形态:
   //   每个调用点实参里的**每个字符串字面** ∈ 闭合清单(类型层 tsc 也会红;这里再钉一遍,防 `as any` / 模板串绕过),
   //   而且实参必须含字面(全动态表达式让人读不出传了什么维度)。
-  it("🔴 B-109:每个调用点传的维度字面 ∈ EXEC_TARGET_COMPONENT_DIMS(路由同一份清单)", () => {
+  it("🔴 每个调用点传的维度字面 ∈ EXEC_TARGET_COMPONENT_DIMS(路由同一份清单)", () => {
     const files = [...walk(resolve(SRC, "app")), ...walk(resolve(SRC, "components")), ...walk(resolve(SRC, "lib"))].filter(
       (fp) => !fp.endsWith("exec-targets-client.ts") && !fp.endsWith("exec-targets-dims.ts")
     );
@@ -78,7 +76,7 @@ describe("🔴 接线守卫:/api/exec-targets 只许在 exec-targets-client.ts �
         for (const lit of lits) expect(EXEC_TARGET_COMPONENT_DIMS as readonly string[], `${rel}: ${m[0]}`).toContain(lit);
       }
     }
-    // 消费者名单也是棘轮:B-109 当时漏掉了编排页与建表向导,这两处今后必须在
+    // 消费者名单也是棘轮:当时漏掉了编排页与建表向导,这两处今后必须在
     for (const rel of CONSUMERS) expect(seen, `${rel} 必须经 fetchExecTargets 取清单`).toContain(rel);
   });
 });

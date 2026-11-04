@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###############################################################################
-# scripts/lib/execution-regions.sh —— 控制面「放行清单」(执行 region 列表)的**唯一作者**(序 48)。
+# scripts/lib/execution-regions.sh —— 控制面「放行清单」(执行 region 列表)的**唯一作者**。
 #
 #   exec_regions_registry                 只读:注册表 bgp-execution-envs 里**未删除**执行环境的 region,逐行(不含 home 自身也无妨,调用方会并)
 #   exec_regions_candidates_read          只读:SSM /bgp/wiring/execution-region-candidates 里的**候选区**,逐行;参数不存在 ⇒ 空
@@ -10,7 +10,7 @@
 #   exec_regions_account_not_opted_in     只读:账号**未 opt-in** 的 region(ec2 describe-regions --all-regions),逐行;读失败 ⇒ 回非 0(不 die,调用方决定)
 #   exec_regions_pick_probe LIST          挑一个**不在** LIST 里的区给 IAM 模拟门做 any-region 探测:账号未 opt-in 的区优先,固定备选兜底;都没有 ⇒ 空串
 #
-# 【为什么存在(序 48,2026-10-19 客户现网法兰克福加区实录)】平台 TaskRole 等 18 处 IAM `aws:RequestedRegion` 条件
+# 【为什么存在(2026-10-19 客户现网法兰克福加区实录)】平台 TaskRole 等 18 处 IAM `aws:RequestedRegion` 条件
 #   在 synth 期烘入模板(infra/lib/shared/execution-regions.ts),所以「加一个执行区」= 必须重部署一次控制面「放行」;
 #   客户在页面建好区之后还要运维在 CLI 跑 redeploy-platform.sh,这一步既慢又容易忘(忘了的症状是「检测初始化」9 行红)。
 #   SPEC §12.0 不许把放行塞进执行环境 CodeBuild(那会让部署角色拿到控制面写权),所以自动化的唯一正路是**把「人决定平台
@@ -133,11 +133,11 @@ exec_regions_account_not_opted_in() {
   printf '%s\n' "$out" | tr '\t' '\n' | grep -E "$EXEC_REGION_NAME_RE" | sort -u || true
 }
 
-# 固定备选探测区(B-114 之前的唯一来源;现在只做兜底)。顺序固定,方便判据与日志对照。
+# 固定备选探测区(此前的唯一来源;现在只做兜底)。顺序固定,方便判据与日志对照。
 EXEC_REGIONS_PROBE_FALLBACK="eu-central-1 eu-west-3 sa-east-1 ca-central-1 ap-south-1 eu-north-1 ap-northeast-3"
 
 # 给 IAM 模拟门挑 any-region 探测区:必须**不在**放行清单里(否则那几条 any-region 轴等于没验)。
-# 🔴 B-114(2026-10-22 测试账号升级真撞):`EXEC_REGION_CANDIDATES=all-enabled` 把账号已启用的全部区放进清单,
+# 🔴 (2026-10-22 测试账号升级真撞):`EXEC_REGION_CANDIDATES=all-enabled` 把账号已启用的全部区放进清单,
 #   7 个固定备选区全在其中 ⇒ 挑不出 ⇒ 调用方 die ⇒ 平台栈其实已部署完却被报成失败、页面向导拿不到裁决。
 #   根治:探测区**优先从账号未 opt-in 的区里挑** —— 它们按定义不可能进放行清单(候选区必须已启用、注册表在用区都是真部署过的区),
 #   而 IAM SimulatePrincipalPolicy 只拿 `aws:RequestedRegion` 当字符串条件值评估,区不必启用;固定备选只做兜底

@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 通用 Flink SQL 流作业 runner —— S3 Tables(托管 Iceberg)变体(模块 32)。
+ * 通用 Flink SQL 流作业 runner —— S3 Tables(托管 Iceberg)变体。
  *
  * 与默认 runner 同样把平台注入的多语句 Flink SQL(运行时属性 bgp.sql)逐句执行(DDL/SET 即时、
  * INSERT 进 StatementSet 长驻),但【拦截 CREATE CATALOG(type=iceberg / catalog-impl)】并改在

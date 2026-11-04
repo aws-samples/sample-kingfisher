@@ -1,6 +1,6 @@
-// 序 38 → 序 50 第二批 —— 治理目录「同步列信息」运行记录(runSchemaSyncRecorded / readSchemaSyncRun)。
+// → —— 治理目录「同步列信息」运行记录(runSchemaSyncRecorded / readSchemaSyncRun)。
 // 【缺陷原形】POST 同步长调用超 ALB 60s 墙 ⇒ 504,而工作在后台做完了(s38 复跑 71d)。
-// 【序 50 第二批】治理专用的「45s 内回应 / 202 running / 并入 joined」协议退役:等待与 202 由模块 55 统一框架接管
+// 治理专用的「45s 内回应 / 202 running / 并入 joined」协议退役:等待与 202 由统一框架接管
 //   (submitLongOp 45s 转 202;并发由对象租约 governance:schema-sync 挡成 409),本模块只剩**运行记录**:
 //   条件写 running(别的实例已在跑 ⇒ 抛,不起第二份)→ 跑工作 → 落终态并返回;GET 读「最近一次同步」不变(stale 判定不变)。
 // 【只 mock 真外部】DDB(settings 表)。
@@ -42,7 +42,7 @@ function deferred<T>() { let resolve!: (v: T) => void; let reject!: (e: unknown)
 
 beforeEach(() => { h.rows.clear(); h.calls.length = 0; });
 
-describe("schema-sync-run(序 50 第二批:只剩运行记录)", () => {
+describe("schema-sync-run(只剩运行记录)", () => {
   it("治理专用 202 协议已退役:模块不再导出 startOrJoinSchemaSync / SCHEMA_SYNC_RESPOND_WITHIN_MS;15 分钟判过期不变", () => {
     expect((mod as Record<string, unknown>).startOrJoinSchemaSync).toBeUndefined();
     expect((mod as Record<string, unknown>).SCHEMA_SYNC_RESPOND_WITHIN_MS).toBeUndefined();

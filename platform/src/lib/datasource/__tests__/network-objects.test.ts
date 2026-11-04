@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 系统设置「数据源网络对象」清单与孤儿清理(唯一作者 lib/datasource/network-objects.ts)的判据。
+// 系统设置「数据源网络对象」清单与孤儿清理(唯一作者 lib/datasource/network-objects.ts)的判据。
 //
 // 🔴 只 mock 真外部:EC2 事实读取(datasource-service 的三个只读函数)、注册表、DDB、作业表存储。
 //    network-objects ↔ sg-cleanup-job(入队)之间不 mock:入队走真的 enqueueSgCleanup ⇒ createJob(作业表存储被 mock)。
@@ -91,7 +91,7 @@ describe("listDatasourceNetworkObjects", () => {
   });
 });
 
-describe("requestOrphanSgCleanup:服务端重核三条件,过了才入 B-130 清理作业", () => {
+describe("requestOrphanSgCleanup:服务端重核三条件,过了才入清理作业", () => {
   const ok = { region: "us-east-1", targetId: "tgt_home", createdBy: "admin" };
   it("参数形态 / 不存在 / 不是平台组 / 仍被源行引用 / 仍有网卡 ⇒ 各自 400 / 404 / 409,零入队", async () => {
     await expect(requestOrphanSgCleanup({ ...ok, sgId: "nope" })).rejects.toMatchObject({ status: 400 });

@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.1a-naming-ssot
 // 执行环境资源命名 —— 部署期侧出口(SSOT re-export)。
 //
 // 唯一真源是 `platform/naming.json`(见其 $comment)。本文件是它在【部署期侧(infra/CDK)】的出口:

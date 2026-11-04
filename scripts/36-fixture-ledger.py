@@ -7,7 +7,7 @@
     python3 scripts/36-fixture-ledger.py --profile temp-account \
             --delete "fk2r-0919095841-home,fk2r-0919095841-usw2_a"           # 只删点到名字的这几个
 
-🔴 **为什么要有它**(WP-27 第 4 步的一般化):本仓反复出现两个对偶的毛病 ——
+🔴 **为什么要有它**(第 4 步的一般化):本仓反复出现两个对偶的毛病
   ① 验收段「自造夹具、验完删净」⇒ 判据全绿而**用户切过去看到空页面**(记忆
      `all-capabilities-visible-in-every-region`);
   ② 而删不净的那些又堆在页面上,让用户分不清「示范对象」和「脏数据」:2026-09-19 就有 3 个

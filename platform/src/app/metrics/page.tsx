@@ -47,11 +47,11 @@ function Spark({ data }: { data: number[] }) {
 }
 
 export default function MetricsPage() {
-  // @kf-batch 50-WP4quater-reads(工单 SC-13)—— 指标值按区:列表读 `?scope=`,计算落点走 body。
+  // 指标值按区:列表读 `?scope=`,计算落点走 body。
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
-  // @kf-batch 50-WP31-place-first-class —— 计算落点唯一作者 `landingOfScope`(单区视角 = 该区;「全部 / 对比」= 显式主控区)。
+  // 计算落点唯一作者 `landingOfScope`(单区视角 = 该区;「全部 / 对比」= 显式主控区)。
   //   原来非单区视角发 `{}`、由服务端「没给 = 主控区」兜 ⇒ 服务端现在缺落点一律 400。
   const computeTargetId = landingOfScope(scope);
   const { getToken, user, loading: authLoading } = useAuth();

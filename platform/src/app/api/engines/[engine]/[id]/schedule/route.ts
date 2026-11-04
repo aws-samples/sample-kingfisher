@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 
 // POST /api/engines/[engine]/[id]/schedule  body { cronExpression, targets?: string[] }
-//   为该引擎作业发布 cron 调度 DAG —— @kf-batch 50-WP13-mwaa-region **逐 target 扇出到该 target 自己的 MWAA**
+//   为该引擎作业发布 cron 调度 DAG —— **逐 target 扇出到该 target 自己的 MWAA**
 //   (用户 2026-09-06 拍板「每个区域的定时任务都是自己区域的 MWAA 执行的,不允许跨区域调度」;SPEC v3.26 §3.14)。
 //   原版只发 home 一份、用 home 的角色 / application / 脚本桶(注释自证「MWAA 是 home 独有」)—— 已作废。
 //   前提:作业至少成功运行过一次(脚本已写);扇出时逐 target ensure application + 上传脚本 + 复制 jar。
 // DELETE /api/engines/[engine]/[id]/schedule  下线全部产物(绑定 ∪ 台账,逐 target pause + 删该区 DAG 文件 + scheduleEnabled=false)。
 
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— targets 子集的唯一解析作者
+// targets 子集的唯一解析作者
 import { requestedSubset } from "@/lib/place/resolve";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
@@ -100,7 +100,7 @@ export async function DELETE(
     // 覆盖面 = 绑定 ∪ 台账,逐 target 去它自己的 MWAA(原版只 pause home / 删 home 桶 ⇒ 非 home 孤儿调度)
     const offlined = await offlineEmrFanout(job);
     const result = { dagId: emrBaseDagIdOf(job), offlined };
-    // 🔴 T-14:有任何一区下线失败(如还有 run 没停)⇒ 整体报错、**不**把 scheduleEnabled 置 false;台账已刻意保留,再点一次可重试。
+    // 🔴 有任何一区下线失败(如还有 run 没停)⇒ 整体报错、**不**把 scheduleEnabled 置 false;台账已刻意保留,再点一次可重试。
     const failedRows = offlineFailures(offlined);
     if (failedRows.length) {
       return apiError(offlineFailureMessage(failedRows, OFFLINE_RETRY_TAIL), 502,

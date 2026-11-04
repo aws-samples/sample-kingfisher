@@ -2,11 +2,11 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:AI 模型运行时配置 / FAULT seam 启用状态 / AgentCore 模型回执 三项。
+// AI 模型运行时配置 / FAULT seam 启用状态 / AgentCore 模型回执 三项。
 import { resolveModelRuntime } from "@/lib/ai/model";
 import { faultSeamStatus } from "@/lib/ai/fault-seam";
 import { getAgentCoreMetaStatus } from "@/lib/ai/agentcore-contract";
-// @kf-batch 50-init-deploy-mechanism —— 执行环境部署机制(broker + CodeBuild)真在否
+// 执行环境部署机制(broker + CodeBuild)真在否
 import { probeDeployMechanism } from "@/lib/exec-env/deploy-control";
 
 // 接线健康体检(防回归根治 · 可观测层)。
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
     detail: memBackend === "agentcore" && memId ? `agentcore 托管记忆 · ${memId}` : `自管记忆(backend=${memBackend || "未设"})`,
   });
 
-  // ④ @kf-batch 50-W5-seg2-WP8 模块 51:当前生效模型 + 来源层(配置面挂了 ⇒ runtime-stale 标 down,让「AI 模型」卡与本卡同红)。
+  // ④:当前生效模型 + 来源层(配置面挂了 ⇒ runtime-stale 标 down,让「AI 模型」卡与本卡同红)。
   try {
     const m = await resolveModelRuntime("genbi");
     items.push({
@@ -120,7 +120,7 @@ export async function GET(req: NextRequest) {
         : "本进程尚无 AgentCore 调用(inprocess 路径不经此)",
   });
 
-  // ⑦ @kf-batch 50-init-deploy-mechanism 执行环境部署机制:缺它 ⇒ 向导「开始部署」必报 Function not found,而其余全绿
+  // ⑦ 执行环境部署机制:缺它 ⇒ 向导「开始部署」必报 Function not found,而其余全绿
   //    (2026-09-06 新账号真撞:deploy-all 老版本从未发 BgpExecEnvDeployStack)。只读探测,不 invoke broker。
   try {
     const m = await probeDeployMechanism();

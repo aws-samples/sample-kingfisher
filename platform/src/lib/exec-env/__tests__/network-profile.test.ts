@@ -1,7 +1,7 @@
-// @kf-batch 50-WP16-zero-egress(退役 K-5 网络规模)
+// (退役 K-5 网络规模)
 // 🔴 **本文件从「链路守卫」翻转成「退役守卫」**。
 //   原来它钉的是:注册表 networkProfile → broker env `EXEC_ENV_NAT_GATEWAYS` → buildspec / p0e-gate
-//   `-c exec-env-nat-gateways` → context.ts 这条链不许断。WP-16 之后执行环境零出网、NAT 恒为 0,
+//   `-c exec-env-nat-gateways` → context.ts 这条链不许断。此后执行环境零出网、NAT 恒为 0,
 //   这条链**整条退役** ⇒ 现在要钉的是**它不许复活**,以及退役退得干净(残留半条链比没有更危险:
 //   buildspec 传一个 context.ts 会抛的入参 = 每次部署都炸在第一步)。
 import { describe, it, expect } from "vitest";

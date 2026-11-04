@@ -1,11 +1,10 @@
-// @kf-batch 50-WP15-airflow-serverless(T-12)
 // **台账行键的唯一作者**:`bgp-task-runs` 的 `(taskId, runId)` 在多 region 下怎么才不碰撞。
 //
 // ── 为什么必须有这一刀(真环境 2026-09-07 坐实)──────────────────────────────────
 // 50 SPEC §1.2 早写明「复合 runId 存在的唯一理由 = 同 cron 两 target 的 `scheduled__<logical_date>` 完全相同」,
 // 但四个**调度器侧**写入方(serverless 运行时 / legacy ETL DAG / legacy EMR DAG / legacy workflow DAG)一直写 raw run_id。
 // 后果不是报错,是**静默覆盖**:同一作业绑 home + usw2_a,两区各自跑完各写一行 ⇒ 同键 ⇒ **后写的盖掉先写的**。
-// 实测(sls 第六轮):两区 workflow 都 SUCCESS、两区 CTAS 都真跑,而 `bgp-task-runs` 只剩 1 行 `targetId=tgt_usw2_a`
+// 实测(sls):两区 workflow 都 SUCCESS、两区 CTAS 都真跑,而 `bgp-task-runs` 只剩 1 行 `targetId=tgt_usw2_a`
 // ⇒ 「一个区的成功盖掉另一个区的记录」,在跨法域场景下等于**审计缺失**;若一区失败一区成功,看板还会假绿。
 //
 // ── 唯一性口径(不变量) ────────────────────────────────────────────────────────

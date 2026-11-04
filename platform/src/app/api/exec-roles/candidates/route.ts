@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-// 序 72 B-139(模块 56)—— 页面「执行角色」下拉的候选:GET /api/exec-roles/candidates?engine=glue|emr|flink&targetId=
+// 页面「执行角色」下拉的候选:GET /api/exec-roles/candidates?engine=glue|emr|flink&targetId=
 //   登录即可读(与「角色顾问 → 推荐」同级);engine 不在闭合清单 / 缺 targetId ⇒ 400(落点显式,不默认主控区);
 //   IAM 读失败 ⇒ 502 UPSTREAM_ERROR 如实报(平台缺 iam:ListRoles = 栈没升级到含本刀的版本,文案点名)。
 

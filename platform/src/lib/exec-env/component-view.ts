@@ -1,8 +1,7 @@
-// @kf-batch 50-B02-spec-vs-observed
 /**
  * **呈现面「这个组件到底装出来了没有」的唯一判断**（纯函数，好钉判据）。
  *
- * 【为什么需要它（2026-09-20 B-02，用户从页面复制给我的那三行之一）】
+ * 【为什么需要它（2026-09-20，用户从页面复制给我的那三行之一）】
  * ```
  * eu-west-1 不承接新工作 已注册 tgt_euw1_a  core redshift  法域 eu-sim  探活 09-20 12:09
  * ```
@@ -11,11 +10,11 @@
  * tgt_euw1_a  status=registered  顶层 components=['core','redshift']
  *             spec={}  observed={}  resources 键数=0  probe.ok=False
  * ```
- * ⇒ 界面宣称了**两个根本没有载体的组件**（与 WP-26 那条「界面宣称了没有载体的能力」同族）。
+ * ⇒ 界面宣称了**两个根本没有载体的组件**（与那条「界面宣称了没有载体的能力」同族）。
  *
  * 【根因分两层，而且**第二层是我改了一版之后才量出来的**】
  * 第一层：顶层 `components` 本该是 observed 的镜像（`lifecycle.materializedProjection()`：
- *   `components: [...observed.components]`，P50.3b 双轴）。2026-09-20 量到 `tgt_euw1_a` 的
+ *   `components: [...observed.components]`，双轴）。2026-09-20 量到 `tgt_euw1_a` 的
  *   `spec` 与 `observed` **都是空 map**，只有旧顶层字段有值 ⇒ 页面信了顶层就等于宣称没有的组件。
  *   ⇒ 第一版修成「以 observed 为准」。
  * 🔴🔴 第二层（2026-09-21 同一个描述符**再量一次**，它变了）：
@@ -52,7 +51,7 @@ export interface ComponentViewInput {
 /**
  * 这个环境**真的装完并验过**了吗 —— 「已装」的必要条件。
  *
- * 🔴🔴 **为什么光看 `observed.components` 不够**（2026-09-21 真值坐实，B-02 的第二层）：
+ * 🔴🔴 **为什么光看 `observed.components` 不够**（2026-09-21 真值坐实，该缺陷的第二层）：
  * ```
  * tgt_euw1_a  status=failed
  *             顶层 components      = ['core','redshift']
@@ -80,7 +79,7 @@ export function targetIsReady(target: ComponentViewInput): boolean {
  * 卡片上要逐个显示的组件行。
  *
  * 并集语义：顶层声称的 ∪ 观测到的 —— 两边都要列出来，因为
- *   · 只在顶层里（observed 没有）= **声称了却没建出来** ⇒ 待部署（B-02 那个形态）；
+ *   · 只在顶层里（observed 没有）= **声称了却没建出来** ⇒ 待部署（那个形态）；
  *   · 只在 observed 里（顶层没有）= 投影落后了，但它**真的在**  ⇒ 已装（不许因为投影漏了就不显示）。
  */
 export function componentViewItems(target: ComponentViewInput): ComponentViewItem[] {

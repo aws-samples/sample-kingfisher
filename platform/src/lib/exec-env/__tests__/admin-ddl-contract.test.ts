@@ -1,4 +1,3 @@
-// @kf-batch 50-G2R
 // G2R —— admin-DDL **结构化请求 + 私有模板**单测(50 SPEC §3.9a v3.3,用户拍板 B)。
 //
 // 【这是新的真边界,所以测试要盯两件事】
@@ -23,7 +22,7 @@ import { lintGeneratedStatement } from "@/lib/exec-env/admin-ddl-guards";
 const PID = "proj-01M1KP594D2E6DJQC8EZ8CRAES"; // 真环境形态(大写 ULID),见 project-schema.ts 的订正说明
 const TID = "tgt_home";
 
-// @kf-batch 50-WP11b-shared-writer —— 建模类 operation 的台账对象(真执行器在第 2 步服务端读台账得到;这里给夹具)
+// 建模类 operation 的台账对象(真执行器在第 2 步服务端读台账得到;这里给夹具)
 const CODE_ROW = { kind: "code-table" as const, codeTableId: "country", code: "country" };
 const MODEL_ROW = {
   kind: "model-table" as const,
@@ -64,17 +63,17 @@ const SAMPLES: AdminDdlRequest[] = [
   { operation: "grant", targetId: TID, projectId: PID },
   { operation: "drop-project-schema", targetId: TID, projectId: PID, approvalId: "apr-1" },
   { operation: "dms-ingest-bootstrap", targetId: TID },
-  // @kf-batch 50-WP11b-shared-writer —— land-code-table 改成 target 级(码表没有项目维)
+  // land-code-table 改成 target 级(码表没有项目维)
   { operation: "land-code-table", targetId: TID, codeTableId: "country" },
-  // @kf-batch 52-P52.5a-supply — 🔴 **追加在末尾**:上面用了 `SAMPLES[0]` / `SAMPLES[6]` 这种下标,
+  // 🔴 **追加在末尾**:上面用了 `SAMPLES[0]` / `SAMPLES[6]` 这种下标,
   // 插在中间会把别的断言悄悄换成另一个 operation(下标索引的样本表最容易这样出事)。
   { operation: "grant-role-to-login", targetId: TID, projectId: PID },
-  // @kf-batch 50-WP11b-shared-writer —— 同样追加在末尾(理由同上)
+  // 同样追加在末尾(理由同上)
   { operation: "grant-shared-writer", targetId: TID, codeTableId: "country" },
   { operation: "land-model-table", targetId: TID, modelTableId: "01MODELTABLE" },
   { operation: "drop-landed-table", targetId: TID, kind: "code-table", objectId: "country" },
   { operation: "drop-landed-table", targetId: TID, kind: "model-table", objectId: "01MODELTABLE" },
-  // @kf-batch 50-WP9a-durable-jobs —— permission canary 的两条(追加在末尾,理由同上)
+  // permission canary 的两条(追加在末尾,理由同上)
   { operation: "create-canary-probes", targetId: TID, projectId: PID },
   { operation: "revoke-public-create", targetId: TID },
 ];
@@ -121,7 +120,7 @@ describe("🔴 结构化请求:类型层不给自由 SQL 的口子", () => {
     expect(() => parseAdminDdlRequest({ operation: "land-code-table", targetId: TID, codeTableId: "a;b" })).toThrow(
       /codeTableId/
     );
-    // @kf-batch 50-WP11b-shared-writer —— 码表是 target 级:带 projectId 说明调用方对语义有误解
+    // 码表是 target 级:带 projectId 说明调用方对语义有误解
     expect(() =>
       parseAdminDdlRequest({ operation: "land-code-table", targetId: TID, projectId: PID, codeTableId: "country" })
     ).toThrow(/target 级/);
@@ -161,7 +160,7 @@ describe("🔴 模板内容的关键不变量", () => {
   // 🔴 标题刻意不写成"那条禁令的形状":L1 扫描门禁(l1-no-grant-to-public.test.ts)禁止全仓出现,
   //    而豁免名单只留给"禁令自身的定义与它的 payload 测试"。本处改口径即可,不必加豁免。
   //    另订正一处旧数:实测是 **8 处**(6 处源码 + 2 处被 git 跟踪的 core-dist 编译副本),原写 6 处。
-  it("模板产物绝不把对象授权给 PUBLIC(52 P52.1 L1 已撤的那 8 处存量授权的形状)", () => {
+  it("模板产物绝不把对象授权给 PUBLIC(L1 已撤的那 8 处存量授权的形状)", () => {
     for (const s of SAMPLES) {
       const projectId = "projectId" in s ? (s as { projectId: string }).projectId : undefined;
       for (const stmt of buildAdminDdlStatements(s, ctx(projectId, s))) {
@@ -171,7 +170,6 @@ describe("🔴 模板内容的关键不变量", () => {
   });
 
   it("schema / role / 登录用户名一律来自 SSOT,不是调用方给的", () => {
-    // @kf-batch 52-P52.5a-supply
     // 🔴🔴 **本条原来在钉一个真 bug**:它断 `create-project-schema` 的产物里必须出现 **role 名**,
     // 而那个 role 名来自 `ALTER SCHEMA … OWNER TO "role_proj_…"` —— 真环境第一次执行就报
     // `ERROR: user "role_proj_proj_01m1…" does not exist`:**Redshift 的 schema 属主必须是 user,
@@ -197,7 +195,7 @@ describe("🔴 模板内容的关键不变量", () => {
     expect(out).not.toMatch(/\binsert\b/);
     expect(out).not.toMatch(/\bdelete\b/);
     expect(out, "但结构必须建出来,否则就是 no-op").toMatch(/create table/);
-    // @kf-batch 50-WP11b-shared-writer —— 落点改经 SSOT(过渡期 = 现网 public.dim_code_<code>,不再是 shared.code_<id>)
+    // 落点改经 SSOT(过渡期 = 现网 public.dim_code_<code>,不再是 shared.code_<id>)
     expect(out).toContain(`"public"."dim_code_country"`);
     expect(out, "旧模板自己拼的第二个落点名不许回来").not.toContain(SHARED_SCHEMA);
   });
@@ -323,8 +321,7 @@ describe("🔴 GeneratedAdminStatement 的铸造面必须封闭(v3 P0-B)", () =>
   });
 });
 
-// @kf-batch 50-WP9a-durable-jobs
-describe("🔴 permission canary 的两条模板(WP-9 ④-3 / ⑨-7)", () => {
+describe("🔴 permission canary 的两条模板(④-3 / ⑨-7)", () => {
   const build = (s: AdminDdlRequest) =>
     buildAdminDdlStatements(s, ctx("projectId" in s ? (s as { projectId: string }).projectId : undefined, s)).map(String);
 

@@ -1,14 +1,13 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 进 `isolated` 的**服务端前置判据**(WORK-PACKAGES WP-9 ④-3 末句;50 SPEC §3.9b「进 isolated 的前置」)。
+// 进 `isolated` 的**服务端前置判据**(④-3 末句;50 SPEC §3.9b「进 isolated 的前置」)。
 //
-//   ① 在用项目都有 per-project secret(P52.5a 已有:present / missing / unverifiable 三分)
+//   ① 在用项目都有 per-project secret(已有:present / missing / unverifiable 三分)
 //   ② 在用项目最新 canary 全 pass ∧ epoch 一致 ∧ ≤ 24h(本包 permission-canary)
-//   ③ 产物凭证扫描 = 0(Glue 脚本 / DAG 里烤进去的 admin secret ARN;WP-9 ② 第 10 行)
+//   ③ 产物凭证扫描 = 0(Glue 脚本 / DAG 里烤进去的 admin secret ARN;② 第 10 行)
 //   ④ 近 7 天 `CredentialFallback` = 0(回落指标;cred-observability 写的那条)
 //
-// 🔴 **全部 fail-closed**:任何一项「拿不准」都算不满足 —— 尤其 ③:它的实现归 **WP-9b**(序 4 写入收口 /
-//    序 8 产物重发布),在那之前它回 `unavailable`,于是 isolated **一定被拒**。这是有意的:
-//    `isolated` 单调不可逆,在「烤进产物里的 admin ARN 还没清零」时推过去,稳态就是虚设(WP-9 ⑩-2)。
+// 🔴 **全部 fail-closed**:任何一项「拿不准」都算不满足 —— 尤其 ③:它的实现(写入收口 /
+//    产物重发布),在那之前它回 `unavailable`,于是 isolated **一定被拒**。这是有意的
+//    `isolated` 单调不可逆,在「烤进产物里的 admin ARN 还没清零」时推过去,稳态就是虚设(⑩-2)。
 // 🔴 不在这里推进状态:本模块只**判**,推进仍只经 `advanceCredentialIsolationState`(唯一写通道)。
 import { listProjectsWithBindings, verifyProjectCredentials } from "@/lib/exec-env/project-cred-supply";
 import { canaryPrerequisite, latestCanaryByProject } from "@/lib/exec-env/permission-canary";
@@ -42,14 +41,14 @@ export interface PrereqDeps {
 }
 
 /**
- * ③ 的默认实现:**如实回 unavailable**(扫描器归 WP-9b)。
+ * ③ 的默认实现:**如实回 unavailable**(扫描器)。
  * 🔴 不许写成 `{status:"ok", adminArnHits:0}` 先放行 —— 那正是「没有载体的能力宣称」。
  */
 export async function scanArtifactCredentialsUnavailable(_targetId: string): Promise<ArtifactScanResult> {
   return {
     status: "unavailable",
     reason:
-      "产物凭证扫描尚未实现(归 WP-9b:写入收口 + 产物重发布之后才能扫清)。在扫描器落地前,进 isolated 一律被拒 —— " +
+      "产物凭证扫描尚未实现(写入收口 + 产物重发布之后才能扫清)。在扫描器落地前,进 isolated 一律被拒 —— " +
       "Glue 脚本 / DAG 里烤进去的 admin secret ARN 不清零,isolated 只是名义上的稳态",
   };
 }

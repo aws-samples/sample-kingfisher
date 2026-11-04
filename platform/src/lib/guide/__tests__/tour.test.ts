@@ -1,4 +1,3 @@
-// @kf-batch 53-guide-tour
 // 新手引导「交互式导览」的门禁(用户 2026-09-14:「一步一步引导人家…第一步点击什么,然后下一步…」)。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -8,9 +7,7 @@ import { JOURNEYS } from "@/lib/guide/content";
 import {
   expandJourney, journeyByKey, navTestId, readProgress,
   unanchoredSteps, TOUR_UNANCHORED_LIMIT, TOUR_PROGRESS_KEY,
-  // @kf-batch 53-guide-tour-reach
   anchorIsUsable, anchorRectSignature, anchorSettled, shouldAdvanceAfterNavigation, tourStepAt,
-  // @kf-batch 50-WP23-guide-scope-gate
   missingAnchorAdvice,
 } from "@/lib/guide/tour";
 
@@ -131,11 +128,11 @@ describe("🔴 棘轮:还没有页内锚点的动线步只减不增", () => {
     ).toBe(TOUR_UNANCHORED_LIMIT);
   });
   it("上限不许被悄悄放大", () => {
-    expect(TOUR_UNANCHORED_LIMIT, "只减不增:WP-21 步 7 已归 0").toBeLessThanOrEqual(0);
+    expect(TOUR_UNANCHORED_LIMIT, "只减不增:已归 0").toBeLessThanOrEqual(0);
   });
 });
 
-// @kf-batch 53-guide-tour-reach —— WP-21 部署后真环境抓到的两个缺口(见 ACCEPTANCE §8septtricies)
+// 部署后真环境抓到的两个缺口(见 ACCEPTANCE §8septtricies)
 describe("🔴🔴 锚点「找到了」≠「看得见」", () => {
   it("只有找到 + 可见 + 有面积才算能打聚光灯", () => {
     expect(anchorIsUsable({ found: true, width: 60, height: 16, hidden: false })).toBe(true);
@@ -230,7 +227,6 @@ function execSyncGrep(testid: string): string[] {
   }
 }
 
-// @kf-batch 50-WP23-guide-scope-gate
 describe("🔴🔴 锚点缺失时说什么:ScopeGate 是**可解的页面状态**,不许说成「没接入锚点」", () => {
   const base = { index: 1, total: 12, title: "自然语言问数", testid: "genbi-ask-input" };
 

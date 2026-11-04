@@ -1,4 +1,4 @@
-// 模块 23 — GenBI 语义表检索（platform 适配器层）。
+// GenBI 语义表检索（platform 适配器层）。
 //
 // 检索的引擎无关核心逻辑已收敛进 @genbi/core/retrieval-core（buildSemanticCatalog /
 // prefilter / entryBrief / selectRelevantTables，模型调用经 ModelClient 注入）。
@@ -8,9 +8,9 @@
 //   3) selectRelevantTables(旧 4 参数签名包装) —— 注入 bedrockModelClient 调 core,
 //      使 agent.ts 调用点零改。
 //
-// 模块46 阶段1c:抽 core 检索纯逻辑 + 引入 ModelClient 接口。
+//当前阶段1c:抽 core 检索纯逻辑 + 引入 ModelClient 接口。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 import { GENBI } from "./config";
@@ -18,7 +18,7 @@ import type { SchemaTable } from "./core/types";
 import { omRequest, isOmConfigured } from "@/lib/openmetadata/om-client";
 import type { ModelClient, ModelConverseInput, ModelConverseOutput } from "./core/model-client";
 import { selectRelevantTables as coreSelectRelevantTables } from "./core/retrieval-core";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:modelId 改为调用时求值(能力 key genbi-retrieval),经 invokeConverse 退避/降级;
+// modelId 改为调用时求值(能力 key genbi-retrieval),经 invokeConverse 退避/降级;
 // 不再读模块加载期常量 GENBI.modelId(GENBI 仍用于 region)。实际用的模型经 onInvocation 回给 genbi 的 _meta.invocations[]。
 import { invokeConverse } from "@/lib/ai/invoke";
 import type { AiInvocationMeta } from "@/lib/ai/meta";
@@ -52,7 +52,7 @@ export async function fetchOmDescriptions(): Promise<Record<string, string>> {
 export type RetrievalInvocationSink = (inv: AiInvocationMeta) => void;
 
 // ── ModelClient 的 Bedrock 直连实现（不纯，留适配器层）──
-// @kf-batch 50-W5-seg2-WP8:改为工厂 —— 每次问数一个实例,modelId 在 converse 时经 invokeConverse 求值(51 SPEC §3.3),
+// 改为工厂 —— 每次问数一个实例,modelId 在 converse 时经 invokeConverse 求值(51 SPEC §3.3),
 // 并把实际使用的模型(可能已降级)回给调用方;core 的 ModelClient 接口零改。
 function makeBedrockModelClient(onInvocation?: RetrievalInvocationSink): ModelClient {
   return {

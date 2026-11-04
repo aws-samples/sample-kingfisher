@@ -1,5 +1,4 @@
-// @kf-batch 50-B39-plan-target
-// 计划中心「面向哪个区」的装配层判据(B-39 第三处,真环境段 cov COV-B39-PLAN 坐实):
+// 计划中心「面向哪个区」的装配层判据(第三处,真环境段 cov COV-B39-PLAN 坐实):
 //   路由决定落点 → createPlanTask **落库** → 执行体读回 → planner 的只读发现工具 → 计划记录的 targets。
 // 🔴 缺陷原形:类型里有 targetId、注释写着「必须落库」,而 Put 的 Item 里没写它 ⇒ 执行体读回的行恒无落点
 //   ⇒ us-west-2 视角的计划查的是主控区目录、计划也被盖成主控区。各模块单测都绿 —— 断在接缝上。
@@ -78,7 +77,7 @@ async function planFor(targetId: string) {
   return { row, plan };
 }
 
-describe("🔴 B-39 计划落点:建任务 → 落库 → 执行体 → 发现工具 → 计划记录,全程同一个区", { timeout: 30_000 }, () => {
+describe("🔴 计划落点:建任务 → 落库 → 执行体 → 发现工具 → 计划记录,全程同一个区", { timeout: 30_000 }, () => {
   it("🔴 us-west-2 视角:任务行落了 targetId;发现工具查 tgt_usw2_a;计划 targets == [tgt_usw2_a]", async () => {
     const { row, plan } = await planFor("tgt_usw2_a");
     expect(row?.targetId).toBe("tgt_usw2_a");
@@ -92,7 +91,7 @@ describe("🔴 B-39 计划落点:建任务 → 落库 → 执行体 → 发现�
     expect(introspected).toEqual(["tgt_home"]);
     expect(plan?.targets).toEqual(["tgt_home"]);
   });
-  it("B-39 之前的存量任务行(无 targetId)⇒ 经唯一作者解析为主控区(不在别处补缺省)", async () => {
+  it("此前的存量任务行(无 targetId)⇒ 经唯一作者解析为主控区(不在别处补缺省)", async () => {
     const { runPlanTask } = await import("../plan-task-runner");
     db.set(keyOf("bgp-copilot_plan_tasks", { taskId: "legacy" }), { taskId: "legacy", status: "pending", prompt: "p", projectId: "proj-a", env: "dev", createdBy: "u" });
     await runPlanTask({ taskId: "legacy", status: "pending", prompt: "p", projectId: "proj-a", env: "dev", createdBy: "u", createdAt: "" } as any, "tk");

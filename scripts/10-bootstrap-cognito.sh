@@ -64,7 +64,7 @@ echo "[cognito] user pool: $POOL"
 USERS=(admin pm-tester rbac-tester ops-analyst biz-tester)
 # 🔴 生产上线批次 A:生产模式只建 admin(其余四个是测试账号)—— 与 infra/lib/shared/deploy-mode.ts 的
 #   rosterForMode 同一条规则;缺省同样按 production(忘了传参 = 少建测试账号,而不是生产里冒出测试账号)。
-# 🔴 序 39 第二刀护栏:**单独重跑**本脚本时核 SSM /bgp/deploy-mode(deploy-all 定下模式后不许换)—— 否则在生产环境上
+# 🔴 护栏:**单独重跑**本脚本时核 SSM /bgp/deploy-mode(deploy-all 定下模式后不许换)—— 否则在生产环境上
 #   手敲 BGP_DEPLOY_MODE=demo 重跑本脚本就会冒出四个测试账号。规则:SSM 有值 ⇒ 以它为准,env 给了**别的**值 ⇒ 拒绝(exit 2);
 #   SSM 读不到(没写 / 无权)⇒ 按 env,缺省 production,并把依据打到 stderr。离线判据 infra/test/cognito-mode-guard/test_mode_guard.sh。
 resolve_deploy_mode() {  # stdout = 生效模式;冲突时 exit 2(stderr 已说明)

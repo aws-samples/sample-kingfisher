@@ -1,4 +1,3 @@
-// @kf-batch 50-WP13-mwaa-region
 // EMR 定时 DAG 生成器:执行面 / 控制面两个 region 拆开(控制面单份在 home)+ 章 = 这份 DAG 真正执行的 target。
 import { describe, it, expect, beforeEach } from "vitest";
 import { execFileSync } from "node:child_process";
@@ -6,7 +5,6 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateEmrJobDag } from "@/lib/engines/emr/dag-generator";
-// @kf-batch 37-emr-run-date
 import { runParamArgv } from "@/lib/etl/run-params";
 import type { EmrEngineJob } from "@/lib/engines/emr/types";
 
@@ -46,7 +44,7 @@ describe("🔴 非 home:emr 打该区、ddb 仍打 home、章 = 该 target、dag
   });
 });
 
-// @kf-batch 37-emr-run-date —— B-56 的经典调度那一半:定时 run 把业务日期参数追加到 entryPointArguments
+// 该缺陷的经典调度那一半:定时 run 把业务日期参数追加到 entryPointArguments
 /** 把产物里 airflow / boto3 换成空壳后 exec,拿到 run_job 真正传给 emr.start_job_run 的 entryPointArguments。 */
 function runJobEntryArgs(py: string, ds: string): string[] {
   const dir = mkdtempSync(join(tmpdir(), "kf-emr-dag-"));
@@ -83,7 +81,7 @@ print(json.dumps(CALLS[0]["jobDriver"]["sparkSubmit"]["entryPointArguments"]))
   return JSON.parse(execFileSync("python3", [join(dir, "main.py")], { encoding: "utf8" }).trim().split("\n").pop()!);
 }
 
-describe("🔴 B-56(经典调度):定时 run 的 entryPointArguments = 用户入参 + 全套业务日期参数(与 provider.submit 同一张表)", () => {
+describe("🔴 (经典调度):定时 run 的 entryPointArguments = 用户入参 + 全套业务日期参数(与 provider.submit 同一张表)", () => {
   it("产物里:ENTRY_ARGS + bgp_run_param_argv(ds),片段已嵌入,宿主 import re, sys;旧写法不再出现", () => {
     const py = generateEmrJobDag(job(), { ...ctx, entryPointArguments: ["--mode", "daily"] });
     expect(py).toContain('"entryPointArguments": ENTRY_ARGS + bgp_run_param_argv(ds)');

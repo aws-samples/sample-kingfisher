@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 分发 Lambda 的离线判据(真 import 部署进 Lambda 的那份 index.mjs,注入假依赖)。
 //   ① 只分发 INSERT + pending 的命令(MODIFY / REMOVE / 非 pending 一律忽略 —— 平台写终态也会产生流事件);
 //   ② 请求只带 commandId,带内部密钥头 + 来源头,打到 ALB 的**私网地址**;

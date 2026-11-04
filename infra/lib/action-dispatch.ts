@@ -1,12 +1,11 @@
-// @kf-batch 50-WP28-platform-action-node
-// 🔴🔴 **「按时跑一次平台动作」的主控区一侧**(WP-28 序 2 + 序 3):命令表 + 分发 Lambda + 内部密钥。
+// 🔴🔴 **「按时跑一次平台动作」的主控区一侧**:命令表 + 分发 Lambda + 内部密钥。
 //
 // 链路:执行区 DAG 的 platform-action 节点 →(IAM,跨区回主控区 DynamoDB = 唯一获准例外)
 //       → **本构件的命令表** bgp-action-commands(INSERT, pending)→ Streams(只收 INSERT)
 //       → **本构件的分发 Lambda**(平台 VPC 内)→ ALB 私网地址 → 平台内部端点 /api/internal/actions/run
 //       → 平台校验 + 抢单 + 执行白名单动作的库函数 → 命令行写终态 → DAG 轮询到终态。
 //
-// 【为什么命令表建在这里而不是 BgpDatabaseStack】WORK-PACKAGES WP-28 序 2 写的是 database-stack;
+// 【为什么命令表建在这里而不是 BgpDatabaseStack】写的是 database-stack;
 //   施工时改到与消费端同一个构件,理由只有一条:Lambda 的事件源要 **Stream ARN**(带时间戳、不可推导),
 //   放在别的栈就得跨栈导出 —— 而跨栈导出会把两个栈钉死(本仓记过 export 死锁)。命令表是 7 天 TTL 的
 //   传声筒、运行历史在 bgp-task-runs,与消费端同生命周期是对的。表名不变(执行区角色按 `bgp-*` 授权)。
@@ -74,7 +73,7 @@ export class ActionDispatch extends Construct {
     // ①b 调度对象表:pk = "default-user"(单分区,低量配置数据),sk = taskId(`gov_<ulid>` / `gcard_<cardId>`)。
     //    发布台账 `deployments[targetId]` 落在这一行(CarrierLedger);run 台账的 taskId 就是它。
     //    🔴 只存非数据值(动作 id / 参数 / 归属 / cron);卡片的结果与标题仍在该区 S3。
-    //    🔴 放在平台栈(不是 BgpDatabaseStack):两栈互不依赖,只重部署平台栈的环境否则缺表(序 33 ③ 部署前勘定)。
+    //    🔴 放在平台栈(不是 BgpDatabaseStack):两栈互不依赖,只重部署平台栈的环境否则缺表(部署前勘定)。
     new dynamodb.Table(this, "Schedules", {
       tableName: ACTION_SCHEDULES_TABLE_NAME,
       partitionKey: { name: "userId", type: dynamodb.AttributeType.STRING },
@@ -89,7 +88,7 @@ export class ActionDispatch extends Construct {
     // ② 内部共享密钥(平台侧 internal-guard 按 ARN 读)
     this.secret = new secretsmanager.Secret(this, "InternalKey", {
       secretName: ACTION_DISPATCH_SECRET_NAME,
-      description: "平台内部端点 /api/internal/** 的共享密钥(分发 Lambda ↔ 平台;WP-28)",
+      description: "平台内部端点 /api/internal/** 的共享密钥(分发 Lambda ↔ 平台)",
       generateSecretString: { passwordLength: 48, excludePunctuation: true, includeSpace: false },
       removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
@@ -102,7 +101,7 @@ export class ActionDispatch extends Construct {
     });
     sg.addEgressRule(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(props.listenerPort), "to platform ALB (private IPs)");
     sg.addEgressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(443), "AWS APIs (Secrets Manager / EC2 / DynamoDB)");
-    props.albSecurityGroup.addIngressRule(sg, ec2.Port.tcp(props.listenerPort), "Allow action-dispatcher Lambda (WP-28)");
+    props.albSecurityGroup.addIngressRule(sg, ec2.Port.tcp(props.listenerPort), "Allow action-dispatcher Lambda");
 
     // ④ 分发 Lambda
     this.fn = new lambda.Function(this, "Fn", {
@@ -121,7 +120,7 @@ export class ActionDispatch extends Construct {
         LB_FULL_NAME: props.loadBalancerFullName,
         PLATFORM_PORT: String(props.listenerPort),
       },
-      description: "WP-28:把平台动作命令(DDB Streams)转交平台内部端点;不做任何业务",
+      description: "把平台动作命令(DDB Streams)转交平台内部端点;不做任何业务",
     });
     this.secret.grantRead(this.fn);
     // 只许把**仍是 pending** 的命令判 failed(条件写在代码里;IAM 只给 UpdateItem 这一项写)

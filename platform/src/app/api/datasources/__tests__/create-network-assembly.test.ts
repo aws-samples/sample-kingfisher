@@ -1,16 +1,15 @@
-// @kf-batch 37-B54-ds-user-sg
 // 建 JDBC 数据源的网络接入 —— 装配层判据(路由 ↔ datasource-service ↔ secrets ↔ SDK)。
 //
 // 🔴 只 mock 真外部:EC2 / RDS / Glue / Secrets Manager / IAM 客户端、DDB、项目守卫、审计、OM、读源表结构。
 //    路由与 datasource-service 之间**一律不 mock**(接缝就在这里:路由拿到的网络形态 ⇒ Glue 连接 ⇒ 落库)。
 //
 // 两组判据:
-//   ① 老路径(没指定网络 = 自动探测 + 新建 bgp-ds-*):AWS 调用**序列与参数逐字节**钉现状(B-54 改动前录制);
-//   ② B-54:用户指定了子网 + 安全组 ⇒ 一个安全组都不建、不改任何规则;多个安全组全部进 Glue 连接。
+//   ① 老路径(没指定网络 = 自动探测 + 新建 bgp-ds-*):AWS 调用**序列与参数逐字节**钉现状(改动前录制);
+//   ②:用户指定了子网 + 安全组 ⇒ 一个安全组都不建、不改任何规则;多个安全组全部进 Glue 连接。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// 序 57 / B-129:建源 provision 段经 submitLongOp;本文件钉的是 AWS 调用序列,用纯同步退路(LONG_OPS_ASYNC=0)让每次 POST 当场跑完
+// 建源 provision 段经 submitLongOp;本文件钉的是 AWS 调用序列,用纯同步退路(LONG_OPS_ASYNC=0)让每次 POST 当场跑完
 //   (混合响应 / 202 / 租约 / 清理在 app/api/datasources/__tests__/create-long-op-assembly.test.ts)。
 vi.hoisted(() => { process.env.LONG_OPS_ASYNC = "0"; });
 
@@ -45,7 +44,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
     }
     if (cmd === "DescribeVpcsCommand") return { Vpcs: h.vpcCidr ? [{ VpcId: input.VpcIds[0], CidrBlock: h.vpcCidr }] : [] };
     if (cmd === "DescribeSubnetsCommand") {
-      // B-133 第二刀:写 Glue 连接前按子网事实取 AZ(子网 ↔ 可用区各异,判据才能分辨「来自子网」与「来自探测 / 环境变量」)
+      // 第二刀:写 Glue 连接前按子网事实取 AZ(子网 ↔ 可用区各异,判据才能分辨「来自子网」与「来自探测 / 环境变量」)
       const facts: Record<string, [string, string]> = { "subnet-rds-a": ["vpc-rds", "us-east-1b"], "subnet-default": ["vpc-default", "us-east-1a"], "subnet-cust-1": ["vpc-rds", "us-east-1c"] };
       const ids: string[] = input.SubnetIds ?? input.Filters?.find((f: any) => f.Name === "subnet-id")?.Values ?? [];
       return { Subnets: ids.filter((x) => x in facts).map((x) => ({ SubnetId: x, VpcId: facts[x][0], AvailabilityZone: facts[x][1] })) };
@@ -87,7 +86,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { DATASOURCES: "bgp-datasources", LONG_OPS: "bgp-long-ops" },
   docClient: {
     send: vi.fn(async (cmd: any) => {
-      // 序 50 第二批:PUT / DELETE 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
+      // PUT / DELETE 先核对象租约(读 bgp-long-ops 的 lease 行)⇒ 没有租约 = 空
       if (cmd.input?.TableName === "bgp-long-ops") return {};
       if (cmd.constructor.name === "PutCommand") h.puts.push(cmd.input.Item);
       if (cmd.constructor.name === "GetCommand") return { Item: h.getItem };
@@ -129,7 +128,7 @@ const ec2Writes = () =>
   h.calls.filter((c) => c.svc === "ec2" && /^(Create|Authorize|Revoke|Delete|Modify)/.test(c.cmd));
 
 beforeEach(() => {
-  // B-129 ②:Glue 角色核验进程内只核一次;本文件每条判据都钉「先建密钥、再查角色」,所以每条前清缓存
+  // ②:Glue 角色核验进程内只核一次;本文件每条判据都钉「先建密钥、再查角色」,所以每条前清缓存
   __resetGlueRoleCache();
   h.calls.length = 0;
   h.puts.length = 0;
@@ -151,7 +150,7 @@ beforeEach(() => {
 const GLUE_CONN = {
   Name: "bgp-conn-AAAAAADS0001",
   ConnectionType: "JDBC",
-  // @kf-batch 44-jdbc-params —— MySQL 方言默认参数(B-86)也进 Glue 连接的 JDBC URL
+  // MySQL 方言默认参数也进 Glue 连接的 JDBC URL
   ConnectionProperties: { JDBC_CONNECTION_URL: `jdbc:mysql://${RDS_HOST}:3306/db1?zeroDateTimeBehavior=CONVERT_TO_NULL`, USERNAME: "u", PASSWORD: "p" },
 };
 
@@ -161,17 +160,17 @@ describe("① 老路径(没指定网络)= 自动探测 + 新建 bgp-ds-*:AWS 调
     expect(res.status).toBe(201);
     expect(netCalls()).toEqual([
       { svc: "rds", cmd: "DescribeDBInstancesCommand", input: {} },
-      // 序 61 B-133:建组即带归属标签(被按「无网卡即孤儿」清理的工具误删过 ⇒ 标签让清理流程能排除、让人能看出归属)
+      // 建组即带归属标签(被按「无网卡即孤儿」清理的工具误删过 ⇒ 标签让清理流程能排除、让人能看出归属)
       { svc: "ec2", cmd: "CreateSecurityGroupCommand", input: { GroupName: "bgp-ds-AADS0001", Description: "BGP datasource 01HXAAAAAAAAAAAAAAAADS0001", VpcId: "vpc-rds",
         TagSpecifications: [{ ResourceType: "security-group", Tags: [{ Key: "bgp:managed", Value: "datasource" }, { Key: "bgp:datasourceId", Value: "01HXAAAAAAAAAAAAAAAADS0001" }, { Key: "bgp:targetId", Value: "tgt_home" }] }] } },
       { svc: "ec2", cmd: "AuthorizeSecurityGroupIngressCommand", input: { GroupId: "sg-plat-new", IpPermissions: [{ IpProtocol: "-1", UserIdGroupPairs: [{ GroupId: "sg-plat-new" }] }] } },
       { svc: "ec2", cmd: "DescribeVpcsCommand", input: { VpcIds: ["vpc-rds"] } },
       { svc: "ec2", cmd: "AuthorizeSecurityGroupIngressCommand", input: { GroupId: "sg-plat-new", IpPermissions: [{ IpProtocol: "tcp", FromPort: 3306, ToPort: 3306, IpRanges: [{ CidrIp: "10.0.0.0/16" }] }] } },
-      // B-133 第二刀:写连接前按子网事实核 AZ(自愈 / 改网络按源行重建时源行没有 AZ,建源也走同一个作者)
+      // 第二刀:写连接前按子网事实核 AZ(自愈 / 改网络按源行重建时源行没有 AZ,建源也走同一个作者)
       { svc: "ec2", cmd: "DescribeSubnetsCommand", input: { Filters: [{ Name: "subnet-id", Values: ["subnet-rds-a"] }] } },
       { svc: "glue", cmd: "CreateConnectionCommand", input: { ConnectionInput: { ...GLUE_CONN, PhysicalConnectionRequirements: { SubnetId: "subnet-rds-a", SecurityGroupIdList: ["sg-plat-new"], AvailabilityZone: "us-east-1b" } } } },
     ]);
-    // 落库形态逐字节:老路径不多也不少一个键(B-133 第二刀起多 availabilityZone 一个键)
+    // 落库形态逐字节:老路径不多也不少一个键(第二刀起多 availabilityZone 一个键)
     expect(h.puts).toHaveLength(1);
     expect(h.puts[0].networkConfig).toStrictEqual({ vpcId: "vpc-rds", subnetId: "subnet-rds-a", availabilityZone: "us-east-1b", securityGroupId: "sg-plat-new", isRds: true, rdsInstanceId: "mydb" });
     const body = await res.json();
@@ -230,13 +229,13 @@ describe("① 老路径(非主控区落点):用落点那个区的网络事实,�
   });
 });
 
-describe("② B-54:用户指定了子网 + 安全组 ⇒ 平台一个组都不建,用户的组全部进 Glue 连接", () => {
+describe("②:用户指定了子网 + 安全组 ⇒ 平台一个组都不建,用户的组全部进 Glue 连接", () => {
   const USER_NET = { subnetId: "subnet-cust-1", securityGroupIds: ["sg-cust-a", "sg-cust-b", "sg-cust-c"], availabilityZone: "us-east-1c" };
 
   it("🔴 零 EC2 写调用(不建组 / 不放行);仍做只读探测(RDS 识别 VPC)", async () => {
     const res = await post({ network: USER_NET });
     expect(res.status).toBe(201);
-    expect(ec2Writes(), "用户指定了组还在建 / 改安全组 = B-54 复发").toEqual([]);
+    expect(ec2Writes(), "用户指定了组还在建 / 改安全组 = 回归").toEqual([]);
     // 正控制:探测照做(否则「零写」可能只是整段网络步骤被跳过了)
     expect(netCalls().map((c) => `${c.svc}:${c.cmd}`)).toEqual(["rds:DescribeDBInstancesCommand", "ec2:DescribeSubnetsCommand", "glue:CreateConnectionCommand"]);
   });
@@ -259,7 +258,7 @@ describe("② B-54:用户指定了子网 + 安全组 ⇒ 平台一个组都不�
     expect((body.data ?? body).provisionedResources.securityGroupId).toBe("sg-cust-a");
   });
 
-  it("没选 AZ ⇒ 按**用户子网自己的**可用区事实(1c)写连接,不再沿用探测出的另一子网(RDS 子网组 1b)的 AZ(B-133 第二刀)", async () => {
+  it("没选 AZ ⇒ 按**用户子网自己的**可用区事实(1c)写连接,不再沿用探测出的另一子网(RDS 子网组 1b)的 AZ(第二刀)", async () => {
     await post({ network: { subnetId: "subnet-cust-1", securityGroupIds: ["sg-cust-a"] } });
     const conn = h.calls.find((c) => c.cmd === "CreateConnectionCommand")!;
     expect(conn.input.ConnectionInput.PhysicalConnectionRequirements).toEqual({ SubnetId: "subnet-cust-1", SecurityGroupIdList: ["sg-cust-a"], AvailabilityZone: "us-east-1c" });
@@ -297,7 +296,7 @@ describe("③ 删数据源:只删平台自建的组,用户的组永远不删;缺
   const del = () => DELETE(new NextRequest(`https://x.test/api/datasources/${DSID}`, { method: "DELETE" }), { params: { id: DSID } });
   const ec2Deletes = () => h.calls.filter((c) => c.cmd === "DeleteSecurityGroupCommand").map((c) => c.input.GroupId);
 
-  it("B-54 新行(用户指定,无 platformSecurityGroupId):只查不删用户的组,行照删,200", async () => {
+  it("新行(用户指定,无 platformSecurityGroupId):只查不删用户的组,行照删,200", async () => {
     h.sgNames = { "sg-cust-a": "customer-db", "sg-cust-b": "customer-app" };
     h.getItem = { datasourceId: DSID, projectId: "proj-a", networkConfig: { vpcId: "v", subnetId: "s", securityGroupId: "sg-cust-a", securityGroupIds: ["sg-cust-a", "sg-cust-b"], isRds: false } };
     const res = await del();
@@ -333,8 +332,8 @@ describe("③ 删数据源:只删平台自建的组,用户的组永远不删;缺
   });
 });
 
-// @kf-batch 44-jdbc-params —— 建源装配:路由 ↔ datasource-service ↔ provider 真连(用户附加参数进 Glue 连接 URL 与落库;不合法 ⇒ 400 零 AWS 调用)
-describe("⑤ 附加 JDBC 参数(序 44 B-88)", () => {
+// 建源装配:路由 ↔ datasource-service ↔ provider 真连(用户附加参数进 Glue 连接 URL 与落库;不合法 ⇒ 400 零 AWS 调用)
+describe("⑤ 附加 JDBC 参数", () => {
   it("jdbcParams=useSSL=false ⇒ Glue 连接 URL = 方言默认参数 + 用户参数;落库 jdbcParams 归一化形态", async () => {
     const res = await post({ jdbcParams: " useSSL=false; serverTimezone=Asia/Shanghai " });
     expect(res.status).toBe(201);

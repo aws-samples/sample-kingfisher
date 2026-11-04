@@ -1,4 +1,4 @@
-// 模块 13 — 项目空间服务 (v1.4.0)
+// 项目空间服务 (v1.4.0)
 //
 // DynamoDB-backed projects, memberships, approvals + role resolution. See
 // docs/design/13-multitenancy-rbac/DESIGN.md for the model.
@@ -49,12 +49,12 @@ export interface Approval {
   projectId: string;
   type: string; // "membership" (others reserved for later pillars)
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-33)—— 这条审批**作用在哪些执行区**。
+   * 这条审批**作用在哪些执行区**。
    *
    * 三类审批的区语义**本来就不同**,所以这个字段是可选的,不是「忘了填」:
    *   · `deploy`(晋升作业到受保护环境):被晋升的那个作业**有 `targets[]`** ⇒ 建审批时就能派生;
    *   · `membership`(入组):控制面动作,与区无关 ⇒ **不填**;
-   *   · `data-access`(数据访问):对象是 `fqn`,而治理 fqn 至今没有区维(工单 SC-8)⇒ 暂不填。
+   *   · `data-access`(数据访问):对象是 `fqn`,而治理 fqn 至今没有区维⇒ 暂不填。
    *
    * 🔴 读侧规则:**没填的一律不藏**(与治理约定「未声明 = 全平台通用」同一条道理)。
    * 审批收件箱是「我必须处理的事」——按一个它自己都不知道的维度把待办藏起来,
@@ -312,7 +312,7 @@ export async function createApproval(input: {
   payload: Record<string, unknown>;
   requestedBy: string;
   requestedBySub?: string;
-  /** @kf-batch 50-WP4quater-reads(工单 SC-33)—— 作用区(只有能派生的类型才传;见 `Approval.targetIds`) */
+  /** 作用区(只有能派生的类型才传;见 `Approval.targetIds`) */
   targetIds?: string[];
 }): Promise<Approval> {
   const approvalId = ulid();

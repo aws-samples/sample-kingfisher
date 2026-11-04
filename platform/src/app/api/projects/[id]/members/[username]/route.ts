@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-D4
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProjectConfigAdmin } from "@/lib/projects/guard";

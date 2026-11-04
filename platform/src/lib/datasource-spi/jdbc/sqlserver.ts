@@ -1,6 +1,6 @@
-// 模块 42 — SQL Server provider(JDBC 范式,P42.3)。
+// SQL Server provider(JDBC 范式)。
 //
-// 【驱动】tedious@18(纯 JS,微软官方,mssql 底层;P42.0 实证 alpine 可用)。
+// 【驱动】tedious@18(纯 JS,微软官方,mssql 底层;实证 alpine 可用)。
 // 按需 dynamic import——未装进 platform 依赖前,introspect/ping 优雅降级(返回 [] / reachable:false)。
 // 【方言差异】URL=jdbc:sqlserver://host:port;databaseName=db;系统表=sys.columns/sys.tables;
 //   driver=com.microsoft.sqlserver.jdbc.SQLServerDriver。

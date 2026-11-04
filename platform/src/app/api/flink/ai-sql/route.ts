@@ -2,13 +2,13 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
-// 序 46 B-107 — 通用 AI 长调用:生成主体在 lib/ai/long-op-executors.ts(flink-ai-sql);45s 未出结果 ⇒ 202 + 轮询。
+// 通用 AI 长调用:生成主体在 lib/ai/long-op-executors.ts(flink-ai-sql);45s 未出结果 ⇒ 202 + 轮询。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 import { getCorrelationId } from "@/lib/observability/logger";
 
 // POST /api/flink/ai-sql — 自然语言 → Flink SQL(Bedrock Converse,复用 GenBI 模型)。
 // 响应:同步 200 `{ sql, model, usage, dialect }` + `_meta`(51 SPEC §3.3a 落点⑥:现有 `model:` 保留 + `_meta`,两值相等 M14);
-//   未含 INSERT INTO ⇒ 422;推理模型慢时 202 `{ taskId, async:true }`,客户端传输层(全局 fetch 拦截器)轮询(B-107)。
+//   未含 INSERT INTO ⇒ 422;推理模型慢时 202 `{ taskId, async:true }`,客户端传输层(全局 fetch 拦截器)轮询。
 export async function POST(req: NextRequest) {
   const ctx = await requireProject(req, "editor");
   if (ctx instanceof NextResponse) return ctx;

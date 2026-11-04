@@ -1,6 +1,6 @@
 "use client";
 
-// @kf-batch 50-SEQ47a-promote-ux —— 资源在三个环境里的发布状态(当前 / 已发布 vN / 审批中 / 未发布),挂在详情页按钮栏旁。
+// 资源在三个环境里的发布状态(当前 / 已发布 vN / 审批中 / 未发布),挂在详情页按钮栏旁。
 //   数据来自 GET /api/promote/lineage?type=&id=(lib/env/promote-service.ts lineageStatus 唯一作者);
 //   听 PromoteButton 广播的 `bgp:promoted` 即时刷新,不用页面传回调。
 

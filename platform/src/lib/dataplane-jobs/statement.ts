@@ -1,11 +1,10 @@
-// @kf-batch 50-WP9a-durable-jobs
 // Redshift Data API 的**两段式原语**:提交(拿 statementId 立即返回)/ 读终态(一次 Describe)。
 //
 // 🔴 为什么不复用 `target-clients.execOnTarget`:那是「提交 + 原地轮询到终态(≤~3 分钟)」的同步形态,
-//    一个请求里跑 N 个项目 × ~10 条语句,跨区就撞 ALB 504(WP-9 ② 第 2/3 行)。作业化之后,
+//    一个请求里跑 N 个项目 × ~10 条语句,跨区就撞 ALB 504(② 第 2/3 行)。作业化之后,
 //    一步只做「提交」或「读一次终态」,statementId 记在作业行上,下一步(可能在另一个副本、
 //    进程重启之后)接着读 —— 那需要的正是这两个**不等待**的原语。
-// 🔴 `target-clients.ts` 不改(并行包 WP-31 在那里):新原语写在这里,客户端用唯一工厂 `lib/aws/clients.ts`。
+// 🔴 `target-clients.ts` 不改(并行包在那里):新原语写在这里,客户端用唯一工厂 `lib/aws/clients.ts`。
 // 🔴 `secretArn` 必填(禁 IAM fallback,§3.9a 第 8 步;与 execOnTarget 同一纪律)。
 import {
   BatchExecuteStatementCommand,
@@ -36,7 +35,7 @@ function assertSecretArn(secretArn: string): void {
  *  · 1 条 ⇒ ExecuteStatement;
  *  · 多条 ⇒ BatchExecuteStatement(Data API 在**一个事务**里按序执行;任何一条失败整批回滚 ⇒
  *    作业重试时不会留下「做了一半」的状态 —— 这比逐条提交更适合可续跑的作业)。
- * @param statementName 关联键(写成审计 id ⇒ 从 Redshift 侧能反查到这条审计,与 E-186 同一做法)
+ * @param statementName 关联键(写成审计 id ⇒ 从 Redshift 侧能反查到这条审计,与同一做法)
  */
 export async function submitStatements(args: {
   place: StatementPlace;

@@ -1,4 +1,4 @@
-// 模块 43-C — 补数幂等推进器(照抄模块38 tasks.ts 的条件写 + runToken 范式)。
+// 补数幂等推进器(照抄tasks.ts 的条件写 + runToken 范式)。
 //
 // tick(planId) 一次推进(可被前端刷新/定时 DAG 多次触发而不重复提交):
 //  1) reconcile:对 running 实例读 bgp-task-runs 终态 → 回写 succeeded/failed(+超时兜底判 failed)
@@ -16,11 +16,11 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { executeInstance } from "./execute";
 import { getPlan, listInstances, refreshPlanProgress } from "./service";
 import type { BackfillInstanceRow, BackfillPlanRow } from "./types";
-// 序 37 B-64:启动核心对「上一次 run 收尾中」的异常名(唯一作者 lib/sync/start-run.ts)
+// 启动核心对「上一次 run 收尾中」的异常名(唯一作者 lib/sync/start-run.ts)
 import { GLUE_CONCURRENT_RUNS_ERROR } from "@/lib/sync/start-run";
 
 /**
- * 序 37 B-64:同一实例因 Glue「上一次 run 收尾中」(ConcurrentRunsExceededException)被**还回 pending** 的上限
+ * 同一实例因 Glue「上一次 run 收尾中」(ConcurrentRunsExceededException)被**还回 pending** 的上限
  * (按 attempts 计:claim 每次 +1;泵每 30s 一拍 ⇒ 最多等约 4 分钟)。真环境 2026-10-12 第二轮撞到:并发 1 的同步任务补数,
  * 第二个日期紧接第一个日期启动 ⇒ Glue 还没把上一次 run 收尾完 ⇒ 实例被判 failed、计划「部分失败」。
  * 这不是失败,是「现在不行、下一拍再来」;超过上限仍撞才如实判 failed(有界)。
@@ -53,7 +53,7 @@ async function claimInstance(planId: string, sk: string): Promise<string | null>
   }
 }
 
-// 序 37 B-64:把实例还回 pending(仅当仍是当前 owner 的 running);attempts 保留(claim 已 +1),lastError 记原因让页面看得见。
+// 把实例还回 pending(仅当仍是当前 owner 的 running);attempts 保留(claim 已 +1),lastError 记原因让页面看得见。
 async function deferInstance(planId: string, sk: string, runToken: string, why: string): Promise<void> {
   await docClient.send(new UpdateCommand({
     TableName: TABLES.BACKFILL_INSTANCES,
@@ -187,7 +187,7 @@ export async function tick(projectId: string, planId: string): Promise<TickResul
         })).catch(() => {});
         submitted += 1;
       } catch (e: any) {
-        // 序 37 B-64:Glue「上一次 run 收尾中」⇒ 还回 pending,泵下一拍(30s)再领;attempts 到上限仍撞才判失败。
+        // Glue「上一次 run 收尾中」⇒ 还回 pending,泵下一拍(30s)再领;attempts 到上限仍撞才判失败。
         if (e?.name === GLUE_CONCURRENT_RUNS_ERROR && Number(inst.attempts ?? 0) + 1 < BACKFILL_DEFER_MAX_ATTEMPTS) {
           console.warn(`[backfill] ${planId} ${inst.sk} 上一次 run 收尾中,还回 pending 等下一拍(第 ${Number(inst.attempts ?? 0) + 1}/${BACKFILL_DEFER_MAX_ATTEMPTS} 次)`);
           await deferInstance(planId, inst.sk, runToken, e?.message || "上一次运行仍在收尾").catch(() => {});

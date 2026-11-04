@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-fanout
 // **逐 target 扇出下发**(50 DESIGN §5.2「逐 region 下发」/ INTERACTION §2.2 / SPEC §1.3a-S1)——
 // 一个定义绑了 N 个 region,发布时就要产出 N 份产物、写 N 条台账。本文件是这件事的**唯一作者**。
 //
@@ -19,7 +18,7 @@
 //   🔴 这个映射是**单向**的:权威记录是台账里的 `deployments[targetId].artifact`,
 //   不要试图从 dag_id 反解 targetId(`TARGET_ID_RE` 允许正文内部出现 `__`,反解不唯一)。
 //
-// ── 🔴 WP-13(2026-09-06 用户拍板)「每个区域的定时任务都是自己区域的 MWAA 执行的」──────────
+// ── 🔴 (2026-09-06 用户拍板)「每个区域的定时任务都是自己区域的 MWAA 执行的」──────────
 // 本文件曾把 N 份 DAG 都写进 **home** 桶、由 home Airflow 跨区触发。现在每份产物落**该 target 自己的** MWAA
 // (`mwaaEndpointFor`,SPEC §3.14):桶 / 环境 / region 三元由 mwaa-endpoint.ts 单一作者给,这里只按它写;
 // 缺 MWAA 的 target 在**任何写之前**整体拒(`requireMwaaForTargets`,零产物),预览行给机器可读 code 让前端直达补装。
@@ -30,7 +29,7 @@
 // 在跨法域场景下这就是**数据出境**。⇒ 绑定收缩时必须显式下线被摘掉的那些 target
 // (`offlineUnboundTargets`),而下线的覆盖面是 **绑定 ∪ 台账**,不是只看当前绑定。
 
-// @kf-batch 50-WP31-place-first-class —— 多区扇出的唯一写法(L10)
+// 多区扇出的唯一写法(L10)
 import { forEachTargetPlace } from "@/lib/place/fanout";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { TABLES } from "@/lib/aws/dynamodb";
@@ -40,16 +39,16 @@ import { assertTargetId, isHome } from "@/lib/exec-env/target-id";
 import { regionOfTarget } from "@/lib/exec-env/target-region";
 import { s3ClientFor } from "@/lib/exec-env/target-clients";
 import { recordDeployment, removeDeployment } from "@/lib/exec-env/deployments";
-// @kf-batch 50-WP15-airflow-serverless —— serverless 分路(产物 = YAML + 运行时代码包 → 该区 workflow;经典分路逐字节不变)
+// serverless 分路(产物 = YAML + 运行时代码包 → 该区 workflow;经典分路逐字节不变)
 import { publishServerlessWorkflow, offlineServerlessWorkflow } from "@/lib/scheduler/serverless/publish";
 import type { ServerlessJobSpec } from "@/lib/scheduler/serverless/yaml-generator";
-// 序 73 模块 57 —— serverless 作业 spec 的唯一作者(字段集合只在那里定义;工作流离线作业节点拼的是同一份)
+// serverless 作业 spec 的唯一作者(字段集合只在那里定义;工作流离线作业节点拼的是同一份)
 import { serverlessJobSpecFor } from "@/lib/etl/job-spec";
-// @kf-batch 50-WP5-rungroup —— 组表名的单一出口(别处不许再写 TABLES.RUN_GROUPS)
+// 组表名的单一出口(别处不许再写 TABLES.RUN_GROUPS)
 import { runGroupsTableName } from "@/lib/monitor/run-groups";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
 import { currentDefinitionVersion } from "@/lib/versions/version-service";
-// @kf-batch 50-WP13-mwaa-region —— 「哪个 target 用哪套 Airflow」的唯一作者(SPEC v3.26 §3.14)
+// 「哪个 target 用哪套 Airflow」的唯一作者(SPEC v3.26 §3.14)
 import {
   homeMwaaEndpoint,
   mwaaEndpointFor,
@@ -57,7 +56,7 @@ import {
   MWAA_NOT_INSTALLED_CODE,
   requireMwaaForTargets,
   isServerlessEndpoint,
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6):预览与发布同一份联合解析;调度器切换时下线旧产物
+  // 预览与发布同一份联合解析;调度器切换时下线旧产物
   schedulerEndpointFor,
   serverlessEndpointFor,
   type SchedulerEndpoint,
@@ -70,7 +69,7 @@ const USER_ID = "default-user";
 
 /**
  * home 的 DAG 桶(GET 预览响应顶层 `bucket` 字段的兼容口径)。
- * @kf-batch 50-WP13-mwaa-region 🔴 **不再是「所有 target 的桶」**:非 home 的 DAG 从此落**该 target 自己的** MWAA 桶
+ * 🔴 **不再是「所有 target 的桶」**:非 home 的 DAG 从此落**该 target 自己的** MWAA 桶
  *   (`MwaaEndpoint.dagBucket`,预览 / 发布行级 `bucket` 才是真值)。原注释「只有 home 有 MWAA」已作废 —— 那正是用户点名的漏洞。
  */
 export function mwaaDagBucket(): string {
@@ -102,11 +101,11 @@ export interface FanoutPlanRow {
   workgroup: string;
   database: string;
   dagId: string;
-  /** 🔴 WP-13:**该 target 自己的** DAG 桶(缺 MWAA 时为 `—`) */
+  /** 🔴 **该 target 自己的** DAG 桶(缺 MWAA 时为 `—`) */
   bucket: string;
   /** 该 target 的 Airflow 环境名(缺 MWAA 时为 `—`);serverless ⇒ `workflow <dagId>` */
   envName: string;
-  /** @kf-batch 50-WP15-airflow-serverless:这一行会走哪个调度器(INTERACTION §2.2b 预览行显示;缺调度组件时无) */
+  /** 这一行会走哪个调度器(INTERACTION §2.2b 预览行显示;缺调度组件时无) */
   scheduler?: "mwaa" | "serverless";
   /**
    * 凭证**形态**。🔴 只给形态,绝不给 ARN/用户名/口令 —— 预览是要显示给人看的,
@@ -116,7 +115,7 @@ export interface FanoutPlanRow {
   /** 这个 target 现在能不能下发。`false` 时 `reason` 必有值。 */
   ok: boolean;
   reason?: string;
-  /** @kf-batch 50-WP13-mwaa-region 机器可读拒因(前端据此渲染「去执行环境补装 MWAA」按钮) */
+  /** 机器可读拒因(前端据此渲染「去执行环境补装 MWAA」按钮) */
   code?: typeof MWAA_NOT_INSTALLED_CODE;
 }
 
@@ -127,25 +126,24 @@ export interface FanoutPlanRow {
  * 一个 target 解析失败就整体抛错的话,用户只能看到第一个错、一个一个试
  * (宪法 B6「前置校验提前告知」的反面)。所以逐行 try,把原因写进 `reason`。
  */
-/** @kf-batch 50-WP5-rungroup —— 本文件产出的定时组属于哪类定义(值域 = 模块 14 的 ResourceType) */
+/** 本文件产出的定时组属于哪类定义(值域 =  ResourceType) */
 const DEFINITION_KIND = "etl-job";
 
-// 序 73 模块 57:`serverlessPlaceOf`(执行落点 PlaceWire)随 spec 字面量一起搬进唯一作者 `lib/etl/job-spec.ts`。
+// `serverlessPlaceOf`(执行落点 PlaceWire)随 spec 字面量一起搬进唯一作者 `lib/etl/job-spec.ts`。
 
 export async function planFanout(job: EtlJob): Promise<FanoutPlanRow[]> {
   const base = baseDagIdOf(job);
   const rows: FanoutPlanRow[] = [];
-  // @kf-batch 50-WP31-place-first-class —— 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
+  // 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
   //   stop-on-first-failure 照旧),解析得开的区各自一个嵌套落点上下文;循环体除 `continue` → `return` 外一字未改。
   await forEachTargetPlace(
     bindingTargets(job),
     async (targetId) => {
       const home = isHome(targetId);
       const dagId = dagIdForTarget(base, targetId);
-      // @kf-batch 50-WP13-mwaa-region
       // 🔴 先解析**该 target 的 MWAA**:没装就整行 ✗ + 机器可读 code(前端渲染「去执行环境补装 MWAA」),
       //    而不是把它的 DAG 算成「发到 home 桶」—— 那就是用户点名的跨区域调度。
-      // @kf-batch 50-WP15-airflow-serverless —— 🔴 预览与发布**同一份解析**(schedulerEndpointFor)。真环境 T-3:预览仍按经典 MWAA 解析,
+      // 🔴 预览与发布**同一份解析**(schedulerEndpointFor)。真环境:预览仍按经典 MWAA 解析,
       //    与实际走 serverless 的发布不一致;只装 serverless 的 target 会被预览判 ✗ 挡住整次发布。
       let ep: SchedulerEndpoint | null = null;
       let mwaaReason: string | undefined;
@@ -214,14 +212,14 @@ export async function planFanout(job: EtlJob): Promise<FanoutPlanRow[]> {
 export interface FanoutPublishRow {
   targetId: string;
   dagId: string;
-  /** @kf-batch 50-WP13-mwaa-region 这份产物落到的桶 / Airflow / region(该 target 自己的;skipped 行为空) */
+  /** 这份产物落到的桶 / Airflow / region(该 target 自己的;skipped 行为空) */
   bucket?: string;
   envName?: string;
   region?: string;
   /** `skipped` = 前面某个 target 失败,按 fail-fast 停在那里,这个 target **没动过** */
   status: "ok" | "failed" | "skipped";
   error?: string;
-  /** @kf-batch 50-WP15-airflow-serverless:这份产物走的调度器 */
+  /** 这份产物走的调度器 */
   scheduler?: "mwaa" | "serverless";
   workflowArn?: string;
 }
@@ -241,7 +239,6 @@ export async function publishFanout(
   job: EtlJob,
   args: {
     cron: string;
-    // @kf-batch 50-P50.3-matrix
     /**
      * 🔴 只下发这几个 target(版本一致性矩阵的「**重发到此 region**」用)。
      * 必须是**绑定的子集** —— 由调用方(路由)先校验;这里再过一遍归一,
@@ -258,7 +255,7 @@ export async function publishFanout(
   // 而 home 是存量业务所在、也是最可能成功的那个。让它先落地才符合 §2.2「已成功的保留」。
   // (只改下发**顺序**,不改绑定本身 —— 绑定顺序仍是用户的,存在 `targets[]` 里。)
   const all = bindingTargets(job).slice().sort((a, b) => (isHome(a) ? -1 : isHome(b) ? 1 : 0));
-  // @kf-batch 50-P50.3-matrix —— 子集重发:只保留既在绑定里、又被点名的那些。
+  // 子集重发:只保留既在绑定里、又被点名的那些。
   const only = args.onlyTargets && args.onlyTargets.length ? new Set(args.onlyTargets) : null;
   const targets = only ? all.filter((t) => only.has(t)) : all;
   if (only && targets.length === 0) {
@@ -267,14 +264,13 @@ export async function publishFanout(
         `下发不会顺手改绑定 —— 要发到新区域请先在作业编辑器里绑上它。`
     );
   }
-  // @kf-batch 50-WP13-mwaa-region
-  // 🔴 **先核全部 target 的 MWAA,再动任何一个字节**(ACCEPTANCE E-208:缺 MWAA 时零产物)。缺的一起列(宪法 B6),
+  // 🔴 **先核全部 target 的 MWAA,再动任何一个字节**(ACCEPTANCE:缺 MWAA 时零产物)。缺的一起列(宪法 B6),
   //    抛 MwaaNotInstalled 由路由映射 409 + 直达补装;绝不「把该区的 DAG 先发到 home」。
   const endpoints = await requireMwaaForTargets(targets);
   const rows: FanoutPublishRow[] = [];
   let stopped = false;
 
-  // @kf-batch 50-WP31-place-first-class —— 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
+  // 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
   //   stop-on-first-failure 照旧),解析得开的区各自一个嵌套落点上下文;循环体除 `continue` → `return` 外一字未改。
   await forEachTargetPlace(
     targets,
@@ -286,8 +282,8 @@ export async function publishFanout(
         return; // (原 continue)
       }
       try {
-        // @kf-batch 50-WP15-airflow-serverless —— 调度器切换(详情页改偏好后重新发布):台账记的调度器 ≠ 本次端点种类 ⇒ 先下线旧产物,
-        //    否则两套调度器按同一 cron 跑同一作业(S-10)。有台账且种类不同才动手;零切换 = 零副作用。
+        // 调度器切换(详情页改偏好后重新发布):台账记的调度器 ≠ 本次端点种类 ⇒ 先下线旧产物,
+        //    否则两套调度器按同一 cron 跑同一作业。有台账且种类不同才动手;零切换 = 零副作用。
         await offlinePreviousSchedulerIfSwitched(job, targetId, dagId, ep);
         const binding =
           job.type === "redshift"
@@ -298,16 +294,16 @@ export async function publishFanout(
                 databaseOverride: job.redshiftConfig?.database,
               })
             : undefined;
-        // @kf-batch 50-WP15-airflow-serverless —— serverless 分路:同一份绑定解析(binding),产物换成 YAML + 运行时代码包 + workflow
+        // serverless 分路:同一份绑定解析(binding),产物换成 YAML + 运行时代码包 + workflow
         if (isServerlessEndpoint(ep)) {
           const stamp = resolveRunStamp(job, targetId);
-          // 序 73 模块 57:spec 字段集合只在唯一作者 `lib/etl/job-spec.ts#serverlessJobSpecFor` 定义(工作流的离线作业节点拼的是同一份);
+          // spec 字段集合只在唯一作者 `lib/etl/job-spec.ts#serverlessJobSpecFor` 定义(工作流的离线作业节点拼的是同一份);
           //   这里只解析事实(端点区 / 数仓绑定 / 定时分组)再交给它。产物逐字节同搬出前。
           const spec: ServerlessJobSpec = serverlessJobSpecFor(job, targetId, {
             dagId,
             endpointRegion: ep.region,
             binding: job.type === "redshift" ? binding : undefined,
-            // @kf-batch 50-WP5-rungroup —— O2 定时确定性分组。
+            // O2 定时确定性分组。
             // 🔴 判据是 **`all`(全部绑定)而不是 `targets`(本次发布的子集)**:子集重发时若按 `targets` 判,
             //    那个区的 DAG 就会**没有** scheduledGroup,而另一个区还带着 ⇒ 同一个 cron 分出两个组
             //    (症状只是「没归成一组」,不报错 —— 正是本模块要消灭的那类静默)。
@@ -364,7 +360,7 @@ export async function publishFanout(
           table: TABLES.ETL_JOBS,
           key: { userId: USER_ID, jobId: job.jobId },
           targetId,
-          // @kf-batch 50-WP15-airflow-serverless(T-16):经典分支也显式写 scheduler —— 台账必须自己说清这份产物在哪个调度器上,
+          // 经典分支也显式写 scheduler —— 台账必须自己说清这份产物在哪个调度器上,
           //   不靠「缺省即 mwaa」的隐式约定(切换偏好后判定、页面 tag、下线分路都读它)。
           record: { version, publishedAt: Date.now(), status: "ok", artifact: dagId, scheduler: "mwaa" },
         });
@@ -402,13 +398,13 @@ export async function offlineFanout(
   const { offlineDag } = await import("@/lib/scheduler/mwaa-offline");
   const list = opts.onlyTargets ?? deployedOrBoundTargets(job);
   const out: Array<{ targetId: string; dagId: string; paused: boolean; dagFileDeleted: boolean; skipped?: string; failed?: boolean }> = [];
-  // @kf-batch 50-WP31-place-first-class —— 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
+  // 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):逐区**顺序**执行(与原 for 循环同序,
   //   stop-on-first-failure 照旧),解析得开的区各自一个嵌套落点上下文;循环体除 `continue` → `return` 外一字未改。
   await forEachTargetPlace(
     list,
     async (targetId) => {
       const dagId = dagIdForTarget(base, targetId);
-      // @kf-batch 50-WP15-airflow-serverless —— 台账说这份产物走的是 serverless ⇒ 去该区 workflow(Stop run + DeleteWorkflow + 删定义);否则经典 offlineDag
+      // 台账说这份产物走的是 serverless ⇒ 去该区 workflow(Stop run + DeleteWorkflow + 删定义);否则经典 offlineDag
       const rec = (job.deployments as Record<string, { scheduler?: string; workflowArn?: string } | undefined> | undefined)?.[targetId];
       let r: { paused: boolean; dagFileDeleted: boolean; skipped?: string; failed?: boolean };
       if (rec?.scheduler === "serverless") {
@@ -418,17 +414,17 @@ export async function offlineFanout(
           const o = await offlineServerlessWorkflow({ ep: sep, dagId, workflowArn: rec.workflowArn });
           r = { paused: o.deleted, dagFileDeleted: o.dagFileDeleted };
         } catch (e) {
-          // 🔴 T-14:下线失败**绝不清台账** —— 台账里的 workflowArn 是平台唯一能再找到它的线索,
+          // 🔴 下线失败**绝不清台账** —— 台账里的 workflowArn 是平台唯一能再找到它的线索,
           //   清了就是「workflow 还按 cron 跑、平台却认为已下线」的永久孤儿(真环境留下过 4 个)。
           //   失败如实带出(failed),由路由决定报错;运维再点一次下线即可重试。
           r = { paused: false, dagFileDeleted: false, skipped: `serverless 下线失败:${String((e as Error)?.message ?? e).slice(0, 240)}`, failed: true };
         }
       } else {
-        // @kf-batch 50-WP13-mwaa-region 🔴 下线去**该 target 的** MWAA(SPEC §3.12 `offlineDag(dagId, targetId)`);原版只 pause home / 删 home 桶
+        // 🔴 下线去**该 target 的** MWAA(SPEC §3.12 `offlineDag(dagId, targetId)`);原版只 pause home / 删 home 桶
         r = await offlineDag(dagId, targetId);
       }
       // 台账跟着清:DAG 撤了台账还留 ok 就是「看板假绿」(见 removeDeployment 的说明)。
-      // 🔴 T-14 例外:下线**失败**时保留台账(含 workflowArn),否则孤儿 workflow 再也找不回来。
+      // 🔴 例外:下线**失败**时保留台账(含 workflowArn),否则孤儿 workflow 再也找不回来。
       if (!r.failed) await removeDeployment({ table: TABLES.ETL_JOBS, key: { userId: USER_ID, jobId: job.jobId }, targetId });
       out.push({ targetId, dagId, paused: r.paused, dagFileDeleted: r.dagFileDeleted, ...(r.skipped ? { skipped: r.skipped } : {}), ...(r.failed ? { failed: true } : {}) });
     },
@@ -438,10 +434,9 @@ export async function offlineFanout(
 }
 
 /**
- * @kf-batch 50-WP18d-unpublish-seam
  * 「逐区下线之后,**哪些区其实没撤下来**」—— 四个调用点(删作业 / 解绑 / 取消调度 ×2)问同一个人。
  *
- * 🔴 为什么必须有这个作者:`offlineFanout` **不抛异常**(它按 T-14 的教训把失败写成 `failed` 行并
+ * 🔴 为什么必须有这个作者:`offlineFanout` **不抛异常**(它的教训把失败写成 `failed` 行并
  *   刻意保留台账),于是「靠 try/catch 拦住」的调用点**一个都拦不住** —— 真环境的下场是
  *   「页面说已下线 / 作业已删,而那个区的 workflow 还在按 cron 跑,且 workflowArn 随行消失」。
  *   原来这段过滤在两个路由里各写一遍、另两个调用点**根本没写**(写了 ≠ 接上了)。
@@ -462,7 +457,7 @@ export const OFFLINE_RETRY_TAIL =
   "调度状态保持不变、台账保留 —— 再点一次下线可重试(常见原因:还有 run 在跑,等它到终态)。";
 
 /**
- * @kf-batch 50-WP15-airflow-serverless —— 调度器切换时先下线旧产物(ETL / EMR 两条扇出共用)。
+ * 调度器切换时先下线旧产物(ETL / EMR 两条扇出共用)。
  * 台账 `deployments[targetId].scheduler`(缺省 mwaa)≠ 本次端点种类 ⇒ 按**旧**种类下线(serverless ⇒ 删 workflow + 定义;mwaa ⇒ pause + 删 DAG 文件)。
  * 返回被下线的旧种类;无台账 / 种类相同 ⇒ "none"(零副作用)。
  */
@@ -516,5 +511,5 @@ export async function offlineUnboundTargets(
 }
 
 
-// @kf-batch 50-WP31-place-first-class —— 原 resolveWorkgroupForSpec(数仓绑定缺失时的工作组缺省)已删:落点只来自绑定(serverlessPlaceOf)
-// 序 73 模块 57 —— `splitSqlForSpec` 随 spec 字面量一起搬进唯一作者 `lib/etl/job-spec.ts`(语句切分仍只经 lib/etl/dag-generator.ts#splitSql)。
+// 原 resolveWorkgroupForSpec(数仓绑定缺失时的工作组缺省)已删:落点只来自绑定(serverlessPlaceOf)
+// `splitSqlForSpec` 随 spec 字面量一起搬进唯一作者 `lib/etl/job-spec.ts`(语句切分仍只经 lib/etl/dag-generator.ts#splitSql)。

@@ -1,4 +1,4 @@
-// 模块 13 — 项目空间常量与角色 (v1.4.0)
+// 项目空间常量与角色 (v1.4.0)
 
 export const DEFAULT_PROJECT_ID = "proj-default";
 export const DEFAULT_PROJECT_NAME = "默认空间";
@@ -28,14 +28,14 @@ export function projectDisplayDescription(
 // localStorage["bgp-active-project"]).
 export const PROJECT_HEADER = "x-bgp-project";
 
-// 模块 15 — 多环境 (v1.6.0): config resources live in an environment within a project.
+// 多环境 (v1.6.0): config resources live in an environment within a project.
 export const ENVS = ["dev", "staging", "prod"] as const;
 export type Env = (typeof ENVS)[number];
 export const DEFAULT_ENV: Env = "dev";
 export const ENV_HEADER = "x-bgp-env";
 // Promoting INTO a protected environment requires an approval (type "deploy").
 export const PROTECTED_ENVS: Env[] = ["prod"];
-// @kf-batch 50-SEQ47a-promote-ux —— 环境颜色 / 说明的唯一作者(顶栏切换器、资源 EnvTag、各环境发布状态三处共用;原来只在 Header 里有一份)。
+// 环境颜色 / 说明的唯一作者(顶栏切换器、资源 EnvTag、各环境发布状态三处共用;原来只在 Header 里有一份)。
 export const ENV_COLOR: Record<Env, string> = { dev: "green", staging: "gold", prod: "red" };
 export const ENV_DESC: Record<Env, string> = { dev: "开发", staging: "预发", prod: "生产" };
 

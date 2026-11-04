@@ -1,4 +1,3 @@
-// @kf-batch 50-WP9a-durable-jobs
 // 测试用的**真外部替身**:Redshift Data API / Secrets Manager / Redshift Serverless / CloudWatch。
 // 只替换 `@/lib/aws/clients` 工厂吐出来的客户端(`regionalClient` / `redshiftDataClient`),
 // 平台自己的模块(target-clients / 执行器 / statement 原语)一律真跑 —— 这是装配层判据的意义。
@@ -42,7 +41,7 @@ export class FakeAws {
   secrets = new Map<string, { arn: string; value: string; region: string }>();
   /** DescribeSecret 对这些名字抛(模拟读失败) */
   secretReadErrors = new Map<string, string>();
-  /** @kf-batch 50-project-delete-orphans —— DeleteSecret 对这些名字抛(模拟 AccessDenied / 限流) */
+  /** DeleteSecret 对这些名字抛(模拟 AccessDenied / 限流) */
   secretDeleteErrors = new Map<string, string>();
   metricValues: number[] = [];
   metricError: string | null = null;
@@ -141,7 +140,7 @@ export class FakeAws {
             s.value = i.SecretString;
             return { ARN: s.arn };
           }
-          // @kf-batch 50-project-delete-orphans —— 🔴 secret 是**区域性**的:在别的区删同名 secret = 没有这个 secret。
+          // 🔴 secret 是**区域性**的:在别的区删同名 secret = 没有这个 secret。
           //   (只在 Delete 上按区判:删错区回 absent 正是「回收报成功、真 secret 原封不动」的那种缺陷,判据要看得见它)
           if (n === "DeleteSecretCommand") {
             const err = this.secretDeleteErrors.get(i.SecretId);

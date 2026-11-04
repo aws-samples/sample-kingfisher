@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @kf-batch 50-WP27-9cap-matrix
 """验收夹具台账的**分类与删除守卫**离线判据(`scripts/36-fixture-ledger.py`)。
 
     python3 infra/test/fixture-ledger-classify/test_classify.py     # 退出码 0 = 全过

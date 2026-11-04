@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-P50.3-mirror
 // **跨地域一屏只读元数据总览**(50 INTERACTION §4quater 线框 / SPEC §3.13)。
 //
 // 对标产品(含 DataWorks)只能**切在单地域**看资产/血缘/质量;这里给的是中央跨 target 的
@@ -243,7 +242,7 @@ export default function CrossTargetMirrorOverview() {
               <Button size="small" type="link" style={{ padding: 0 }} disabled={!isAdmin}
                 // 🔴 每个分面一个**稳定锚点**:总览里同时有多个区,`get_by_role("立即同步").first`
                 //   会点到**别的区**那颗按钮,然后判据去看本区状态没变 ⇒ 假红(2026-09-15 段 w3e 实测)。
-                //   锚点带 targetId 是产品对验收套件的契约(同 WP-21 的 `nav-<key>`、`rs-load-schema`)。
+                //   锚点带 targetId 是产品对验收套件的契约(同  `nav-<key>`、`rs-load-schema`)。
                 data-testid={`mirror-sync-${f.targetId}`}
                 loading={busy === `${f.targetId}#glue`} icon={<CloudSyncOutlined />}
                 onClick={() => sync(f.targetId, ["glue"])}>

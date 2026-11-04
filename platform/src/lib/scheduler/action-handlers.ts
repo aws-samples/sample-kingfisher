@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **白名单动作 → 执行体** 的唯一登记处。每个执行体**只调产品自己的库函数**(与手动路由同一个作者),
 //    本文件只做三件事:从命令取参数 → 调库函数 → 把「能力态 / 空结果」判成失败(不许静默成功)+ 留审计。
 //
@@ -140,7 +139,6 @@ export const cardRefreshHandler: ActionHandler = async (cmd) => {
 };
 
 /**
- * @kf-batch 50-CAPSEED-seed-dispatch
  * 造数:在该区跑一次部署期的造数作业(`runSeedOnce`,与 `/api/seed/run` 同一个作者),**等到终态**。
  * 🔴 失败 / 作业不存在 / 已有一轮在跑 ⇒ 抛 ⇒ 命令 failed ⇒ DAG 的 task 失败(不许静默成功)。
  *    run 台账由 DAG 的 `__start` / `__finish` 收口(taskType=seed),这里不另写一行。

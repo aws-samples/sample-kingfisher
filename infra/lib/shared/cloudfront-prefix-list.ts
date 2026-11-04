@@ -1,4 +1,4 @@
-// @kf-batch 50-WP4sexies-home-region / 50-PROD-A-launch-hardening(h)
+// 50-PROD-A-launch-hardening(h)
 // CloudFront **origin-facing 托管前缀列表 id** 的单一作者。
 //
 // 【为什么单独一个文件】这个 id 原来**抄了两份**(`platform-stack.ts` 与 `om-service-stack.ts`),

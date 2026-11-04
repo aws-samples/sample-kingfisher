@@ -1,9 +1,8 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 🔴🔴 **节点语义的单一作者**(合同 SPEC v3.43 §3.15)。
 //
 // 【为什么必须只有一份】`sql` / `python` / `sync` 三类节点的执行体、受限执行(exec/eval 黑名单 + 受限
 // __builtins__)、跨执行体作业锁、以及台账/落点的 env 构造,原来**只存在于经典 runtime-lib 一处**。
-// WP-17 要让同样的语义也跑在 MWAA Serverless 的代码包里 —— 如果各写一份,就是本仓最贵的那类缺陷:
+// 要让同样的语义也跑在 MWAA Serverless 的代码包里 —— 如果各写一份,就是本仓最贵的那类缺陷
 // Task#19(publish 与 schedule/enable 两份 DAG 生成副本漂移)与 370cd0c(两侧锁属性名不一致 = 白加锁)
 // 都不报错,只是**行为悄悄分叉**。所以这里把「不依赖 Airflow」的那一整块抽出来,
 // 经典 runtime-lib 与 serverless 代码包**都拼这一份**,由 `runtime-single-author` 门禁钉住:
@@ -14,7 +13,7 @@
 //     `_update_run_record`(读 Airflow `context["dag_run"]`)、branch / foreach 的 operator 表达。
 //   · 留在 serverless `runtime-py.ts`:`run_job`(单作业)、`start_workflow` / `run_node` / `finish_workflow`
 //     (台账三写点 + branch gate 的 `AirflowSkipException`)。
-//   · 序 73 模块 57:作业族(`_record` / 作业锁 / 软限 / 落点 / `_run_redshift` / `_run_glue` / `_run_emr`)在**另一份**共享块
+//   ·:作业族(`_record` / 作业锁 / 软限 / 落点 / `_run_redshift` / `_run_glue` / `_run_emr`)在**另一份**共享块
 //     `job-exec-py.ts`(两载体同样都拼);本文件的 `_exec_job` / `_sync_node_record` 调用它们(Python 名字在调用时解析,
 //     两块拼进同一个模块即可)。
 //   · 判据:本文件里**不许**出现 `from airflow`(那就说明抽错了边界)。
@@ -87,7 +86,7 @@ def _eval_cond_safe(expr, ctx=None):
 
 
 def _mk(spec):
-    # @kf-batch 50-WP4quinquies-pushdown —— 两个轴(说明见 TS 侧 lib/workflow/dag-place.ts):
+    # 两个轴(说明见 TS 侧 lib/workflow/dag-place.ts):
     #   exec_region = 干活的区(glue / redshift-data);ctrl_region = 主控区(DynamoDB 台账只在主控区有表)。
     #   合成一个 region 时,「调度在 usw2 而活儿打回主控区」不报错、只是跑错区(跨法域 target 下即违反驻留约定)。
     #   存量兼容:旧 spec 只有 region 一个键,而它的值恒等于主控区(那正是被修掉的 bug)⇒ 回落等价。
@@ -102,10 +101,10 @@ def _mk(spec):
         "redshift": boto3.client("redshift-data", region_name=exec_region),
         "ddb": boto3.resource("dynamodb", region_name=ctrl_region),
         "workflow_id": spec["workflow_id"],
-        # 序 73 模块 57(R3):工作流名字(发布期由 DagSpec / YAML env 带进来;老产物没有 ⇒ 空串,回链行就不写 workflowName)
+        # 工作流名字(发布期由 DagSpec / YAML env 带进来;老产物没有 ⇒ 空串,回链行就不写 workflowName)
         "workflow_name": str(spec.get("workflow_name") or ""),
         "dag_id": spec["dag_id"],
-        # @kf-batch 50-WP26-sync-schedule-carrier —— **台账归属**(载体 ≠ 记在谁头上)。
+        # **台账归属**(载体 ≠ 记在谁头上)。
         #   缺省回落到工作流自己 ⇒ 与改动前逐字节相同(旧 spec 没有这三个字段也照旧跑)。
         #   同步任务的调度载体复用同一个 DAG 机制,但运行记录要落到它自己那一行、
         #   且**不许**回写 bgp-workflows(那张表里没有它的行,盲写会 upsert 出幽灵工作流)。
@@ -117,7 +116,7 @@ def _mk(spec):
         # 与 TS 侧 resolveRunStamp 的口径一致(存量默认工作区 / 单执行目标 home)。
         "project_id": spec.get("project_id") or "proj-default",
         "target_id": spec.get("target_id") or "tgt_home",
-        # 数仓落点也走 spec(50 P50.1 收编:原来 _exec_sql_once 里**写死** bgp-workgroup/dev,
+        # 数仓落点也走 spec(收编:原来 _exec_sql_once 里**写死** bgp-workgroup/dev,
         # 连 env 都不看 ⇒ REDSHIFT_WORKGROUP 一改,workflow 的 SQL 节点会打到另一个数仓)。
         #
         # 🔴 这两个刻意用 spec[...] 直取,而不是 spec.get(...) or 字面量:
@@ -135,7 +134,6 @@ def _mk(spec):
 
 
 def _update_workflow_status(env, status):
-    # @kf-batch 50-WP26-sync-schedule-carrier
     # 🔴 合成载体(如同步任务的定时调度)在 bgp-workflows 里**没有行** ——
     #   DDB 的 update_item 默认是 upsert,盲写会**凭空造出一条幽灵工作流**
     #   (只有 lastRunStatus 几个字段,之后出现在编排列表里却没有任何定义)。
@@ -151,7 +149,7 @@ def _update_workflow_status(env, status):
 
 
 def _node_run_id(workflow_run_id, node_id, target_id):
-    # 序 73 模块 57 —— 节点引用的作业 / 同步任务**自己的**台账 runId:
+    # 节点引用的作业 / 同步任务**自己的**台账 runId:
     #   <工作流 run 的 raw 段>__<节点 id>#<targetId>(与 lib/monitor/run-key.ts composeRunId 同形:末段恒为 targetId,
     #   raw 段带节点 id ⇒ 同一次工作流运行里两个节点引用同一个作业也不会同键互盖)。
     #   工作流 run id 缺失(经典载体没有 dag_run 的测试形态)时退成随机 raw,绝不让两次运行同键。
@@ -165,7 +163,7 @@ def _node_run_id(workflow_run_id, node_id, target_id):
 
 
 def _put_workflow_name(env, item):
-    # 序 73 模块 57(R3):回链行带工作流名字(页面显示「由工作流 X 触发」);老产物的 env 没有名字 ⇒ 不写这个键,页面回落显示 workflowId
+    # 回链行带工作流名字(页面显示「由工作流 X 触发」);老产物的 env 没有名字 ⇒ 不写这个键,页面回落显示 workflowId
     name = env.get("workflow_name")
     if name:
         item["workflowName"] = str(name)
@@ -173,7 +171,7 @@ def _put_workflow_name(env, item):
 
 
 def _sync_node_record(env, task, task_id, status, started, job_name, glue_run_id, node_id, workflow_run_id, scheduler, error=None):
-    # 序 73 B-141 ②(57 DESIGN R8):工作流里的同步节点把这次运行写进**同步任务自己的**运行历史
+    # (57 DESIGN R8):工作流里的同步节点把这次运行写进**同步任务自己的**运行历史
     #   (taskType=sync · triggeredBy=workflow · 回链 workflowId / workflowRunId / nodeId),与离线作业节点同一套「双写回链」。
     # 🔴 同步任务自己的定时调度载体(carrier-ledger:ledger_task_id == task_id)已由 __start / __finish 记在它名下 ⇒ 不再多写一行。
     # 🔴 写不成即抛(与 _record 同一条纪律):台账是运行历史的唯一真值源,吞掉 = 作业跑了而历史里没有这次。
@@ -235,7 +233,6 @@ def _exec_sync(env, task_id, node_id=None, workflow_run_id=None, scheduler=None,
     print("Glue job %s completed: %s" % (job_name, st))
 
 
-# 序 73 模块 57(57 DESIGN §3.3)
 # ══════════════════════════════════════════════════════════════════════════
 # 离线作业节点 —— 执行语义 = 作业「立即运行 / 定时」**同一核心**:spec 在**发布期**由 TS 侧唯一作者
 # (lib/workflow/job-node-spec.ts → lib/etl/job-spec.ts / lib/engines/emr/job-spec.ts)解析成与单作业载体**同一份** jobSpec
@@ -317,7 +314,6 @@ def _exec_job(env, node, ds=None, workflow_run_id=None, scheduler=None, **kwargs
     return job_run_id
 
 
-# @kf-batch 50-WP28-platform-action-node
 # ══════════════════════════════════════════════════════════════════════════
 # 平台动作节点 —— 「按时跑一次**平台**动作」(治理定时任务 / 问数卡片定时刷新)。
 # 本执行器**只做传声筒**:往**主控区**的命令表投一条 pending 命令,再轮询同一行直到终态。
@@ -394,7 +390,6 @@ def _sanitize_node_id(node_id):
 
 
 def _lock_attr_for(target_id, node_id):
-    # @kf-batch 50-P50.3-multibind
     # 🔴🔴 与 TS 侧 lib/etl/run-lock.ts 的 lockAttrFor **逐字节对齐**(50 SPEC §3.6 的 4 家之③)。
     # 不变量:同 target + 同节点 = 互斥;不同 target + 同节点 = 并行。
     # home 豁免:与存量**逐字节同名**(并存期里存量 DAG / 补数 / 正在跑的作业都在抢那个名字,
@@ -450,7 +445,7 @@ def _release_wf_lock(env, lock_attr, token):
 
 
 def _exec_sql_once(env, sql, sqls=None):
-    # @kf-batch 37-sync-capability —— B-66:节点 SQL 含多条语句(发布时由 TS splitSql 预切成 data.sqls)⇒
+    # 节点 SQL 含多条语句(发布时由 TS splitSql 预切成 data.sqls)⇒
     #   batch_execute_statement 一次提交 = **单事务**(与离线 Redshift 作业 _run_redshift、补数 runWorkflowSqlNode 同口径)。
     #   原来一律 execute_statement 只收单语句 ⇒ 工作流里表达不了「DROP + CTAS」这类原子重算,Showcase ROI 工作流被迫
     #   拆成两个节点,每次运行都有一两分钟表不存在的窗口,定时刷新的问数卡片撞上即失败(真环境 2026-10-12 坐实)。
@@ -480,7 +475,7 @@ def _sql_error_of(desc):
 def _exec_sql(env, sql, node_id=None, sqls=None, **kwargs):
     # node_id 提供 → 抢跨执行体作业级锁(与 MWAA etl DAG / Node 补数互斥);叠加 OID 退避重试。
     # workflow 节点【不能跳过】(破坏下游依赖):等满仍抢不到 → 抛错让这个节点失败(YAML 的 retries 可以是 0,不承诺重试;lease 兜底自愈)。
-    # @kf-batch 50-P50.3-multibind —— 锁属性名走唯一口径(含 target 维;home 时与存量同名)。
+    # 锁属性名走唯一口径(含 target 维;home 时与存量同名)。
     lock_attr = _lock_attr_for(env.get("target_id"), node_id) if node_id else None
     token = uuid.uuid4().hex
     lock_wait_started = time.time()

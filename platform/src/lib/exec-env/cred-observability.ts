@@ -1,11 +1,10 @@
-// @kf-batch 52-P52.5a-supply
 // 凭证过渡态的**可观测闭环**(50 SPEC §3.9b「回落可观测(闭环)」格)。
 //
 // ── 为什么必须有这个文件 ──────────────────────────────────────────────────────
 // §3.9b 原文钉了一句很硬的话:「🔴 **仅 `console.warn` + 进程内 Map 不算可观测闭环**」。
 // 而 `privileged-cred.noteDegradation` 在 G 批交付时就正好是那个形状,文件里也如实登记了
 // 「还缺:审计事件、按 target·project 的指标、provisioning 超时告警、`isolated` 出现 fallback
-// 的零容忍告警。补齐属 P52.5a」。本文件就是那四件。
+// 的零容忍告警。补齐」。本文件就是那四件。
 //
 // ── 四件里最要紧的是第四件 ───────────────────────────────────────────────────
 // 🔴 `isolated` 状态下**出现回落**不是一个"指标偏高"的问题,而是隔离边界已经破了。
@@ -21,7 +20,7 @@
 // 于是"审计静默失效"本身也是可见的 —— 这是与"吞掉就完了"的关键区别。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { putEventIfNew } from "@/lib/alerting/events";
 import { writeAuditRecord } from "@/lib/audit";

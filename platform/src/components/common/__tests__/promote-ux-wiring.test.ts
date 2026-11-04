@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47a-promote-ux —— 接线判据(「写了」≠「接上了」):发布到环境的可发现性改造必须真的挂到每个入口页上。
+// 接线判据(「写了」≠「接上了」):发布到环境的可发现性改造必须真的挂到每个入口页上。
 //   读源文件钉调用点,不钉样式。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

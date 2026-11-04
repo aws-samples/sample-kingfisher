@@ -1,5 +1,4 @@
-// @kf-batch 50-B109-exec-target-dims
-// GET /api/exec-targets 的维度闭合清单(B-109):编排页传 "airflow"、建表向导传 "core" 曾被这条路由 400,
+// GET /api/exec-targets 的维度闭合清单:编排页传 "airflow"、建表向导传 "core" 曾被这条路由 400,
 // 页面吞成空列表 ⇒ 「执行区域(可多选)」永远空、「全选当前活跃区(0)」灰了一个月。
 // 本判据钉**事实**:每个维度回哪些目标(与写路径同口径)、不在清单的维度 400 并列出清单(不回空列表)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -30,7 +29,7 @@ beforeEach(() => {
   h.targets = [HOME, USW2, USW1_NO_SCHED, EUC1_LAKE_MWAA];
 });
 
-describe("GET /api/exec-targets —— 维度闭合清单(B-109)", () => {
+describe("GET /api/exec-targets —— 维度闭合清单", () => {
   it("缺省 = redshift:只列装了数仓的(EMR 面板 / 直查 / 建模 / 离线作业的既有口径不变)", async () => {
     const r = await call("");
     expect(r.status).toBe(200);

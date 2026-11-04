@@ -1,5 +1,5 @@
 "use client";
-// @kf-batch 37-sync-capability —— 同步向导里序 37 新能力的控件(过滤条件预览 / 表名模板 / 业务日期时区 /
+// 同步向导里新能力的控件(过滤条件预览 / 表名模板 / 业务日期时区 /
 // 派生列 / 覆盖范围 / 空结果开关)。合法形态的唯一作者是 lib/sync/run-vars.ts,这里只做呈现与录入。
 //
 // 🔴 存量任务零影响:这里的 Form.Item **一个 initialValue 都不给**(给了 ⇒ getFieldsValue(true) 里就多出缺省值,
@@ -87,7 +87,7 @@ export function BusinessTimezoneField({ form }: { form: FormInstance }) {
 }
 
 // ───────────────────────── ② 带日期变量的源表名 ─────────────────────────
-// 序 56(客户 2026-10-27 反馈):模板在源库里不存在,此前它没有列 ⇒ 客户为了看列把某个月表也勾成普通表 ⇒ 两者目标名相同,
+// 模板在源库里不存在,此前它没有列 ⇒ 客户为了看列把某个月表也勾成普通表 ⇒ 两者目标名相同,
 //   同一次运行向同一张目标表写两次。现在模板可以指定一张「样例表」(源库里同结构的真表)只用来读列结构:
 //   添加 / 改样例时把样例表的列映射复制给模板(fieldMappings[模板]),第 1 步字段映射 / 建表预览 / 派生列候选随之可见;样例表不会被同步。
 export function TemplateTablesEditor({ form, templateTables, setTemplateTables, sourceTableNames, templateSamples, setTemplateSamples, fieldMappings, setFieldMappings }: {
@@ -271,7 +271,7 @@ export function WriteOptionsSection({ form, sourceColumns, targetType }: {
         }}
       </Form.Item>
 
-      {/* 序 37 B-61:合并键 —— 只在写入模式 = 合并时出现(放在本节最后,不改变既有控件的位置与下标)。 */}
+      {/* 合并键 —— 只在写入模式 = 合并时出现(放在本节最后,不改变既有控件的位置与下标)。 */}
       {/* 🔴 不给初值、不给缺省:没有键的合并任务由前端校验(validateSyncCapabilityFields)与服务端 400 一起挡住。 */}
       <Form.Item noStyle shouldUpdate={(p, c) => p.writeMode !== c.writeMode || p.mergeKeys !== c.mergeKeys}>
         {() => {

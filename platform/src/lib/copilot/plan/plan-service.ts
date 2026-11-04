@@ -1,10 +1,9 @@
-// 模块 44 — Copilot 执行计划/步骤的存储服务层(bgp-copilot-plans / bgp-copilot-steps)。
+// Copilot 执行计划/步骤的存储服务层(bgp-copilot-plans / bgp-copilot-steps)。
 // 计划 CRUD + 步骤批量落库 + 进度聚合 + 控制动作(确认步骤/暂停/恢复/取消/重试)。
 // 泛化补数 service.ts:补数按"日期×节点"机械展开,Copilot 直接落 planner 产出的异构步骤(PlanSpec)。
 // 乐观锁 version 防并发覆盖(与补数同款);refreshPlanProgress 高频回写不带锁(避免与控制动作互斥)。
 
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-// @kf-batch 50-WP4quater-reads(工单 SC-17)
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import type {
@@ -49,7 +48,7 @@ export async function createPlan(input: {
   createdBy: string;
   prompt: string;
   spec: PlanSpec;
-  /** @kf-batch 50-WP4quater-reads(工单 SC-17)—— 计划面向的执行区。🔴 B-39:必填(原「缺省主控区」= 静默默认值) */
+  /** 计划面向的执行区。🔴 必填(原「缺省主控区」= 静默默认值) */
   targetId: string;
 }): Promise<CopilotPlanRow> {
   const { projectId, createdBy, prompt, spec } = input;
@@ -66,7 +65,7 @@ export async function createPlan(input: {
     summary: spec.summary || "",
     findings: spec.findings || "",
     autoExecute: false, // L2:引擎不代执行。翻 L3 是显式配置 + 用户批准的动作,绝非代码默认。
-    // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 计划的执行区(建出来的作业都落这个区)
+    // 计划的执行区(建出来的作业都落这个区)
     targets: [input.targetId],
     status: spec.steps.length === 0 ? "succeeded" : "planned", // 0 步 = 无需执行(直接答),即完成
     progress: emptyProgress(spec.steps.length),
@@ -139,7 +138,6 @@ export async function listPlans(projectId: string): Promise<CopilotPlanRow[]> {
   return Items as CopilotPlanRow[];
 }
 
-// @kf-batch 50-project-delete-orphans
 /**
  * 计划「还没收口」吗(删项目前置校验的口径)—— **穷尽表**:`PlanStatus` 加一个值不在这里登记 ⇒ `tsc` 不过。
  *
@@ -169,7 +167,6 @@ export function isPlanOpen(status: unknown): boolean {
 }
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 该项目**拥有**的、**未收口**的计划(删项目前置校验用)。
  *
  * 与 `listPlans` 的区别,每一条都是删除守卫需要而列表页不需要的:

@@ -1,4 +1,4 @@
-// 模块 43-B — 读工作流某次 run 的节点运行态(供破线预测)。
+// 读工作流某次 run 的节点运行态(供破线预测)。
 //
 // 首期数据来源:workflow 级 run 记录(bgp-task-runs)+ 各节点基线。平台当前把 workflow 整体作为
 // 一条 run 记录(节点级 task-instance 在 MWAA 内,读取需 MWAA API);因此:

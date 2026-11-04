@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP3
 // **执行角色键**的唯一作者(50 SPEC v3.21 §3.1a「执行角色键」/ §6.1 段二落地口径)。
 //
 // 四个描述符键 ↔ 命名 SSOT 的四个 kind:
@@ -11,12 +10,12 @@
 //   ② **补充部署窄通道的唯一例外**(`execRoleRotationVerdict`):执行角色键允许「新增」或「home 名 → 本 target 名」单向切换;
 //      其它任何改写照旧拒。例外由 SSOT 判定,桶 / workgroup / 凭证一个字节都碰不到 —— 不是放宽「只增不改」。
 //   ③ 存量描述符的 home 名 / 缺键**不在 §3.1a 判死**(否则重新部署前 tgt_usw2_a 当场不可用);由准入前置
-//      `hasPerTargetExecRoles`(WP-10a 接进 `unusableReason`)与规则 ① 双门守。`missingPerTargetExecRoles` 就是那道前置的判据。
+//      `hasPerTargetExecRoles`(接进 `unusableReason`)与规则 ① 双门守。`missingPerTargetExecRoles` 就是那道前置的判据。
 //
 // 🔴 本文件**零 AWS SDK 依赖**(只有命名 SSOT + target-id):服务端 route / 客户端组件 / 单测都能 import。
 import { resourceName } from "@/lib/aws/naming";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
-// 序 72 B-139:ARN 形态与角色名解析的唯一作者在 lib/execution-role/resolve.ts(此处原有一份同样的正则,已收口)
+// ARN 形态与角色名解析的唯一作者在 lib/execution-role/resolve.ts(此处原有一份同样的正则,已收口)
 import { roleNameOfArn } from "@/lib/execution-role/resolve";
 
 export const EXEC_ROLE_RESOURCE_KEYS = ["glueRoleArn", "emrExecutionRoleArn", "redshiftCopyRoleArn", "dmsKinesisRoleArn"] as const;
@@ -132,7 +131,7 @@ export function requiredExecRoleKeys(components: readonly unknown[] | undefined 
 
 /**
  * 规则 ③ 的判据:非 home 缺哪些 per-target 执行角色(键缺 **或** 不是本 target 名都算缺)。home ⇒ 恒 []。
- * WP-10a 把它接进 `residencyPrerequisite` / `unusableReason`;本包只提供判据(零生产调用方 ⇒ 按「未验证」对待,见单测)。
+ * 把它接进 `residencyPrerequisite` / `unusableReason`;本包只提供判据(零生产调用方 ⇒ 按「未验证」对待,见单测)。
  */
 export function missingPerTargetExecRoles(t: {
   targetId: string;

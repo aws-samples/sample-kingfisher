@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-CAPSEED-seed-dispatch(登记 CAP-SEED 交付)
+// (登记 CAP-SEED 交付)
 // GET    /api/seed/schedules/[taskId]   取一个定时造数任务
 // PATCH  /api/seed/schedules/[taskId]   改草稿(名称 / cron;**启用中不许改**:先停用再改)
 // DELETE /api/seed/schedules/[taskId]   删除(先把每个有产物的区真撤下来;撤不下来 ⇒ 502,行不删)

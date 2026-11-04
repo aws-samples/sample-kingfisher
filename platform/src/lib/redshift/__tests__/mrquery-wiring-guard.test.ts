@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mrquery
 // 多 region 直查的**接线门禁**(50 INTERACTION §4septies)。
 //
 // 提交层的行为已由 `multi-region-query.test.ts` 真跑覆盖;这里防的是另一类事:
@@ -57,7 +56,7 @@ describe("🔴🔴 取结果 / 取消:必须用**提交时那个 region** 的客
     expect(src, "没把句柄放在显式参数之前 ⇒ region 可被客户端操纵").toMatch(
       /const fromHandle = await peekHandleTargetId\([\s\S]{0,200}?const targetId = fromHandle \|\| requestedTargetId\(req\.nextUrl\.searchParams\.get\("targetId"\)/
     );
-    // @kf-batch 50-WP31-place-first-class —— 🔴 负向:两样都没有 / 目标不存在时**不许回落主控区客户端**
+    // 🔴 负向:两样都没有 / 目标不存在时**不许回落主控区客户端**
     expect(src, "仍回落主控区客户端 ⇒ 漏传时到主控区去查别的区的语句").not.toMatch(/homeRegion\(/);
     // 🔴 负向:Describe 不许用模块级(home)客户端
     expect(src, "仍用模块级 home 客户端 Describe ⇒ 非 home 的 statementId 永远查不到、sheet 卡住").not.toMatch(
@@ -82,7 +81,7 @@ describe("🔴🔴 取结果 / 取消:必须用**提交时那个 region** 的客
     expect(src, "region 来自客户端输入 ⇒ 可被指定成 home 从而让取消静默失效").not.toMatch(
       /regionOfTarget\(\s*(body|req\.nextUrl|searchParams)/
     );
-    // @kf-batch 50-P50.3-mrquery —— 🔴 「语句已结束」不是平台故障,必须 409 不是 500
+    // 🔴 「语句已结束」不是平台故障,必须 409 不是 500
     // (与 W3a-9 同一类错误分类;真环境验收 W3c1-9 抓到过 500)。
     expect(src, "取消一条已结束的语句报 500 ⇒ 把人引去查平台健康,而真相是它已经跑完了").toContain(
       "该语句已结束"
@@ -125,7 +124,7 @@ describe("🔴🔴 前端:每个 sheet 独立生命周期(用户明确否掉「�
     expect(src).toMatch(/if \(!allTerminal\) return new Set<string>\(\)/);
   });
 
-  it("🔴 合并按钮:只在全部终态且列签名一致时可用;**不再**按法域禁用(@kf-batch 50-W5-seg1-WP10a:不设法务门,合并对跨法域可用)", () => {
+  it("🔴 合并按钮:只在全部终态且列签名一致时可用;**不再**按法域禁用(不设法务门,合并对跨法域可用)", () => {
     const src = read(REL);
     expect(src).toMatch(/disabled=\{!allTerminal \|\| signatureMismatch\.size > 0\}/);
     expect(src, "合并按钮又按法域禁用了 ⇒ 法务门残留").not.toMatch(/crossJur/);

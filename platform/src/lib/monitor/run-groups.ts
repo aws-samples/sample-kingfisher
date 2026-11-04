@@ -1,14 +1,13 @@
-// @kf-batch 50-WP5-rungroup
-// 模块 50 O2 —— RunGroup(多区联动运行的**持久父对象**)的**唯一写通道 + 唯一派生口径**。
+// O2 —— RunGroup(多区联动运行的**持久父对象**)的**唯一写通道 + 唯一派生口径**。
 //
 // 合同:50 SPEC v3.44 **§1.3a S7**(表)· **§2.7**(四个端点)· **§3.17**(派生 + 定时确定性键)。
-// 验收:ACCEPTANCE v1.52 段 `o2`(E-160..E-168)。
+// 验收:ACCEPTANCE v1.52 段 `o2`(..)。
 //
 // ── 为什么必须收成「一个」通道(与 run-records.ts 同一手法)────────────────────────
 // ① **状态不许有第二个真值源**:组状态永远由子 run 行派生(`deriveGroupStatus`),
 //    表里的 `status` 只是**物化投影**。谁直接写 `status` 就等于造了第二真值源,
 //    从此「页面说部分成功、表里说失败」这类事故无法排查。
-// ② **组行写失败必须让运行失败**(E-167):放行的后果是那批 run **永远归不了组** ——
+// ② **组行写失败必须让运行失败**:放行的后果是那批 run **永远归不了组**
 //    run 行是只追加的历史事实,事后补不回来(掉头成本的门在数据不在代码)。
 // ③ **按 target 的一等写入必须幂等**:`accepted` / `skipped` 存成**以 targetId 为键的 map**,
 //    而不是 list。`list_append` 天生会重复追加 ⇒ 一次重试就让组页面把同一个区显示两遍。
@@ -72,7 +71,7 @@ export interface RunGroupChild {
   nativeRunId?: string;
 }
 
-/** 组行写失败 —— 运行路由必须把它当「拒绝这次运行」,不许 fail-open(E-167)。 */
+/** 组行写失败 —— 运行路由必须把它当「拒绝这次运行」,不许 fail-open。 */
 export class RunGroupWriteFailed extends Error {
   constructor(readonly op: string, readonly cause: unknown) {
     super(
@@ -154,7 +153,7 @@ export function isTerminalGroupStatus(s: RunGroupStatus): boolean {
  * 扇出循环**之前**建组行。
  *
  * · `runGroupId` 由调用方给(手动扇出 = `runGroupIdFor()` 的 `rg_<ULID>`;定时 = 确定性 `rgs_…`)。
- * · 🔴 **单区不建组**:少于 2 个 target 直接抛 —— 让「单区运行不成组」(E-166)在结构上不可能违反,
+ * · 🔴 **单区不建组**:少于 2 个 target 直接抛 —— 让「单区运行不成组」在结构上不可能违反,
  *   而不是靠调用方记得判。
  * · 🔴 **定时的确定性键会被 N 个区各自建一次** ⇒ 第二个及以后**是加入、不是错误**:
  *   条件写撞了就回 `created:false`(与 `ConditionalCheckFailed = 一个答案、不是故障` 同一条纪律)。
@@ -175,18 +174,18 @@ export async function openRunGroup(args: {
   }
   if (!isResourceType(definitionKind)) {
     throw new RunGroupInputInvalid(
-      `definitionKind 非法:${JSON.stringify(definitionKind)} —— 值域是模块 14 的 ResourceType,不许另造资源词汇`
+      `definitionKind 非法:${JSON.stringify(definitionKind)} —— 值域是 ResourceType,不许另造资源词汇`
     );
   }
   if (!definitionId || !projectId) {
     throw new RunGroupInputInvalid("definitionId / projectId 必填(组行没有归属就无法按项目、按定义查回来)");
   }
   const requestedTargets = Array.from(new Set(args.requestedTargets));
-  // 🔴 单区不建组(E-166)—— **唯一例外 = 重试链**:只剩一个区失败时,新的一次运行仍要能回指原组
-  //    (否则 E-162 要的那条链断在这里)。重试本来就是上一次联动的延续。
+  // 🔴 单区不建组—— **唯一例外 = 重试链**:只剩一个区失败时,新的一次运行仍要能回指原组
+  //    (否则要的那条链断在这里)。重试本来就是上一次联动的延续。
   if (requestedTargets.length < 2 && !args.retryOfRunGroupId) {
     throw new RunGroupInputInvalid(
-      `不足两个执行目标(${requestedTargets.length} 个)且不是重试 ⇒ 不建组。单区运行照旧一条 run、不带 runGroupId(E-166)`
+      `不足两个执行目标(${requestedTargets.length} 个)且不是重试 ⇒ 不建组。单区运行照旧一条 run、不带 runGroupId`
     );
   }
   const item: RunGroupRow = {
@@ -277,7 +276,7 @@ export async function getRunGroupRow(runGroupId: string): Promise<RunGroupRow | 
 /**
  * 取一个组的子 run。
  * 🔴 走 `taskId` Query 再按 runGroupId 过滤(`bgp-task-runs` 上**没有** runGroupId 索引,
- *    SPEC §1.2 的 GSI 属 P50.1 未完成部分)。单个任务级别的量,可接受;**不 Scan**。
+ *    SPEC §1.2 的 GSI 未完成部分)。单个任务级别的量,可接受;**不 Scan**。
  */
 export async function listRunGroupChildren(row: RunGroupRow): Promise<RunGroupChild[]> {
   const rows = (await listRunsByTask(row.definitionId)).filter((r) => r.runGroupId === row.runGroupId);
@@ -292,7 +291,7 @@ export async function listRunGroupChildren(row: RunGroupRow): Promise<RunGroupCh
     const targetId = String(r.targetId ?? "");
     // 🔴 `definitionVersion` **只有一个作者 = 组行的 `accepted[targetId]`**。
     //    第一版把它写在类型上却没有任何地方写值 ⇒ UI 那一列永远是「-」
-    //    (记忆 `unwired-code-is-unverified`:写了 ≠ 接上了;是写 E-168 判据时才发现的)。
+    //    (记忆 `unwired-code-is-unverified`:写了 ≠ 接上了;是写判据时才发现的)。
     //    刻意**不**同时往 run 行上也写一份 —— 同一个事实两处写迟早各自漂移。
     const acceptedVersion = row.accepted?.[targetId]?.definitionVersion;
     return {
@@ -413,7 +412,7 @@ export async function listRunGroupsByDefinition(definitionId: string, limit = 20
 /**
  * 扇出循环**之前**建组行。`runGroupId === undefined`(单区)⇒ **什么都不做**。
  *
- * 🔴 **严格**:写不进去就抛 `RunGroupWriteFailed`,由路由映射成「本次运行未提交」(E-167)。
+ * 🔴 **严格**:写不进去就抛 `RunGroupWriteFailed`,由路由映射成「本次运行未提交」。
  */
 export async function openRunGroupIfFanout(args: {
   runGroupId: string | undefined;
@@ -505,7 +504,7 @@ def _ensure_run_group(spec, run_group_id):
 def _run_group_accept(spec, run_group_id, run_id):
     """把「本区这次接下来了 + 本区产物的定义版本」写进组行的 accepted。
 
-    🔴 定时那条路径的 E-168 载体:两个区若处于**不同定义版本**(一个区单独重发过),
+    🔴 定时那条路径:两个区若处于**不同定义版本**(一个区单独重发过),
        这里就会写出两个不同的 definitionVersion ⇒ 版本漂移在组页面上看得见,
        而**不是**把同一次触发拆成两个组(所以它刻意不进分组键)。
     🔴 写不上不让 run 失败(与建组行同一条理由):真值源是 run 行,这里只是注解。

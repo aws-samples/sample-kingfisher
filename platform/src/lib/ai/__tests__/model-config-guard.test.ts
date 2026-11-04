@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 🔴 模块 51 门禁(51 SPEC §6.4 (a)–(f);ACCEPTANCE M15 / M17 / M18 单测面)。
+// 🔴 门禁(51 SPEC §6.4 (a)–(f);ACCEPTANCE M15 / M17 / M18 单测面)。
 //
 // 这些断言守的是「结构上不可能回到旧形态」,不是功能对不对(功能在各自的单测里):
 //   (a) 9 消费点无一处再读模块加载期 modelId 常量(剥注释后 grep;每点必须 import invokeConverse/invokeAgent 且带自己的能力 key)
@@ -8,8 +7,8 @@
 //   (d) 缓存键含 targetId(Map 而非单例;第二个 targetId 不共用条目)
 //   (e) gptTransportReady() 恒 false(数据就位也 false;源码函数体不读任何 flag)
 //   (f) assertAgentCoreModelMeta 缺 / 不等即抛
-//   (g) @kf-batch 51-v2-multi-vendor:系列判定正则**唯一作者** = lib/ai/core/vendors.ts(51 SPEC §7.1)
-//   (h) @kf-batch 51-v2-multi-vendor:容器落点真接上(genbi agent.js / _runtime 的整形调用点、三个 core-dist/ai 产物、分发副本同源;D17 瞬态流错误重试一次 + 日志)
+//   (g):系列判定正则**唯一作者** = lib/ai/core/vendors.ts(51 SPEC §7.1)
+//   (h):容器落点真接上(genbi agent.js / _runtime 的整形调用点、三个 core-dist/ai 产物、分发副本同源;D17 瞬态流错误重试一次 + 日志)
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { readFileSync, existsSync, writeFileSync, unlinkSync, readdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -263,7 +262,7 @@ describe("(h) 容器侧整形真接上(「写了」≠「接上了」):调用点
     const src = readFileSync(resolve(AGENT, "_runtime/agent-runner.js"), "utf8");
     for (const c of ["netadvisor", "paramadvisor"]) expect(readFileSync(resolve(AGENT, c, "_runtime/agent-runner.js"), "utf8")).toBe(src);
   });
-  // @kf-batch 51-v2-multi-vendor(D17)—— 2026-10-14 …7698 真环境:Kimi K3 下问数容器第 6 轮模型调用「Stream ended without completing a message」,
+  // 2026-10-14 …7698 真环境:Kimi K3 下问数容器第 6 轮模型调用「Stream ended without completing a message」,
   //   容器 catch 静默吞错、不重试。这里钉:两处容器都 import 同一份 transient 清单、留结构化日志、瞬态**只**重试一次、Agent 由工厂重建且历史浅拷贝。
   it("D17:genbi agent.js 与 _runtime/agent-runner.js 都接上 core-dist/ai/transient(判定 + 有界退避 + 日志),Agent 走工厂、重试上限是常量不是字面量", () => {
     const genbi = stripComments(readFileSync(resolve(AGENT, "genbi/agent.js"), "utf8"));

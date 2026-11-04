@@ -1,4 +1,4 @@
-// 序 41 B-117 —— 页面 / 组件里裸发 `fetch(…, { method: "DELETE" })` 的**棘轮**(只减不增)+ 已修四页必须经 `deleteJson`。
+// 页面 / 组件里裸发 `fetch(…, { method: "DELETE" })` 的**棘轮**(只减不增)+ 已修四页必须经 `deleteJson`。
 //
 // 为什么是棘轮而不是一刀全禁:28 处里 23 处各自 `res.json()` 读信封(口径不一但不说假话),一次全改 = 二十几页回归面;
 //   五处**完全不看响应就提示「已删除」**的(sync / datasources / etl-jobs 删作业 / redshift 删任务 / workflow)本批改掉。
@@ -40,7 +40,7 @@ const BASELINE: Record<string, number> = {
   "app/governance/page.tsx": 2,
   "app/settings/page.tsx": 1,
   "app/skills/page.tsx": 1,
-  "components/engines/EmrJobPanel.tsx": 1, // 只剩「下线调度」的 schedule DELETE(它读了信封);删作业已改 deleteJson(序 73 R7:409 JOB_IN_USE 原话要给用户看)
+  "components/engines/EmrJobPanel.tsx": 1, // 只剩「下线调度」的 schedule DELETE(它读了信封);删作业已改 deleteJson(R7:409 JOB_IN_USE 原话要给用户看)
   "components/genbi/SessionCards.tsx": 1,
   "components/finops/BudgetTab.tsx": 1,
   "components/alerting/SlaPanel.tsx": 1,
@@ -53,7 +53,7 @@ const BASELINE: Record<string, number> = {
 /** 本批已修的五页:删除必须经 deleteJson,并且失败分支要把服务端原话呈现出来(message.error)。 */
 const FIXED = ["app/sync/page.tsx", "app/datasources/page.tsx", "app/etl-jobs/page.tsx", "app/redshift/page.tsx", "app/workflow/page.tsx"];
 
-describe("🔴 B-117 页面删除不许不看响应就提示「已删除」", () => {
+describe("🔴 页面删除不许不看响应就提示「已删除」", () => {
   const files = [...walk(resolve(SRC, "app")), ...walk(resolve(SRC, "components"))];
   const found: Record<string, number> = {};
   for (const f of files) {

@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-decommission
-// POST /api/admin/exec-envs/[targetId]/destroy-retry —— 「重试销毁」(WP-30 施工序 5)。
+// POST /api/admin/exec-envs/[targetId]/destroy-retry —— 「重试销毁」。
 // 适用:销毁卡住(decommissioning + lastError,无在途会话),或审批已通过而销毁没能起来。
 // 入参 `{confirm}` 必须逐字等于 region(强确认再来一次:每一次销毁都是一次「真删」)。
 // 🔴 复用**同一份**删除计划(审批单 / 最终快照名不变)⇒ build 侧见快照已在就不再拍、也绝不删快照(build 角色显式 Deny);

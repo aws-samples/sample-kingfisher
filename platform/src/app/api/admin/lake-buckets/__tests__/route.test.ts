@@ -1,4 +1,4 @@
-// 序 38 B-71 —— 外部表桶登记接口:守卫(非 admin 不许写、任何登录用户可读)、落点必填、错误码映射。
+// 外部表桶登记接口:守卫(非 admin 不许写、任何登录用户可读)、落点必填、错误码映射。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
@@ -43,7 +43,7 @@ const del = (qs: string) => DELETE(new NextRequest(`http://x/api/admin/lake-buck
 
 beforeEach(() => { h.identity = { username: "admin", isPlatformAdmin: true }; h.store.length = 0; });
 
-describe("B-71 /api/admin/lake-buckets", () => {
+describe("api/admin/lake-buckets", () => {
   it("登记 → 列 → 撤销;登记 201、撤销 200、再撤销 404", async () => {
     const r1 = await post({ targetId: "tgt_home", bucket: "cust-own", label: "x" });
     expect(r1.status, await r1.clone().text()).toBe(201);

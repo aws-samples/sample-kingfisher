@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "执行环境资源命名的【唯一真源】(模块 50 P50.1a;合同 = 50 DESIGN §3.2 + SPEC §1.1a/§6.5 Q-2 + ACCEPTANCE E-15)。",
+    "执行环境资源命名的【唯一真源】(合同 = 50 DESIGN §3.2 + SPEC §1.1a/§6.5 Q-2 + ACCEPTANCE)。",
     "",
     "为什么是一份纯声明式模板表、而不是两侧各写一段逻辑:",
     "  命名规则要被【运行时侧(platform/Next.js)】和【部署期侧(infra/CDK)】同时消费,而这两侧跨构建边界、",
@@ -19,7 +19,7 @@
     "     它们只在 home 存在一份,没有 target 维度。",
     "",
     "🔴 home 豁免 = 逐个抄 infra 现网实名(不是『理论上该叫什么』)。改这里之前先 grep infra/lib 对齐,",
-    "  否则 P50.2 给 home seed 出来的描述符会指向不存在的资源。反向覆盖门禁 naming-coverage.test.ts 钉住这条。",
+    "  否则给 home seed 出来的描述符会指向不存在的资源。反向覆盖门禁 naming-coverage.test.ts 钉住这条。",
     "",
     "🔴 non-home 一律带 {slug}(= targetSlug,唯一权威 exec-env/target-id.ts#toTargetSlug):",
     "  见下 nonHomeDimension 的说明 —— 不是只有桶要带,region 级资源同样要带。"
@@ -32,7 +32,7 @@
     "$rationale": [
       "定案:non-home 资源名的区分维度是 targetSlug(不可变 targetId 的 DNS 安全形态),不是 region、也不是 cellId。",
       "依据 50 SPEC §6.5 Q-2(v3.0 定案:『FQN 段 / OM service 名 / 审计分片键 / 51 模型键 / 命名 SSOT 全部按 targetId(非 region)派生』)",
-      "+ 50 ACCEPTANCE E-15(v1.7:断言 `bgp-glue-scripts-<账号>-<slug>` 是合法 S3 桶名)。",
+      "+ 50 ACCEPTANCE(v1.7:断言 `bgp-glue-scripts-<账号>-<slug>` 是合法 S3 桶名)。",
       "",
       "为什么不用 region:SPEC §6.5 Q-2 明确【允许同 region 多 target】(蓝绿/主备/迁移新旧并存)——",
       "  这正是不可变 targetId 的存在理由。按 region 派生则同区两 target 的桶名、workgroup 名、MWAA 名全部撞。",
@@ -111,7 +111,7 @@
       "target": "bgp-workgroup-{slug}",
       "maxLength": 64,
       "homeSource": "infra/lib/redshift-stack.ts:65",
-      "$note": "这是 30 行 / 23 文件 `|| \"bgp-workgroup\"` 兜底字面量的收编目标(收编本身属 P50.1,不在 P50.1a)。"
+      "$note": "这是 30 行 / 23 文件 `|| \"bgp-workgroup\"` 兜底字面量的收编目标(收编本身,不在)。"
     },
     "redshiftNamespace": {
       "scope": "account-region",
@@ -203,7 +203,7 @@
       "target": "BgpExecEnv-{slug}-glue-role",
       "maxLength": 64,
       "homeSource": "infra/lib/platform-stack.ts:88",
-      "$note": "P50.2 只引用 home 角色(Role.fromRoleName,DESIGN §3.2 第 3 行);per-target 角色随 P50.3 的跨法域硬门(SPEC §6.1)才有调用方。"
+      "$note": "只引用 home 角色(Role.fromRoleName,DESIGN §3.2 第 3 行);per-target 角色随跨法域硬门(SPEC §6.1)才有调用方。"
     },
     "flinkRole": {
       "scope": "iam-global",
@@ -255,7 +255,7 @@
       "maxLength": 256,
       "homeSource": "infra/lib/kms-stack.ts:26",
       "$note": [
-        "🔴 P50.2 切片 a 补登记(v1 漏了):KMS 别名是 **region 级唯一**,同区两 target 各自建 CMK 会撞别名。",
+        "🔴 切片 a 补登记(v1 漏了):KMS 别名是 **region 级唯一**,同区两 target 各自建 CMK 会撞别名。",
         "漏的原因是反向覆盖门禁 v1 只扫【以 bgp- 开头】的字面量,`\"alias/bgp-data\"` 溜过去了 —— 门禁已加宽。"
       ]
     },
@@ -294,7 +294,7 @@
       "target": "bgp-region-audit-{slug}",
       "maxLength": 255,
       "homeSource": "infra/lib/exec-env/residency-stack.ts",
-      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域审计表(50 SPEC v3.22 §1.3 D)。🔴 home 法域不装 residency-api ⇒ home 模板永不建,只为 SSOT 完整;infra 侧从本 SSOT 派生(resourceName),非字面量。"
+      "$note": "residency-api 片 1 的区域审计表(50 SPEC v3.22 §1.3 D)。🔴 home 法域不装 residency-api ⇒ home 模板永不建,只为 SSOT 完整;infra 侧从本 SSOT 派生(resourceName),非字面量。"
     },
     "residencyResultsTable": {
       "scope": "account-region",
@@ -305,7 +305,7 @@
       "target": "bgp-region-results-{slug}",
       "maxLength": 255,
       "homeSource": "infra/lib/exec-env/residency-stack.ts",
-      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域结果表(50 SPEC v3.22 §1.3a S4)。home 模板永不建,只为 SSOT 完整。"
+      "$note": "residency-api 片 1 的区域结果表(50 SPEC v3.22 §1.3a S4)。home 模板永不建,只为 SSOT 完整。"
     },
     "residencyBucket": {
       "scope": "s3-global",
@@ -317,7 +317,7 @@
       "target": "bgp-region-results-{account}-{slug}",
       "maxLength": 63,
       "homeSource": "infra/lib/exec-env/residency-stack.ts",
-      "$note": "@kf-batch 50-W5-seg1-WP10a residency-api 片 1 的区域结果桶(RETAIN / CMK / deny 复制)。长度:19 + 12 + 1 + 20 = 52 ≤ 63。home 模板永不建。"
+      "$note": "residency-api 片 1 的区域结果桶(RETAIN / CMK / deny 复制)。长度:19 + 12 + 1 + 20 = 52 ≤ 63。home 模板永不建。"
     },
     "stackName": {
       "scope": "cfn",
@@ -344,7 +344,7 @@
       "target": "BgpExecEnv-{slug}-mwaa-role",
       "maxLength": 64,
       "homeSource": "infra/lib/exec-env/mwaa-stack.ts",
-      "$note": "@kf-batch 50-WP13-mwaa-region per-target MWAA 执行角色(SPEC v3.26 §3.14)。🔴 home 的 MWAA 角色是 CDK 自动名(mwaa-stack.ts 未取名),改名 = 替换 home 角色 + 更新 home 环境(半小时级停摆)⇒ home 模板永不建、只为 SSOT 完整(同 residencyAuditTable 先例);infra 侧从本 SSOT 派生(resourceName),非字面量。长度 11+20+10=41 ≤ 64。"
+      "$note": "per-target MWAA 执行角色(SPEC v3.26 §3.14)。🔴 home 的 MWAA 角色是 CDK 自动名(mwaa-stack.ts 未取名),改名 = 替换 home 角色 + 更新 home 环境(半小时级停摆)⇒ home 模板永不建、只为 SSOT 完整(同 residencyAuditTable 先例);infra 侧从本 SSOT 派生(resourceName),非字面量。长度 11+20+10=41 ≤ 64。"
     },
     "workflowBucket": {
       "scope": "s3-global",
@@ -356,7 +356,7 @@
       "target": "bgp-airflow-sls-{account}-{slug}",
       "maxLength": 63,
       "homeSource": "infra/lib/exec-env/airflow-serverless-stack.ts",
-      "$note": "@kf-batch 50-WP15-airflow-serverless MWAA Serverless 的 workflow 定义 / 代码包桶(SPEC v3.27 §3.15)。🔴 与 workflow 同 region、versioned(服务按 VersionId 快照)、RETAIN。home 模板由施工序 2b 的 BgpAirflowServerlessStack 建;infra 侧从本 SSOT 派生(resourceName)。长度 16+12+1+20=49 ≤ 63。"
+      "$note": "MWAA Serverless 的 workflow 定义 / 代码包桶(SPEC v3.27 §3.15)。🔴 与 workflow 同 region、versioned(服务按 VersionId 快照)、RETAIN。home 模板由b 的 BgpAirflowServerlessStack 建;infra 侧从本 SSOT 派生(resourceName)。长度 16+12+1+20=49 ≤ 63。"
     },
     "airflowServerlessRole": {
       "scope": "iam-global",
@@ -367,7 +367,7 @@
       "target": "BgpExecEnv-{slug}-airflow-sls-role",
       "maxLength": 64,
       "homeSource": "infra/lib/exec-env/airflow-serverless-stack.ts",
-      "$note": "@kf-batch 50-WP15-airflow-serverless per-target MWAA Serverless 执行角色(SPEC v3.27 §3.15;信任 airflow-serverless.amazonaws.com;控制面回写为唯一跨区例外,同 mwaaRole)。home 模板由施工序 2b 建。长度 11+20+17=48 ≤ 64。"
+      "$note": "per-target MWAA Serverless 执行角色(SPEC v3.27 §3.15;信任 airflow-serverless.amazonaws.com;控制面回写为唯一跨区例外,同 mwaaRole)。home 模板由b 建。长度 11+20+17=48 ≤ 64。"
     },
     "airflowServerlessSg": {
       "scope": "vpc",
@@ -378,7 +378,7 @@
       "target": "bgp-airflow-sls-sg-{slug}",
       "maxLength": 255,
       "homeSource": "infra/lib/airflow-serverless-home-stack.ts",
-      "$note": "@kf-batch 50-WP15-airflow-serverless MWAA Serverless 工作 SG(自引用 inbound all + egress all)。描述符存 airflowServerlessSgId(真 id),本 kind 给【创建 / 按名查】用的名字(seed-home 按名查 id,与 emrSecurityGroup 同法)。"
+      "$note": "MWAA Serverless 工作 SG(自引用 inbound all + egress all)。描述符存 airflowServerlessSgId(真 id),本 kind 给【创建 / 按名查】用的名字(seed-home 按名查 id,与 emrSecurityGroup 同法)。"
     },
     "platformDataRole": {
       "scope": "iam-global",
@@ -389,7 +389,7 @@
       "target": "BgpExecEnv-{slug}-platform-data-role",
       "maxLength": 64,
       "homeSource": "infra/lib/shared/platform-data-role.ts",
-      "$note": "@kf-batch 50-WP31-seq5-dataplane-role 平台数据面角色(WP-31 L5「能力即授权」):平台 TaskRole 经它取得该 target 的数据面凭证;策略 = 资源只限本 target ∧ aws:RequestedRegion = 该区。信任 = 本账号平台 TaskRole。home 建在平台栈、非 home 建在执行环境 base 栈,同一个作者 infra/lib/shared/platform-data-role.ts。长度 11+20+19=50 ≤ 64。"
+      "$note": "平台数据面角色(L5「能力即授权」):平台 TaskRole 经它取得该 target 的数据面凭证;策略 = 资源只限本 target ∧ aws:RequestedRegion = 该区。信任 = 本账号平台 TaskRole。home 建在平台栈、非 home 建在执行环境 base 栈,同一个作者 infra/lib/shared/platform-data-role.ts。长度 11+20+19=50 ≤ 64。"
     }
   },
   "notCovered": {
@@ -405,10 +405,10 @@
         "$comment": [
           "🔴 反向覆盖门禁附带查出的**既有缺口**(不是本批引入的):这 6 张表在 CDK 与 platform 两侧",
           "各写一份字面量,**都不在 TABLES 常量里** —— 正是 change-safety A1 说的『同一个值有第二处定义』。",
-          "本批(P50.1a 命名 SSOT)刻意不动它:它属 DDB 表名口径、要改 6+ 个现网文件,归 P50.1 的收编批。",
+          "本批(命名 SSOT)刻意不动它:它属 DDB 表名口径、要改 6+ 个现网文件,的收编批。",
           "登记在此是为了让门禁能放行、同时让缺口可见 —— 名单只许缩短,不许悄悄变长。"
         ],
-        "absorbedBy": "P50.1",
+        "absorbedBy": "multi-region-execution/registry",
         "names": [
           "bgp-budgets",
           "bgp-copilot-turns",
@@ -426,7 +426,7 @@
       }
     },
     "controlPlaneOnly": {
-      "reason": "只在 home 存在一份,无 target 维度(含 P50.2 的 exec-env CodeBuild 项目与部署 broker —— 一个项目/一个 broker 服务全部 target)",
+      "reason": "只在 home 存在一份,无 target 维度(含  exec-env CodeBuild 项目与部署 broker —— 一个项目/一个 broker 服务全部 target)",
       "names": [
         "bgp-action-dispatcher",
         "bgp-admin",
@@ -458,7 +458,7 @@
       ]
     },
     "agentcore": {
-      "reason": "AgentCore runtime/gateway/skill 名由 infra/lib/shared/agentcore-base.ts 按 capabilityId 派生;target 绑定随 P50.3/P50.4 的 agentcore 组件",
+      "reason": "AgentCore runtime/gateway/skill 名由 infra/lib/shared/agentcore-base.ts 按 capabilityId 派生;target 绑定随 agentcore 组件",
       "pattern": "bgp-<capabilityId>-{agent,gateway,skills,memory-role,runtime-role,gateway-role}"
     },
     "prose": {
@@ -474,22 +474,22 @@
         "bgp-job-role-"
       ],
       "reasons": {
-        "bgp-region-audit-": "@kf-batch 50-W5-seg1-WP10a platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-audit-*`(通配全部 target 的区域审计表),不是单个资源名;真名由 kind residencyAuditTable 派生",
-        "bgp-region-results-": "@kf-batch 50-W5-seg1-WP10a platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-results-*` / `bgp-region-results-<acct>-*`,不是单个资源名;真名由 kind residencyResultsTable / residencyBucket 派生",
+        "bgp-region-audit-": "platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-audit-*`(通配全部 target 的区域审计表),不是单个资源名;真名由 kind residencyAuditTable 派生",
+        "bgp-region-results-": "platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `table/bgp-region-results-*` / `bgp-region-results-<acct>-*`,不是单个资源名;真名由 kind residencyResultsTable / residencyBucket 派生",
         "bgp-": "om-ingestion-stack.ts 里嵌入 Python 的容器过滤正则 `['bgp-.*']` 的前缀片段,不是资源名",
-        "bgp-mwaa-": "@kf-batch 50-WP13-mwaa-region platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `environment/bgp-mwaa-*` / `role/bgp-mwaa-*/Admin`(通配全部 per-target MWAA 环境),不是单个资源名;真名由 kind mwaaEnvName 派生",
-        "bgp-job-role-": "@kf-batch 50-WP31-seq5-dataplane-role shared/platform-data-role.ts 平台数据面角色策略里的 IAM 资源模式前缀 `role/bgp-job-role-*`(用户经角色顾问建的作业角色,创建权与边界在平台栈 CreateJobRolesWithBoundary;名字由用户起、全局一份),不是单个资源名"
+        "bgp-mwaa-": "platform-stack.ts TaskRole 策略里的 IAM 资源模式前缀 `environment/bgp-mwaa-*` / `role/bgp-mwaa-*/Admin`(通配全部 per-target MWAA 环境),不是单个资源名;真名由 kind mwaaEnvName 派生",
+        "bgp-job-role-": "shared/platform-data-role.ts 平台数据面角色策略里的 IAM 资源模式前缀 `role/bgp-job-role-*`(用户经角色顾问建的作业角色,创建权与边界在平台栈 CreateJobRolesWithBoundary;名字由用户起、全局一份),不是单个资源名"
       }
     },
     "retired": {
       "$comment": [
-        "🔴 @kf-batch 50-W5-seg2-WP1 已下线能力留下的 RETAIN 表(50 SPEC §3.9c 已下线能力登记):infra 保留表定义(删表要过破坏性变更门),",
+        "🔴 已下线能力留下的 RETAIN 表(50 SPEC §3.9c 已下线能力登记):infra 保留表定义(删表要过破坏性变更门),",
         "platform 代码已不再认识它们(TABLES 常量已删;门禁 lib/__tests__/data-service-retired.test.ts (c) 钉住 infra 里三张表仍在、naming-coverage 钉住不许回 TABLES)。",
         "登记在此是让反向覆盖门禁能区分『漏登记』和『刻意留在 infra 的已下线表』。名单只许随删表门缩短,不许当成新表的停车位。"
       ],
       "reason": "已下线能力(数据服务 data-service,2026-09-05 用户拍板)的 RETAIN 表:控制面 home 单份、名字不变、platform 零引用;删表另过破坏性变更门",
       "retiredOn": "2026-09-05",
-      "contract": "docs/design/50-multi-region-execution/SPEC.md §3.9c · WORK-PACKAGES.md WP-1 · ACCEPTANCE.md §8tervicies",
+      "contract": "docs/design/50-multi-region-execution/SPEC.md §3.9c · ACCEPTANCE.md §8tervicies",
       "names": [
         "bgp-data-apis",
         "bgp-data-api-keys",
@@ -507,49 +507,49 @@
           "name": "bgp-cloudtrail",
           "form": "bgp-cloudtrail-<acct>(模板,audit-stack.ts)",
           "reason": "审计桶。50 DESIGN §19 轴D『审计驻留』要求审计数据按法域留区 ⇒ 它最终必须有 target/region 维",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/audit-stack.ts"
         },
         {
           "name": "bgp-management-trail",
           "form": "bgp-management-trail(定值,audit-stack.ts)",
           "reason": "同上:CloudTrail trail 本身也随轴D 的审计驻留改造",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/audit-stack.ts"
         },
         {
           "name": "bgp-glue",
           "form": "OM service 名(嵌入 Python 的 ingestion 配置)",
           "reason": "OpenMetadata 逻辑 service 名。SPEC §6.5 定稿:OM service 名改按 target 派生 `bgp-glue-<targetId>`、home 保留旧名豁免;元数据 FQN 收口在 §3.10",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/om-ingestion-stack.ts"
         },
         {
           "name": "bgp-redshift",
           "form": "OM service 名 + FQN 前缀(`bgp-redshift.dev.public.*`)",
           "reason": "OpenMetadata 逻辑 service 名,且是 FQN 第一段(`bgp-redshift.dev.public.*`)—— 改名必须与 §3.10 权威 FQN 一起动,不能单独改",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/om-ingestion-stack.ts"
         },
         {
           "name": "bgp-s3",
           "form": "OM service 名",
           "reason": "OpenMetadata 逻辑 service 名(S3 数据湖 ingestion)。SPEC §6.5 定稿:OM service 名改按 target 派生、home 保留旧名豁免",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/om-ingestion-stack.ts"
         },
         {
           "name": "bgp-s3tables",
           "form": "OM service 名(S3Tables ingestion)",
           "reason": "OpenMetadata 逻辑 service 名(S3Tables ingestion)。同 OM service 名一批,按 target 派生随 §3.10 FQN 收口",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/om-ingestion-stack.ts"
         },
         {
           "name": "bgp-sources",
           "form": "OM service 名(源库 ingestion)",
           "reason": "OpenMetadata 逻辑 service 名(源库 ingestion)。同 OM service 名一批,按 target 派生随 §3.10 FQN 收口",
-          "absorbedBy": "P50.4",
+          "absorbedBy": "multi-region-execution/audit-residency",
           "source": "infra/lib/om-ingestion-stack.ts"
         }
       ]

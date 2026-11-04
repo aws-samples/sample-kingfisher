@@ -1,7 +1,6 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **平台内部端点的守卫**(`/api/internal/**`)—— 只认「主控区的分发 Lambda」这一个来源。
 //
-// 【鉴权方式 = 最小爆炸半径】WP-28 序 4:「共享密钥落 Secrets Manager;身份只映射到系统主体,只允许白名单动作」。
+// 【鉴权方式 = 最小爆炸半径】「共享密钥落 Secrets Manager;身份只映射到系统主体,只允许白名单动作」。
 //   三道,缺一道都拒:
 //   ① **来源不是 CloudFront**:平台对公网的唯一入口是 CloudFront → ALB,CloudFront 一定会给回源请求带
 //      `X-Amz-Cf-Id`(浏览器去不掉)⇒ 带着它 = 从公网进来的 ⇒ 403。分发 Lambda 在平台 VPC 内直连 ALB 的
@@ -49,11 +48,11 @@ export {
   internalSourceVerdict,
 };
 
-/** @kf-batch 50-WP9a-durable-jobs —— 来源 → 系统主体(封闭映射;来源与主体一一对应,审计里一眼认出是谁)。 */
+/** 来源 → 系统主体(封闭映射;来源与主体一一对应,审计里一眼认出是谁)。 */
 const PRINCIPAL_OF_SOURCE: Record<string, InternalPrincipal> = {
   [INTERNAL_SOURCE_ACTION_DISPATCHER]: INTERNAL_PRINCIPAL,
   [INTERNAL_SOURCE_DATAPLANE_JOB_PUMP]: DATAPLANE_JOB_PUMP_PRINCIPAL,
-  [INTERNAL_SOURCE_BACKFILL_PUMP]: BACKFILL_PUMP_PRINCIPAL, // @kf-batch 50-B51-backfill-pump
+  [INTERNAL_SOURCE_BACKFILL_PUMP]: BACKFILL_PUMP_PRINCIPAL,
 };
 export type { InternalVerdict };
 
@@ -70,7 +69,7 @@ async function defaultLoadSecret(arn: string): Promise<string> {
   const { sdkClient } = await import("@/lib/aws/clients");
   const { ctrlRegionOf } = await import("@/lib/workflow/dag-place");
   // 🔴 密钥在主控区(与平台进程同区);客户端走工厂(落点棘轮 L3/L4),区来自控制面区的唯一作者
-  // @kf-batch 50-WP31-place-first-class 序 31 第三刀 ①:它是**控制面**密钥 ⇒ sdkClient("control-plane")(不注入数据面角色;
+  // 它是**控制面**密钥 ⇒ sdkClient("control-plane")(不注入数据面角色;
   //   原来走数据面工厂,observe 模式下每次先被拒再回任务角色,enforce 模式下内部端点整条 503。与 pump.ts 的读法同一口径)
   const sm = sdkClient("control-plane", SecretsManagerClient, { region: ctrlRegionOf() });
   const r = await sm.send(new GetSecretValueCommand({ SecretId: arn }));
@@ -91,7 +90,7 @@ export async function verifyInternalCaller(
     loadSecret?: (arn: string) => Promise<string>;
     now?: () => number;
     /**
-     * @kf-batch 50-WP9a-durable-jobs —— 本端点只收哪一个来源(缺省 = 分发 Lambda,既有端点逐字节不变)。
+     * 本端点只收哪一个来源(缺省 = 分发 Lambda,既有端点逐字节不变)。
      * 🔴 中间件只判「登记过」,这里判「就是我要的那一个」:泵敲不开分发端点,分发 Lambda 也敲不开泵的端点。
      */
     expectedSource?: string;

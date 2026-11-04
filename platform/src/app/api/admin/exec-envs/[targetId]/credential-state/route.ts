@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.5a-supply
 // POST /api/admin/exec-envs/[targetId]/credential-state —— 推进凭证隔离状态(50 SPEC §3.9b)。
 //
 // 🔴 **为什么必须有这个端点**:§3.9b 的「唯一写通道」`advanceCredentialIsolationState()` 在 G 批就落地了,
-// 但它**一个生产调用方都没有**(实测 `ast-count-callsites` = 0),而合同原文写着「调用方同样归 P52.5a」。
+// 但它**一个生产调用方都没有**(实测 `ast-count-callsites` = 0),而合同原文写着「调用方同样」。
 // 没有调用方 = 状态机永远停在初始态 = 隔离永远不收敛。本端点就是那个调用方。
 //
 // 🔴 **两条前进边、无逆向**:`legacy-seeded → provisioning → isolated`。本端点**不提供任何回退入口**
@@ -11,9 +10,9 @@ export const dynamic = "force-dynamic";
 //
 // 🔴 **进 `isolated` 的前置由服务端硬校验,不信调用方的"我验过了"**:§3.9b 的前置格要求
 // 「该 target 下全部在用项目均有 secret + canary 成功 + 旧 admin fallback 调用面已清零」。
-// @kf-batch 50-WP9a-durable-jobs —— 🔴 canary 不再靠确认串:服务端**真跑**七条(permission-canary.ts),
+// 🔴 canary 不再靠确认串:服务端**真跑**七条(permission-canary.ts),
 //   前置改为 `evaluateIsolationPrereqs` 四项全满足:① 每个在用项目有 secret ② 最新 canary 全 pass ∧ epoch 一致 ∧ ≤24h
-//   ③ 产物凭证扫描 = 0(扫描器归 WP-9b,之前一律 unavailable ⇒ 拒)④ 近 7 天 CredentialFallback = 0。
+//   ③ 产物凭证扫描 = 0(扫描器,之前一律 unavailable ⇒ 拒)④ 近 7 天 CredentialFallback = 0。
 //   确认串保留作**具名承担**(谁按的这一下),但不再替代判据。
 //
 // 🔴 **审计 fail-closed**:状态迁移前先写「意图」审计,写不进去就**不迁移**(§3.9a 第 6 步同款纪律:

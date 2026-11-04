@@ -84,7 +84,7 @@ fi
 # ── 2b-2) 🔴🔴 **验收脚本不许自造执行环境描述符**(2026-09-20,用户第 N 次点名)──
 # 用户原话:「一个区域只能有一个执行区域,我说了 N 次了」。这条规矩早就做成**产品守卫**
 # (`registerTarget` → 409 `region-already-has-environment`),可两个段**直写 DynamoDB 绕过了它**:
-#   · `o1` 的 E-157a:put-item 一条 `region=us-west-2` 的假描述符 —— 而那个区已有 `tgt_usw2_a`;
+#   · `o1` 的:put-item 一条 `region=us-west-2` 的假描述符 —— 而那个区已有 `tgt_usw2_a`;
 #   · `gbc` 的 GC-10④:把第二个区的描述符**整行复制**成 `tgt_gbcneg1`。
 # ⇒ 跑到那两条判据时,页面上**真出现两个执行环境**。判据为了取证违反产品规则,绝对不许
 #   (记忆 criteria-must-not-break-product-rules:同形第二次,第一次是 I-6 在同区注册到第 4 个)。

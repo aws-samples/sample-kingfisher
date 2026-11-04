@@ -1,4 +1,4 @@
-// 网络连通性顾问 Agent —— 模块47 L3:接入 ②runtime 件(agent-runner),只声明"我的差异"。
+// 网络连通性顾问 Agent ——:接入 ②runtime 件(agent-runner),只声明"我的差异"。
 //
 // 【收敛前】本文件曾是 213 行:手写 for(iter) ConverseCommand 循环(与 paramadvisor 逐字 73% 相同)
 // + RULES_TEXT(手抄自 rules.ts,已真实漂移:AZ_MATCH 丢"运行时才失败"对比语义、PRIVATE_EGRESS

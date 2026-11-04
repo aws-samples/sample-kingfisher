@@ -1,5 +1,4 @@
-// @kf-batch 50-WP5-rungroup
-// 定时确定性组键的 **TS ↔ Python 逐字节 parity**(50 SPEC v3.44 §3.17.2;判据 E-164 / 门禁 scheduled-key-parity)。
+// 定时确定性组键的 **TS ↔ Python 逐字节 parity**(50 SPEC v3.44 §3.17.2;判据 门禁 scheduled-key-parity)。
 //
 // 🔴 为什么必须真的跑 python:两个语言各写一份的下场本仓记过 ——「只改执行侧挡不住生成侧」。
 //    这里把 `pythonScheduledRunGroupSource()` 产出的源码写进临时文件、用 python3 真跑,
@@ -88,7 +87,7 @@ describe("🔴🔴 定时确定性组键:TS 与 Python 逐字节一致", () => {
   });
 });
 
-describe("🔴 E-164 的两半:同槽位相同 / 不同槽位不同", () => {
+describe("🔴 两半:同槽位相同 / 不同槽位不同", () => {
   const args = { definitionKind: "etl-job", definitionId: "job1", cron: "0 3 * * *" };
 
   it("同一次触发的两个区(差 800ms / 差 9 秒)⇒ **同一个** rgs_", () => {

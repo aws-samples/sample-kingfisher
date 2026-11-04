@@ -1,4 +1,4 @@
-// 模块47 L3 — @netadvisor/core 规则目录的【快照守卫】。
+// @netadvisor/core 规则目录的【快照守卫】。
 //
 // rules 抽 core 后天然单源(network-advisor/rules.ts 反向 re-export core/rules,只有一份 RULES),
 // 无需 L2 catalog 那种"core 常量 === 平台真源"双源比对(netadvisor 本就单源,无外部常量)。

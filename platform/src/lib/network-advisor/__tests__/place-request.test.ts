@@ -1,7 +1,6 @@
-// @kf-batch 41-B115-netadvisor-place
-// 🔴🔴 网络顾问的落点必须由请求点名、region 必须来自注册表描述符(B-115)。
+// 🔴🔴 网络顾问的落点必须由请求点名、region 必须来自注册表描述符。
 //
-// 【缺陷原形(序 31 二刀 ⑤ 代码盘点 + …9435 observe 未归因榜 11 次)】L1 探测 / 目标解析 / 一键修复的 EC2 / RDS / Redshift 客户端
+// 【缺陷原形(代码盘点 + …9435 observe 未归因榜 11 次)】L1 探测 / 目标解析 / 一键修复的 EC2 / RDS / Redshift 客户端
 //   都是模块级 NET_ADVISOR.region(= 主控区);`ConnectivityRequest.region?` 字段存在但探测器根本不看它 ⇒ 数据源或目标在别的区时,
 //   顾问拿到的是主控区的 VPC / 子网 / 安全组事实,裁决与建议按错的 VPC 给。
 // 【这组判据钉的事实】placeConnectivityRequest 是三条路由共用的唯一落点作者:缺 targetId ⇒ PlaceUndecidable(400,不默认主控区);
@@ -34,7 +33,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("网络顾问:请求落点(B-115)", () => {
+describe("网络顾问:请求落点", () => {
   it("🔴 缺 targetId ⇒ PlaceUndecidable(路由 400),**不**默认主控区", async () => {
     const { placeConnectivityRequest } = await import("@/lib/network-advisor/place");
     const { PlaceUndecidable } = await import("@/lib/place/types");

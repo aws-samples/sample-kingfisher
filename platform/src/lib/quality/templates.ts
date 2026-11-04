@@ -1,4 +1,4 @@
-// 模块 19 — 数据质量规则模板库 (v1.10.0)
+// 数据质量规则模板库 (v1.10.0)
 //
 // 同构纯 TS：前端 import 元数据（QUALITY_TEMPLATES_META / DIMENSION_LABELS）渲染表单；
 // 后端 import 全部（含 buildSql / evaluate / validateRule）生成校验 SQL 并判定结果。

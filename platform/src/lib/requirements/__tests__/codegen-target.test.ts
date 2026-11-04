@@ -1,5 +1,4 @@
-// @kf-batch 50-B27-codegen-place
-// 🔴🔴 B-27(2026-10-01):AI 代码生成(作业开发 / EMR / 需求)的 grounding **只看主控区** —— 仓目录
+// 🔴🔴 AI 代码生成(作业开发 / EMR / 需求)的 grounding **只看主控区** —— 仓目录
 //   `introspectSchema(GENBI.workgroup, GENBI.database)`、湖目录、以及 Glue 提示词里写死的 `workgroup=bgp-workgroup、database=dev`
 //   全是主控区 ⇒ 给 us-west-2 的作业生成代码,模型看到的是主控区的表,写进代码的是那个区根本不存在的工作组实名。
 // 装配层:只 mock 真外部(数仓直查出口 = Redshift Data API 边界 / Athena SDK / 注册表 / 模型侧),codegen ↔ schema ↔ athena 之间不 mock。
@@ -9,7 +8,7 @@ import { join, resolve } from "node:path";
 
 const h = vi.hoisted(() => {
   process.env.GENBI_POLL_MS = "1";
-  // 序 43 B-91:联邦目录查询前的 GetCatalog(Glue 真外部)也记区 —— 湖目录 grounding 的目录探测必须跟着作业绑定的区走
+  // 联邦目录查询前的 GetCatalog(Glue 真外部)也记区 —— 湖目录 grounding 的目录探测必须跟着作业绑定的区走
   return { dq: [] as { region: string; workgroup: string }[], athena: [] as { region: string; input: any }[], glue: [] as { region: string; name: string }[], system: "" };
 });
 
@@ -50,7 +49,7 @@ vi.mock("@aws-sdk/client-athena", async (orig) => {
   return { ...real, AthenaClient: FakeAthena };
 });
 
-// 序 43 B-91:Glue SDK 是真外部 —— startQuery 对联邦目录查询先 GetCatalog(目录已在 ⇒ 不建)。只记区与命令名。
+// Glue SDK 是真外部 —— startQuery 对联邦目录查询先 GetCatalog(目录已在 ⇒ 不建)。只记区与命令名。
 vi.mock("@aws-sdk/client-glue", async (orig) => {
   const real: any = await orig();
   class FakeGlue {
@@ -72,7 +71,7 @@ vi.mock("@/lib/exec-env/registry", () => ({
     resources: { athenaWorkgroup: "bgp-athena-tgt-usw2-a", datalakeBucket: "dl-usw2", tableBucket: "bgp-table-bucket-tgt-usw2-a" },
   })),
 }));
-// 序 38 B-71:外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记外部桶,湖目录仍只有该区平台表桶
+// 外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记外部桶,湖目录仍只有该区平台表桶
 vi.mock("@/lib/lake/external-table-buckets", () => ({ listExternalTableBuckets: vi.fn(async () => []) }));
 
 vi.mock("@/lib/ai/model", () => ({
@@ -101,7 +100,7 @@ describe("🔴🔴 装配层:AI 代码生成按**作业绑定的区**做 groundi
     expect(r.groundedOn).toEqual({ targetId: "tgt_usw2_a", region: "us-west-2", workgroup: "bgp-wg-tgt-usw2-a", database: "dev_usw2" });
     expect(h.dq.map((x) => x.region)).toEqual(["us-west-2"]);
     expect(h.athena.map((x) => x.region)).toEqual(["us-west-2"]);
-    expect(h.glue, "B-91:湖目录探测前的 GetCatalog 也打到该区,且目录已在就不建").toEqual([{ region: "us-west-2", name: "GetCatalogCommand" }]);
+    expect(h.glue, "湖目录探测前的 GetCatalog 也打到该区,且目录已在就不建").toEqual([{ region: "us-west-2", name: "GetCatalogCommand" }]);
     expect(h.system).toContain("usw2_only_orders");
     expect(h.system).toContain("usw2_lake_t");
     expect(h.system).toContain("bgp-wg-tgt-usw2-a");
@@ -122,8 +121,8 @@ describe("🔴🔴 装配层:AI 代码生成按**作业绑定的区**做 groundi
 
 describe("🔴 接线:三个生成路由 + 两个页面都把区带到生成处(调用位置)", () => {
   const read = (rel: string) => code(readFileSync(join(SRC, rel), "utf8")).replace(/^import .*$/gm, "");
-  // @kf-batch 50-WP31-place-first-class —— 原来 `targetIdOf(body)` 把缺 / 空回成 undefined(= 主控区);现在缺即 400
-  // 序 46 B-107 → 模块 55 —— 生成主体搬进 lib/ai/long-op-executors.ts(路由只做点名 + 提交任务);点名仍在路由,区经任务 params.targetId
+  // 原来 `targetIdOf(body)` 把缺 / 空回成 undefined(= 主控区);现在缺即 400
+  // → —— 生成主体搬进 lib/ai/long-op-executors.ts(路由只做点名 + 提交任务);点名仍在路由,区经任务 params.targetId
   //   落库带到执行体(异步任务可能由另一次请求接管,不落库 = 接手那一刻忘了在哪个区)。判据改盯「路由点名 → params.targetId → 执行体传区」整条链。
   it("三个生成路由都经点名作者 requestedTargetId 取区(缺 / 非法 ⇒ 400)并落进任务 params;执行体按 params.targetId 生成,都回 groundedOn", () => {
     const ex = read("lib/ai/long-op-executors.ts");
@@ -147,8 +146,7 @@ describe("🔴 接线:三个生成路由 + 两个页面都把区带到生成处(
     expect(ex, "执行体写死主控区").not.toMatch(/HOME_TARGET_ID/);
   });
 
-  // @kf-batch 50-WP31-place-first-class(B-36)
-  it("🔴 B-36 需求创建作业:绑定区点名 + 与 /api/etl-jobs 同一套绑定校验 + 必须含生成区 + 不再写死主控区工作组", () => {
+  it("🔴 需求创建作业:绑定区点名 + 与 /api/etl-jobs 同一套绑定校验 + 必须含生成区 + 不再写死主控区工作组", () => {
     const cj = read("app/api/requirements/[id]/create-job/route.ts");
     expect(cj).toMatch(/assertBindableTargetsForEngine\(targetType, requestedTargets\(body, "[^"]+"\), "redshift", \{/);
     expect(cj).toMatch(/const grounded = targetOfStamp\(r\.implementation\?\.groundedTargetId\);/);

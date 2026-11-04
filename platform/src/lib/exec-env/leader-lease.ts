@@ -1,5 +1,4 @@
-// @kf-batch 50-P50.3b-2a-reconciler
-// P50.3b-2a:周期 reconciler 的【单例选主】(进程内 lease 单例;SPEC §3.5a / DESIGN §20.24)。
+// 2a:周期 reconciler 的【单例选主】(进程内 lease 单例;SPEC §3.5a / DESIGN §20.24)。
 //
 // 【为什么必须选主】平台服务是 ApplicationLoadBalancedFargateService,desiredCount 2~6(可扩)⇒ 若每副本
 //   都跑 reconciler,会对每个 target 重复探活 N 次。用一条 DDB 条件写租约选出唯一 leader,只它真跑。

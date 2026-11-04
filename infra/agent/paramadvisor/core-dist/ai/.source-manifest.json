@@ -3,8 +3,8 @@
   "capability": "ai",
   "tsconfig": "platform/tsconfig.ai-core.json",
   "sources": {
-    "platform/src/lib/ai/core/converse-shape.ts": "610e88e1990acbfe82c52db245000640004a62a5d19cb24a39947868cb71d7ee",
-    "platform/src/lib/ai/core/transient.ts": "4cc736e43181f58b58ba096cec06f9a19e9159312fd97f043de0fa9f4911166e",
-    "platform/src/lib/ai/core/vendors.ts": "a9059ab5b2b149ec29458bbecd2329b95594e564a59d6d4b997d1b3a64639c8f"
+    "platform/src/lib/ai/core/converse-shape.ts": "8ece3285306e4541b5b7ec75a852a3339f411c6f78c80954c168e66c0c89bd7f",
+    "platform/src/lib/ai/core/transient.ts": "0c94e36a87589ed1e145762127f7caa262d66d63859a07f88873ca3122207ff1",
+    "platform/src/lib/ai/core/vendors.ts": "9e32c90446815e8d54f92e42807edf0c10476088431c90fff072e901d6698563"
   }
 }

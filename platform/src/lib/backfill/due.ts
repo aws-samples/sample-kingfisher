@@ -1,4 +1,3 @@
-// @kf-batch 50-B51-backfill-pump
 // 「哪些补数计划还要推进」的**唯一一次读** —— 后台推进泵用(单一作者)。
 //
 // 🔴 零 node 内置依赖:泵在 `instrumentation.ts` 的可达面上(见 `pump.ts` 文件头)。只 import docClient / 表名 /

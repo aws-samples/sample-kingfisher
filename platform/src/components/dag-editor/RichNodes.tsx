@@ -1,4 +1,4 @@
-// 模块 33-B — 六个新节点的渲染组件(仅 runtime-lib 引擎)。
+// 六个新节点的渲染组件(仅 runtime-lib 引擎)。
 // 照 SqlNode.tsx 范式:memo + Handle(target/source)+ nodeStatusStyle[data.runStatus]。
 // branch 是唯一特殊者:多个 source Handle(每个分支一个出口 + 默认出口),
 // 出边靠 reactflow 原生 sourceHandle 承载"分支归属"(见 types/workflow.ts WorkflowEdge)。
@@ -12,7 +12,7 @@ import { nodeStatusStyle, NODE_TEXT, NODE_SUBTEXT } from "./nodeStatus";
 import { useT } from "@/lib/i18n/useT";
 
 // 通用外壳:统一配色/状态/边框,子节点只传 icon + 标题 + 副文本 + 额外 Handle。
-// 序 73 模块 57:导出给 JobNode.tsx 复用(同一个外壳,不再抄一份);`testId` 落在根节点上给页面驱动判据定位。
+// 导出给 JobNode.tsx 复用(同一个外壳,不再抄一份);`testId` 落在根节点上给页面驱动判据定位。
 export function Shell({
   data, icon, title, sub, extraSource, testId,
 }: {

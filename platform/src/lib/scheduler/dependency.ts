@@ -1,5 +1,4 @@
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
-// @kf-batch 50-WP17-serverless-workflow
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
 // 🔴🔴 **本文件原来整条链都恒打主控区**(第 6 处同族缺陷,2026-09-11 抓到):
 //   · 下游工作流:模块级 `homeMwaaEndpoint().envName` + `new MWAAClient(AWS_REGION)` ⇒ 对绑在别区的
 //     下游执行 `dags trigger`,主控区**根本没有那个 DAG** ⇒ Airflow CLI 静默失败,而平台照样写了一行
@@ -17,9 +16,9 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { StartJobRunCommand } from "@aws-sdk/client-glue";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { putRunRecord, updateRunRecord, resolveRunStamp } from "@/lib/monitor/run-records";
-// 序 61 B-133 —— 扇出前核对下游源的外部网络对象(与同步启动核心同一作者)
+// 扇出前核对下游源的外部网络对象(与同步启动核心同一作者)
 import { reconcileDatasourceNetwork } from "@/lib/datasource/network-reconcile";
 import type { DataSource } from "@/types/datasource";
 
@@ -40,7 +39,7 @@ async function startDownstreamSync(task: any, upstreamId: string): Promise<void>
     console.warn(`[SCH-03] downstream sync ${task.taskId} has no Glue job yet; skipping (run it once from the platform first)`);
     return;
   }
-  // 序 61 B-133 —— 扇出前核对下游源的外部网络对象:平台组 / 连接被平台外删除 ⇒ 按源行重建接回再起作业;
+  // 扇出前核对下游源的外部网络对象:平台组 / 连接被平台外删除 ⇒ 按源行重建接回再起作业;
   //   用户自带对象 / 密钥缺失 ⇒ 不发 StartJobRun,落一条 failed 运行行(与启动路径同一句中文),用户在运行历史里看得到。
   if (typeof task.datasourceId === "string" && task.datasourceId) {
     const { Item: dsRow } = await docClient.send(
@@ -66,7 +65,6 @@ async function startDownstreamSync(task: any, upstreamId: string): Promise<void>
   const { JobRunId } = await glue.send(new StartJobRunCommand({ JobName: task.glueJobName }));
   const runId = ulid();
   const now = new Date().toISOString();
-  // @kf-batch 52-P52.2-W2a-run-stamp
   // 归属取**下游任务行**(不是上游):这条 run 是下游任务的 run,归下游所在项目。
   await putRunRecord({
     taskId: task.taskId, runId, taskType: "sync", startedAt: now,
@@ -106,7 +104,7 @@ async function triggerDownstreamWorkflow(wf: any, upstreamId: string): Promise<v
     const runId = ulid();
     const res = await mwaaCli(ep, `dags trigger ${wf.airflowDagId} -r ${runId}`);
     if (!res.ok) throw new Error(res.stderr || res.stdout || "dags trigger 失败");
-    // @kf-batch 52-P52.2-W2a-run-stamp — 归属取下游工作流行。
+    // 归属取下游工作流行。
     await putRunRecord({
       taskId: wf.workflowId, runId, taskType: "workflow", startedAt: now,
       triggeredBy: "dependency", stamp: resolveRunStamp(wf, target),
@@ -168,7 +166,6 @@ export async function triggerDownstream(upstreamId: string): Promise<void> {
 // safe to call from every completion path (sync poll, glue-status backfill, workflow
 // status backfill, and the DAG's own on_success write) without double-starting anything.
 export async function fireDownstreamOnce(upstreamId: string, runId: string): Promise<void> {
-  // @kf-batch 52-P52.2-W2a-run-stamp
   // 🔴 顺带修一个幽灵行洞:原条件只有 `attribute_not_exists(downstreamFired)`,而它对
   // **根本不存在的行恒真** ⇒ upstreamId/runId 打错时 DDB 会 upsert 出一条只有
   // `{taskId, runId, downstreamFired:true}` 的 run(监控页会看到一条无名无状态的运行)。

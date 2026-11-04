@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-xregion-peering
 // 执行环境 VPC 的 **CIDR 分配**(平台侧;50 SPEC §3.14ter)。
 //
 // 【为什么平台侧要有一份】CIDR 必须在**注册那一刻**就定下来并落进描述符:

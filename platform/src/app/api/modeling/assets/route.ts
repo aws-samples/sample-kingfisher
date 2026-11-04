@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { getAssetBinding, setAssetBinding } from "@/lib/modeling/service";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 35: 建模资产归属(表/指标 → 分层/域)。GET ?fqn= 查归属(登录可读);PUT 设置(平台管理员)。
+// 建模资产归属(表/指标 → 分层/域)。GET ?fqn= 查归属(登录可读);PUT 设置(平台管理员)。
 export async function GET(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);

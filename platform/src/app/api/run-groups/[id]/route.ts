@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 50-WP5-rungroup
 // GET /api/run-groups/[id] —— 一次多区联动运行的整组视图(50 SPEC v3.44 §2.7)。
 //
 // 🔴 `derivedStatus` 是**唯一可显示的状态**:表里的 `status` 只是物化投影(§3.17.1 第 2 条)。

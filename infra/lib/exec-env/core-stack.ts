@@ -1,12 +1,12 @@
-// @kf-batch 50-P50.2a-exec-env-stackgroup(v2 @ 50-W5-seg1-WP3:per-target 执行角色)
+// (v2 @ 50-W5-seg1-WP3:per-target 执行角色)
 // 执行环境 **core 组件**栈(50 SPEC §1.1 的 core 资源袋)。
 //
 // 交付 `REQUIRED_CORE_RESOURCES` 那六项的真实资源 + 把实名以 CFN Output 吐出来:
 //   datalakeBucket / scriptsBucket / tableBucket / athenaWorkgroup / glueRoleArn / emrSecurityGroupId
-//   + 🔴 WP-3 起 `emrExecutionRoleArn`(EMR Serverless 作业执行角色,per-target;SPEC v3.21 §6.1 段二)
+//   + 🔴 起 `emrExecutionRoleArn`(EMR Serverless 作业执行角色,per-target;SPEC v3.21 §6.1 段二)
 // (`emrSubnetIds` 由底座栈的 privateSubnetIds 提供,这里一并转出,免得 buildspec 拼两个栈的输出。)
 //
-// 🔴🔴 **WP-3(2026-09-05)订正 P50.2 的「IAM 角色只在 home 建一次、栈组引用 home 角色」定案**:
+// 🔴🔴 **订正 「IAM 角色只在 home 建一次、栈组引用 home 角色」定案**:
 //   那是 SPEC §6.1 段一的过渡形态。跨法域 target 上线前的硬门(段二)= 每个 target 用**绑死本 target** 的角色,
 //   共享角色只剩 home。Glue / EMR 不是组件而是 core 能力 ⇒ 两个角色都建在本栈:
 //   `glueRoleArn` **改吐本 target 的角色**(不再是 home 的 `bgp-glue-role`),新增 `emrExecutionRoleArn`。
@@ -39,7 +39,7 @@ import {
   serviceTrust,
   tableBucketAnyArn,
 } from "./exec-roles";
-// @kf-batch 50-WP16-zero-egress —— 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
+// 私有子网类型的唯一真值(零出网 = PRIVATE_ISOLATED)
 import { execEnvPrivateSubnets } from "./private-subnets";
 
 export interface ExecEnvCoreStackProps extends ExecEnvStackProps {
@@ -107,15 +107,15 @@ export class ExecEnvCoreStack extends ExecEnvStack {
       allowAllOutbound: true,
     });
 
-    // ── per-target 执行角色(WP-3;SPEC v3.21 §6.1 段二)────────────────────────
-    // 🔴 P50.2 那句「取 home 的角色名、栈组引用 home 角色」已作废(见文件头)。两个角色的**动作集照抄 home 同类角色**
+    // ── per-target 执行角色(SPEC v3.21 §6.1 段二)────────────────────────
+    // 🔴 那句「取 home 的角色名、栈组引用 home 角色」已作废(见文件头)。两个角色的**动作集照抄 home 同类角色**
     //    (功能守恒:不在这里单独收窄),资源面改指本 target 的三桶 / 表桶 / 本 region;`Resource:"*"` 的语句由
     //    `boundStatement` 自动挂 `aws:RequestedRegion`。唯一刻意的收窄 = **不给任意用户 S3 桶**(home 的 glue 角色有
-    //    `s3:GetObject on *` 供用户 S3 源接入):那正是横移负向(ACCEPTANCE E-143)要拒的面;非 home 的用户源接入归 WP-7。
+    //    `s3:GetObject on *` 供用户 S3 源接入):那正是横移负向(ACCEPTANCE)要拒的面;非 home 的用户源接入。
     const scriptsBucketName = nameOf("scriptsBucket");
     const scriptsArns = bucketArnPair(p, scriptsBucketName);
     const datalakeArns = bucketArnPair(p, datalakeBucketName);
-    // B-127:s3tables 授权 = 本区**任意**表桶(客户自有表桶登记后要能写;区仍由 ARN 绑死),不再只有本区平台表桶
+    // s3tables 授权 = 本区**任意**表桶(客户自有表桶登记后要能写;区仍由 ARN 绑死),不再只有本区平台表桶
     const tableBucketArns = tableBucketAnyArn(ctx, p);
     const regionSecrets = (patterns: string[]) => patterns.map((x) => `arn:${p}:secretsmanager:${region}:${account}:secret:${x}`);
     const regionLogs = [`arn:${p}:logs:${region}:${account}:*`];
@@ -197,7 +197,7 @@ export class ExecEnvCoreStack extends ExecEnvStack {
     new cdk.CfnOutput(this, "scriptsBucket", { value: nameOf("scriptsBucket") });
     new cdk.CfnOutput(this, "tableBucket", { value: tableBucketName });
     new cdk.CfnOutput(this, "athenaWorkgroup", { value: athenaWorkgroupName });
-    // 🔴 WP-3:两个角色 ARN 都是**本 target 的**(平台侧 `assertPerTargetExecRole` 按 SSOT 名核;synth-gate #6 反向钉)
+    // 🔴 两个角色 ARN 都是**本 target 的**(平台侧 `assertPerTargetExecRole` 按 SSOT 名核;synth-gate #6 反向钉)
     new cdk.CfnOutput(this, "glueRoleArn", { value: glueRole.roleArn });
     new cdk.CfnOutput(this, "emrExecutionRoleArn", { value: emrRole.roleArn });
     new cdk.CfnOutput(this, "emrSecurityGroupId", { value: this.emrSecurityGroup.securityGroupId });

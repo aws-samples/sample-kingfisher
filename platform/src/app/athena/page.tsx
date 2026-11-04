@@ -5,7 +5,7 @@ import { Button, Space, Table, Alert, Spin, message, Card, Tag, Tree, Tooltip } 
 import { PlayCircleOutlined, ClearOutlined, CloudOutlined, ReloadOutlined, TableOutlined } from "@ant-design/icons";
 import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-4):数据湖查询与表树都按区。
+// 执行范围:数据湖查询与表树都按区。
 // 🔴 与 `/redshift` 同款:**执行目标默认跟随顶栏视角**(INTERACTION §9.4),一棵树只显示一个区。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope } from "@/lib/scope/scope";
@@ -13,7 +13,7 @@ import { landingOfScope } from "@/lib/scope/scope";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 interface S3TableInfo { namespace: string; name: string; qualifiedName: string; }
-// 序 38 B-71:命名空间带「来自哪个表桶」(平台表桶 / 平台管理员登记的外部表桶)
+// 命名空间带「来自哪个表桶」(平台表桶 / 平台管理员登记的外部表桶)
 interface S3NamespaceTree { namespace: string; tables: S3TableInfo[]; bucket?: string; catalog?: string; external?: boolean; }
 
 function fmtBytes(n?: number): string {
@@ -25,7 +25,7 @@ function fmtBytes(n?: number): string {
 
 export default function AthenaPage() {
   const t = useT();
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴 编辑器不再预填主控区表桶的示例 SQL(在别的区视角下,那条 SQL 指向的
+  // 🔴 编辑器不再预填主控区表桶的示例 SQL(在别的区视角下,那条 SQL 指向的
   // 是**另一个区**的表桶,点执行就是跨区查询)。表树到达后取该区第一张表生成示例(见 fetchTables)。
   const [sql, setSql] = useState("");
   const [running, setRunning] = useState(false);
@@ -39,11 +39,11 @@ export default function AthenaPage() {
   // S0(50 SPEC §0/§3.7):启动接口下发的 queryHandle —— 取结果/取消都要带,服务端凭它判归属。
   const [currentHandleId, setCurrentHandleId] = useState("");
   const pollRef = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // @kf-batch 50-WP4ter-coverage —— 当前视角 = 执行目标(单区视角锚定该区;「全部」= 主控区)
+  // 当前视角 = 执行目标(单区视角锚定该区;「全部」= 主控区)
   const { scope, targets: scopeTargets } = useScope();
   const execTarget = scope.kind === "target" ? scope.targetId : undefined;
   const execRegion = execTarget ? scopeTargets?.find((x) => x.targetId === execTarget)?.region || execTarget : "";
-  // @kf-batch 50-WP31-place-first-class —— 请求恒带落点(全部 / 对比 = 主控区,显式);execTarget 只管界面标签
+  // 请求恒带落点(全部 / 对比 = 主控区,显式);execTarget 只管界面标签
   const tq = `targetId=${encodeURIComponent(landingOfScope(scope))}`;
 
   const fetchTables = async () => {
@@ -62,14 +62,14 @@ export default function AthenaPage() {
     } finally { setLoadingTables(false); }
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,重拉表树(护栏 4)
+  // 切区不重载页面,重拉表树(护栏 4)
   useEffect(() => {
     fetchTables();
     return () => { if (pollRef.current) clearTimeout(pollRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tq]);
 
-  // 序 52 —— 数据源页「建外部表」成功后的「去数据湖直查」带 ?sql= 进来 ⇒ 预填编辑器(只在编辑器还空着时,与 fetchTables 给示例 SQL
+  // 数据源页「建外部表」成功后的「去数据湖直查」带 ?sql= 进来 ⇒ 预填编辑器(只在编辑器还空着时,与 fetchTables 给示例 SQL
   //   同一条「不盖用户已写内容」的规则);落点仍由 ?scope= 经顶栏视角决定,这里不碰。
   useEffect(() => {
     const preset = new URLSearchParams(window.location.search).get("sql");
@@ -81,7 +81,7 @@ export default function AthenaPage() {
     try {
       const res = await fetch("/api/athena/query", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-WP4ter-coverage —— 执行落点走 body(不是 `?scope=`)
+        // 执行落点走 body(不是 `?scope=`)
         body: JSON.stringify({ sql, targetId: landingOfScope(scope) }),
       });
       const data = await res.json();
@@ -128,7 +128,7 @@ export default function AthenaPage() {
   };
 
   const treeData = tree.map((ns) => ({
-    // 序 38 B-71:外部表桶的命名空间标明桶名(同名命名空间可能在两个桶里),key 也带桶
+    // 外部表桶的命名空间标明桶名(同名命名空间可能在两个桶里),key 也带桶
     title: ns.external
       ? <span data-testid="lake-ns-external"><Tag color="purple" style={{ marginRight: 4 }}>{ns.bucket}</Tag>📁 {ns.namespace}</span>
       : <span>📁 {ns.namespace}</span>,
@@ -143,7 +143,7 @@ export default function AthenaPage() {
     <div>
       <h2>
         <CloudOutlined /> {t("Athena 查询（S3 Tables / Iceberg）")}
-        {/* @kf-batch 50-WP4ter-coverage —— 护栏 2:执行目标必须一眼可见(查错区比查不出来更坏) */}
+        {/* 护栏 2:执行目标必须一眼可见(查错区比查不出来更坏) */}
         {execRegion ? (
           <Tag color="blue" style={{ marginLeft: 8 }} data-testid="athena-exec-target">{execRegion}</Tag>
         ) : (

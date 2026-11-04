@@ -1,4 +1,3 @@
-// @kf-batch 50-WP9a-durable-jobs
 // 作业种类 handler 的**接口**(供给 / canary / 9b 起的盘点与搬迁都按它写)。
 //
 // 🔴 handler 的唯一职责是「看当前私有 state,走**一小步**,回下一个 state」:

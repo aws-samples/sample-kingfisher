@@ -1,4 +1,4 @@
-// 模块 55 / 序 50 第二批 —— 同步向导两种长操作的执行体:按预览建目标表(execute-ddl)/ 生成建表语句并探测目标表(generate-ddl)。
+// 同步向导两种长操作的执行体:按预览建目标表(execute-ddl)/ 生成建表语句并探测目标表(generate-ddl)。
 //
 // 原路由(app/api/sync/execute-ddl · app/api/sync/generate-ddl)的「主体」原样搬入:项目鉴权 / 落点点名 / 拒收 SQL 文本 /
 // buildTargetDdl(白名单 + 生成,唯一作者)**留在路由**;这里只做「解析数仓绑定 → 探测 / 建表 / 打标记(经 awaitTerminal 等终态)→ 审计 → 回 data」。

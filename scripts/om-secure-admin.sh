@@ -4,7 +4,6 @@
 #
 #   ./scripts/om-secure-admin.sh <profile> [region]
 #
-# @kf-batch 50-PROD-A-launch-hardening
 # 🔴 为什么:OM 用 basic 认证、出厂口令 admin/admin,而 OM 经 CloudFront 对公网可达 ⇒ 任何人都能
 #   登录客户的元数据目录。口令由 BgpOmServiceStack 生成(bgp/om/admin-password,RETAIN);平台 om-client
 #   与问数技能 Lambda 从同一个密钥读(读不到就不登录,绝不回落 admin)。

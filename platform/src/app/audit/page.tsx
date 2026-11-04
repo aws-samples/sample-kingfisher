@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Card, Table, Tag, Space, Button, Input, Select, Typography, message } from "antd";
 import { ReloadOutlined, SearchOutlined, FileSearchOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-12)。审计条目现在带 `targetId`
+// 执行范围。审计条目现在带 `targetId`
 // (`lib/audit.ts`:exec-env 类由 resourceId 派生,数据面动作由调用方显式传)。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { toScopeParam } from "@/lib/scope/scope";
@@ -31,7 +31,7 @@ interface AuditRow {
   action?: string;
   resourceType?: string;
   resourceId?: string;
-  /** @kf-batch 50-WP4ter-coverage —— 这次动作作用在哪个执行环境(存量条目没有,视图上按主控区算) */
+  /** 这次动作作用在哪个执行环境(存量条目没有,视图上按主控区算) */
   targetId?: string;
   detail?: any;
   method?: string;
@@ -45,7 +45,6 @@ export default function AuditPage() {
   const [keyword, setKeyword] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("");
 
-  // @kf-batch 50-WP4ter-coverage
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeAmp = scopeParam ? `&scope=${encodeURIComponent(scopeParam)}` : "";
@@ -60,7 +59,7 @@ export default function AuditPage() {
       .finally(() => setLoading(false));
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,靠 deps 重拉(护栏 4)
+  // 切区不重载页面,靠 deps 重拉(护栏 4)
   useEffect(() => {
     fetchData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -85,7 +84,7 @@ export default function AuditPage() {
 
   return (
     <div>
-      {/* @kf-batch 50-WP4ter-coverage —— 如实说明存量条目的口径:落章之前的动作没有区维,
+      {/* 如实说明存量条目的口径:落章之前的动作没有区维,
           按「控制面在主控区」归主控区。不说清 = 用户会以为主控区的条目莫名其妙变多了。 */}
       <Alert
         type="info"
@@ -135,7 +134,7 @@ export default function AuditPage() {
           pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => t("共 {n} 条", { n: total }) }}
           locale={{ emptyText: t("暂无审计记录") }}
           columns={[
-            // @kf-batch 50-WP4ter-coverage —— 「在哪个区做的」必须在列表里看得见,
+            // 「在哪个区做的」必须在列表里看得见,
             // 否则按区过滤了却看不出依据,用户无法判断过滤对不对
             {
               title: t("执行环境"),

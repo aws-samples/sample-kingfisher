@@ -17,7 +17,7 @@ import SyncNode from "./SyncNode";
 import SqlNode from "./SqlNode";
 import PythonNode from "./PythonNode";
 import { BranchNode, EmptyNode, JoinNode, ForeachNode, SetvarNode, ExternalNode } from "./RichNodes";
-// 序 73 模块 57 —— 离线作业节点
+// 离线作业节点
 import { JobNode } from "./JobNode";
 import NodeConfigPanel from "./NodeConfigPanel";
 
@@ -26,7 +26,7 @@ interface Props {
   edges: Edge[];
   onChange: (nodes: Node[], edges: Edge[]) => void;
   /**
-   * 序 73 模块 57(R1 / R8):这个工作流的执行区(行上的章;无章的存量工作流 = 主控区)。
+   * 这个工作流的执行区(行上的章;无章的存量工作流 = 主控区)。
    * 节点面板按它过滤候选(`?scope=<落点>`):只列出绑定了这些区的同步任务 / 离线作业 —— 与发布期 fail-closed 判定同一口径。
    */
   wfTargets: string[];
@@ -65,7 +65,7 @@ export default function DagEditor({ nodes: initNodes, edges: initEdges, onChange
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges]);
 
-  // 33-B: 渲染组件映射(nodeType → 组件)。老三 + 六新 + 离线作业节点(序 73);加节点在此加一行。
+  // 33-B: 渲染组件映射(nodeType → 组件)。老三 + 六新 + 离线作业节点;加节点在此加一行。
   const nodeTypes = useMemo(() => ({
     sync: SyncNode, sql: SqlNode, python: PythonNode,
     branch: BranchNode, empty: EmptyNode, join: JoinNode,

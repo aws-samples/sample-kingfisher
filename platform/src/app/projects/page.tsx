@@ -5,7 +5,7 @@ import {
   Table, Button, Space, Tag, Modal, Form, Input, Select, message,
   Popconfirm, Drawer, Divider, Empty, Typography, Card, notification,
 } from "antd";
-// @kf-batch 50-SEQ47a-promote-ux —— 批准「发布到环境」后给出「切到 {toEnv} 查看」(用户 2026-10-19 批准 4 次都不知道去哪看)
+// 批准「发布到环境」后给出「切到 {toEnv} 查看」(用户 2026-10-19 批准 4 次都不知道去哪看)
 import { gotoEnvResource } from "@/components/common/PromoteButton";
 import type { ResourceType } from "@/lib/versions/version-service";
 import { PlusOutlined, AppstoreOutlined, TeamOutlined, DeleteOutlined, BellOutlined, LoadingOutlined } from "@ant-design/icons";
@@ -18,7 +18,7 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
 import { Tooltip } from "antd";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-21):单区视角只列**在该区获授权**的项目。
+// 执行范围:单区视角只列**在该区获授权**的项目。
 // 🔴 这一格是数据驻留的核心:「本项目在这个区能不能用」原来页面上一个字都不说。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { Alert } from "antd";
@@ -58,7 +58,6 @@ export default function ProjectsPage() {
   const [groups, setGroups] = useState<string[]>([]);
   useEffect(() => { (async () => setGroups(groupsFromToken(await getToken())))(); }, [getToken]);
   const canCreate = canCreateProject(groups);
-  // @kf-batch 50-WP4ter-coverage
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
@@ -77,7 +76,7 @@ export default function ProjectsPage() {
   // （含晋升 deploy / 入组 membership / 数据访问 data-access）。
   // 🔴 D4 起"能决策" = 平台 admin ∨（manager ∧ 该项目 owner）——后端 approvals/route.ts 用
   //    与本页同一个 canManageProjectConfig 判据过滤，所以纯 developer-owner 不会再看到本项目的待审。
-  // @kf-batch 50-WP4quater-reads(工单 SC-33)—— 审批收件箱按执行范围筛。
+  // 审批收件箱按执行范围筛。
   // 🔴 只筛**带区的**审批(deploy 类从被晋升作业派生);入组 / 数据访问两类不藏。
   // 🔴 被筛掉几条必须显示出来:收件箱漏一条 = 一件该批的事没人批,而界面上毫无痕迹(护栏 1)。
   const fetchInbox = async () => {
@@ -97,7 +96,7 @@ export default function ProjectsPage() {
     setDiscoverable(d?.success ? d.data.filter((p: any) => p.myRole === null) : []);
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,重拉项目(护栏 4)
+  // 切区不重载页面,重拉项目(护栏 4)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchProjects(); fetchDiscover(); fetchInbox(); }, [scopeQs]);
 
@@ -112,7 +111,7 @@ export default function ProjectsPage() {
   };
 
   const handleCreate = async () => {
-    const values = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const values = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!values) return;
     const res = await fetch("/api/projects", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values),
@@ -126,9 +125,9 @@ export default function ProjectsPage() {
     }
   };
 
-  // 模块 55 第二批(序 50)—— 删项目空间是长操作:数仓冷恢复时服务端超 45 秒回 202(协议 long-op/1),全局 fetch 拦截器轮询到终态再交回
+  // 删项目空间是长操作:数仓冷恢复时服务端超 45 秒回 202(协议 long-op/1),全局 fetch 拦截器轮询到终态再交回
   //   同形响应,页面右下「正在后台执行:删除项目空间(已 n 秒)」;这里拿到的就是终态(200 / 400 列明细 / 503)。
-  //   序 49 ③ B-95 那套「202 warming + 页面按 retryAfterMs 自动重发」在这里退役。同一项目在途时忽略重复点击。
+  //   那套「202 warming + 页面按 retryAfterMs 自动重发」在这里退役。同一项目在途时忽略重复点击。
   const [deleting, setDeleting] = useState<Record<string, true>>({});
   const deletingRef = useRef<Set<string>>(new Set());
   const handleDelete = async (projectId: string) => {
@@ -163,7 +162,7 @@ export default function ProjectsPage() {
 
   const handleAddMember = async () => {
     if (!drawerProject) return;
-    const values = await memberForm.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const values = await memberForm.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!values) return;
     const res = await fetch(`/api/projects/${drawerProject.projectId}/members`, {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values),
@@ -180,7 +179,7 @@ export default function ProjectsPage() {
     d?.success ? (message.success(t("已移除")), refreshDrawer()) : message.error(d?.error?.message || t("移除失败"));
   };
 
-  // @kf-batch 50-SEQ47a-promote-ux —— 批准 deploy 审批后,接口已回 promote(targetId / toEnv / created / sourceVersion,见 approvals/[id] 路由),
+  // 批准 deploy 审批后,接口已回 promote(targetId / toEnv / created / sourceVersion,见 approvals/[id] 路由),
   //   原来页面只 toast「已批准」,人不知道 prod 里已经多了一份、也不知道去哪看 ⇒ 这里给可点的「切到 {toEnv} 环境查看」。
   //   (形参 / 局部名刻意不叫 d / p:读取级门禁 page-read-coverage 按名字传播「携带范围」标记,撞名会把抽屉那次 /api/approvals 读误判成已带范围)
   const notifyPromoted = (resp: any) => {
@@ -218,14 +217,14 @@ export default function ProjectsPage() {
 
   // 审批项的可读标签（与抽屉内一致），供全局收件箱复用。
   const approvalLabel = (a: Approval) =>
-    // @kf-batch 50-WP30-decommission —— 删除执行环境的审批单(只有平台管理员看得到;服务端按类型过滤)
+    // 删除执行环境的审批单(只有平台管理员看得到;服务端按类型过滤)
     a.type === "exec-env-delete"
       ? t("删除执行环境 {tid}({region})", { tid: String(a.payload?.targetId ?? ""), region: String(a.payload?.region ?? "") })
       : a.type === "deploy"
       ? t("晋升 {name} → {toEnv}", { name: a.payload?.name || a.payload?.resourceType || "", toEnv: a.payload?.toEnv })
       : a.type === "data-access"
       ? t("申请访问数据表 {table}", { table: String(a.payload?.fqn || "").split(".").pop() || a.payload?.fqn })
-      // @kf-batch 50-SEQ47c-catalog-ddl —— prod 环境的数据目录建表 / 改表审批(payload 由 lib/governance/catalog-ddl.ts 定形)
+      // prod 环境的数据目录建表 / 改表审批(payload 由 lib/governance/catalog-ddl.ts 定形)
       : a.type === "ddl"
       ? ddlApprovalText(a)
       : t("申请加入项目（角色 {role}）", { role: a.payload?.role });
@@ -280,7 +279,7 @@ export default function ProjectsPage() {
 
   return (
     <div>
-      {/* @kf-batch 50-WP4ter-coverage —— 单区视角下必须说清「这里只列在该区获授权的项目」,
+      {/* 单区视角下必须说清「这里只列在该区获授权的项目」,
           否则用户会以为项目丢了(护栏 1:不让用户丢东西,先把话说明白) */}
       {scope.kind === "target" && (
         <Alert
@@ -305,7 +304,7 @@ export default function ProjectsPage() {
         {t("每个项目空间是独立的工作区：数据源 / 同步任务 / 编排 / Redshift 任务 / 作业等资源按空间隔离，按项目角色（owner > editor > viewer）授权。顶部可切换当前空间。")}
       </Text>
 
-      {/* @kf-batch 50-WP4quater-reads(工单 SC-33)—— 🔴 被执行范围筛掉的待办必须显示出来。
+      {/* 🔴 被执行范围筛掉的待办必须显示出来。
           收件箱少一条 = 一件该批的事没人批,而界面上毫无痕迹 —— 那正是护栏 1 要挡的「丢东西」。 */}
       {inboxHidden > 0 && (
         <Alert
@@ -323,7 +322,7 @@ export default function ProjectsPage() {
           <div style={{ marginTop: 8 }}>
             {inbox.map((a) => {
               const proj = projects.find((p) => p.projectId === a.projectId);
-              // @kf-batch 50-WP30-decommission —— 🔴 审批接收端**回放影响预览快照**(INTERACTION §1.4 机制 C;52 §5bis):
+              // 🔴 审批接收端**回放影响预览快照**(INTERACTION §1.4 机制 C;52 §5bis):
               //   销毁哪个区 / 三个数 / 将保留哪些数据资源 / 谁发起 —— 看不到这些的审批就是橡皮图章。
               const snap = a.type === "exec-env-delete" ? (a.payload?.snapshot as { counts?: Record<string, number | null>; retained?: Array<{ kind: string; name: string; note: string }>; computedAt?: string } | undefined) : undefined;
               return (

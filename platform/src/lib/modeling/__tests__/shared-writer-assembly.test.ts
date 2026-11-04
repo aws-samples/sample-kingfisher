@@ -1,14 +1,13 @@
-// @kf-batch 50-WP11b-shared-writer
 // 🔴🔴 **装配层**:建模落地 ↔ admin 执行器 ↔ 私有模板 ↔ 落点 SSOT ↔ 台账 —— 兄弟模块之间**一个都不 mock**
 // (mock-hygiene-guard 的纪律;lib/modeling 原在欠账名单里,本文件补上后从名单删除)。
 //
 // 只 mock **真外部**:DynamoDB(台账)/ 执行环境注册表 / Redshift Data API + Secrets Manager(target-clients 的
 // AWS 出口)/ 中央审计 / 区域审计 / 主控区 admin secret / OM 推送。数仓用一个**小型假 Redshift**代替:
 // 它按「谁在执行(admin 还是 shared_writer)」判权限、按授权决定 information_schema 能不能看见那张表 ——
-// 这两条正是本包的承重语义(E-230 / 观测必须在授权之后),mock 若不模拟它们,接缝就又被抹平了。
+// 这两条正是本包的承重语义(观测必须在授权之后),mock 若不模拟它们,接缝就又被抹平了。
 //
-// 判据对应:E-229(该区真有那些行、写入者是窄权写者)· E-230(窄权写者只对授过的那张表有写权、无 DROP)·
-// E-234(维度表 home 版与非 home 版列签名逐字节相同 = 建模 DDL 只有一个作者)· E-235(白名单最严态下建模照落、
+// 判据对应:(该区真有那些行、写入者是窄权写者)·(窄权写者只对授过的那张表有写权、无 DROP)·
+// (维度表 home 版与非 home 版列签名逐字节相同 = 建模 DDL 只有一个作者)·(白名单最严态下建模照落、
 // 同一状态下业务绑定照拒、落点伪造成 proj_ 照拒)· 成员资格(台账查不到即拒)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -194,7 +193,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
 import { landCodeTableById as landCodeTableByIdRaw, unbindCodeTable as unbindCodeTableRaw } from "@/lib/modeling/service";
 import { applyModelTableById as applyModelTableByIdRaw, createModelTable } from "@/lib/modeling/dimensions";
 import { landToTargets as landToTargetsRaw, CODE_TABLE_COLUMNS } from "@/lib/modeling/landing";
-// 模块 55 / 序 50:landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
+// landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
 //   判据直接调库函数,所以在 op 帧里调(与真路由同一条路;「无上下文即抛」本身由 lib/long-ops/__tests__/context-await.test 钉)。
 import { runInLongOp } from "@/lib/long-ops/context";
 const inOp = <T,>(fn: () => Promise<T>): Promise<T> => runInLongOp({ taskId: "test", opKind: "modeling-land" }, fn);
@@ -219,7 +218,7 @@ const usw2Target = (over: Record<string, unknown> = {}) => ({
   credentialIsolationState: "provisioning",
   provisioningDeadlineAt: "2099-01-01T00:00:00Z",
   credentialEpoch: 0,
-  // 🔴 E-235:白名单最严那一态(谁都不能绑)
+  // 🔴 白名单最严那一态(谁都不能绑)
   access: { mode: "allowlist", projects: [] },
   resources: {
     redshiftWorkgroup: "bgp-workgroup-tgt-usw2-a",
@@ -253,8 +252,8 @@ beforeEach(() => {
   h.ddb.set(`${TABLES.CODE_TABLES}|01CT`, { ...CT });
 });
 
-describe("🔴🔴 装配层:非主控区码表落地走窄权写者(E-229 / E-230 / E-235)", () => {
-  it("E-229:该区真有那些行(行数 == 枚举数),DDL 由 admin 执行、DML 由 shared_writer 执行;台账回写 ok", async () => {
+describe("🔴🔴 装配层:非主控区码表落地走窄权写者", () => {
+  it("该区真有那些行(行数 == 枚举数),DDL 由 admin 执行、DML 由 shared_writer 执行;台账回写 ok", async () => {
     const ct = await landCodeTableById("01CT", { targets: [USW2], actor: ADMIN });
     const rec = ct.landedByTarget?.[USW2];
     expect(rec?.status, `落地记录:${JSON.stringify(rec)}`).toBe("ok");
@@ -279,7 +278,7 @@ describe("🔴🔴 装配层:非主控区码表落地走窄权写者(E-229 / E-2
     expect(JSON.stringify(h.audits)).not.toContain(pw);
   });
 
-  it("E-230(假数仓侧):窄权写者对**别的表**写被拒、DROP 被拒;🔴 正控制:对授过的那张表写成功", async () => {
+  it("(假数仓侧):窄权写者对**别的表**写被拒、DROP 被拒;🔴 正控制:对授过的那张表写成功", async () => {
     await landCodeTableById("01CT", { targets: [USW2], actor: ADMIN });
     const tc = await import("@/lib/exec-env/target-clients");
     const arn = h.secrets["us-west-2|bgp/shared-writer/tgt-usw2-a"].arn;
@@ -300,7 +299,7 @@ describe("🔴🔴 装配层:非主控区码表落地走窄权写者(E-229 / E-2
     expect(granted).toEqual(["public.dim_code_country"]);
   });
 
-  it("🔴🔴 E-235 成对:allowlist=[] 下建模照落;同一状态下业务作业绑这个区照拒 project-not-allowed", async () => {
+  it("🔴🔴 成对:allowlist=[] 下建模照落;同一状态下业务作业绑这个区照拒 project-not-allowed", async () => {
     const ct = await landCodeTableById("01CT", { targets: [USW2], actor: ADMIN });
     expect(ct.landedByTarget?.[USW2]?.status).toBe("ok");
     expect(JSON.stringify(ct.landedByTarget?.[USW2]), "建模路径上不许再出现这句拒因").not.toContain("无项目上下文");
@@ -340,8 +339,8 @@ describe("🔴🔴 装配层:非主控区码表落地走窄权写者(E-229 / E-2
   });
 });
 
-describe("🔴🔴 装配层:维度 / 事实表(E-234 + 门②)", () => {
-  it("E-234:同一张维度表 home 版与 usw2 版列签名逐字节相同(建模 DDL 只有一个作者)", async () => {
+describe("🔴🔴 装配层:维度 / 事实表(+ 门②)", () => {
+  it("同一张维度表 home 版与 usw2 版列签名逐字节相同(建模 DDL 只有一个作者)", async () => {
     const mt = await createModelTable({
       name: "用户维度",
       tableType: "dimension",

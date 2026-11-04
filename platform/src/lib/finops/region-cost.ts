@@ -1,7 +1,6 @@
-// @kf-batch 50-WP6-cost-by-region(WP-6 施工序 3 / 5)
 // 成本按区的两件纯计算(零 IO,单测钉;读取由路由做):
-//   ① `regionCards` —— 大盘第一层的 region 卡片(O3a,E-170):本月累计 + 上月同期 + 环比;
-//   ② `reconcileByRegion` —— 任务成本 Tab 的「已归因 / 未分摊」按 region 对账(O3b,E-172)。
+//   ① `regionCards` —— 大盘第一层的 region 卡片(O3a):本月累计 + 上月同期 + 环比;
+//   ② `reconcileByRegion` —— 任务成本 Tab 的「已归因 / 未分摊」按 region 对账(O3b)。
 //
 // 🔴 两件事都**只认 AWS region**,不认 target:CE 的维度里没有「执行环境」,同区两套环境的钱分不开。
 //    界面必须把「按 AWS region 分组,非 target 归因」写出来(INTERACTION §3.2)。

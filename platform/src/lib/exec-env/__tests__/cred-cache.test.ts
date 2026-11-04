@@ -1,5 +1,4 @@
-// @kf-batch 50-G2R
-// G6(模块 50)—— 复合键 SSOT + 进程级缓存单测。
+// G6—— 复合键 SSOT + 进程级缓存单测。
 //
 // 【为什么必须有这个测试】三个被改造的缓存原本都缓存**负结果**(`admin-secret` 用 null、
 // `zeroetl` 用 ""),那是刻意的:没配 secret 的环境不该每次调用都打一次 Secrets Manager。
@@ -120,8 +119,8 @@ describe("ProcessCache —— 负结果也必须缓存", () => {
     expect(c.peek(k1), "epoch 前进后旧槽不得命中").toBeUndefined();
     expect(await c.resolve(k1, async () => "arn:NEW-SECRET")).toBe("arn:NEW-SECRET");
     // ⚠️ 如实登记:`getPrivilegedCred` 的**正结果**路径今天走不到(lookupProjectSecretArn 在
-    // G 阶段恒返回 undefined,per-project secret 要 P52.5a 才创建),所以那一层的端到端
-    // 行为测试要等 P52.5a。此处先在机制层钉住。
+    // G 阶段恒返回 undefined,per-project secret 要才创建),所以那一层的端到端
+    // 行为测试要等。此处先在机制层钉住。
   });
 
   it("peek 区分'未解析'(undefined)与'解析过且为空'(null)——只缓存正结果的站点靠它", async () => {
@@ -210,9 +209,9 @@ describe("ProcessCache —— 负结果也必须缓存", () => {
 // 上一批我只修了失活的**粒度**(前缀批量清),没修**时机**:`resolve()` 是
 // "未命中 → await resolver → set",失活只删当时已落槽的键 ⇒ 恰在写窗口的在途解析
 // 会在失活**之后**把旧值写回,把 fail-open 的空值缓存到整个进程生命周期(实测复现)。
-// 这一组就是那条竞态的回归门禁(ACCEPTANCE E-18)。
+// 这一组就是那条竞态的回归门禁(ACCEPTANCE)。
 // ══════════════════════════════════════════════════════════════════════════════
-describe("🔴 在途解析 × 失活 的竞态(E-18)", () => {
+describe("🔴 在途解析 × 失活 的竞态", () => {
   it("🔴🔴 失活发生在解析途中 ⇒ 旧值**不得**写回缓存(v3 实测曾写回)", async () => {
     const c = new ProcessCache<string>();
     let release: (v: string | null) => void = () => {};

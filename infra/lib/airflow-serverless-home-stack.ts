@@ -1,5 +1,4 @@
-// @kf-batch 50-WP15-airflow-serverless
-// home 区的 **MWAA Serverless 入口**栈 BgpAirflowServerlessStack(50 SPEC v3.27 §3.15;WP-15 施工序 2b)。
+// home 区的 **MWAA Serverless 入口**栈 BgpAirflowServerlessStack。
 //
 // 【为什么 home 也要一份】用户拍板的验收 = 无头 + **≥2 region** 每个调度任务真跑三引擎(DESIGN 6septies);home 是两区之一。
 //   与执行环境组件栈 `infra/lib/exec-env/airflow-serverless-stack.ts` 是刻意的两份实现(同 mwaa 的 home / 非 home 两份先例):

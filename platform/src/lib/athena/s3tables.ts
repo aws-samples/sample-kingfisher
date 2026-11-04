@@ -1,9 +1,9 @@
-// 模块 24 — 枚举 S3 Tables 表桶下的命名空间与表，供前端表树与查询拼接 3 段限定名。
+// 枚举 S3 Tables 表桶下的命名空间与表，供前端表树与查询拼接 3 段限定名。
 // 用 s3tables 控制面 API（ListNamespaces / ListTables），不依赖 Glue 目录的可读性。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { notePlaceDecision } from "@/lib/place/context";
 import {
@@ -22,7 +22,7 @@ export const S3TABLES_CATALOG = process.env.S3TABLES_CATALOG || "s3tablescatalog
 // Athena 联邦目录引用：catalog = `<联邦目录>/<表桶>`，查询 3 段名为 "catalog"."ns"."table"。
 export const ATHENA_CATALOG_REF = `${S3TABLES_CATALOG}/${S3TABLES_BUCKET}`;
 
-/** 表桶 ARN —— 🔴 只接受**已解析的落点**(B-26:原来是零参函数,恒拼主控区的那一个)。 */
+/** 表桶 ARN —— 🔴 只接受**已解析的落点**(原来是零参函数,恒拼主控区的那一个)。 */
 function tableBucketArnOf(place: S3TablesPlace): string {
   return `arn:aws:s3tables:${place.region}:${account}:bucket/${place.bucket}`;
 }
@@ -37,7 +37,7 @@ export interface S3TableInfo {
 export interface S3NamespaceTree {
   namespace: string;
   tables: S3TableInfo[];
-  // 序 38 B-71:这个命名空间来自哪个表桶(平台表桶 / 已登记的外部表桶);存量只有平台表桶的调用方不读这三个键
+  // 这个命名空间来自哪个表桶(平台表桶 / 已登记的外部表桶);存量只有平台表桶的调用方不读这三个键
   bucket?: string;
   catalog?: string;
   external?: boolean;
@@ -45,7 +45,7 @@ export interface S3NamespaceTree {
 
 /**
  * 三段限定名 `"<目录引用>"."ns"."table"`。
- * 🔴🔴 B-26(2026-10-01):原签名 `qualifiedName(ns, table)` 恒用**主控区**的目录引用 ⇒ 别的区的调用方
+ * 🔴🔴 原签名 `qualifiedName(ns, table)` 恒用**主控区**的目录引用 ⇒ 别的区的调用方
  *   (实时计算「查询结果」)拼出来的 SELECT 指向主控区的表桶。⇒ 目录引用改成**必填**,由调用方从
  *   `resolveS3TablesPlace(targetId).catalogRef` 取 —— 不给就编译不过,不再有「漏传 = 主控区」这条静默路。
  */
@@ -53,7 +53,7 @@ export function qualifiedName(catalogRef: string, namespace: string, table: stri
   return `"${catalogRef}"."${namespace}"."${table}"`;
 }
 
-// @kf-batch 50-WP4ter-coverage —— 工单 SC-4:表树按区。
+// 表树按区。
 /** 某个 target 的 S3 Tables 落点(表桶实名 + region + 联邦目录引用)。 */
 export interface S3TablesPlace {
   targetId: string;
@@ -69,7 +69,7 @@ export interface S3TablesPlace {
  * 🔴 非 home 的表桶名取描述符资源袋 `tableBucket`(部署期实名),不由这里拼。
  * home 逐字节等价:仍用上面那对 env 值。
  */
-// @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = 主控区);空串 / 非法 ⇒ 抛,不变成主控区
+// 落点必填(原来缺省 = 主控区);空串 / 非法 ⇒ 抛,不变成主控区
 export async function resolveS3TablesPlace(targetId: string): Promise<S3TablesPlace> {
   notePlaceDecision({ targetId, via: "resolveS3TablesPlace" });
   const { HOME_TARGET_ID, isHome, assertTargetId } = await import("@/lib/exec-env/target-id");
@@ -90,7 +90,7 @@ export async function resolveS3TablesPlace(targetId: string): Promise<S3TablesPl
   return { targetId: id, region: t.region, bucket, catalogRef: `${S3TABLES_CATALOG}/${bucket}`, home: false };
 }
 
-// ── 序 38 B-71:一个执行环境的**全部**S3 Tables 落点 = 平台表桶 + 已登记的外部表桶 ─────────────────
+// ──:一个执行环境的**全部**S3 Tables 落点 = 平台表桶 + 已登记的外部表桶 ─────────────────
 //   缺陷原形:直查表树 / 治理目录 / 问数只认 resolveS3TablesPlace ⇒ 客户写进自己表桶的数据在平台里一张表都看不到。
 export interface S3TablesPlaceEx extends S3TablesPlace {
   /** false = 该区平台表桶(部署期建);true = 平台管理员登记的外部表桶(平台只读它) */
@@ -178,7 +178,7 @@ function clientForRegion(r: string): S3TablesClient {
 }
 
 // 列出表桶下所有命名空间及其表，组织成树。
-// 🔴 B-26:落点**必填**(原来 `place?` 缺省 = 主控区;主控区调用方现在显式解析 home 的落点)。
+// 🔴 落点**必填**(原来 `place?` 缺省 = 主控区;主控区调用方现在显式解析 home 的落点)。
 export async function listNamespaceTree(place: S3TablesPlace): Promise<S3NamespaceTree[]> {
   const arn = tableBucketArnOf(place);
   const c = clientForRegion(place.region);

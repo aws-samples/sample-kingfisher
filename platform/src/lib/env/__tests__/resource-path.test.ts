@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47a-promote-ux —— 资源类型 → 页面路径(闭合清单,少一个 tsc 就红;这里钉值)。
+// 资源类型 → 页面路径(闭合清单,少一个 tsc 就红;这里钉值)。
 import { describe, it, expect } from "vitest";
 import { resourcePath } from "../resource-path";
 

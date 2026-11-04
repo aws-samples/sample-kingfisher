@@ -1,12 +1,11 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 1 —— 落点的**唯一作者**(L1):决策(TargetRef)→ 解析(Place)。
+// 落点的**唯一作者**(L1):决策(TargetRef)→ 解析(Place)。
 //
 // 五条原则里本文件管前两条 + 第四条:
 //   · 落点只有一个来源 = DDB 描述符,**主控区也一样**(读 `tgt_home` 描述符,不读 env 常量);
 //   · 决策只有一处且显式:`placeOfRequest` / `placeOfBinding` 推不出就抛 PlaceUndecidable,**没有「没传 = 主控区」**;
 //   · fail-closed:描述符缺 / 不就绪 / 缺资源 ⇒ PlaceUnavailable,绝不回落。
 //
-// 🔴 本序只**新增**这条路,不改现有调用点(那是序 3,按引擎逐批迁移 + 棘轮降档)。
+// 🔴 本序只**新增**这条路,不改现有调用点(那是,按引擎逐批迁移 + 棘轮降档)。
 
 import type { NextRequest } from "next/server";
 import {
@@ -20,7 +19,7 @@ import { HOME_TARGET_ID, isValidTargetId } from "@/lib/exec-env/target-id";
 import { SCOPE_PARAM, parseScope } from "@/lib/scope/scope";
 import { notePlaceDecision } from "./context";
 import { PlaceUnavailable, PlaceUndecidable, type Place, type TargetRef } from "./types";
-// 序 31 第二刀 ②:投影函数搬到零依赖叶子 descriptor.ts(请求外循环要用它建显式上下文,而本文件碰 node:crypto 可达面);
+// 投影函数搬到零依赖叶子 descriptor.ts(请求外循环要用它建显式上下文,而本文件碰 node:crypto 可达面);
 //   这里 re-export 保住既有 import 路径。
 import { placeOfDescriptor } from "./descriptor";
 export { placeOfDescriptor } from "./descriptor";
@@ -35,7 +34,7 @@ export function targetRef(targetId: string): TargetRef {
 
 /**
  * 请求里**点名**的落点(查询串 / 请求体的 `targetId`)。缺 / 空 ⇒ PlaceUndecidable(路由回 400),**不默认主控区**。
- * WP-31 序 3:原来这类入口写 `targetId || undefined` 再交给「缺省 = 主控区」的解析器 ⇒ 前端漏传就静默落主控区
+ * 原来这类入口写 `targetId || undefined` 再交给「缺省 = 主控区」的解析器 ⇒ 前端漏传就静默落主控区
  * (数据源弹窗列网络就是这么列出主控区 VPC 的)。前端**显式**带上落点,后端只认点名。
  */
 export function requestedTargetId(raw: unknown, where: string): string {
@@ -47,7 +46,7 @@ export function requestedTargetId(raw: unknown, where: string): string {
 
 /**
  * 新建对象时请求里**点名**的绑定区列表(`targets[]`,兼收单值 `targetId`)。空 ⇒ PlaceUndecidable(400)。
- * WP-31 序 3:原来「两个都没给 = 绑主控区」⇒ /etl-jobs 页新建作业不带落点,在 us-west-2 视角建出的作业
+ * 原来「两个都没给 = 绑主控区」⇒ /etl-jobs 页新建作业不带落点,在 us-west-2 视角建出的作业
  * 静默绑到主控区(application 也建在主控区)、并从当前视角消失(段 wp31 W31-E1/E2 无头坐实)。
  * 只做「有没有点名 + 格式」;能不能绑(准入 / 组件 / 白名单)仍由各引擎的绑定校验判。
  */
@@ -93,7 +92,7 @@ export function viewabilityVerdict(t: ExecutionTarget, violation: string | null)
 }
 
 /**
- * @kf-batch 50-WP31-place-first-class —— B-35 后一半(2026-10-11 真环境无头坐实):
+ * 后一半(2026-10-11 真环境无头坐实):
  * **读接口**点名一个**已注册**执行环境 ⇒ 它的落点(位置事实全部来自描述符)。
  *
  * `requestedTargetId` 只验格式 ⇒ 一个格式合法但**不存在**的 targetId(`tgt_nope_zz`)一路流到下游,
@@ -129,7 +128,7 @@ export async function registeredPlace(targetId: string, where: string): Promise<
  *   · `via`:决策记账里写哪个引擎作者做的决定(观测清单按它归类;缺省 `resolvePlace`)。
  *     引擎作者(如 `resolveFlinkPlace`)委托到这里时传自己的名字 ⇒ 一次决策只记**一笔**,不是两层各记一笔。
  *   · `component`:该落点必须装了的组件(描述符 `components[]`)。缺 ⇒ PlaceUnavailable(409),**不回落主控区**。
- *     @kf-batch 50-WP31-place-first-class 序 3 收尾:Flink 主控区分支改走描述符时加 —— 主控区也要核组件,
+ *     收尾:Flink 主控区分支改走描述符时加 —— 主控区也要核组件,
  *     原来主控区走 env 常量、从来不核「主控区装没装 flink」。
  */
 export interface ResolvePlaceOpts {
@@ -185,7 +184,7 @@ export function placeResource(place: Place, key: string): string {
 /**
  * 对象自己的绑定 ⇒ 落点(写路由 / 按对象执行的唯一来源)。
  * 🔴 与 `bindingTargets` 的区别:它对「两个字段都没有」回主控区(存量行的历史约定),
- *    这里**不回**:序 3 迁移某类对象前,先把它的存量行补上章,再切到本函数。
+ *    这里**不回**:迁移某类对象前,先把它的存量行补上章,再切到本函数。
  */
 export function placeOfBinding(row: { targets?: unknown; targetId?: unknown } | null | undefined): TargetRef {
   const raw = Array.isArray(row?.targets) ? (row!.targets as unknown[]) : [];

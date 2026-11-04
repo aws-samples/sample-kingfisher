@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.1-L1-grant-public
 // 🔴 **L1 扫描门禁**(52 SPEC §3.5 / DESIGN §11.4 的"硬验收门:巡检扫全仓 == 0"的代码侧)。
 //
 // 【为什么必须有这条,而不是"改完 8 处就完事"】L1 撤掉的 8 处里有 **6 处是生成侧**
@@ -106,7 +105,7 @@ describe("🔴 L1 门禁:全仓不许再出现「把数仓对象授权给 PUBLIC
     }
     expect(
       offenders,
-      "🔴 又出现了把数仓对象授权给 PUBLIC 的形态 —— 它让库内所有身份读写该表,击穿模块 52 项目隔离。" +
+      "🔴 又出现了把数仓对象授权给 PUBLIC 的形态 —— 它让库内所有身份读写该表,击穿项目隔离。" +
         "平台各路径统一数仓身份,建完表本就可见,不需要任何补授权;要授权请给具体项目角色。"
     ).toEqual([]);
   });
@@ -149,7 +148,7 @@ describe("🔴 L1 门禁:全仓不许再出现「把数仓对象授权给 PUBLIC
       "例如:统计每个商品分类的销售额,结果写入 public.dws_category_sales。",
       // 撤销授权(L1 存量清理要用的正是它)不该被自己的门禁拦。
       "REVOKE ALL ON public.orders FROM PUBLIC;",
-      // 正解形态:授权给具体项目角色(P52.5a 供给层要生成的就是这个)。
+      // 正解形态:授权给具体项目角色(供给层要生成的就是这个)。
       "GRANT SELECT ON ALL TABLES IN SCHEMA shared TO ROLE role_proj_abc;",
       "GRANT USAGE ON SCHEMA proj_abc TO ROLE role_proj_abc;",
       // 同一行里 GRANT 与 public 之间**隔着分号**(两条语句)⇒ 不是同一条语句,不该咬。

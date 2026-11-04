@@ -1,5 +1,4 @@
-// @kf-batch 41-B121-dms-start-single-flight
-// 🔴🔴 DMS 通道「启动」必须**立刻**受理、且同一任务**只许一条**启动编排在飞(B-121)。
+// 🔴🔴 DMS 通道「启动」必须**立刻**受理、且同一任务**只许一条**启动编排在飞。
 //
 // 【真环境证据(2026-10-24 全新账号页面驱动段 wp24,主控区 ECS 日志 + DMS 真值)】
 //   07:40:54 第一次点「启动」⇒ `dms.instance.lazy_create`(全新账号没有复制实例,现场创建)
@@ -117,7 +116,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
           if (input.ReturnValuesOnConditionCheckFailure === "ALL_OLD" && row) err.Item = { taskId: { S: row.taskId } };
           throw err;
         }
-        if (!row) throw new Error("判据夹具:无条件写到不存在的行(真 DDB 会 upsert —— 这正是 B-08 禁止的形态)");
+        if (!row) throw new Error("判据夹具:无条件写到不存在的行(真 DDB 会 upsert —— 这正是条件写守卫禁止的形态)");
         applySet(row, input.UpdateExpression, names, values);
         return { Attributes: JSON.parse(JSON.stringify(row)) };
       }
@@ -249,7 +248,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("DMS 通道启动:立刻受理 + 单飞(B-121)", () => {
+describe("DMS 通道启动:立刻受理 + 单飞", () => {
   it("① 全新账号(复制实例不存在)⇒ 发起懒创建后**立刻** 202,不在请求里等它 available;等待在后台,就位后编排照常走完", async () => {
     h.rows.set(TASK_ID, task());
     // 第 1 次 Describe:缺 ⇒ 懒创建;第 2 次(创建后紧接的那次):creating;第 3 次起(后台):available
@@ -279,7 +278,7 @@ describe("DMS 通道启动:立刻受理 + 单飞(B-121)", () => {
   it("② 🔴🔴 两次并发启动 ⇒ 一个 202、一个 409 START_IN_PROGRESS;复制任务只建一次、终态 running(改动前:两条编排互撞 ⇒ error)", async () => {
     h.rows.set(TASK_ID, task());
     h.instance = "creating"; h.instanceAvailableAfterDescribes = 2;
-    // 让两条编排(若真有两条)都先 Describe 再 Create,把 B-121 原形那种交错留出来
+    // 让两条编排(若真有两条)都先 Describe 再 Create,把原形那种交错留出来
     h.hooks.beforeTaskCreate = () => new Promise((res) => setTimeout(res, 10));
     const [a, b] = await Promise.all([post(), post()]);
     const statuses = [a.status, b.status].sort();

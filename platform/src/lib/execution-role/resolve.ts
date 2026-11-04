@@ -1,4 +1,4 @@
-// 序 72 B-139(模块 56)—— 执行角色 ARN 形态 + 「自定义优先、留空回退平台默认」的**唯一作者**。
+// 执行角色 ARN 形态 + 「自定义优先、留空回退平台默认」的**唯一作者**。
 //
 // 改动前这两件事在 lib/etl/job-service.ts · lib/sync/start-run.ts · lib/realtime/flink-service.ts ·
 // lib/engines/emr/{provider,schedule-fanout}.ts · app/api/flink/jobs/{route,[id]/route}.ts 各写一份(同一条正则抄了七遍);

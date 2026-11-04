@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3-matrix
 // **版本一致性矩阵**的读接口(50 INTERACTION §3.1 + §3.1a)。
 //
 // 客户痛点原话「怕操作漏掉某个 region 导致数据对不上」—— 这张看板就是那句话的正面回应。

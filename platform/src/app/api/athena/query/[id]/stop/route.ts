@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { requireProject } from "@/lib/projects/guard";
 import { stopQuery, resolveAthenaPlace } from "@/lib/athena/client";
@@ -28,7 +28,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (chk instanceof NextResponse) return chk;
 
   try {
-    // @kf-batch 50-WP4ter-coverage
     const place = await resolveAthenaPlace(requestedTargetId(req.nextUrl.searchParams.get("targetId"), "停止 Athena 查询"));
     await stopQuery(params.id, place.region);
     recordAudit(req, "athena.stop", { resourceType: "athena-query", resourceId: params.id });

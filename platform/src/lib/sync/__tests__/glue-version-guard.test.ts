@@ -1,5 +1,5 @@
-// 序 38 B-69 / 序 53 —— Glue 版本守卫:单元判据 + 接线判据(新建 / 保存两条路由都在**调用位置**接上了,不是只 import;
-//   序 53 起再钉:缺省 == 清单最高、全仓不许再写死「5.1」缺省、离线计算 / 发现作业 / 参数顾问 / 提示词都读同一个作者)。
+// Glue 版本守卫:单元判据 + 接线判据(新建 / 保存两条路由都在**调用位置**接上了,不是只 import;
+//   再钉:缺省 == 清单最高、全仓不许再写死「5.1」缺省、离线计算 / 发现作业 / 参数顾问 / 提示词都读同一个作者)。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -12,13 +12,13 @@ import {
 
 const SRC = join(__dirname, "..", "..", "..");
 
-describe("B-69 / 序 53 版本判定", () => {
+describe("版本判定", () => {
   it("缺省值在闭合清单里,且本身支持 S3 Tables;写 S3 Tables 的最低版本仍是 5.1", () => {
     expect((GLUE_VERSIONS as readonly string[]).includes(GLUE_VERSION_DEFAULT)).toBe(true);
     expect(glueVersionSupportsS3Tables(GLUE_VERSION_DEFAULT)).toBe(true);
     expect(S3_TABLES_MIN_GLUE_VERSION).toBe("5.1");
   });
-  it("🔴 序 53:缺省 == 清单里的最高版本(用户 2026-10-26 拍板「缺省最高、允许降版」),清单按升序排", () => {
+  it("🔴 缺省 == 清单里的最高版本(用户 2026-10-26 拍板「缺省最高、允许降版」),清单按升序排", () => {
     const sorted = [...GLUE_VERSIONS].sort(compareGlueVersions);
     expect(sorted).toEqual([...GLUE_VERSIONS]);
     expect(GLUE_VERSION_DEFAULT).toBe(sorted[sorted.length - 1]);
@@ -58,7 +58,7 @@ describe("B-69 / 序 53 版本判定", () => {
     expect(isGlueVersion("6.0")).toBe(true);
     expect(isGlueVersion(6)).toBe(false);
   });
-  it("🔴 序 53:存量记录没存版本 ⇒ 按它被写下时的缺省 5.1(不是新缺省 6.0);存了就用;清单外抛 —— 升级不改任何已有任务 / 作业的 Glue 版本", () => {
+  it("🔴 存量记录没存版本 ⇒ 按它被写下时的缺省 5.1(不是新缺省 6.0);存了就用;清单外抛 —— 升级不改任何已有任务 / 作业的 Glue 版本", () => {
     expect(GLUE_VERSION_FOR_UNVERSIONED_RECORDS).toBe("5.1");
     expect(GLUE_VERSION_FOR_UNVERSIONED_RECORDS).not.toBe(GLUE_VERSION_DEFAULT);
     expect(glueVersionOfRecord(undefined)).toBe("5.1");
@@ -67,7 +67,7 @@ describe("B-69 / 序 53 版本判定", () => {
     expect(glueVersionOfRecord("4.0")).toBe("4.0");
     expect(() => glueVersionOfRecord("3.0")).toThrow(/不合法/);
   });
-  it("🔴 序 53:Glue ≥ 6.0 的同步作业带 Spark 4 兼容开关(ANSI 关 + 六个 JDBC legacy 映射开关),< 6.0 为空(作业定义逐字节不变)", () => {
+  it("🔴 Glue ≥ 6.0 的同步作业带 Spark 4 兼容开关(ANSI 关 + 六个 JDBC legacy 映射开关),< 6.0 为空(作业定义逐字节不变)", () => {
     expect(glueVersionNeedsSpark4Compat("6.0")).toBe(true);
     expect(glueVersionNeedsSpark4Compat("7.0")).toBe(true);
     expect(glueVersionNeedsSpark4Compat("5.1")).toBe(false);
@@ -95,7 +95,7 @@ describe("B-69 / 序 53 版本判定", () => {
   });
 });
 
-describe("B-69 validateSyncGlueVersion", () => {
+describe("validateSyncGlueVersion", () => {
   it("不带 glueConfig / 不带 glueVersion / 空串 ⇒ null(缺省合法)", () => {
     expect(validateSyncGlueVersion({ targetType: "s3-tables" })).toBeNull();
     expect(validateSyncGlueVersion({ targetType: "s3-tables", glueConfig: {} })).toBeNull();
@@ -124,7 +124,7 @@ function callSitesOnly(src: string): string {
 }
 const read = (...rel: string[]) => callSitesOnly(readFileSync(join(SRC, ...rel), "utf8"));
 
-describe("B-69 接线:新建(POST)与保存(PUT)路由都在调用位置接上了 validateSyncGlueVersion,且启动核心用的是同一份常量", () => {
+describe("接线:新建(POST)与保存(PUT)路由都在调用位置接上了 validateSyncGlueVersion,且启动核心用的是同一份常量", () => {
   it("POST /api/sync", () => {
     const code = read("app", "api", "sync", "route.ts");
     expect((code.match(/validateSyncGlueVersion\(/g) || []).length).toBe(1);
@@ -148,13 +148,13 @@ describe("B-69 接线:新建(POST)与保存(PUT)路由都在调用位置接上�
     expect(code).toContain("glueVersionLabel(x)");
     expect(code).toContain("initialValue={GLUE_VERSION_DEFAULT}");
     expect(code).not.toMatch(/\["4\.0", "5\.0", "5\.1"/);
-    // 序 53:编辑存量任务回填时,没版本的补成 5.1(不让 initialValue 6.0 顶上去)
+    // 编辑存量任务回填时,没版本的补成 5.1(不让 initialValue 6.0 顶上去)
     expect(code).toContain("withRecordGlueVersion(editing)");
     expect(code).toContain("glueVersion: GLUE_VERSION_FOR_UNVERSIONED_RECORDS");
   });
 });
 
-describe("🔴 序 53 接线:离线计算 / 发现作业 / 参数顾问 / 提示词 / 诊断证据都从单一作者取版本,全仓不再写死「5.1」缺省", () => {
+describe("🔴 接线:离线计算 / 发现作业 / 参数顾问 / 提示词 / 诊断证据都从单一作者取版本,全仓不再写死「5.1」缺省", () => {
   it("离线计算页:表单缺省 + 下拉清单都取单一作者", () => {
     const code = read("app", "etl-jobs", "page.tsx");
     expect(code).toContain("glueVersion: GLUE_VERSION_DEFAULT");

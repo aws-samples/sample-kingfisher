@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 同步启动核心 ensureGlueSyncJob ↔ 数据源网络对象核对自愈的装配层判据(真调用序列)。
+// 同步启动核心 ensureGlueSyncJob ↔ 数据源网络对象核对自愈的装配层判据(真调用序列)。
 //
 // 【缺陷原形(2026-10-28 测试账号)】平台为数据源建的安全组被平台外删除 ⇒ 之后每次同步启动 / 定时运行都失败,运行行只有 AWS 原话;
 //   源仍显示「已连接」;编辑不重建组;产品里没有修复入口。
@@ -47,7 +47,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
       const ids: string[] = input.GroupIds ?? input.Filters?.find((f: any) => f.Name === "group-id")?.Values ?? [];
       return { SecurityGroups: ids.filter((id) => h.sgs[id]).map((id) => ({ GroupId: id, GroupName: h.sgs[id].GroupName, Tags: h.sgs[id].Tags })) };
     }
-    // B-133 第二刀:子网事实带 VPC / 可用区(写 Glue 连接前按它取 AZ;源行不存 AZ)
+    // 第二刀:子网事实带 VPC / 可用区(写 Glue 连接前按它取 AZ;源行不存 AZ)
     if (cmd === "DescribeSubnetsCommand") return { Subnets: [{ SubnetId: "subnet-1", VpcId: "vpc-1", AvailabilityZone: "us-east-1a" }] };
     if (cmd === "CreateSecurityGroupCommand") { h.sgs["sg-rebuilt"] = { GroupName: input.GroupName, Tags: input.TagSpecifications?.[0]?.Tags ?? [] }; return { GroupId: "sg-rebuilt" }; }
     if (cmd === "DescribeVpcsCommand") return { Vpcs: [{ VpcId: input.VpcIds[0], CidrBlock: "10.0.0.0/16" }] };
@@ -89,7 +89,7 @@ const CONN = "bgp-conn-AAAAAADS0133";
 const base = GOLDEN_SHAPES[0].ds as unknown as Record<string, unknown>;
 const platformDs = () => ({
   ...base, datasourceId: DS_ID, glueConnectionName: CONN, secretArn: "arn:aws:secretsmanager:us-east-1:000000000000:secret:bgp/datasource/x",
-  // 与建源真落库同形:没有 availabilityZone(2.1.2 及之前从不落;B-133 第二刀起连接的 AZ 按子网事实取)
+  // 与建源真落库同形:没有 availabilityZone(2.1.2 及之前从不落;第二刀起连接的 AZ 按子网事实取)
   networkConfig: { vpcId: "vpc-1", subnetId: "subnet-1", securityGroupId: "sg-plat", isRds: false },
 }) as unknown as DataSource;
 const userDs = () => ({
@@ -113,7 +113,7 @@ beforeEach(() => {
   process.env.AWS_ACCOUNT_ID = "123456789012";
 });
 
-describe("ensureGlueSyncJob ↔ 网络对象核对自愈(B-133 装配)", () => {
+describe("ensureGlueSyncJob ↔ 网络对象核对自愈(装配)", () => {
   it("平台组被删 ⇒ 先 CreateSecurityGroup(带标签)+ UpdateConnection,再建命名空间 / 写脚本 / 建作业 ⇒ ok:true", async () => {
     delete h.sgs["sg-plat"];
     const r = await ensureGlueSyncJob({ task: task(), taskId: TASK_ID, ds: platformDs(), tid: "tgt_home" });

@@ -26,10 +26,10 @@ export class OmSearchStack extends cdk.Stack {
     this.esSg = new ec2.SecurityGroup(this, "OmEsSg", { vpc: props.vpc, description: "OpenMetadata ES" });
     this.esSg.addIngressRule(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(443));
 
-    // 模块 27 (WS2 — 高可用): 由「1 节点 / 单 AZ」升级为「2 数据节点 + 3 专用主节点 / 2 AZ
+    // (WS2 — 高可用): 由「1 节点 / 单 AZ」升级为「2 数据节点 + 3 专用主节点 / 2 AZ
     // zone-awareness」。原先单节点单 AZ 是 SPOF——节点或 AZ 故障即 OM 搜索/元数据查询不可用。
     // 专用主节点(奇数 3 个)保证脑裂保护下的稳定选主。
-    // 模块 27 (WS1 — 加密): 静态加密用数据域 CMK + 节点间加密 + 强制 HTTPS(传输加密)。
+    // (WS1 — 加密): 静态加密用数据域 CMK + 节点间加密 + 强制 HTTPS(传输加密)。
     this.domain = new opensearch.Domain(this, "OmSearch", {
       domainName: "bgp-om-search",
       version: opensearch.EngineVersion.OPENSEARCH_2_11,

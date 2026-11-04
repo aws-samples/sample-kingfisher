@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 判据 ACCEPTANCE 段 `slsw` **SW-11**:经典 mwaa **不再提供新装**,而**存量环境功能守恒**。
 //
 // 🔴 这一组的全部难点在**那条界线**:用户拍板「后面也不部署普通版本的 mwaa 了」,
@@ -45,7 +44,7 @@ describe("SW-11 经典 mwaa:不再提供,存量守恒", () => {
     // 🔴 已装 mwaa 的环境要补装别的组件时,`components` 是**全集**语义、且明令不许减组件
     //   ⇒ 它**必须**继续带着 mwaa。判据写成「全集里不许有 mwaa」就会把存量环境彻底锁死
     //   (连补装 airflow-serverless 都做不到)—— 差一个字,行为差很远。
-    // @kf-batch 50-PROD-B-seq33 ②:补充部署 = 补齐到完整集 ⇒ 存量形状改成「缺 airflow-serverless、带着 mwaa」
+    // ②:补充部署 = 补齐到完整集 ⇒ 存量形状改成「缺 airflow-serverless、带着 mwaa」
     const keep = planComponentAddition(["core", "mwaa", "redshift", "dms", "flink"], ["core", "mwaa", "redshift", "dms", "flink", "airflow-serverless"], { isHome: false });
     expect(keep.ok, (keep as { message?: string }).message).toBe(true);
     expect((keep as { added: string[] }).added).toEqual(["airflow-serverless"]);
@@ -74,7 +73,7 @@ describe("SW-11 经典 mwaa:不再提供,存量守恒", () => {
     }
   });
 
-  // @kf-batch 50-PROD-B-seq33 ②:向导不再有勾选(组件集由法域唯一决定)⇒ 停供组件**根本不出现在向导里**;
+  // ②:向导不再有勾选(组件集由法域唯一决定)⇒ 停供组件**根本不出现在向导里**;
   //   「已停止提供」的说明留在 api.ts 的元数据里,供详情页给存量已装 mwaa 的环境显示。
   it("🔴 向导:只读列完整组件集,停供的 mwaa 不出现;api.ts 元数据仍留 mwaa 一行(存量详情页要用)", () => {
     const api = readSource("app/exec-envs/api.ts");

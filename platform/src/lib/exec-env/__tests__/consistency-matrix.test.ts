@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-matrix
 // 版本一致性矩阵**聚合层**的门禁(50 INTERACTION §3.1 + §3.1a)。
 //
 // 🔴 这张看板最要紧的不是"算出格子",是**别误报**:误报与假绿一样致命 ——
@@ -257,7 +256,7 @@ describe("🔴🔴 格子与计数:只有三类参与判定", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("🔴🔴 观测态 → 格子态:穷举映射 + **两侧 attention 口径必须逐态相等**", () => {
-  it("`LANDED_TO_CELL` 覆盖全部 6 个观测态(漏一个态就会静默落进默认值,而默认值最可能是绿;@kf-batch 50-W5-seg1-WP10a:residency-blocked 已删)", () => {
+  it("`LANDED_TO_CELL` 覆盖全部 6 个观测态(漏一个态就会静默落进默认值,而默认值最可能是绿;:residency-blocked 已删)", () => {
     expect(sorted(Object.keys(LANDED_TO_CELL))).toEqual([
       "credential-gap", "drift", "failed", "never-landed", "ok", "stale",
     ]);
@@ -313,7 +312,7 @@ describe("🔴🔴 建模产物格子:⊘ 不计入、drift 计入但**不给一
         targets: [HOME, USW2],
         landedByTarget: {
           [HOME]: landRec("ok", hash),
-          [USW2]: landRec("credential-gap", hash, { error: "缺窄权 shared-writer 通道(P52.5a 遗留项)" }),
+          [USW2]: landRec("credential-gap", hash, { error: "缺窄权 shared-writer 通道" }),
         },
       }),
     ];

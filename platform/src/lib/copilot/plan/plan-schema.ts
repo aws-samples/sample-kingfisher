@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 规划大脑的结构化产出 Zod schema(喂给 Strands structuredOutputSchema)。
+// Copilot 规划大脑的结构化产出 Zod schema(喂给 Strands structuredOutputSchema)。
 // Strands Agent 用它强约束模型产出符合 PlanSpec 的 JSON,并【自动校验 + 校验失败重试】
 // (StructuredOutputError 兜底)。schema 与 types.ts 的 PlanSpec/StepSpec 一一对应(单一事实源)。
 //

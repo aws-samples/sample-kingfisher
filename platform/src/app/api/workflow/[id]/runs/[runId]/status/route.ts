@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP13-mwaa-region —— MWAA 环境 / 桶只经解析器(home 逐字节不变)
+// MWAA 环境 / 桶只经解析器(home 逐字节不变)
 import { schedulerEndpointFor, isServerlessEndpoint, mwaaClientFor, MwaaNotInstalled, mwaaErrorResponse } from "@/lib/scheduler/mwaa-endpoint";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 50-WP17-serverless-workflow —— serverless 的 reconcile-on-read(判据 slsw SW-12)
+// serverless 的 reconcile-on-read(判据 slsw SW-12)
 import { readServerlessRunState } from "@/lib/scheduler/serverless/task-logs";
 import { serverlessWorkflowArnOf } from "@/lib/workflow/publish-dag";
 import { NextRequest, NextResponse } from "next/server";
@@ -12,7 +12,7 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { fireDownstreamOnce } from "@/lib/scheduler/dependency";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { updateRunRecord, resolveRunStamp } from "@/lib/monitor/run-records";
 
 // WF-07 — backfill a workflow run's status/duration from Airflow.
@@ -25,7 +25,6 @@ import { updateRunRecord, resolveRunStamp } from "@/lib/monitor/run-records";
 // repeatedly (the frontend polls it for any still-"running" rows in the 运行历史 tab).
 
 const USER_ID = "default-user";
-// @kf-batch 50-WP17-serverless-workflow
 // 🔴 这里原来是**模块级**的 `new MWAAClient({ region: AWS_REGION })` + `homeMwaaEndpoint().envName`
 //    ⇒ 回填一个**别区**工作流的运行状态时,问的是主控区的 Airflow:那儿没有这个 DAG ⇒ `list-runs` 空 ⇒
 //    走到下面的「孤儿宽限期」分支,把一次**跑得好好的** run 在 3 分钟后标成 failed(看板假红,还会误触发下游)。
@@ -91,7 +90,7 @@ export async function GET(
 
     // ── serverless:reconcile-on-read(SW-12)────────────────────────────────
     // 🔴 台账行只说「这次 run 开始了」:节点 task 被服务硬杀(60 min 上限 / 基础设施)时**没有任何代码在跑**,
-    //    行会停在 running。状态的真值在**服务侧**(与 T-13 同一条纪律),所以这里以服务侧为准回填。
+    //    行会停在 running。状态的真值在**服务侧**(与同一条纪律),所以这里以服务侧为准回填。
     //    刻意不做定时补偿器:那是另一套要部署、要监控、还会自己坏的东西。
     if (isServerlessEndpoint(ep)) {
       const workflowArn = await serverlessWorkflowArnOf(
@@ -150,7 +149,6 @@ export async function GET(
       const ORPHAN_GRACE_MS = 3 * 60 * 1000;
       if (ageMs > ORPHAN_GRACE_MS) {
         const now = new Date().toISOString();
-        // @kf-batch 52-P52.2-W2a-run-stamp
         await updateRunRecord({
           taskId: params.id, runId: params.runId,
           set: {
@@ -177,7 +175,6 @@ export async function GET(
         : run.duration || 0;
     const finishedAt = Number.isFinite(endMs) ? new Date(endMs).toISOString() : new Date().toISOString();
 
-    // @kf-batch 52-P52.2-W2a-run-stamp
     await updateRunRecord({
       taskId: params.id, runId: params.runId,
       set: { status, finishedAt, duration },

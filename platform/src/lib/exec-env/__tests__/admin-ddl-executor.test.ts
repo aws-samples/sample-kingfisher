@@ -1,10 +1,9 @@
-// @kf-batch 52-P52.5a-supply
 // 🔴 闭合 admin-DDL 执行器的门禁(50 SPEC §3.9a 九步固定序)。
 //
 // 本文件的每一条都对着一个**能真发生**的失败:
 //   · 口令进审计 ⇒ 审计表变成口令库;
 //   · 审计挪到执行之后 ⇒ 执行过但没记录;
-//   · SecretArn 省掉 ⇒ 退回联邦身份、表属主分叉(P52.1-L1 修过);
+//   · SecretArn 省掉 ⇒ 退回联邦身份、表属主分叉(修过);
 //   · lint 少传 projectId ⇒ 跨项目归属校验形同不存在;
 //   · 审批只看"带了单号" ⇒ 一张成员审批单就能当删库许可。
 // 🔴 全部写成**可执行断言**:文本级门禁证明不了 `...(x ? {x} : {})` 这类"源码里有、运行时没有"。
@@ -73,7 +72,7 @@ vi.mock("@/lib/projects/project-service", () => ({
   listAllProjects: vi.fn(async () => Array.from(projects).map((projectId) => ({ projectId }))),
 }));
 
-// ── @kf-batch 50-WP11b-shared-writer:建模台账(成员资格守卫的真值源;执行器第 2 步动态 import 它们)──
+// ──:建模台账(成员资格守卫的真值源;执行器第 2 步动态 import 它们)──
 let codeTables: Record<string, { codeTableId: string; code: string }> = {};
 let modelTables: Record<string, Record<string, unknown>> = {};
 vi.mock("@/lib/modeling/service", () => ({
@@ -93,7 +92,7 @@ vi.mock("@/lib/exec-env/admin-ddl-guards", () => ({ ...guards, lintGeneratedStat
 const executorMod = await import("@/lib/exec-env/admin-ddl-executor");
 const { executeAdminDdl, provisionProjectLogin, provisionSharedWriter, actorFromIdentity, systemActor, AdminDdlDenied, redactSql, ADMIN_DDL_PLACE_VIA } =
   executorMod;
-// @kf-batch 50-WP31-place-first-class(B-98)—— 落点决策账本(真模块;请求存储由测试注入)
+// 落点决策账本(真模块;请求存储由测试注入)
 const placeCtx = await import("@/lib/place/context");
 const { projectDbUserName, projectRoleName, projectSchema, projectSecretName } = await import(
   "@/lib/exec-env/project-schema"
@@ -440,16 +439,16 @@ describe("🔴 返回面封闭:本模块不导出任何拿得到 admin 凭证的
     }
     // 白名单:新增导出必须在这里显式过一遍(防有人偷偷加回取凭证的口子)
     expect(names).toEqual([
-      // @kf-batch 50-WP31-place-first-class(B-98)—— 落点决策署名常量(字面 "admin-ddl-executor"),不是取凭证的口子
+      // 落点决策署名常量(字面 "admin-ddl-executor"),不是取凭证的口子
       "ADMIN_DDL_PLACE_VIA",
       "AdminDdlDenied",
       "actorFromIdentity",
       "executeAdminDdl",
       "provisionProjectLogin",
-      // @kf-batch 50-WP11b-shared-writer —— 第三个公开入口(SPEC §3.9d.4);返回值里同样没有 ARN / 口令
+      // 第三个公开入口(SPEC §3.9d.4);返回值里同样没有 ARN / 口令
       "provisionSharedWriter",
       "redactSql",
-      // @kf-batch 50-WP9a-durable-jobs —— 两段式入口(§3.9a 合同差分 ③-1):提交凭据里只有 auditId / statementId / region,
+      // 两段式入口(§3.9a 合同差分 ③-1):提交凭据里只有 auditId / statementId / region,
       //   读终态只回 affected / 脱敏错误 —— 与同步入口同一条「返回面封闭」
       "settleAdminDdl",
       "submitAdminDdl",
@@ -515,9 +514,9 @@ describe("actor 构造与脱敏工具", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP11b-shared-writer —— E-233(单测):窄权写者通道的执行器侧不变量(SPEC §3.9d)
+// (单测):窄权写者通道的执行器侧不变量(SPEC §3.9d)
 // ══════════════════════════════════════════════════════════════════════════════
-describe("🔴🔴 E-233 台账成员资格守卫:id 在码表 / 模型表台账里查不到 ⇒ 第 2 步拒,零执行零审计", () => {
+describe("🔴🔴 台账成员资格守卫:id 在码表 / 模型表台账里查不到 ⇒ 第 2 步拒,零执行零审计", () => {
   it("码表类三个 operation:台账查不到 ⇒ 拒(不是判一个不存在的 kind 字段)", async () => {
     codeTables = {};
     for (const req of [
@@ -569,7 +568,7 @@ describe("🔴🔴 E-233 台账成员资格守卫:id 在码表 / 模型表台账
   });
 });
 
-describe("🔴🔴 E-233 grant-shared-writer:逐表授权、零 schema 级写权", () => {
+describe("🔴🔴 grant-shared-writer:逐表授权、零 schema 级写权", () => {
   it("产物逐字节 = USAGE ON SCHEMA + 这一张表的四个 DML 权(主体名 / 落点都来自 SSOT)", async () => {
     await executeAdminDdl(ADMIN, { operation: "grant-shared-writer", targetId: "tgt_home", codeTableId: "region_cn" });
     expect(execCalls.map((c) => c.sql)).toEqual([
@@ -615,7 +614,7 @@ describe("🔴🔴 E-233 grant-shared-writer:逐表授权、零 schema 级写权
   });
 });
 
-describe("🔴🔴 E-233 provisionSharedWriter:口令不出函数、返回值没有 ARN、只建用户不授权", () => {
+describe("🔴🔴 provisionSharedWriter:口令不出函数、返回值没有 ARN、只建用户不授权", () => {
   const USW2_TARGET = {
     targetId: "tgt_usw2_a",
     region: "us-west-2",
@@ -673,11 +672,11 @@ describe("🔴🔴 E-233 provisionSharedWriter:口令不出函数、返回值没
   });
 });
 
-// @kf-batch 50-WP31-place-first-class(序 31 第二刀 ① = B-98)
+// (=)
 // 🔴 本执行器是**第二条**数据面通道:建模落地 / 维表 DDL 的非主控区一跳走它而不走 resolveRedshiftBinding。
 //   原来只做准入、不记落点决策 ⇒ observe 把该区的 redshift-data / secretsmanager 调用判成 cross-region(第三十九 / 四十轮
 //   16 / 12 条全是它);enforce 一开会误拦。判据钉事实:决策在**准入之后、第一次数据面执行之前**进账本;被拒不记;请求外不抛。
-describe("🔴 B-98 admin-DDL 执行器记落点决策(准入之后、执行之前;被拒不记)", () => {
+describe("🔴 admin-DDL 执行器记落点决策(准入之后、执行之前;被拒不记)", () => {
   let store: object = {};
   const decided = () =>
     placeCtx.decisionsOfCurrentRequest().decisions.filter((d) => d.via === ADMIN_DDL_PLACE_VIA).map((d) => d.targetId);

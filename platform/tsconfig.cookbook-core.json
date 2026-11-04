@@ -1,5 +1,5 @@
 {
-  // @cookbook/core 独立编译成 CJS 的配置(模块45 P45.5b)。
+  // @cookbook/core 独立编译成 CJS 的配置。
   // 与 tsconfig.core.json(@genbi/core)、tsconfig.{paramadvisor,netadvisor}-core.json 同构。
   // 【只 include 方言 guard 纯子集】core-guard/guard-core/mask/types/seed —— 【故意排除】
   // registry/store/retrieve/prompt/capability-vocab:它们顶层 import @/lib/aws/dynamodb(store)与其它

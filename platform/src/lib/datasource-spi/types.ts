@@ -1,4 +1,4 @@
-// 模块 42 — 数据源 SPI:通用类型（范式无关）。
+// 数据源 SPI:通用类型（范式无关）。
 //
 // 设计红线：数据源走 SPI 插件化——新数据源 = 独立 provider 文件纯增量 + registry 注册一行;
 // 老代码零改动。照抄样板:lib/engines/{types,spi,registry}.ts（引擎 SPI,已成立的样板）。
@@ -14,16 +14,16 @@
 export type SourceParadigm = "jdbc" | "object-store" | "nosql" | "stream";
 
 // 全部支持的源类型（加源 = 这里加一个字面量 + registry 加一行 provider）。
-// P42.1-P42.3 落 jdbc 四兄弟;P42.7 落 kinesis(流范式首个,收编 Flink 源);P42.4/P42.5 落 s3/dynamodb。
+// 落 jdbc 四兄弟;落 kinesis(流范式首个,收编 Flink 源);落 s3/dynamodb。
 export type DataSourceType =
   | "mysql"
   | "postgresql"
   | "oracle"
   | "sqlserver"
-  | "kinesis" // ← 流范式(P42.7)
-  | "msk" // ← 流范式第二个:MSK / Kafka(P42.6)
-  | "dynamodb" // ← NoSQL 范式首个(P42.5)
-  | "s3"; // ← 对象存储范式首个(P42.4)
+  | "kinesis" // ← 流范式
+  | "msk" // ← 流范式第二个:MSK / Kafka
+  | "dynamodb" // ← NoSQL 范式首个
+  | "s3"; // ← 对象存储范式首个
 
 // 凭证形态:决定 Secret 内容结构 + 建源表单认证区 + provider 如何读凭证。
 //  userpass   = {username,password}          —— JDBC 四兄弟

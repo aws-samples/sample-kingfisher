@@ -1,5 +1,5 @@
 "use client";
-// 序 41 B-117 —— 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
+// 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
 import { deleteJson } from "@/lib/http/delete-json";
 
 import React, { useEffect, useState } from "react";
@@ -7,17 +7,17 @@ import { Table, Button, Space, Tag, Popconfirm, message, Drawer, Descriptions, C
 import { PlusOutlined, ReloadOutlined, DatabaseOutlined, TableOutlined, SearchOutlined, ApiOutlined, ApartmentOutlined, CloudServerOutlined } from "@ant-design/icons";
 import type { DataSource } from "@/types/datasource";
 import DataSourceModal from "./DataSourceModal";
-// 序 52 / B-124:S3 源行「建外部表(Athena 直查)」弹窗;落点 = 行上的章(唯一读法),外部表建在那个区
+// S3 源行「建外部表(Athena 直查)」弹窗;落点 = 行上的章(唯一读法),外部表建在那个区
 import S3ExternalTableModal from "./S3ExternalTableModal";
 import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
+// 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
 import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
-// 序 38 B-70:取表清单的唯一作者(直连 / 经 Glue 连接发现 + 轮询都在它里面)
+// 取表清单的唯一作者(直连 / 经 Glue 连接发现 + 轮询都在它里面)
 import { fetchSourceTables } from "@/lib/datasource/tables-client";
 
 const statusColor: Record<string, string> = { active: "green", inactive: "default", error: "red" };
@@ -29,7 +29,7 @@ export default function DatasourcesPage() {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<DataSource | undefined>();
-  // 序 38 B-70:via / note / loading —— 表清单是直连读的还是经 Glue 连接发现的,页面要说清楚
+  // via / note / loading —— 表清单是直连读的还是经 Glue 连接发现的,页面要说清楚
   const [metaDrawer, setMetaDrawer] = useState<{ open: boolean; ds?: DataSource; tables: any[]; via?: "control-plane" | "glue-discovery"; note?: string; discoveredAt?: string; loading?: boolean; waitingNote?: string }>({ open: false, tables: [] });
   const [deletingId, setDeletingId] = useState<string>("");
   // DS-05: connectivity heartbeat — per-row probe + batch probe.
@@ -40,23 +40,23 @@ export default function DatasourcesPage() {
   const [netVpcs, setNetVpcs] = useState<any[]>([]);
   const [netSubnets, setNetSubnets] = useState<any[]>([]);
   const [netSgs, setNetSgs] = useState<any[]>([]);
-  // @kf-batch 50-WP4quater-reads —— 这份网络清单是哪个区的(护栏 2:落点必须一眼可见)
+  // 这份网络清单是哪个区的(护栏 2:落点必须一眼可见)
   const [netRegion, setNetRegion] = useState("");
   const [netVpc, setNetVpc] = useState<string | undefined>(undefined);
   const [netSubnetId, setNetSubnetId] = useState<string | undefined>(undefined);
   const [netSgIds, setNetSgIds] = useState<string[]>([]);
   const [savingNet, setSavingNet] = useState(false);
   const [netDrawer, setNetDrawer] = useState<{ open: boolean; ds?: DataSource }>({ open: false });
-  // 序 52 / B-124:S3 源「建外部表」弹窗(targetId / region = 这条源的落点,打开时按行上的章算好)
+  // S3 源「建外部表」弹窗(targetId / region = 这条源的落点,打开时按行上的章算好)
   const [s3Ext, setS3Ext] = useState<{ open: boolean; ds?: DataSource; targetId: string; region: string }>({ open: false, targetId: "", region: "" });
-  // @kf-batch 50-WP4bis-p1-scope —— 当前执行范围(顶栏选的那个;URL 是权威)。
+  // 当前执行范围(顶栏选的那个;URL 是权威)。
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `scope=${encodeURIComponent(scopeParam)}` : "";
-  // @kf-batch 50-WP4quater-reads(工单 SC-30)—— 网络清单的取数落点(单区视角 = 该区;分组 / 全局 = 主控区)
-  // @kf-batch 50-WP31-place-first-class —— 落点显式(全局 / 分组 = 主控区写明,不靠后端缺省)
+  // 网络清单的取数落点(单区视角 = 该区;分组 / 全局 = 主控区)
+  // 落点显式(全局 / 分组 = 主控区写明,不靠后端缺省)
   const netTargetId = landingOfScope(scope);
-  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴🔴 上一版这里写的是「一期建源只发生在主控区…
+  // 🔴🔴 上一版这里写的是「一期建源只发生在主控区…
   //    建出来的行当前视角看不见」。用户 2026-09-10 明确驳回了那个状态:「**所有的任务都要创建在
   //    当前区域,不能只是创建在主控区,没意义…不然也是白干了。**」
   // ⇒ 现在:单区视角 ⇒ **就建在那个区**(落点随视角);主控区 / 全局视角 ⇒ 建在主控区。
@@ -64,7 +64,7 @@ export default function DatasourcesPage() {
   const createTargetId = scope.kind === "target" ? scope.targetId : undefined;
   const createRegion = createTargetId ? scopeTargets?.find((x: { targetId: string; region?: string }) => x.targetId === createTargetId)?.region || createTargetId : "";
 
-  // 序 52 / B-124:打开「建外部表」—— 落点取行上的章(存量无章 = 主控区;章非法由唯一读法抛,这里如实报错、不默认主控区)
+  // 打开「建外部表」—— 落点取行上的章(存量无章 = 主控区;章非法由唯一读法抛,这里如实报错、不默认主控区)
   const openS3External = (ds: DataSource) => {
     try {
       const targetId = datasourceOwnerTarget(ds as unknown as Record<string, unknown>);
@@ -106,7 +106,7 @@ export default function DatasourcesPage() {
       if (cur.status) params.set("status", cur.status);
       if (cur.hasGlue) params.set("hasGlue", cur.hasGlue);
       if (cur.hasSecret) params.set("hasSecret", cur.hasSecret);
-      // @kf-batch 50-WP4bis-p1-scope —— 带上当前执行范围;`global` 时 `toScopeParam` 回 null
+      // 带上当前执行范围;`global` 时 `toScopeParam` 回 null
       // ⇒ **URL 与改动前逐字节相同**(回滚点),不会凭空多出一个 `?scope=global`。
       if (scopeQs) params.set("scope", scopeParam!);
       const qs = params.toString();
@@ -123,7 +123,7 @@ export default function DatasourcesPage() {
     fetch(`/api/flink/network?targetId=${encodeURIComponent(netTargetId)}`).then((r) => r.json()).then((d) => {
       if (d?.success) { setNetVpcs(d.data.vpcs || []); setNetSubnets(d.data.subnets || []); setNetSgs(d.data.securityGroups || []); setNetRegion(d.data.region || ""); }
     }).catch(() => {});
-    // @kf-batch 50-WP4bis-p1-scope —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)。
+    // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scopeQs]);
 
@@ -134,7 +134,7 @@ export default function DatasourcesPage() {
       message.success(t("已删除"));
       fetchData();
     } catch (e) {
-      // 序 41 B-117:删不掉(502 连带资源撤不下来 / 409 进行中)⇒ 原话呈现、行不动
+      // 删不掉(502 连带资源撤不下来 / 409 进行中)⇒ 原话呈现、行不动
       message.error((e as Error).message || t("删除失败"));
     } finally {
       setDeletingId("");
@@ -151,7 +151,7 @@ export default function DatasourcesPage() {
       if (d?.reachable === true) message.success(t("可达 ({latency}ms)", { latency: d.latencyMs }));
       else if (d?.reachable === false) message.error(t("不可达: {err}", { err: d.error || t("连接失败") }));
       else if (d?.via === "glue-connection" && d?.state === "testing") {
-        // 序 38 B-70:控制面直连不到 ⇒ 已改经数据源自己的 Glue 连接探测(一次性 Glue 作业在该连接的子网 / 安全组里登录源库,1–3 分钟),轮询结果;
+        // 控制面直连不到 ⇒ 已改经数据源自己的 Glue 连接探测(一次性 Glue 作业在该连接的子网 / 安全组里登录源库,1–3 分钟),轮询结果;
         //   页面不再轮询时,列表 / 单条读取也会把结论推进出来(lib/datasource/glue-probe-settle.ts)
         message.info(d.message || t("已改经数据源的 Glue 连接探测(约 1–3 分钟)"), 6);
         fetchData();
@@ -189,7 +189,7 @@ export default function DatasourcesPage() {
     }
   };
 
-  // 序 38 B-70:直连读不到且有 Glue 连接 ⇒ 后端起经 Glue 连接的发现作业(202),这里轮询到结果;抽屉上说明来源
+  // 直连读不到且有 Glue 连接 ⇒ 后端起经 Glue 连接的发现作业(202),这里轮询到结果;抽屉上说明来源
   const browseMeta = async (ds: DataSource, refresh = false) => {
     setMetaDrawer({ open: true, ds, tables: [], loading: true });
     openMetaWithNetwork(ds);
@@ -221,7 +221,7 @@ export default function DatasourcesPage() {
     {
       title: t("连接信息"), key: "connection",
       render: (_: any, r: DataSource) => {
-        // 模块42:非 JDBC 源(DynamoDB/S3/Kinesis/MSK)无 host/port/db,按连接袋渲染;JDBC 保持原样。
+        // 非 JDBC 源(DynamoDB/S3/Kinesis/MSK)无 host/port/db,按连接袋渲染;JDBC 保持原样。
         const c = (r as any).connection || {};
         if (r.type === "dynamodb") return (
           <div style={{ fontSize: 12 }}>
@@ -261,11 +261,11 @@ export default function DatasourcesPage() {
       };
       const st = m[v] || m.inactive;
       const hb = (r as any).heartbeat;
-      // 序 38 B-70:结论来自哪条网要说清楚 —— 经 Glue 连接验证的给个小标;控制面直连不到不再被当成「不可达」
+      // 结论来自哪条网要说清楚 —— 经 Glue 连接验证的给个小标;控制面直连不到不再被当成「不可达」
       const viaGlue = hb?.via === "glue-connection";
-      return <div data-testid="ds-status-cell"><Badge status={st.s} text={st.t} />{/* 序 49 ② B-73:原来紧跟「已连接」显示 testResult.totalMs —— 那是查 Glue 连接配置的耗时,不是连上源库的延迟;只留心跳 ♥ 延迟 */}{hb?.latencyMs != null && hb?.reachable ? <span style={{ fontSize: 11, color: "#52c41a" }}> ♥{hb.latencyMs}ms</span> : null}
+      return <div data-testid="ds-status-cell"><Badge status={st.s} text={st.t} />{/* 原来紧跟「已连接」显示 testResult.totalMs —— 那是查 Glue 连接配置的耗时,不是连上源库的延迟;只留心跳 ♥ 延迟 */}{hb?.latencyMs != null && hb?.reachable ? <span style={{ fontSize: 11, color: "#52c41a" }}> ♥{hb.latencyMs}ms</span> : null}
         {viaGlue && <Tooltip title={hb?.controlPlane?.error ? t("控制面直连不到该源({err});以 Glue 连接验证为准", { err: String(hb.controlPlane.error).slice(0, 80) }) : t("以数据源自己的 Glue 连接验证为准")}><Tag data-testid="ds-via-glue" style={{ marginLeft: 6, fontSize: 11 }} color={hb?.state === "testing" ? "processing" : hb?.reachable ? "green" : hb?.state === "unknown" ? "default" : "orange"}>{hb?.state === "testing" ? t("Glue 连接验证中") : t("经 Glue 连接")}</Tag></Tooltip>}
-        {/* 序 61 B-133:外部网络对象的核对结论 —— broken = 用户自带对象 / 密钥缺失(平台不代建)或自愈失败,文案点名对象并指路;healed = 平台对象曾被平台外删除、已自动重建接回(次数在涨 = 账号里有清理工具在删平台对象) */}
+        {/* 外部网络对象的核对结论 —— broken = 用户自带对象 / 密钥缺失(平台不代建)或自愈失败,文案点名对象并指路;healed = 平台对象曾被平台外删除、已自动重建接回(次数在涨 = 账号里有清理工具在删平台对象) */}
         {r.networkState === "broken" && <Tooltip title={r.networkIssue?.message || t("数据源依赖的网络对象已不存在")}><Tag data-testid="ds-network-broken" color="red" style={{ marginLeft: 6, fontSize: 11 }}>{t("网络对象缺失")}</Tag></Tooltip>}
         {r.networkState === "healed" && <Tooltip title={t("平台自建的安全组 / Glue 连接曾被平台外删除,已自动重建并接回;最近一次 {at}。请排查账号里是否有清理工具在删带 bgp:managed 标签的对象", { at: String(r.lastHealedAt || "").slice(0, 19).replace("T", " ") })}><Tag data-testid="ds-network-healed" color="green" style={{ marginLeft: 6, fontSize: 11 }}>{t("已自愈 {n} 次", { n: r.healCount ?? 1 })}</Tag></Tooltip>}
       </div>;
@@ -276,7 +276,7 @@ export default function DatasourcesPage() {
       render: (_: any, record: DataSource) => (
         <Space>
           <Button size="small" icon={<TableOutlined />} onClick={() => browseMeta(record)}>{t("浏览表")}</Button>
-          {/* 序 52 / B-124:只有 S3 源有「建外部表」—— 把一个数据集登记成 Athena 外部表,建在这条源所在的区 */}
+          {/* 只有 S3 源有「建外部表」—— 把一个数据集登记成 Athena 外部表,建在这条源所在的区 */}
           {record.type === "s3" && (
             <Tooltip title={t("把这条 S3 源下的数据集登记成 Athena 外部表,建在它所在的区;建好可在数据湖直查里查询")}>
               <Button size="small" icon={<CloudServerOutlined />} data-testid="ds-s3-external-btn" onClick={() => openS3External(record)}>{t("建外部表")}</Button>
@@ -300,7 +300,7 @@ export default function DatasourcesPage() {
         <Space>
           <Button icon={<ReloadOutlined />} onClick={() => fetchData()}>{t("刷新")}</Button>
           <Button icon={<ApiOutlined />} loading={pingingAll} onClick={handleHeartbeatAll}>{t("检测可达性")}</Button>
-          {/* @kf-batch 50-WP4bis-p1-scope —— 护栏 2「写操作在按钮上复述目标」(INTERACTION §9.3-2)。
+          {/* 护栏 2「写操作在按钮上复述目标」(INTERACTION §9.3-2)。
               非主控区视角下**先说清**建出来的源落在主控区、当前视角看不到。 */}
           <Tooltip title={createRegion ? t("将在 {r} 建这条数据源:密钥、安全组、Glue 连接都建在那个区;由它派生的同步任务也会在那个区跑", { r: createRegion }) : t("将在主控区建这条数据源")}>
             <Button type="primary" icon={<PlusOutlined />} data-testid="ds-create-btn" onClick={() => { setEditing(undefined); setModalOpen(true); }}>
@@ -326,9 +326,9 @@ export default function DatasourcesPage() {
           <Button onClick={() => { const f = { name: "", type: "", status: "", hasGlue: "", hasSecret: "" }; setFilters(f); fetchData(f); }}>{t("重置")}</Button>
         </Space>
       </Card>
-      {/* @kf-batch 50-WP4bis-p1-scope —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
+      {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」 */}
       <OtherScopesHint resources={["datasource"]} />
-      {/* @kf-batch 50-WP4bis-p1-scope —— 无头验收要能**只**数这张表的行(抽屉里还有别的表),故包一层带 testid 的容器 */}
+      {/* 无头验收要能**只**数这张表的行(抽屉里还有别的表),故包一层带 testid 的容器 */}
       <div data-testid="ds-table">
         <Table
           columns={columns}
@@ -341,15 +341,15 @@ export default function DatasourcesPage() {
       </div>
       <DataSourceModal open={modalOpen} editing={editing} createTargetId={createTargetId} landingTargetId={netTargetId} onClose={() => setModalOpen(false)} onSuccess={(mode) => {
         setModalOpen(false);
-        // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 建完如实回报落点(它现在就在当前视角里,
+        // 建完如实回报落点(它现在就在当前视角里,
         // 所以是 success 而不是 warning;上一版那句「已在主控区建好、当前范围看不到」已不成立)
-        // @kf-batch 42-ux-feedback —— 编辑成功只报「已更新」:原来编辑也弹「已在主控区建好这条数据源」,与弹窗自己的「已更新」叠成两条且第二条说错了事
+        // 编辑成功只报「已更新」:原来编辑也弹「已在主控区建好这条数据源」,与弹窗自己的「已更新」叠成两条且第二条说错了事
         if (mode === "updated") message.success(t("已更新"));
         else message.success(createRegion ? t("已在 {r} 建好这条数据源", { r: createRegion }) : t("已在主控区建好这条数据源"));
         fetchData();
       }} />
 
-      {/* 序 52 / B-124:S3 源行「建外部表(Athena 直查)」—— 落点 = 这条源所在区(标题与按钮都写明);成功块带「去数据湖直查」 */}
+      {/* S3 源行「建外部表(Athena 直查)」—— 落点 = 这条源所在区(标题与按钮都写明);成功块带「去数据湖直查」 */}
       <S3ExternalTableModal open={s3Ext.open} ds={s3Ext.ds} targetId={s3Ext.targetId} region={s3Ext.region} onClose={() => setS3Ext({ open: false, targetId: "", region: "" })} />
 
       <Drawer title={t("元数据浏览 - {name}", { name: metaDrawer.ds?.name || "" })} open={metaDrawer.open} onClose={() => setMetaDrawer({ open: false, tables: [] })} width={600}>
@@ -363,7 +363,7 @@ export default function DatasourcesPage() {
             <Descriptions.Item label={t("Glue连接")}>{metaDrawer.ds.glueConnectionName || t("无")}</Descriptions.Item>
           </Descriptions>
         )}
-        {/* 序 38 B-70:等发现作业 / 发现结果来源说明 + 重新发现 */}
+        {/* 等发现作业 / 发现结果来源说明 + 重新发现 */}
         {metaDrawer.loading && (
           <Alert type="info" showIcon data-testid="ds-tables-discovering" style={{ marginBottom: 12 }}
             message={metaDrawer.waitingNote ? t("正在经数据源的 Glue 连接发现表") : t("正在读取表结构…")} description={metaDrawer.waitingNote} />
@@ -396,7 +396,7 @@ export default function DatasourcesPage() {
         title={
           <Space size={6}>
             {t("网络配置 - {name}", { name: netDrawer.ds?.name || "" })}
-            {/* @kf-batch 50-WP4quater-reads(工单 SC-30)—— 护栏 2:这份 VPC / 子网 / 安全组清单是哪个区的,
+            {/* 护栏 2:这份 VPC / 子网 / 安全组清单是哪个区的,
                 必须一眼可见。看不见区的网络下拉,是「选了一个别的区的子网」这类事故的温床。 */}
             {netRegion ? <Tag color="blue" data-testid="ds-network-region">{netRegion}</Tag> : null}
           </Space>

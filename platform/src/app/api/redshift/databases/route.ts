@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { ListDatabasesCommand } from "@aws-sdk/client-redshift-data";
-// @kf-batch 50-WP2-directquery
 // 🔴 裸客户端收编:`ListDatabases` 是**region 内**的调用 —— 用主控区客户端去列非 home 工作组的库,
 //    最好的情况是报 ResourceNotFound、最坏的情况是列出主控区的库并冒充那个区的(静默串味)。
 // 🔴 `?targetId=` 跟 SQL 编辑器自己的执行目标选择走(W3-c1 已有那个选择器),**不读 `?scope=`**:
@@ -9,14 +8,13 @@ import { ListDatabasesCommand } from "@aws-sdk/client-redshift-data";
 import { resolveDirectQueryPlaceSafe } from "@/lib/redshift/direct-query";
 import { redshiftDataClientFor } from "@/lib/exec-env/target-clients";
 import { getActiveProjectId } from "@/lib/projects/guard";
-// @kf-batch 50-WP31-place-first-class
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
+// 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
 import { requestedRegisteredPlace } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
-  // @kf-batch 50-WP31-place-first-class —— 🔴 落点必须点名(缺 / 非法 ⇒ 400):原来「没给 = 主控区」⇒ 漏传就列主控区的库。
+  // 🔴 落点必须点名(缺 / 非法 ⇒ 400):原来「没给 = 主控区」⇒ 漏传就列主控区的库。
   //   放在 try 之外:下面那个兜底 catch 会把一切错误吞成 `dev`,落点错误不许被它吞掉。
   let targetId: string;
   try {

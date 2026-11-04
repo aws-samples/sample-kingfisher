@@ -15,7 +15,7 @@ import { prefillFor } from "./prefill-adapters";
 import { selectCandidatePlacements } from "./placement";
 import { isAgentCoreConfigured, invokeNetAdvisorAgent, type AdvisorInvokeOutput } from "./agentcore-client";
 import { runtimeSessionId } from "./memory";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显:把 agent 实际用的模型带到路由层。
+// `_meta` 回显:把 agent 实际用的模型带到路由层。
 import type { AiModelUse } from "@/lib/ai/meta";
 import { AgentCoreModelMismatch } from "@/lib/ai/agentcore-contract";
 import type {
@@ -28,7 +28,7 @@ import type {
 } from "./types";
 
 export { prefillFor } from "./prefill-adapters";
-// @kf-batch 41-B115-netadvisor-place —— 路由层把请求落到执行环境上的唯一入口
+// 路由层把请求落到执行环境上的唯一入口
 export { placeConnectivityRequest } from "./place";
 export type * from "./types";
 
@@ -49,7 +49,7 @@ export function adjudicatePath(input: JudgeInput): { rulings: Ruling[]; verdict:
 // `backend` 标签如实反映真实后端(回退后须改回 inprocess)。进程内实现既是默认路径也是回退兜底(一份两用)。
 export interface AdviseResult extends ConnectivityRecommendation {
   backend: "agentcore" | "inprocess"; // 真翻转铁证：如实反映实际走的后端。
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:实际用的模型(inprocess 由 agent 返回;agentcore 由容器回执,缺省=无回执)。
+  // 实际用的模型(inprocess 由 agent 返回;agentcore 由容器回执,缺省=无回执)。
   model?: AiModelUse;
 }
 
@@ -67,7 +67,7 @@ export async function advise(
       const out = await invokeNetAdvisorAgent(sid, { request: req, history });
       return { ...assembleFromAgentCore(req, out), backend: "agentcore", model: out.model };
     } catch (e) {
-      // @kf-batch 50-W5-seg2-WP8:模型回执不匹配 = 接线故障,fail-closed 上抛(路由 503),不回落假装成功。
+      // 模型回执不匹配 = 接线故障,fail-closed 上抛(路由 503),不回落假装成功。
       if (e instanceof AgentCoreModelMismatch) throw e;
       // Runtime 故障(冷启动/限流/Gateway/MCP)不应让本可用功能失败：自动回落进程内。
       console.warn(`[netadvisor] AgentCore 调用失败,回退 inprocess: ${e instanceof Error ? e.message : String(e)}`);

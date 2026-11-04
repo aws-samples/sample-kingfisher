@@ -5,14 +5,14 @@ import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP7-sync-pushdown(原则 3)—— DMS 通道尚未逐区,非 home 章 fail-closed
+// (原则 3)—— DMS 通道尚未逐区,非 home 章 fail-closed
 import { boundToHomeOnly } from "@/lib/exec-env/definition-binding";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { putRunRecord, settleRunningRuns, resolveRunStamp } from "@/lib/monitor/run-records";
 import { recordAudit } from "@/lib/audit";
 import { getCorrelationId, logger } from "@/lib/observability/logger";
-// @kf-batch 50-B08-sync-task-write-guard —— 同步任务行的唯一状态写通道(条件写,不 upsert 幽灵行)
+// 同步任务行的唯一状态写通道(条件写,不 upsert 幽灵行)
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
 import {
   ensureSourceEndpoint,
@@ -25,7 +25,7 @@ import {
   REPLICATION_INSTANCE_BROKEN_STATUSES,
   waitTaskStartable,
 } from "@/lib/realtime/dms-service";
-// @kf-batch 50-WP24-sync-teardown —— 停 / 删 / 「启动被接管后停回去」共用**同一个**下线作者
+// 停 / 删 / 「启动被接管后停回去」共用**同一个**下线作者
 import { teardownSyncChannel } from "@/lib/sync/teardown";
 import {
   ensureRedshiftDmsUser,
@@ -33,7 +33,7 @@ import {
   ensureRoleAssociatedToNamespace,
 } from "@/lib/realtime/redshift-target";
 
-// 模块 31 (R6) — 实时同步启动入口(syncMode=realtime / channel=dms)。
+// 实时同步启动入口(syncMode=realtime / channel=dms)。
 //
 // 与 Glue 批同步的 /start 解耦(关注点分离):本路由专门编排 DMS CDC,调用 R5 固化的幂等服务层。
 // 编排顺序固化了 R3/R4 实测的 7 个踩坑解法(目标准备 → endpoints → 任务 → 启动)。
@@ -41,8 +41,7 @@ import {
 // 生产级:editor+ RBAC、审计、幂等(全程 ensure*)、结构化日志带 correlationId、错误不吞。
 // 不创建常驻基建(DMS 实例/Kinesis 由门控 BgpRealtimeStack 提供;经环境变量判断是否就绪)。
 //
-// @kf-batch 41-B121-dms-start-single-flight
-// 【B-121(2026-10-24 全新账号页面驱动段 wp24 抓到)】两件事一起坏:
+// 【(2026-10-24 全新账号页面驱动段 wp24 抓到)】两件事一起坏
 //   ① 返 202 之前同步 `await getReplicationInstanceArn()`:全新账号第一次「启动」要现场创建复制实例
 //      (3–8 分钟),一次 HTTP 请求等过 60s 边缘超时 ⇒ 页面 504(「不知道成没成」),服务端请求照跑;
 //   ② 没有「同一任务只许一条启动编排」的守卫:用户看到 504 再点,就再多一条;实例就位后几条编排
@@ -71,12 +70,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const ctx = await guardResourceAccess(req, task, "editor");
   if (ctx instanceof NextResponse) return ctx;
 
-  // 模块 31 + DMS 扩展:DMS 通道支持 full(普通全量 full-load)/ incremental・realtime(full-load-and-cdc)。
+  // + DMS 扩展:DMS 通道支持 full(普通全量 full-load)/ incremental・realtime(full-load-and-cdc)。
   // 迁移类型由同步模式派生。realtime 任务后端已强制 channel=dms;full/incremental 经前端选 DMS 通道路由至此。
   if (task.channel !== "dms") {
     return apiError("该任务非 DMS 通道,请用对应入口启动", 400, { code: "VALIDATION_FAILED", correlationId: cid });
   }
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴 原则 3:DMS 是主控区里的托管通道(HomeOnlyReason:
+  // 🔴 原则 3:DMS 是主控区里的托管通道(HomeOnlyReason:
   // dms-bootstrap-home;复制实例/角色只有 home 那套 env),尚未逐区。非 home 章任务在这里跑 =
   // 拿主控区的 DMS 去拉别区的源、写主控区数仓 —— 数据当场出境。如实拒,DMS target 化归后续包。
   if (!boundToHomeOnly(task)) {
@@ -97,7 +96,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       correlationId: cid,
     });
   }
-  // 🔴 B-121 ①:这里只**看一眼**(实例缺就发起懒创建、立刻回当前状态),不在请求里等它 available。
+  // 🔴 ①:这里只**看一眼**(实例缺就发起懒创建、立刻回当前状态),不在请求里等它 available。
   let instanceStatus = "";
   try {
     instanceStatus = (await probeReplicationInstance()).status;
@@ -155,10 +154,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   // DMS 编排(建用户/schema/角色关联/endpoints/连通性测试/启动)耗时数十秒到数分钟,远超 HTTP/CloudFront
   // 超时。生产级做法:**异步 fire-and-forget**——立即返回 202 provisioning,后台编排并把进度/
   // 终态(running/error + 错误信息)写回任务;前端轮询 /realtime-status 获取结果。
-  // @kf-batch 50-B08-sync-task-write-guard —— 走唯一写通道(条件写)。
+  // 走唯一写通道(条件写)。
   // 🔴 这是**后台 fire-and-forget** 的写回:从这里发起到真正写回之间,用户完全可能已经把任务删了
   //   ⇒ 盲 Update 会把它凭空造回来(一条没名字、删不掉的残行)。
-  // 🔴 B-121:每一笔都带「仍是本次启动在管」的条件 —— 用户中途「停止」/「删除」/ 另一次启动接管后,
+  // 🔴 每一笔都带「仍是本次启动在管」的条件 —— 用户中途「停止」/「删除」/ 另一次启动接管后,
   //   本条编排的回写一律落空(返回 superseded),绝不盖掉别人的状态。
   const writeOwned = async (status: string, extra: Record<string, unknown> = {}): Promise<"owned" | "superseded"> => {
     try {
@@ -183,7 +182,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     }
   };
 
-  // 🔴 B-121 ②:把任务置 provisioning 的这一笔就是「单飞」守卫 —— 条件写:行在、且**不是**一条还新鲜的
+  // 🔴 ②:把任务置 provisioning 的这一笔就是「单飞」守卫 —— 条件写:行在、且**不是**一条还新鲜的
   //   provisioning。条件不成立 ⇒ 409,不起第二条编排。(读出来再判不行:读与写之间就是并发窗口。)
   const claim = await updateSyncTaskIfExists({
     taskId: params.id,
@@ -207,7 +206,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     );
   }
 
-  // @kf-batch 52-P52.2-W2a-run-stamp — 同 zero-etl:刻意保留"同 runId 反复 Put 推进状态"的存量语义。
+  // 同 zero-etl:刻意保留"同 runId 反复 Put 推进状态"的存量语义。
   const writeRun = (status: string, extra: Record<string, unknown> = {}) =>
     putRunRecord({
       taskId: params.id, runId, taskType: "sync", status, startedAt, triggeredBy: "manual",
@@ -217,7 +216,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
   // 落一条 running 运行记录(立即可在"运行历史"看到本次启动)。
   // 关闭本任务此前残留的 running 运行记录(常驻通道重启/后台轮询中断会累积多条 running,与 zero-etl 同处理)。
-  // @kf-batch 52-P52.2-W2a-run-stamp
   try {
     await settleRunningRuns({ taskId: params.id, status: "stopped", set: { finishedAt: startedAt }, stamp: resolveRunStamp(task) });
   } catch { /* best-effort */ }
@@ -236,7 +234,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     let started = false;
     try {
       logger.info("realtime.start.begin", { correlationId: cid, taskId: params.id, schemaName, tableName, instanceCold });
-      // B-121 ①:等复制实例就位挪到这里(首次 10–15 分钟,预算 30 分钟,B-137);等完先确认任务还归我管。
+      // ①:等复制实例就位挪到这里(首次 10–15 分钟,预算 30 分钟);等完先确认任务还归我管。
       await getReplicationInstanceArn(); log("✓ DMS 复制实例就绪");
       if ((await writeOwned("provisioning")) === "superseded") return bail("instance-ready");
       const targetSecretArn = await ensureRedshiftDmsUser(redshiftHost); log("✓ 目标 Redshift 专用用户/密钥就绪(dms_ingest)"); // 踩坑④

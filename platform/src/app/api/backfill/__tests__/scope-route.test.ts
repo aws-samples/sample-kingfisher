@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4bis-p1-scope
 // `GET /api/backfill` 的执行范围过滤 —— **B 类(绑定列表),但字段名是 `execTargets` 不是 `targets`**。
 //
 // 🔴 为什么必须可执行:这里最容易出的错是「用默认字段名过滤」——

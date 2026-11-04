@@ -1,4 +1,3 @@
-// @kf-batch 50-WP9a-durable-jobs
 // 「哪些作业到期了」的**唯一一次 Query** —— 泵与 store 共用(单一作者)。
 //
 // 🔴 零 node 内置依赖(泵在 instrumentation 可达面里;见 schema.ts 文件头)。
@@ -9,7 +8,7 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";
 import { DATAPLANE_JOBS_TABLE, DUE_SHARD, GSI_BY_DUE } from "@/lib/dataplane-jobs/schema";
 
-/** 每轮最多推进几条(WP-9 ④-2:每轮 ≤5)。 */
+/** 每轮最多推进几条(④-2:每轮 ≤5)。 */
 export const PUMP_MAX_PER_TICK = 5;
 
 /**

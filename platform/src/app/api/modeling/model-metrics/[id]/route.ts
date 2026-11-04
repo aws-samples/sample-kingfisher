@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { updateModelMetric, deleteModelMetric } from "@/lib/modeling/model-metrics";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 35 P1 D4: 指标 改 / 删(仅平台管理员)。
+// D4: 指标 改 / 删(仅平台管理员)。
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);

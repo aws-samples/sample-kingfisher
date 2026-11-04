@@ -1,5 +1,4 @@
-// @kf-batch 50-WP30-discard
-// 🔴🔴 WP-30 路 A「弃置」装配层:discard ↔ deploy-control(CFN 处置)↔ recovery(会话收口)↔ lifecycle(唯一写通道)
+// 🔴🔴 「弃置」装配层:discard ↔ deploy-control(CFN 处置)↔ recovery(会话收口)↔ lifecycle(唯一写通道)
 //   之间**一律不 mock**;只 mock 真外部 —— DynamoDB(一张内存行 + **忠实的条件表达式求值器**)、CloudFormation、CodeBuild。
 //
 // 为什么必须是装配层(而不是给 discard.ts 单测 mock 掉 recovery / lifecycle):
@@ -7,7 +6,7 @@
 //   条件接住(version 3→4→5)、`operation` 删键而不是置 undefined。mock 掉兄弟模块,这些全看不见(mock-hides-the-seam)。
 //
 // 夹具 = 2026-10-01 新账号第一章 `w5a` 真撞出来的 `tgt_apn1_a` 描述符(脱敏):ap-northeast-1 注册一次性 T3 ⇒
-//   部署 build FAILED(B-29:AZ 写死 a/b)⇒ 卡在 provisioning + 一个没人收口的部署会话 + 部署锁,目标区一个栈都没有。
+//   部署 build FAILED(AZ 写死 a/b)⇒ 卡在 provisioning + 一个没人收口的部署会话 + 部署锁,目标区一个栈都没有。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 type Item = Record<string, any>;
@@ -259,7 +258,7 @@ describe("🔴🔴 装配层:弃置真实形状的 tgt_apn1_a(部署失败 + 未
     expect(h.seq.slice(firstWrite + 1, secondWrite), "收口写之后、退役写之前必须重读").toContain("ddb:GetCommand");
   });
 
-  it("🔴 目标区有本环境的栈(哪怕是已回滚完的 ROLLBACK_COMPLETE)⇒ 409 指向路 B,**零写**,描述符原样", async () => {
+  it("🔴 目标区有本环境的栈(哪怕是已回滚完的 ROLLBACK_COMPLETE)⇒ 409 指向,**零写**,描述符原样", async () => {
     h.stacks["BgpExecEnv-tgt-apn1-a-core"] = "ROLLBACK_COMPLETE";
     const before = structuredClone(h.item);
     const e = await refusal(discardTarget("tgt_apn1_a", ACTOR));
@@ -332,7 +331,7 @@ describe("🔴 拒绝面(判定在 lib,路由原样映射;全部零写)", () => 
     h.item = null;
     expect((await refusal(discardTarget("tgt_apn1_a", ACTOR))).httpStatus).toBe(404);
   });
-  it("装出来过(phase=ready)⇒ 409 指向路 B,不查 CFN", async () => {
+  it("装出来过(phase=ready)⇒ 409 指向,不查 CFN", async () => {
     const x = apn1();
     x.observed = { phase: "ready", health: "healthy", components: ["core"], probe: { ...PROBE, ok: true, items: [] } };
     x.ready = true; x.status = "active";
@@ -363,7 +362,7 @@ describe("🔴🔴 lifecycle:弃置边 ⇔ DiscardFence **成对**(同 enable �
   const post = (phase: string) => ({ spec: { intent: "delete" as const, desiredComponents: ["core"] }, observed: { phase, health: "unknown", components: [] } as any });
   const fence = (fromPhase: "registered" | "provisioning") => ({ expectedVersion: 3, fromPhase, noStacksVerifiedAt: "2026-10-01T09:00:00.000Z" });
 
-  it("PHASE_EDGES:→gone 只有 registered / provisioning(弃置)与 decommissioning(路 B 销毁完成)三个来源", () => {
+  it("PHASE_EDGES:→gone 只有 registered / provisioning(弃置)与 decommissioning(销毁完成)三个来源", () => {
     const into = TARGET_PHASES.filter((p) => PHASE_EDGES[p].includes("gone"));
     expect([...into].sort()).toEqual(["decommissioning", "provisioning", "registered"]);
   });
@@ -378,7 +377,7 @@ describe("🔴🔴 lifecycle:弃置边 ⇔ DiscardFence **成对**(同 enable �
       .rejects.toBeInstanceOf(PhaseTransitionError);
     expect(h.ddb).toEqual([]);
   });
-  it("DiscardFence 用在 decommissioning→gone(路 B 的边)⇒ 抛", async () => {
+  it("DiscardFence 用在 decommissioning→gone(边)⇒ 抛", async () => {
     await expect(transitionPhase("tgt_apn1_a", { from: "decommissioning", expectedVersion: 3, post: post("gone"), discardFence: fence("provisioning"), reason: "x" }))
       .rejects.toBeInstanceOf(PhaseTransitionError);
   });

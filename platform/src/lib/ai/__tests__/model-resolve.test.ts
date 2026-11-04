@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 解析链单测(51 SPEC §3.1 / §3.1a / §6.1② / §6.2①②;ACCEPTANCE M7 / M16 / M18)。
+// 解析链单测(51 SPEC §3.1 / §3.1a / §6.1② / §6.2①②;ACCEPTANCE M7 / M16 / M18)。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mem = vi.hoisted(() => ({ db: null as unknown as import("@/lib/settings/__tests__/mem-ddb").MemDdb }));

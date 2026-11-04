@@ -1,8 +1,8 @@
-// 模块 43-A — 运维知识库(Incident Memory)数据类型。
+// 运维知识库(Incident Memory)数据类型。
 // 单表 bgp-incidents 两类 item(pk="incident#<projectId>"):
 //   · 主档 sk="sig#<signature>"    —— 按 signature 归并的故障类别,永久沉淀(无 ttl)。
 //   · 发生 sk="occ#<sig>#<diagId>" —— 每次发生快照,ttl 180d 自动过期。
-// 安全:只存元数据(signature/症状模板/根因归纳/引擎),严禁存表名/路径/账号/密钥(继承模块36 E5)。
+// 安全:只存元数据(signature/症状模板/根因归纳/引擎),严禁存表名/路径/账号/密钥(继承E5)。
 
 export type IncidentStatus = "unresolved" | "resolved-verified" | "silenced";
 export type FixKind = "config" | "code" | "backfill" | "infra" | "data";
@@ -37,7 +37,7 @@ export interface IncidentMaster {
   affectedTasks: string[]; // 去重任务名(resourceName)
   firstSeenAt: string;
   lastSeenAt: string;
-  // @kf-batch 50-WP4quater-reads(工单 SC-20)—— **这类故障在哪些区发生过**。
+  // **这类故障在哪些区发生过**。
   // 🔴 字段名刻意就叫 `targets`:它等于平台 B 类绑定的默认字段名(`DEFAULT_BINDING_ATTR`),
   // 于是 `filterRowsByScope` 与 `bindingTargets` 的**三级回落**(targets → targetId → home)直接可用,
   // 不需要在这里再写一份「归哪个区」的判定 —— 多写一份就多一处会漂的规则。
@@ -65,7 +65,7 @@ export interface IncidentOccurrence {
   runId: string;
   diagnosticId: string; // 关联 bgp-diagnostics(报告全文在那,此处只存摘要)。幂等去重键。
   symptomDigest: string; // 现象摘要(已脱敏:错误码/首行/引擎)
-  // @kf-batch 50-WP4quater-reads(工单 SC-20)—— 这**一次**发生在哪个区(从 run 行上的章读来,不猜)。
+  // 这**一次**发生在哪个区(从 run 行上的章读来,不猜)。
   targetId?: string;
   resolvedAt?: string; // 该次何时恢复(用于 MTTR)——A.1 暂不填,预留
   ttl: number; // epoch 秒,180d

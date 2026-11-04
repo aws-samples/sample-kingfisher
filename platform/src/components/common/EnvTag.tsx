@@ -1,6 +1,6 @@
 "use client";
 
-// @kf-batch 50-SEQ47a-promote-ux —— 资源所在环境的标签(dev / staging / prod),颜色与顶栏环境切换器同一作者(ENV_COLOR)。
+// 资源所在环境的标签(dev / staging / prod),颜色与顶栏环境切换器同一作者(ENV_COLOR)。
 //   客户 2026-10-19 反馈「界面如何在 dev 一键发布至 prod」—— 页面核实:资源详情里**看不出自己在哪个环境**,顶栏切换器又不起眼。
 
 import React from "react";

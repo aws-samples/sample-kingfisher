@@ -1,4 +1,3 @@
-// @kf-batch 50-WP24b-vacuous-sync
 // 同步任务「**有没有活可干**」的单一作者。
 //
 // 🔴🔴 【真环境实测(2026-09-17)】建任务时把表清单写在了 `tables` 字段(而契约是 `sourceTables`),
@@ -39,8 +38,7 @@ export function normalizeSourceTables(v: unknown): string[] {
 /**
  * 回 null = 有活可干;回字符串 = 人话拒因(调用方转 400)。
  *
- * @kf-batch 41-B123-sync-source-locator-by-paradigm
- * 🔴 B-123(2026-10-25 页面驱动段 scq A1-2 真撞):「从哪读」原来只认 JDBC 的源库名(sourceDatabase)——
+ * 🔴 (2026-10-25 页面驱动段 scq A1-2 真撞):「从哪读」原来只认 JDBC 的源库名(sourceDatabase)——
  *   S3 对象存储源在向导里列得出数据集、勾得了,到「完成」却 400「缺少源库名」。S3 / DynamoDB 源**没有库名概念**,
  *   它们的定位在数据源连接袋里(S3 = bucket/prefix,DynamoDB = tableName),同步脚本生成器也正是从连接袋读的。
  * 修法:按数据源**范式**判 —— jdbc 范式要源库名;其它范式交给该 provider 自己的 validateConfig

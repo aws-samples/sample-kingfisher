@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-WP4-o1-scope
 // 顶栏「执行范围」的 context(合同 SPEC v3.36 §2.6.2 / §2.6.5a / §2.6.5b;交互 INTERACTION §9)。
 //
 // 本组件**只负责三件事**:取参数(URL / localStorage / 可用清单)、把决策交给纯函数

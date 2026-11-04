@@ -1,4 +1,4 @@
-// 序 49 ⑦ UX ③ —— 「新建表」向导 schema / 命名空间从手打改为「下拉已有 + 可输新」(调用点判据)。
+// UX ③ —— 「新建表」向导 schema / 命名空间从手打改为「下拉已有 + 可输新」(调用点判据)。
 //   用户 2026-10-20 走查:建表向导 schema 要手打 ⇒ 拍板「改下拉已有 schema + 可输新」。
 //   钉的事实:① 选定执行区后按类型读该区清单(带 targetId;Redshift 用 mode=schemas 只列名,S3 Tables 读 namespaces)
 //   ② 项目私有 proj_* 不进候选 ③ AutoComplete 包着原来的 input,testid 仍是 ct-schema(页面驱动判据 / 用户照旧能直接输入)

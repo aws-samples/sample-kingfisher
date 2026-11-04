@@ -1,8 +1,7 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 🔴🔴 **permission canary**(WORK-PACKAGES WP-9 ④-3 / 施工序 3;50 SPEC §3.9b「进 isolated 的前置:canary 成功」)。
+// 🔴🔴 **permission canary**(④-3;50 SPEC §3.9b「进 isolated 的前置:canary 成功」)。
 //
 // ── 它取代了什么 ─────────────────────────────────────────────────────────────────
-// P52.5a 的 `credential-state` 进 isolated 时只核「每个项目有 secret」,canary 那一半靠一句**逐字确认串**
+//  `credential-state` 进 isolated 时只核「每个项目有 secret」,canary 那一半靠一句**逐字确认串**
 // 「我已完成 canary 与跨项目负测」由操作者具名承担 —— 因为当时服务端**没有办法自证**。
 // 本文件给出这个办法:每个 (target, project) 用**该项目自己的 secret** 在该区的库里真跑七条,读真结果判。
 // 确认串保留(具名承担),但**不再替代判据**。
@@ -42,7 +41,7 @@ import type { CanaryCheckEvidence, CanaryEvidence, CanaryOutcome } from "@/lib/d
 
 export type CanaryCheckId = CanaryCheckEvidence["id"];
 
-/** canary 结果作为 isolated 前置的有效期(WP-9 ④-3:≤ 24h)。 */
+/** canary 结果作为 isolated 前置的有效期(④-3:≤ 24h)。 */
 export const CANARY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** canary 作业行的 TTL(证据可再生;30 天足够回看)。 */
@@ -112,7 +111,7 @@ export const CANARY_CHECKS: readonly CheckSpec[] = [
     id: "C-6",
     role: "negative",
     what: "在 public 建表必须 permission denied",
-    // @kf-batch 50-WP9a-canary-c6-residue(2026-10-11 真环境:撤权前 C-6 真建成了 ⇒ 表留在 public,
+    // (2026-10-11 真环境:撤权前 C-6 真建成了 ⇒ 表留在 public,
     //   之后每一轮都撞 already exists ⇒ C-6 永久 unverifiable,isolated 前置永远过不了 —— 判据自己造的残留把自己堵死)。
     // ⇒ 一个事务里:先删本项目上次可能留下的同名探针(属主就是本项目登录,删得掉)→ 建 → 立刻删。
     //   建被拒 ⇒ 整个事务回滚,错误就是那句 permission denied(结论不变);建成 ⇒ 当场删掉,不留残留(结论 = 隔离有洞)。

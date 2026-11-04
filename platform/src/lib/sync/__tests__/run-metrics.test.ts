@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 B-62:运行行数指标从日志标记取真值(纯函数,零 mock)+ 接线判据。
+// 运行行数指标从日志标记取真值(纯函数,零 mock)+ 接线判据。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -6,7 +6,7 @@ import { parseSyncRunMetrics } from "@/lib/sync/run-metrics";
 
 const S3 = "s3tablescatalog.gamedb";
 
-describe("B-62 rowsWritten 取真值", () => {
+describe("rowsWritten 取真值", () => {
   it("只 S3 覆盖(两张表):rowsWritten = 各表 SYNC_VERIFY target_rows 之和,不再抄 rowsRead", () => {
     const logs = [
       "Read 2 rows, 2 columns from players",

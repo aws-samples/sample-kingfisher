@@ -1,6 +1,6 @@
 // AgentCore Runtime 容器入口：实现契约 /invocations(POST) + /ping(GET)，端口 8080。
 // 平台标准见 docs/design/28-agentcore-standard/DESIGN.md §3 契约 1。
-// 【模块47 L3】容器转 ESM(package.json type:module,配合 Strands/agent-runner);require→import。
+// 容器转 ESM(package.json type:module,配合 Strands/agent-runner);require→import。
 import http from "node:http";
 import { runAgent } from "./agent.js";
 
@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
         const out = await runAgent({
           request,
           history: Array.isArray(input.history) ? input.history : [],
-          // @kf-batch 50-W5-seg2-WP8 — 模块 51:平台按运行时配置透传的模型(顶层 payload.modelId,兼容 input.modelId)。
+          // 平台按运行时配置透传的模型(顶层 payload.modelId,兼容 input.modelId)。
           modelId: typeof payload.modelId === "string" ? payload.modelId : (typeof input.modelId === "string" ? input.modelId : undefined),
         });
         return send(res, 200, { output: out });

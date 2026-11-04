@@ -3,7 +3,7 @@
 import React from "react";
 import { useT } from "@/lib/i18n/useT";
 
-// 模块 22 — 首页仪表盘自绘 SVG 图表 (v1.14.0)
+// 首页仪表盘自绘 SVG 图表 (v1.14.0)
 //
 // 无第三方图表库（避免与 antd v6 的依赖/体积冲突），全部用 SVG 自绘，配色对齐青蓝科技主题。
 // 提供：Donut（甜甜圈 + 图例，用于状态/构成分布）、TrendArea（时间序列面积+折线趋势）、
@@ -313,7 +313,7 @@ export function TrendArea({
 }
 
 /** 环形仪表（单一比率 0-100，用于成功率/准点率等 KPI）。自绘 SVG，配色随值分档（红/黄/绿）。
- *  模块 34 运维大屏用；零依赖，与 Donut/TrendArea 同风格、同换肤 CSS 变量。 */
+ *  运维大屏用；零依赖，与 Donut/TrendArea 同风格、同换肤 CSS 变量。*/
 export function Gauge({
   value,
   label,
@@ -373,7 +373,7 @@ export interface GanttRow {
 }
 
 /** 甘特/时间线（最近运行的起止条）。自绘 SVG，横轴=时间，每行一个 run。hover 显示明细浮层。
- *  模块 34 运维大屏用；零依赖，颜色按状态。 */
+ *  运维大屏用；零依赖，颜色按状态。*/
 export function GanttTimeline({ rows, rowH = 22 }: { rows: GanttRow[]; rowH?: number }) {
   const t = useT();
   const [tip, setTip] = React.useState<TipState | null>(null);
@@ -511,7 +511,7 @@ export function BarList({ data }: { data: Slice[] }) {
   );
 }
 
-// ── 模块 37 — BI 报表搭建器新增图表(换肤纵向柱状图 + 数字指标卡)──────────────
+// ── — BI 报表搭建器新增图表(换肤纵向柱状图 + 数字指标卡)──────────────
 // 沿用本文件范式:零依赖 SVG + var(--bgp-*) 换肤 + ChartTooltip hover。取代旧的 MiniChart
 // (硬编码 #1677ff 不换肤),分类色走已过校验的 --bgp-s1..s4。
 

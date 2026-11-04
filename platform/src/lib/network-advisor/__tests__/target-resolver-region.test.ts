@@ -1,4 +1,3 @@
-// @kf-batch 41-B115-netadvisor-place
 // 🔴 目标解析用到的 RDS / Redshift / Redshift Serverless 客户端都按 ctx.region 建(改动前是三个模块级主控区客户端 ⇒ 别的区的实例永远「未发现」)。
 // 只 mock 真外部(三个 SDK 客户端:记构造 region、回最小结果)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -22,7 +21,7 @@ vi.mock("@aws-sdk/client-redshift-serverless", h.mkSdk("RedshiftServerlessClient
 
 beforeEach(() => { h.regions.length = 0; delete process.env.BGP_DATAPLANE_CREDS; vi.resetModules(); });
 
-describe("网络顾问 · 目标解析按落点 region 建客户端(B-115)", () => {
+describe("网络顾问 · 目标解析按落点 region 建客户端", () => {
   it("rds / redshift(provisioned)/ redshift serverless 三种目标 ⇒ 三个客户端都建在 ctx.region", async () => {
     const { resolveTargets } = await import("@/lib/network-advisor/target-resolver");
     const ctx = { degraded: false, missing: [] as string[], region: "eu-west-1" };

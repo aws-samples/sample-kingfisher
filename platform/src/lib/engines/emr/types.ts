@@ -1,4 +1,4 @@
-// 模块 33-A — EMR Serverless 作业类型（EngineJobBase 的 EMR 专属扩展）。
+// EMR Serverless 作业类型（EngineJobBase 的 EMR 专属扩展）。
 
 import type { EngineJobBase } from "../types";
 import type { EmrSpec } from "./spec";

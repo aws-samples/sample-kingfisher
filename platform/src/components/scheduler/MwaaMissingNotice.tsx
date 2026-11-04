@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-WP13-mwaa-region
 // 「以下执行环境未安装 MWAA 调度服务」警示卡(50 INTERACTION v2.18 §2.2a)。
 // 用户拍板:每个区域的定时任务只能由本区域的 MWAA 执行 ⇒ 非 home target 没装 mwaa 就不能为它配调度;
 // 提示必须**在动作的当场、列全、能一键到补装入口**(不是三秒即逝的 toast)。
@@ -16,7 +15,7 @@ export default function MwaaMissingNotice({ payload, style }: { payload: MwaaMis
   const t = useT();
   const router = useRouter();
   if (!payload || payload.missing.length === 0) return null;
-  // @kf-batch 50-WP15-airflow-serverless(INTERACTION v2.19 §2.2a 订正):缺**任一**调度组件都到这张卡;每行列出可选组件;
+  // (INTERACTION v2.19 §2.2a 订正):缺**任一**调度组件都到这张卡;每行列出可选组件;
   //   新 testid scheduler-missing-*(包一层),旧 testid mwaa-missing-* 保留一版(验收脚本 / wiring guard 两个都认)
   return (
     <div data-testid="scheduler-missing-notice">

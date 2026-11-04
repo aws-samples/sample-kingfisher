@@ -1,5 +1,5 @@
 /**
- * @kf-batch 51-v2-multi-vendor(序 40,2026-10-14):`scripts/resolve-home-model.sh` 的离线替身必须**真的在门禁里跑**。
+ * `scripts/resolve-home-model.sh` 的离线替身必须**真的在门禁里跑**。
  *
  * 🔴 为什么:台账 infra/prod-only-layers.json 里它早就有 harness 指针(infra/test/resolve-model/test_resolve_model.sh),
  *   但此前没有任何 vitest 执行它 —— 指针对不等于替身在跑(「写了」≠「接上了」)。本波把候选链(D14)加进脚本,

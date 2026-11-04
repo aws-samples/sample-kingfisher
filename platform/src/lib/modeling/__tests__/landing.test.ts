@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-modeling
 // 建模逐 target 落地的门禁 —— 🔴 **全部可执行**(真调 `landToTargets`,打桩只到 AWS SDK 边界)。
 //
 // 合同点名的那句话是本组测试的主线:`landedByTarget` 是「**观测态**,非"我以为推了啥",防看板假绿」。
@@ -20,7 +19,7 @@ const h = vi.hoisted(() => ({
   /** 这些 target 上 `resolveRedshiftBinding` 直接抛(用来验"一个区抛错不影响其它区") */
   throwFor: [] as string[],
   crossJurisdiction: [] as string[],
-  // @kf-batch 50-WP11b-shared-writer —— 非 home 通道的观察点
+  // 非 home 通道的观察点
   /** 已存在的 secret:名 → ARN */
   secrets: {} as Record<string, string>,
   /** admin 执行器收到的结构化请求(按序) */
@@ -85,7 +84,7 @@ vi.mock("@/lib/exec-env/target-clients", () => ({
       },
     };
   }),
-  // @kf-batch 50-WP11b-shared-writer —— 非 home 通道用到的三个出口(真外部:Secrets Manager / Data API)
+  // 非 home 通道用到的三个出口(真外部:Secrets Manager / Data API)
   resolveTargetWarehouse: (t: { targetId: string }) => ({ targetId: t.targetId, region: t.targetId, workgroup: "wg-" + t.targetId, database: "dev" }),
   describeSecretArnByName: vi.fn(async (_region: string, name: string) => h.secrets[name]),
   execOnTarget: vi.fn(async (a: { warehouse: { region: string }; sql: string; secretArn: string }) => {
@@ -154,14 +153,14 @@ import {
   estimateRows as estimateRowsRaw,
   type LandedState,
 } from "@/lib/modeling/landing";
-// 模块 55 / 序 50:landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
+// landing 的 Redshift Data 轮询经 awaitTerminal(无长操作 / 后台等待者上下文即抛 —— 路由侧由 submitLongOp 提供);
 //   判据直接调库函数,所以在 op 帧里调(与真路由同一条路;「无上下文即抛」本身由 lib/long-ops/__tests__/context-await.test 钉)。
 import { runInLongOp } from "@/lib/long-ops/context";
 const inOp = <T,>(fn: () => Promise<T>): Promise<T> => runInLongOp({ taskId: "test", opKind: "modeling-land" }, fn);
 const landToTargets: typeof landToTargetsRaw = (...a) => inOp(() => landToTargetsRaw(...a));
 const unlandFromTarget: typeof unlandFromTargetRaw = (...a) => inOp(() => unlandFromTargetRaw(...a));
 const estimateRows: typeof estimateRowsRaw = (...a) => inOp(() => estimateRowsRaw(...a));
-// @kf-batch 50-WP31-place-first-class(序 31 第二刀 ③)—— 落点决策账本(真模块;请求存储由测试注入,与执行器判据同一写法)
+// 落点决策账本(真模块;请求存储由测试注入,与执行器判据同一写法)
 const placeCtx = await import("@/lib/place/context");
 
 const HOME = "tgt_home";
@@ -285,12 +284,12 @@ describe("🔴 强制重建:只有 force 才 DROP,而且 DROP 必须在建表之
   });
 });
 
-// @kf-batch 50-WP11b-shared-writer —— 原两组「非 home ⇒ credential-gap、一条语句都不执行」**反向改判**:
+// 原两组「非 home ⇒ credential-gap、一条语句都不执行」**反向改判**:
 //   窄权写者通道已交付(SPEC §3.9d),非 home 走与 home **同样的四态**,没有第五态。
 //   跨法域与同法域同一条路(DESIGN §18 决策 6quinquies,不设法务门)。
 const SW = (tid: string) => `bgp/shared-writer/${tid.replace(/_/g, "-")}`;
 
-describe("🔴🔴 非 home 建模落地:窄权写者通道(E-229 / E-233 单测侧)", () => {
+describe("🔴🔴 非 home 建模落地:窄权写者通道(单测侧)", () => {
   it("码表:缺 secret ⇒ 先供给 → admin 建表 → 逐表授权 → 观测 → 窄权写者灌数 → 再观测 ⇒ ok", async () => {
     h.existing[USW2] = CODE_TABLE_COLUMNS; // admin 建表之后,窄权写者能观测到期望结构
     const recs = await landToTargets(args({ targets: [USW2] }));
@@ -317,7 +316,7 @@ describe("🔴🔴 非 home 建模落地:窄权写者通道(E-229 / E-233 单测
     expect(h.writerExec.every((x) => x.secretArn.endsWith("-OLD"))).toBe(true);
   });
 
-  it("🔴 门①:准入用 scope=platform-global(建模没有项目维,不受项目白名单约束;台账 B-17)", async () => {
+  it("🔴 门①:准入用 scope=platform-global(建模没有项目维,不受项目白名单约束;台账)", async () => {
     h.existing[USW2] = CODE_TABLE_COLUMNS;
     await landToTargets(args({ targets: [USW2] }));
     expect(h.bindOpts).toEqual([{ scope: "platform-global" }]);
@@ -505,7 +504,7 @@ describe("🔴🔴 判态纯函数:drift / 门控**绝不**因为定义没变而
     expect(landedStateOf(rec({ status: "failed" }), "h1")).toBe("failed");
   });
 
-  it("需要处理的恰好是那四个(多一个 = 误报,少一个 = 漏报);观测态共 6 个(@kf-batch 50-W5-seg1-WP10a:residency-blocked 已删)", () => {
+  it("需要处理的恰好是那四个(多一个 = 误报,少一个 = 漏报);观测态共 6 个(residency-blocked 已删)", () => {
     expect([...LANDED_ATTENTION].sort()).toEqual(["drift", "failed", "never-landed", "stale"]);
     for (const s of ["ok", "credential-gap"] as LandedState[]) expect(landedNeedsAttention(s)).toBe(false);
   });
@@ -542,13 +541,12 @@ describe("🔴 逐 target 各自 try:一个区失败不影响其它区", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class(序 31 第二刀 ③)
-// 🔴 非 home 落地 / 清理在进 admin 执行器(它自己记 B-98 那笔)**之前**就先打 Secrets Manager(窄权写者 secret 按名现查)、
+// 🔴 非 home 落地 / 清理在进 admin 执行器(它自己记那笔)**之前**就先打 Secrets Manager(窄权写者 secret 按名现查)、
 //   再用窄权身份打 Redshift Data(观测)—— 这些调用在账本上没有任何决策 ⇒ observe 判 unattributed
 //   (…7237 第四十三轮窗口 `unattributedTop` 仅剩的 1 类 = `secretsmanager.DescribeSecret /api/modeling/codetables/<id>/land`)。
 //   判据钉事实:拿到该区仓位(requireReadyTarget 之后)即记决策,且在**第一笔** describeSecretArnByName 之前;
 //   准入 / 落点被拒不记;home 不经本 via(它走 resolveRedshiftBinding 自己记);请求外不抛。
-describe("🔴 序 31 二刀 ③ 非 home 建模落地 / 清理记落点决策(拿到仓位之后、第一笔 Secrets Manager 调用之前)", () => {
+describe("🔴 非 home 建模落地 / 清理记落点决策(拿到仓位之后、第一笔 Secrets Manager 调用之前)", () => {
   let store: object = {};
   const decided = () =>
     placeCtx.decisionsOfCurrentRequest().decisions.filter((d) => d.via === LANDING_PLACE_VIA).map((d) => d.targetId);
@@ -630,7 +628,7 @@ describe("🔴 序 31 二刀 ③ 非 home 建模落地 / 清理记落点决策(�
     expect(decidedAtFirstDescribe).toEqual([USW2]);
   });
 
-  // 序 31 二刀 ④(2026-10-21):解绑预览的行数估算 estimateRows 非 home 分支 —— …7237 升级后 observe 实测 unattributedTop 里
+  // 解绑预览的行数估算 estimateRows 非 home 分支 —— …7237 升级后 observe 实测 unattributedTop 里
   //   `…/unbind-preview` 的 DescribeSecret / ExecuteStatement / DescribeStatement / GetStatementResult 一类 16 项,就是这条路没记决策。
   it("estimateRows 非 home:拿到仓位即记决策,第一笔 describeSecret 时已记(解绑预览路径归因)", async () => {
     h.existing[USW2] = CODE_TABLE_COLUMNS;

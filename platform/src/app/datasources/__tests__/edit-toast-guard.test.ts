@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— 数据源弹窗成功提示的单一作者是页面:编辑 ⇒「已更新」,新建 ⇒ 报落点。
+// 数据源弹窗成功提示的单一作者是页面:编辑 ⇒「已更新」,新建 ⇒ 报落点。
 // 修前编辑成功弹两条(弹窗「已更新」+ 页面「已在主控区建好这条数据源」),第二条说错了事。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";

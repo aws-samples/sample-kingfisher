@@ -1,8 +1,8 @@
-// 模块 33-A — EMR Serverless 作业规格「单一事实源」。
+// EMR Serverless 作业规格「单一事实源」。
 // 对齐 EMR Serverless console「提交 Spark 作业」核心可填项；照 lib/etl/worker-types.ts 范式：
 // 表单、参数顾问 catalog、provider 都从这里取，避免多处漂移。
 
-// EMR Serverless release(序 53,用户 2026-10-26 拍板:**缺省取最高版本、清单允许用户降版**;与 Glue 版本同一口径)。
+// EMR Serverless release(用户 2026-10-26 拍板:**缺省取最高版本、清单允许用户降版**;与 Glue 版本同一口径)。
 // 版本列表 = EMR Serverless 控制台展示顺序,但 **label 用 API 真实值**(实测踩坑:控制台显示 emr-spark-8.0,
 // 但 CreateApplication/StartJobRun 只认 emr-spark-8.0.0——写控制台那个会 ValidationException does-not-exist)。
 // EMR Serverless 无 list-release API,以控制台顺序 + create-application 实测 label 为准。2026-10-26 复核:
@@ -62,7 +62,7 @@ const diskG = (v: string) => String(v || "").replace(/\s*gb/i, "").trim() + "G";
 
 // 规格 → sparkSubmitParameters（确定性生成；平台保留键，用户 sparkConf 不覆盖这些，见 provider）。
 /**
- * 🔴🔴 **把执行区注入到 driver / executor 的环境变量**(2026-09-22 真环境抓到,B-21 第八层)。
+ * 🔴🔴 **把执行区注入到 driver / executor 的环境变量**(2026-09-22 真环境抓到,第八层)。
  *
  * 【真实失败】IAM 全部补齐、日志也能推上去之后,用户那个 copilot 生成的 ROI 作业仍然 ExitCode 1:
  *     botocore.exceptions.NoRegionError: You must specify a region.
@@ -86,7 +86,7 @@ export function regionEnvParameters(region: string): string {
 }
 
 /**
- * 🔴🔴 **落点事实 + 执行区环境变量** 的唯一作者(2026-09-22 收;B-21 第八层)。
+ * 🔴🔴 **落点事实 + 执行区环境变量** 的唯一作者(2026-09-22 收;第八层)。
  *
  * 【为什么收成一处】原来 `provider.ts` 与 `schedule-fanout.ts` 各写了一份 `spark.bgp.*` 清单
  *   —— 两份清单必然走岔:这次要加「区域注入」,漏改一处就等于**定时调度那条路依然会 NoRegionError**
@@ -146,7 +146,7 @@ export const RESERVED_SPARK_CONF = new Set([
   "spark.emr-serverless.driver.disk",
   "spark.emr-serverless.executor.disk",
   // 🔴 执行区注入的四个键是**保留**的:用户 sparkConf 覆盖它 = 把 boto3 调用打到别的 region,
-  //   那不只是「跑不起来」,是**数据驻留**问题(模块 50 的红线)。
+  //   那不只是「跑不起来」,是**数据驻留**问题(红线)。
   "spark.emr-serverless.driverEnv.AWS_REGION",
   "spark.emr-serverless.driverEnv.AWS_DEFAULT_REGION",
   "spark.executorEnv.AWS_REGION",

@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { getMetric, updateMetric, deleteMetric } from "@/lib/metrics/service";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 20: 指标详情 / 改 / 删。
+// 指标详情 / 改 / 删。
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);

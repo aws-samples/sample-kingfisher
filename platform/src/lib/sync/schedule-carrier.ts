@@ -1,5 +1,4 @@
-// @kf-batch 50-WP26-sync-schedule-carrier
-// 🔴🔴 **同步任务的「定时调度」载体**(WP-26;用户 2026-09-20:「我们后面所有的调度都走 mwaa serverless」)。
+// 🔴🔴 **同步任务的「定时调度」载体**(用户 2026-09-20:「我们后面所有的调度都走 mwaa serverless」)。
 //
 // 【改动前是个空壳 —— 而页面还替它宣称在跑】
 //   `POST /api/schedule/enable` 的 sync 分支只往 `bgp-sync-tasks` 写 `scheduleEnabled` / `cronExpression`
@@ -11,7 +10,7 @@
 // 【载体不新造:复用编排那一整套】
 //   编排早就有:`publishWorkflowDag` 按 `targets` **逐区扇出**、`NODE_REGISTRY` 里本来就有 `sync` 节点、
 //   运行期 `_exec_sync` 会起该任务的 Glue 作业并轮询到终态、`__start`/`__finish` 负责 run 台账收口、
-//   日志落 `/aws/mwaa-serverless/<workflow>/` 且任务监控点得开(段 `sls` S-11 真验过)。
+//   日志落 `/aws/mwaa-serverless/<workflow>/` 且任务监控点得开(段 `sls` 真验过)。
 //   ⇒ 「同步任务的定时调度」= **发一个单节点工作流**,节点就是那个 sync 节点。
 //   这样「所有调度都走 MWAA Serverless」是**结构上**成立的,不是又长出一条平行机制。
 //
@@ -60,7 +59,7 @@ export function buildSyncCarrierWorkflow(task: SyncTaskForCarrier, cron: string 
     //   它**不会**在 `bgp-workflows` 里建行(台账归属见下面的 ledger)。
     workflowId: task.taskId,
     name: `${task.name || task.taskId}(定时同步)`,
-    description: "同步任务的定时调度载体(WP-26):单节点 sync 工作流,由平台按 cron 触发",
+    description: "同步任务的定时调度载体:单节点 sync 工作流,由平台按 cron 触发",
     projectId: task.projectId,
     dagDefinition: {
       nodes: [{ id: "sync", type: "sync", data: { syncTaskId: task.taskId, name: task.name || task.taskId } }],
@@ -79,13 +78,12 @@ export function buildSyncCarrierWorkflow(task: SyncTaskForCarrier, cron: string 
   } as unknown as Workflow;
 }
 
-// @kf-batch 50-B09-carrier-drift
 // 🔴 **「同步任务的定时载体是不是落后了」只有这一个作者。**
 //   同步载体不是用户建的工作流,它由 `buildSyncCarrierWorkflow` 现编译出来,而且**带 ledger**
 //   (归属写回 `bgp-sync-tasks` 而不是 `bgp-workflows`)—— ledger 是比对的**隐藏输入**:
 //   少传它,重新生成出来的定义里 `ledger_task_*` 会退回缺省值 ⇒ **每一个同步载体都误报落后**。
 //   ⇒ 谁要查同步载体的 drift,都必须走这里,不许自己拼 workflow + ledger。
-//   (这正是 B-01 的现场:那三个 `ledger_*` 字段**在定义里**,但值是缺省的。)
+//   (这正是该缺陷的现场:那三个 `ledger_*` 字段**在定义里**,但值是缺省的。)
 export async function syncCarrierDrift(task: SyncTaskForCarrier, targetId: string) {
   const { carrierDefinitionDrift } = await import("@/lib/workflow/publish-dag");
   const wf = buildSyncCarrierWorkflow(task, task.cronExpression ?? null);
@@ -116,7 +114,7 @@ export async function publishSyncScheduleCarrier(
   cron: string
 ): Promise<{ perTarget: Array<{ targetId: string; ok: boolean; artifact?: string; error?: string }>; dagId: string }> {
   const wf = buildSyncCarrierWorkflow(task, cron);
-  // @kf-batch 50-B09-secret-single-author —— 🔴 原来在这里按 `task.projectId` 取一遍 admin secret 再传下去,
+  // 🔴 原来在这里按 `task.projectId` 取一遍 admin secret 再传下去,
   //   而 `wf.projectId` **就是** `task.projectId`,发布函数内部的 `resolveRedshiftBinding` 在 home 分支
   //   **算的就是同一个值** ⇒ 两个作者。已收成一个:本处不再取、不再传。
   const r = await publishWorkflowDag(wf, {
@@ -129,7 +127,7 @@ export async function publishSyncScheduleCarrier(
  * 停用:把**每一个有产物的区**的 workflow 真删掉 —— 直接复用编排的 `unpublishWorkflowDag`
  * (它的集合口径 = 绑定 ∪ 台账里有 deployments 的 target;「该区没装调度组件」不算失败)。
  * 🔴 调用方在改记录(`scheduleEnabled=false`)之前**必须看 `allRemoved`** ——
- *   撤不下来就不许动记录,否则孤儿 workflow 会继续按 cron 跑而平台已认为它下线了(WP-18d 那条铁律)。
+ *   撤不下来就不许动记录,否则孤儿 workflow 会继续按 cron 跑而平台已认为它下线了(那条铁律)。
  */
 export async function offlineSyncScheduleCarrier(task: SyncTaskForCarrier) {
   const wf = buildSyncCarrierWorkflow(task, null);

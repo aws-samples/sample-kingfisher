@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-matrix2
 // **版本一致性矩阵的格子语义**(INTERACTION §3.1 / §2bis.4 / §3.1b)—— **纯函数,唯一作者**。
 //
 // 🔴 **为什么从 `deployments.ts` 拆出来**:台账写入要 `@aws-sdk/lib-dynamodb`,而看板页面是
@@ -17,7 +16,7 @@ export interface DeploymentRecord {
   error?: string;
   /** 下发产物的标识(如 DAG id),便于从看板直达产物 */
   artifact?: string;
-  /** @kf-batch 50-WP15-airflow-serverless:这份产物走的调度器(缺省 = 经典 mwaa,存量行没有此字段) */
+  /** 这份产物走的调度器(缺省 = 经典 mwaa,存量行没有此字段) */
   scheduler?: "mwaa" | "serverless";
   /** serverless:workflow 的 ARN / 版本(下线与观测按它找) */
   workflowArn?: string;
@@ -26,7 +25,7 @@ export interface DeploymentRecord {
 
 /**
  * 矩阵格子的状态。🔴 **四个免判态**(`unbound`/`specialized`/`unavailable`/`credential-gap`)不参与红黄判定
- * (§2bis.4 三类 + §3.1b 一类;@kf-batch 50-W5-seg1-WP10a:`residency-blocked` 已删 —— 不设法务门)。
+ * (§2bis.4 三类 + §3.1b 一类;:`residency-blocked` 已删 —— 不设法务门)。
  *
  * ⚠️ **谁产出哪个态**(别在这里猜):
  *  · 前 7 个由 `deploymentCellState()`(任务行)产出;
@@ -93,7 +92,7 @@ export function deploymentCellState(args: {
   if (!d) return "never-deployed";
   if (d.status === "failed") return "failed";
   // 🔴 判据是 `!==` 而不是 `<`。下发版本**高于**当前定义版本听起来不可能,但定义被回滚
-  // (模块 14 版本快照支持回滚)时就会出现。那种格子**不是 ok** —— 库里跑的是一个已经被撤回的版本,
+  // (版本快照支持回滚)时就会出现。那种格子**不是 ok** —— 库里跑的是一个已经被撤回的版本,
   // 而处置与 stale 完全一样(重发对齐)⇒ 归同一态,文案说"版本不一致"而不是"版本旧"。
   // 用 `<` 会把这种格子判成绿,那正是"看板假绿"。
   if (d.version !== currentVersion) return "stale";

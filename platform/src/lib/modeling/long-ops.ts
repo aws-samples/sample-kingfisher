@@ -1,4 +1,4 @@
-// 模块 55 / 序 50(B-111 根治)—— 数据建模四种长操作的执行体:码表落地 / 维表应用 / 解绑 / 解绑预览。
+// (根治)—— 数据建模四种长操作的执行体:码表落地 / 维表应用 / 解绑 / 解绑预览。
 //
 // 原路由(app/api/modeling/{codetables,dimensions}/[id]/{land,apply,unbind,unbind-preview})的「主体」原样搬入:
 // 鉴权(平台管理员)/ 入参校验 / 落点点名(`requestedSubset` / `requestedTargetId`)/ force 必带 confirm **留在路由**;

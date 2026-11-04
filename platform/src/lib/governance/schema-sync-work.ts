@@ -1,4 +1,4 @@
-// 治理目录「同步列信息」的工作体(唯一作者;原在 app/api/governance/sync-redshift-schema/route.ts,模块 55 第二批搬到 lib 让执行体调)。
+// 治理目录「同步列信息」的工作体(唯一作者;原在 app/api/governance/sync-redshift-schema/route.ts,搬到 lib 让执行体调)。
 //
 // 把 Redshift + S3 Tables 真实列信息回填到 OpenMetadata(修治理目录「字段数」恒为 1,并为列级血缘提供真实列名来源)。
 // 幂等、只读 information_schema + 写 OM 元数据。

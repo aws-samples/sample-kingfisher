@@ -1,5 +1,4 @@
-// @kf-batch 51-v2-multi-vendor
-// 模块 51 v2.0 — **Converse 请求整形(唯一作者)**:按厂商档案剥掉该系列不支持的 inferenceConfig 字段、放大 maxTokens;
+// **Converse 请求整形(唯一作者)**:按厂商档案剥掉该系列不支持的 inferenceConfig 字段、放大 maxTokens;
 // 运行期再从 Bedrock 的 ValidationException 原话里**学**到档案没记的字段(51 DESIGN §12 D12;SPEC §7.2)。
 //
 // 🔴 只减字段、只放大 maxTokens,绝不增字段、不改消息体;对 Claude 系列必须是恒等(单测钉住)。

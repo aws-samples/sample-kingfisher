@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 50-WP18-workflow-fanout
 // 「这次在哪些执行范围跑?」运行对话框 —— **单独一个文件**。
 //
 // 🔴 为什么从 `RunGroupPanel.tsx` 里搬出来(2026-09-15):把它和「多区联动运行」组行列表放在同一个文件里,
@@ -34,7 +33,7 @@ export function RunTargetsModal({
   const { scope } = useScope();
   const [picked, setPicked] = useState<string[]>([]);
 
-  // 🔴 **默认跟随视角**(E-165):target 视角只勾本区(前提是它在绑定里)、其余视角全勾。
+  // 🔴 **默认跟随视角**:target 视角只勾本区(前提是它在绑定里)、其余视角全勾。
   //    刻意每次打开都重算 —— 用户切了视角再点运行,默认值必须跟着变。
   useEffect(() => {
     if (!open) return;

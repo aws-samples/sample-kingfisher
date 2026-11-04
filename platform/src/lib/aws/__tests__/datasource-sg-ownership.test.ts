@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 🔴 删数据源只删**平台自建**的安全组(组名 bgp-ds-*);用户指定的组(可能是客户的)平台永远不删。
 //   只 mock 真外部(EC2):按夹具「组 id → 组名」作答,记下每一条命令。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -28,7 +27,7 @@ const DSID = "01HXAAAAAAAAAAAAAAAA12345678"; // 本源的平台组名 = bgp-ds-1
 beforeEach(() => { h.cmds.length = 0; h.groups = { "sg-plat": "bgp-ds-12345678", "sg-cust": "customer-db-access", "sg-other": "bgp-ds-87654321" }; });
 
 describe("🔴 deleteSecurityGroup 按组名判归属", () => {
-  it("🔴 B-54 收紧:**别的数据源**的 bgp-ds-* 组 ⇒ 不删(组名必须恰好等于本源的平台组名)", async () => {
+  it("🔴 收紧:**别的数据源**的 bgp-ds-* 组 ⇒ 不删(组名必须恰好等于本源的平台组名)", async () => {
     expect(await deleteSecurityGroup("sg-other", "us-east-1", DSID)).toBe("skipped-not-platform");
     expect(h.cmds).toEqual(["describe sg-other"]);
   });

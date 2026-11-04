@@ -3,16 +3,16 @@ import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { listMetrics, createMetric } from "@/lib/metrics/service";
-// @kf-batch 50-WP4quater-reads(工单 SC-13)—— 🔴 指标的**值**按区解析:计算路径本来就按区跑
+// 🔴 指标的**值**按区解析:计算路径本来就按区跑
 // (`computeMetric(metricId, scope)`),但值原来只存一份 ⇒ 在 usw2 算一次就覆盖掉主控区的值,
 // 而两个数字看起来都很正常。现在值按区存(`valueByTarget`),这里按当前范围解析出「这个区的值」。
-// 与建模指标(SC-37 的 `metricValueFor`)刻意保持同一形状:该区没算过回 null,**不回落别区的数字**。
+// 与建模指标(`metricValueFor`)刻意保持同一形状:该区没算过回 null,**不回落别区的数字**。
 import { readScope } from "@/lib/exec-env/scope";
 import { scopeTargets } from "@/lib/scope/scope";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 20: 指标定义。GET 列表（登录可读）；POST 建（仅平台管理员）。
+// 指标定义。GET 列表（登录可读）；POST 建（仅平台管理员）。
 export async function GET(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);

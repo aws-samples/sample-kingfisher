@@ -1,10 +1,9 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — GPT 传输门控(51 SPEC §2 PUT 硬闸 P0-5 / §3.4 补强①–④ / §6.3 本波范围)。
+// GPT 传输门控(51 SPEC §2 PUT 硬闸 P0-5 / §3.4 补强①–④ / §6.3 本波范围)。
 //
 // 两个函数,**故意分开**:
 //   · `gptTransportReady()` —— PUT /model-config 硬闸读的那个。🔴 **本波恒返 false,不读 DDB**
 //     (SPEC §3.4 补强①「门的代码 / 端点 / DDB 项与 M13 负向测试必须同期」;D9 真探测由主会话在合并后做,
-//     探测前 GPT 系列**一个都存不进去**,M13a)。P51.2 探测通过后把它改成 `return readTransportGate()`
+//     探测前 GPT 系列**一个都存不进去**,M13a)。探测通过后把它改成 `return readTransportGate()`
 //     一行即放开 —— 这是全仓唯一的放行点。
 //   · `readTransportGate()` —— 读 `ai-model#__transport` 的真实现(GET /transport 用来呈现现状;
 //     5s 短 TTL 独立缓存;>24h 视为失效;**任何异常 ⇒ false,fail-closed**)。
@@ -52,7 +51,7 @@ export async function readTransportGate(now = Date.now()): Promise<boolean> {
 }
 
 /**
- * 🔴 PUT /model-config 硬闸读的门。**P51.1/本波恒 false**,不读任何 flag / env / DDB。
+ * 🔴 PUT /model-config 硬闸读的门。**本波恒 false**,不读任何 flag / env / DDB。
  * 放开条件与步骤见文件头注释;门禁单测 (e) 钉住「恒 false」。
  */
 export async function gptTransportReady(): Promise<boolean> {

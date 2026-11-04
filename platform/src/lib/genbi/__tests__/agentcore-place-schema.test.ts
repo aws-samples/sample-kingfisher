@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4ter-coverage
 // 🔴🔴 **落点入参两侧必须一致**(2026-09-10 真环境抓到的静默跨区执行的门禁)。
 //
 // ── 那个 bug 长什么样 ────────────────────────────────────────────────────────
@@ -33,7 +32,7 @@ function fnBody(src: string, name: string): string {
 
 /**
  * Lambda 侧真正读的落点入参(从 `wireOf` 的实现里抽,不写死清单)。
- * @kf-batch 50-WP31-place-first-class —— 序 4(L6):rs* / ath* 八个平面字段已合并成一个 `place`(PlaceWire v1)。
+ * rs* / ath* 八个平面字段已合并成一个 `place`(PlaceWire v1)。
  *   抽取器仍按「Lambda 读了哪些 `a.<键>`」抽 —— 谁再往回加一个平面落点字段,下面「只许一个」那条就红。
  */
 function placeArgsReadByLambda(): string[] {
@@ -57,7 +56,7 @@ describe("agentcore-place-schema(落点入参三侧一致)", () => {
     expect(readFileSync(STACK_TS, "utf8").length).toBeGreaterThan(1000);
   });
 
-  it("🔴🔴 序 4(L6):落点只有**一个**入参 `place`(rs* / ath* 已合并);两条腿都经它(B-26:原来数据湖那条腿整条没有落点)", () => {
+  it("🔴🔴 落点只有**一个**入参 `place`(rs* / ath* 已合并);两条腿都经它(原来数据湖那条腿整条没有落点)", () => {
     expect(placeArgsReadByLambda()).toEqual(["place"]);
     const rs = readFileSync(RS_JS, "utf8");
     expect(fnBody(rs, "placeOf"), "数仓腿必须经 placeWireLeg 取").toMatch(/placeWireLeg\(w, "redshift"\)/);

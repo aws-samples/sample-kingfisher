@@ -1,5 +1,4 @@
-// @kf-batch 50-B42-om-reconcile
-// 目录对账(B-42)的装配层判据:**只 mock 真外部**(Secrets Manager 取 token · OM 的 HTTP),
+// 目录对账的装配层判据:**只 mock 真外部**(Secrets Manager 取 token · OM 的 HTTP),
 // om-client / om-service / om-mirror-push / om-reconcile 全部跑真代码(接缝不许被 mock 抹平)。
 //
 // 🔴 要钉住的是「删对的、**绝不删错的**」:

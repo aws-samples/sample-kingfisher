@@ -1,4 +1,3 @@
-// @kf-batch 50-WP2-one-agentcore-one-om
 // 「一个 OpenMetadata、按 service 分区」的判定门禁(合同 50 SPEC §3.4.6)。
 //
 // 🔴 这几条错了都不会报错,只会让目录**悄悄少半边或多半边**:
@@ -13,7 +12,6 @@ import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 
 const KNOWN = [HOME_TARGET_ID, "tgt_usw2_a", "tgt_euw1_b"];
 
-// @kf-batch 50-o4REG-sync-om-per-target
 describe("o4-REG:五类 service 同一条 per-target 规则 + 基名单一作者", () => {
   it("同步推送的三类(源 / 湖 / 物理端点)与镜像两类同规则:home 无后缀,其它区 -<slug>", () => {
     expect(omServiceFor("sources", HOME_TARGET_ID)).toBe("bgp-sources");

@@ -1,4 +1,4 @@
-// 模块 43-B — 稳健统计(纯函数,可单测,零依赖)。
+// 稳健统计(纯函数,可单测,零依赖)。
 // MAD(中位数绝对偏差)去异常是关键:一次 backfill 大跑或偶发慢跑不能污染基线 p90。
 
 export function median(xs: number[]): number {

@@ -1,6 +1,6 @@
 "use client";
 
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录行操作「修改表结构」(Redshift 表)。
+// 数据目录行操作「修改表结构」(Redshift 表)。
 // 真实列来自 GET /api/governance/tables/columns?targetId=&schema=&table=(svv_columns);「预览变更」= POST /api/governance/tables/alter dryRun
 // (计划 / 语句 / 拒绝项都是服务端算的,界面不自己猜);「执行」= 同路由不带 dryRun(prod 环境 ⇒ 202 审批单)。
 // 删列不可逆 ⇒ 重档确认:输入物理表名才放行(PRINCIPLES §D-裁决)。
@@ -67,7 +67,7 @@ export default function AlterTableDrawer({ open, target, onClose, onChanged }: A
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [result, setResult] = useState<{ ok: boolean; pending?: boolean; approvalId?: string; text: string } | null>(null);
-  // B-138:环境标识来自 localStorage,首帧按 dev(= 服务端)渲染,挂载后再读,避免 React 19 水合不一致
+  // 环境标识来自 localStorage,首帧按 dev(= 服务端)渲染,挂载后再读,避免 React 19 水合不一致
   const [env] = useBrowserInitialState<string>("dev", () => getActiveEnv());
   const protectedEnv = isProtectedEnv(env);
 

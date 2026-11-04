@@ -11,7 +11,7 @@
   <artifactId>flink-module-msk-iam-auth</artifactId>
   <packaging>jar</packaging>
 
-  <!-- 模块 32-CR / P42.6b — MSK IAM 认证模块。connector id = "msk-iam-auth"(对齐 connector-modules.ts)。
+  <!-- MSK IAM 认证模块。connector id = "msk-iam-auth"(对齐 connector-modules.ts)。
        不是 Flink connector,是纯认证库:提供 software.amazon.msk.auth.iam.{IAMLoginModule,IAMClientCallbackHandler}
        (§11.3 IAM 展开 SQL 属性引用的两个类)。由 resolveModules 在 finalSql 含 AWS_MSK_IAM 时【追加】拼入
        (与 kafka 模块并存,不独立成源)。SASL/SCRAM 认证不需要本模块(kafka 模块自带 ScramLoginModule)。
@@ -35,7 +35,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
         <configuration>
-          <!-- 🔴 §2.4 约束① 落地(P42.6b 真跑实测逼出):aws-msk-iam-auth 直接依赖 jackson-databind 2.18.3,
+          <!-- 🔴 §2.4 约束① 落地(真跑实测逼出):aws-msk-iam-auth 直接依赖 jackson-databind 2.18.3,
                而 kafka 模块内嵌裸 jackson 2.15.2(flink-sql-connector-kafka 未 relocate Jackson)。二者裸
                com.fasterxml.jackson 同名类字节分叉 → 运行期 mergeJars(strict) 判为核心库冲突 FAIL(正确拦截)。
                解法照 iceberg 模块(官方把 Jackson relocate 到 org/apache/iceberg/shaded/,与 kafka 实测 0 冲突):
@@ -48,7 +48,7 @@
               <pattern>com.fasterxml.jackson</pattern>
               <shadedPattern>com.bgp.shaded.mskiam.jackson</shadedPattern>
             </relocation>
-            <!-- 🔴 P42.6b 真跑逼出(2026-07-27):flink-sql-connector-kafka 把 kafka-clients relocate 到
+            <!-- 🔴 真跑逼出(2026-07-27):flink-sql-connector-kafka 把 kafka-clients relocate 到
                  org.apache.flink.kafka.shaded.org.apache.kafka.*(shaded uber connector)。Flink KafkaSourceEnumerator
                  用 shaded ConfigDef 解析 sasl.client.callback.handler.class,要求 handler implements 【shaded 版】
                  AuthenticateCallbackHandler;而 aws-msk-iam-auth 的 IAMClientCallbackHandler implements 【裸版】

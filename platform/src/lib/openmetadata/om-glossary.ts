@@ -1,4 +1,4 @@
-// 模块 35 P1 — 数据标准 / 指标 → OpenMetadata Glossary 推送(best-effort,失败不阻断)。
+// 数据标准 / 指标 → OpenMetadata Glossary 推送(best-effort,失败不阻断)。
 //
 // 数据标准天然对应 OM 的 Glossary Term(业务术语);指标同理(口径=术语定义)。
 // 若 OM 未配置(isOmConfigured()=false)直接跳过。所有调用 fire-and-forget,永不抛到调用方。
@@ -41,7 +41,7 @@ export async function pushStandardGlossary(std: {
 }): Promise<void> {
   try {
     if (!isOmConfigured()) return;
-    const ok = await ensureGlossary(STD_GLOSSARY, "数据标准", "平台数据标准字典(模块35)自动同步");
+    const ok = await ensureGlossary(STD_GLOSSARY, "数据标准", "平台数据标准字典自动同步");
     if (!ok) return;
     const desc = [
       std.description || std.name || "",
@@ -64,7 +64,7 @@ export async function pushMetricGlossary(m: {
 }): Promise<void> {
   try {
     if (!isOmConfigured()) return;
-    const ok = await ensureGlossary(METRIC_GLOSSARY, "指标体系", "平台指标体系(模块35 D4)自动同步");
+    const ok = await ensureGlossary(METRIC_GLOSSARY, "指标体系", "平台指标体系自动同步");
     if (!ok) return;
     const desc = [
       m.caliber || m.description || m.name || "",

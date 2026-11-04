@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 🔴 数仓直查:非平台管理员只许只读。只 mock 真外部(身份 / 项目守卫 / 真正发 SQL 的提交层 —— 它记下收到的 SQL)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

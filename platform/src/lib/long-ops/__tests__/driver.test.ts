@@ -1,4 +1,4 @@
-// 模块 55 — 驱动器判据(= 序 46 B-107 long-call-driver.test 泛化):混合响应(快 ⇒ 同步 / 慢 ⇒ 202 带协议记号)、失败原样上抛 +
+// 驱动器判据(= long-call-driver.test 泛化):混合响应(快 ⇒ 同步 / 慢 ⇒ 202 带协议记号)、失败原样上抛 +
 // LongOpHttpError 落库状态 / 信封、resultStatus 201 透传、执行体跑在 runInLongOp 上下文里、天花板必写 timeout、心跳、LONG_OPS_ASYNC=0 纯同步。
 // 只 mock 真外部 DynamoDB;执行体注册表经参数注入(不 mock 兄弟模块)。
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -37,7 +37,7 @@ async function waitUntil(pred: () => boolean, budgetMs = 1_000): Promise<void> {
 
 beforeEach(() => resetMemLongOps());
 
-describe("模块 55 驱动器:submitLongOp 混合响应", () => {
+describe("驱动器:submitLongOp 混合响应", () => {
   it("快路径(建模):执行体在等待预算内完成 ⇒ mode=sync 带 data;行 succeeded;响应 200 与接入前同形(无 _meta)", async () => {
     const reg = registry(async () => ({ data: { codeTableId: "ct1", landedByTarget: { tgt_usw2_a: { status: "ok" } } } }));
     const ctx = ctxOf();
@@ -49,7 +49,7 @@ describe("模块 55 驱动器:submitLongOp 混合响应", () => {
     expect(await res.json()).toEqual({ success: true, data: { codeTableId: "ct1", landedByTarget: { tgt_usw2_a: { status: "ok" } } } });
   });
 
-  it("快路径(AI):meta.model ⇒ 响应顶层 `_meta`(模型 + correlationId),与 B-107 同形", async () => {
+  it("快路径(AI):meta.model ⇒ 响应顶层 `_meta`(模型 + correlationId),与同类缺陷", async () => {
     const reg = registry(async () => ({ data: { sql: "INSERT INTO t SELECT 1" }, meta: { model: MODEL } }));
     const ctx = ctxOf();
     const result = await submitLongOp(FLINK, ctx, { registry: reg, waitMs: 500 });
@@ -68,7 +68,7 @@ describe("模块 55 驱动器:submitLongOp 混合响应", () => {
     expect([...rows.values()][0].resultStatus).toBe(201);
   });
 
-  it("rawBody(序 50 第二批,编排四条):执行体标 rawBody ⇒ 同步响应就是 data 本体(不包 apiOk 信封),行落 resultRaw;不标的行上没有这一位", async () => {
+  it("rawBody(编排四条):执行体标 rawBody ⇒ 同步响应就是 data 本体(不包 apiOk 信封),行落 resultRaw;不标的行上没有这一位", async () => {
     const raw = { success: true, dagId: "bgp_wf1", scheduler: "serverless", perTarget: [{ targetId: "tgt_home", ok: true }] };
     const reg = registry(async () => ({ data: raw, rawBody: true }));
     const ctx = ctxOf();
@@ -143,7 +143,7 @@ describe("模块 55 驱动器:submitLongOp 混合响应", () => {
   });
 });
 
-describe("模块 55 驱动器:driveExecution 天花板与心跳", () => {
+describe("驱动器:driveExecution 天花板与心跳", () => {
   it("到天花板执行体还没回 ⇒ abort + 行 timeout(LONG_OP_TIMEOUT);执行体之后才回也写不进(状态不回退)", async () => {
     let signal: AbortSignal | undefined;
     let release!: () => void;

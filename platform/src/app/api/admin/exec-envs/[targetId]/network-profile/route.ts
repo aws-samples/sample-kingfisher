@@ -1,7 +1,6 @@
-// @kf-batch 50-WP16-zero-egress
 // 🔴 **已下线**:POST /api/admin/exec-envs/[targetId]/network-profile(改网络规模 = 改 NAT 数)。
-// 执行环境自 WP-16 起零出网(SPEC §3.16):NAT 恒为 0 ⇒ 没有可调的档。
-// 处置口径同 WP-1:回 **410** 而不是删路由。存量描述符里的 `networkProfile` 字段保留但不再有行为。
+// 执行环境零出网(SPEC §3.16):NAT 恒为 0 ⇒ 没有可调的档。
+// 处置口径同:回 **410** 而不是删路由。存量描述符里的 `networkProfile` 字段保留但不再有行为。
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
     return apiError("targetId 形态非法", 400, { code: "VALIDATION_FAILED" });
   }
   // 留审计:能看出还有谁在调这个退役端点(写类 route 必留审计,门禁钉)
-  recordAudit(req, "exec-env.network-profile.retired", { resourceType: "exec-env", resourceId: params.targetId, detail: { retiredBy: "WP-16 零出网" } }).catch(() => {});
+  recordAudit(req, "exec-env.network-profile.retired", { resourceType: "exec-env", resourceId: params.targetId, detail: { retiredBy: "零出网" } }).catch(() => {});
   return apiError(
     "网络规模(standard / economy)已下线:执行环境零出网,不建 NAT 网关、不占弹性 IP,没有可调的档。",
     410,

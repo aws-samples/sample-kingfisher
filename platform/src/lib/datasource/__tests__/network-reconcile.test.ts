@@ -1,4 +1,4 @@
-// 序 61 B-133 —— 数据源外部网络对象核对自愈(唯一作者 lib/datasource/network-reconcile.ts)的判据。
+// 数据源外部网络对象核对自愈(唯一作者 lib/datasource/network-reconcile.ts)的判据。
 //
 // 🔴 只 mock 真外部:按区 SDK 客户端工厂(EC2 / Glue / RDS / Secrets Manager)、DDB、审计出口、告警中心出口。
 //    network-reconcile ↔ datasource-service ↔ ds-place ↔ ds-patch 之间**一律不 mock**(接缝就在这里:事实读取 ⇒ 重建 ⇒ 接回 ⇒ 落行)。
@@ -85,7 +85,7 @@ const TAGS = [{ Key: "bgp:managed", Value: "datasource" }, { Key: "bgp:datasourc
 const platformDs = (over: Record<string, unknown> = {}) => ({
   datasourceId: DS_ID, name: "GameData-MySQL", type: "mysql", host: "db.example.internal", port: 3306, database: "gamedb",
   secretArn: SECRET, glueConnectionName: CONN, status: "active",
-  // 🔴 与建源真落库同形:networkConfig **没有** availabilityZone(2.1.2 及之前建源从不落它;B-133 第二刀起新行才带)——
+  // 🔴 与建源真落库同形:networkConfig **没有** availabilityZone(2.1.2 及之前建源从不落它;第二刀起新行才带)——
   //    夹具若自带 AZ,「重建的连接丢了可用区」这一刀永远测不到(10-29 …4916 页面驱动 B133-7 真撞后改)
   networkConfig: { vpcId: "vpc-1", subnetId: "subnet-1", securityGroupId: "sg-plat-old", isRds: false },
   ...over,
@@ -134,7 +134,7 @@ describe("reconcileDatasourceNetwork —— 平台拥有的对象:缺了就按�
     expect(upd[0].input.Name).toBe(CONN);
     expect(upd[0].input.ConnectionInput.PhysicalConnectionRequirements.SecurityGroupIdList).toEqual(["sg-new-1"]);
     expect(upd[0].input.ConnectionInput.PhysicalConnectionRequirements.SubnetId).toBe("subnet-1");
-    // B-133 第二刀:源行没有 AZ,接回的连接仍必须带子网的可用区(UpdateConnection 整体替换 PhysicalConnectionRequirements,缺了作业起不来)
+    // 第二刀:源行没有 AZ,接回的连接仍必须带子网的可用区(UpdateConnection 整体替换 PhysicalConnectionRequirements,缺了作业起不来)
     expect(upd[0].input.ConnectionInput.PhysicalConnectionRequirements.AvailabilityZone).toBe("us-east-1a");
     expect((decodePatch(h.patches[0]).networkConfig as any).availabilityZone).toBe("us-east-1a");
     expect(cmd("glue", "CreateConnectionCommand")).toHaveLength(0);
@@ -176,7 +176,7 @@ describe("reconcileDatasourceNetwork —— 平台拥有的对象:缺了就按�
     const create = cmd("glue", "CreateConnectionCommand");
     expect(create).toHaveLength(1);
     expect(create[0].input.ConnectionInput.Name).toBe(CONN);
-    // B-133 第二刀:源行没有 AZ ⇒ 重建的连接的 AvailabilityZone 来自子网事实(DescribeSubnets),不是 undefined
+    // 第二刀:源行没有 AZ ⇒ 重建的连接的 AvailabilityZone 来自子网事实(DescribeSubnets),不是 undefined
     expect(create[0].input.ConnectionInput.PhysicalConnectionRequirements).toEqual({ SubnetId: "subnet-1", SecurityGroupIdList: ["sg-plat-old"], AvailabilityZone: "us-east-1a" });
     expect(cmd("sm", "GetSecretValueCommand")).toHaveLength(1);
     expect(ec2Writes()).toHaveLength(0);
@@ -213,7 +213,7 @@ describe("reconcileDatasourceNetwork —— 平台拥有的对象:缺了就按�
     expect((decodePatch(h.patches[0]).networkConfig as any)).toMatchObject({ vpcId: "vpc-2", subnetId: "subnet-default", securityGroupId: "sg-new-1" });
   });
 
-  it("B-133 第二刀:写连接的作者按子网事实取 AZ —— 调用方给的 AZ 与子网矛盾 ⇒ 拒绝写(零 UpdateConnection);子网不在 ⇒ 拒绝写", async () => {
+  it("第二刀:写连接的作者按子网事实取 AZ —— 调用方给的 AZ 与子网矛盾 ⇒ 拒绝写(零 UpdateConnection);子网不在 ⇒ 拒绝写", async () => {
     await expect(updateGlueConnectionNetwork(CONN, { subnetId: "subnet-1", securityGroupIds: ["sg-plat-old"], availabilityZone: "us-east-1z" }, "us-east-1"))
       .rejects.toThrow(/可用区矛盾.*us-east-1z.*us-east-1a/);
     expect(cmd("glue", "UpdateConnectionCommand")).toHaveLength(0);

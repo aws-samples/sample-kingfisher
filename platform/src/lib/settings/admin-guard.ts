@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — /api/admin/model-config/** 的路由内纵深守卫(51 SPEC §2:middleware.ts 网关强制 bgp-admin 之外,
+// /api/admin/model-config/** 的路由内纵深守卫(51 SPEC §2:middleware.ts 网关强制 bgp-admin 之外,
 // 路由内再做一层 `isPlatformAdmin`,照 `api/admin/users/route.ts` 的 requireAdmin 写法复刻;P2-4)。
 //
 // 🔴 与 51 SPEC §2 补强⑤ 同源的风险提醒:`identity.ts` 在 Cognito 未配置时给所有人 isPlatformAdmin:true(demo 模式)。
@@ -21,8 +20,8 @@ export async function requirePlatformAdmin(req: NextRequest): Promise<{ identity
  * 验收脚本按 `body.error` 断言;这里同时保留 `success:false` 与人话 `message`,前端两种读法都通。
  */
 export function modelConfigError(
-  // @kf-batch 50-WP4-o1-scope —— 新增 `ScopeParamRenamed`(50 SPEC v3.34 §2.6.0:参数 `scope` → `settingScope`,旧名即拒不留别名)
-  // @kf-batch 51-v2-multi-vendor —— 新增 `ToolUseUnavailable`(51 SPEC §7.4 ③′:toolUse:"probe" 的系列探测通过但拿不到 tool-use 证据,不许设为全局默认)
+  // 新增 `ScopeParamRenamed`(50 SPEC v3.34 §2.6.0:参数 `scope` → `settingScope`,旧名即拒不留别名)
+  // 新增 `ToolUseUnavailable`(51 SPEC §7.4 ③′:toolUse:"probe" 的系列探测通过但拿不到 tool-use 证据,不许设为全局默认)
   error: "ProbeFailed" | "NotAllowedFamily" | "NotInCatalog" | "VersionConflict" | "RateLimited" | "TransportNotVerified" | "ToolUseUnavailable" | "ValidationFailed" | "CatalogUnavailable" | "StoreUnavailable" | "ScopeParamRenamed",
   status: number,
   extra: Record<string, unknown> = {}

@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— B-56:EMR Serverless 作业的业务日期**从未进作业**。
+// EMR Serverless 作业的业务日期**从未进作业**。
 //
 // 【真实缺口】provider.submit 收到 opts.runDate 只写进台账;StartJobRun 的 entryPointArguments 恒为用户填的
 //   那几个,脚本 j.script 原样上传 ⇒ 手动「指定日期运行」/ 补数 / 同日期重跑对 EMR 作业全是空转
@@ -100,7 +100,7 @@ beforeEach(() => {
   h.job = job();
 });
 
-describe("🔴🔴 B-56:EMR submit 把业务日期以参数形式传进作业(手动 / 补数 / 重跑同一条路)", () => {
+describe("🔴🔴 EMR submit 把业务日期以参数形式传进作业(手动 / 补数 / 重跑同一条路)", () => {
   it("指定业务日期 ⇒ entryPointArguments = 用户入参 + 全套业务日期参数(与 Glue 离线作业同一张表、同一顺序)", async () => {
     const r = await emrServerlessProvider.submit(job(), { runDate: "2026-09-01", triggeredBy: "manual", targetId: "tgt_home" });
     expect(r.runDate).toBe("2026-09-01");

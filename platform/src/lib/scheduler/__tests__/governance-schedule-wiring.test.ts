@@ -1,4 +1,4 @@
-// @kf-batch 50-WP28-platform-action-node(WP-29 治理)
+// (治理)
 // 🔴 接线判据(「写了」≠「接上了」):定时治理任务从建 → 启用 → 监控页出行 → 日志,每一段都要接上。
 //   查的是**调用位置**(先剥 import 与注释),不是「文件里出现过这个名字」。
 import { describe, it, expect } from "vitest";

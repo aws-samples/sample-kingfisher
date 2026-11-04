@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.1a-naming-ssot
 // 执行环境资源命名 —— 运行时侧出口(SSOT re-export)。
 //
 // 唯一真源是 `platform/naming.json`(见其 $comment)。本文件是它在【运行时侧(platform/Next.js)】的出口。
@@ -151,7 +150,7 @@ export function resourceName(kind: ResourceKind | string, vars: ResourceNameVars
 }
 
 /**
- * 序 72 B-140 —— 某类资源**名字的形态**(home / target 两模板都认),用来判定一个物理名「是不是平台建的这类资源」
+ * 某类资源**名字的形态**(home / target 两模板都认),用来判定一个物理名「是不是平台建的这类资源」
  * (如依赖库 URI 的桶是不是平台脚本桶,才许在提交到别的区时换成该区的桶);**不**用来生成名字(生成走 `resourceName`)。
  * 变量形态:account = 12 位数字;slug / component = 小写字母数字连字符;region = 形如 us-east-1。
  */

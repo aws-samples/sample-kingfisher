@@ -1,8 +1,7 @@
-// @kf-batch 50-W5-seg2-WP10a
-// residency-audit.ts —— 可审计闭包的单测(50 SPEC v3.23 §3.2 / §3.3;ACCEPTANCE E-186 / E-187 / E-191 / E-196 / E-197 / E-200 的单测面)。
+// residency-audit.ts —— 可审计闭包的单测(50 SPEC v3.23 §3.2 / §3.3;ACCEPTANCE 单测面)。
 //
 // 打桩只到 AWS SDK 边界(中央 docClient / 区域 docClient / 注册表读 / run 行写通道),审计 item 形状、同意判定、fail-closed 方向全部真跑。
-// 变异靶(注释里的 M-x 与 ACCEPTANCE E-200 对应):
+// 变异靶(注释里的 M-x 与 ACCEPTANCE 对应):
 //   M-a 删掉 `if (isHome(targetId)) return null` 之前的短路 ⇒ 「home 零区域客户端调用」红
 //   M-b `requireResidencyAck` 改成 hasAck 失败也放行 ⇒ 「缺同意 409」红
 //   M-c 区域写失败吞掉不抛 ⇒ 「写不成即拒」红
@@ -160,7 +159,7 @@ beforeEach(() => {
   vi.mocked(dynamoDocClientFor).mockClear();
 });
 
-describe("🔴 home / 同法域:一字不变、零区域客户端(E-200 home 请求零区域客户端调用)", () => {
+describe("🔴 home / 同法域:一字不变、零区域客户端(home 请求零区域客户端调用)", () => {
   it("home ⇒ null,且**不读注册表、不建区域客户端、不写中央**(M-a 靶)", async () => {
     const r = await residencyAudit({ actor: userActor(USER), targetId: HOME, entry: "execute", sqlText: SQL });
     expect(r).toBeNull();
@@ -184,7 +183,7 @@ describe("🔴 home / 同法域:一字不变、零区域客户端(E-200 home 请
   });
 });
 
-describe("🔴 跨法域:同意前置(E-196 / E-197)", () => {
+describe("🔴 跨法域:同意前置", () => {
   it("缺同意 ⇒ 抛 ResidencyAckRequired,带当前版本 + 逐字文案 + 哈希;区域客户端零调用(M-b 靶)", async () => {
     const p = residencyAudit({ actor: userActor(USER), targetId: EU, entry: "execute", sqlText: SQL });
     await expect(p).rejects.toBeInstanceOf(ResidencyAckRequired);
@@ -241,7 +240,7 @@ describe("🔴 跨法域:同意前置(E-196 / E-197)", () => {
   });
 });
 
-describe("🔴 跨法域:双写形状 + 写不成即拒(E-186 / E-187 / M-c / M-d)", () => {
+describe("🔴 跨法域:双写形状 + 写不成即拒(M-c / M-d)", () => {
   it("区域全量(operator / SQL 原文 / entry / authKind)+ 中央摘要(同 auditId、只有 sqlHash、无 SQL 无 operator)", async () => {
     ackFor("sub-A", EU);
     const r = await residencyAudit({ actor: userActor(USER), targetId: EU, entry: "execute", sqlText: SQL, projectId: "proj-a", rows: 3, durationMs: 120 });
@@ -317,7 +316,7 @@ describe("🔴 错误 → 响应映射(SPEC §3.2 v3.23 的 409 / 503 形状,单
   });
 });
 
-describe("🔴 定时 run 的观测后补写(E-191;pending 抢占协议,M-e 靶)", () => {
+describe("🔴 定时 run 的观测后补写(pending 抢占协议,M-e 靶)", () => {
   const run = { taskId: "job-1", runId: "01RUN", targetId: EU, triggeredBy: "schedule" };
   it("非定时 / home / 同法域 ⇒ 零 I/O", async () => {
     expect(await auditObservedScheduledRun({ ...run, triggeredBy: "manual" })).toEqual({ audited: false });

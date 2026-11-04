@@ -1,5 +1,5 @@
-// 模块 43-B — SLA 定义 CRUD + 破线预测持久化 + 预测告警推送(复用模块34通道)。
-// 不改模块34规则引擎:仅 import 其 dispatch/putEventIfNew/updateEventDelivery/getChannels。
+// SLA 定义 CRUD + 破线预测持久化 + 预测告警推送(复用通道)。
+// 不改规则引擎:仅 import 其 dispatch/putEventIfNew/updateEventDelivery/getChannels。
 
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
@@ -8,7 +8,7 @@ import { dispatch } from "@/lib/alerting/notify";
 import { putEventIfNew, updateEventDelivery } from "@/lib/alerting/events";
 import { getChannels } from "@/lib/alerting/channels";
 import type { SlaRow, SlaPrediction } from "./types";
-// @kf-batch 50-WP4quater-reads(工单 SC-15)—— SLA 的区维**从绑定对象派生**,不让用户再填一次。
+// SLA 的区维**从绑定对象派生**,不让用户再填一次。
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 
 const slaPk = (projectId: string) => `sla#${projectId}`;
@@ -16,7 +16,6 @@ const slaPk = (projectId: string) => `sla#${projectId}`;
 const USER_ID = "default-user";
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-15)
  * 这条 SLA 管的对象(任务 / 工作流)跑在哪些区。
  *
  * 🔴 **派生而不是让用户填**:SLA 表单里再放一个「区」选择器,等于同一件事有两个真值源 ——
@@ -86,7 +85,7 @@ export async function createSla(projectId: string, createdBy: string, body: any)
     },
     warnLeadMin: Math.max(1, parseInt(body?.warnLeadMin, 10) || 30),
     channelIds: Array.isArray(body?.channelIds) ? body.channelIds : [],
-    // @kf-batch 50-WP4quater-reads(工单 SC-15)—— 区维派生自绑定对象(见 targetsOfBinding 注释)
+    // 区维派生自绑定对象(见 targetsOfBinding 注释)
     targets: await targetsOfBinding(target.taskId, target.workflowId),
     createdAt: now,
     updatedAt: now,
@@ -146,15 +145,15 @@ export async function saveLastPrediction(projectId: string, slaId: string, predi
   })).catch(() => {});
 }
 
-// 推送"预测破线"告警(复用模块34通道 + 事件幂等去重)。dedupeKey=sla#<slaId>#<runId>#predicted:
-// 同一 (slaId, runId) 只推一次;不同语义(模块34固定 timeout 规则)dedupeKey 不同,互不覆盖。
+// 推送"预测破线"告警(复用通道 + 事件幂等去重)。dedupeKey=sla#<slaId>#<runId>#predicted:
+// 同一 (slaId, runId) 只推一次;不同语义(固定 timeout 规则)dedupeKey 不同,互不覆盖。
 export async function pushBreachAlert(sla: SlaRow, prediction: SlaPrediction, extra: { node?: string }): Promise<{ pushed: boolean; status?: string }> {
   const dedupeKey = `sla#${sla.slaId}#${prediction.runId}#predicted`;
   const etaLocal = new Date(prediction.etaAt).toISOString().slice(11, 16);
   const slaLocal = new Date(prediction.slaAt).toISOString().slice(11, 16);
   const message = `工作流「${sla.name}」预计 ${etaLocal} 完成,SLA ${slaLocal},大概率破线(余量 ${prediction.marginMin} 分钟)${extra.node ? `,当前卡在 ${extra.node}` : ""}。`;
-  // trigger 用模块34既有 AlertEvent.trigger 字段(taskId/taskName/runId/taskType/metricValue),
-  // 不扩展其类型(红线:不改模块34)。SLA 语义(etaAt/slaAt/卡点)已进 message 成品串。
+  // trigger 用既有 AlertEvent.trigger 字段(taskId/taskName/runId/taskType/metricValue),
+  // 不扩展其类型(红线:不改)。SLA 语义(etaAt/slaAt/卡点)已进 message 成品串。
   const event = await putEventIfNew({
     ruleId: `sla#${sla.slaId}`,
     ruleName: `SLA预测破线:${sla.name}`,

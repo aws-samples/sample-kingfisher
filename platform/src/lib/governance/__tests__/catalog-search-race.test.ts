@@ -1,5 +1,4 @@
-// @kf-batch 50-B10-stale-response-race
-// 🔴🔴 **并发请求的陈旧响应竞态:晚到的那份会赢**（B-10）。
+// 🔴🔴 **并发请求的陈旧响应竞态:晚到的那份会赢**（）。
 //
 // 【为什么是结构判据而不是行为判据 —— 这一点必须说清，别让下一个人以为我偷懒】
 // 竞态的行为判据**天生不稳定**：要它红，必须让「先发的那次」比「后发的那次」**晚回来**，
@@ -9,7 +8,7 @@
 // ⇒ 主力判据钉**结构**：凡写 state 的位置，都必须在「序号比对」之后。这是闭合式的：
 //   不是枚举「哪几处忘了比」，而是要求**每一处** `setCatalogData` 都在那道闸后面。
 //
-// 【真缺陷（2026-09-20 在 B-06 诊断过程中发现）】
+// 【真缺陷（2026-09-20 在诊断过程中发现）】
 //   `searchCatalog` 原本是 `const d = await fetch(...); setCatalogData(...)` ——
 //   没有序号、没有 AbortController、没有「只认最后一次」⇒ 用户连着搜两次（或切区与搜索同时发生），
 //   两个请求并发，**谁晚回来谁写进 state**：搜了新词，列表显示的却是上一次的结果。
@@ -44,7 +43,7 @@ function searchCatalogBody(src: string): string {
   return rest.slice(0, next > 0 ? next : rest.length);
 }
 
-describe("治理目录搜索:陈旧响应必须被丢弃(B-10)", () => {
+describe("治理目录搜索:陈旧响应必须被丢弃", () => {
   const code = stripComments(raw);
   const body = searchCatalogBody(code);
 
@@ -84,14 +83,13 @@ describe("治理目录搜索:陈旧响应必须被丢弃(B-10)", () => {
   it("④ 负向:不许再出现「拿到响应直接写 state」那个原始形态", () => {
     // 原始形态 = `const d = await res.json();` 紧接着就 setCatalogFresh/setCatalogData(中间没有闸)
     const naive = /const\s+d\s*=\s*await\s+res\.json\(\);\s*set(CatalogFresh|CatalogData)/.test(body);
-    expect(naive, "响应与写 state 之间没有那道闸 ⇒ 回到 B-10 的原始缺陷").toBe(false);
+    expect(naive, "响应与写 state 之间没有那道闸 ⇒ 回到原始缺陷").toBe(false);
   });
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-B18-catalog-state-two-meanings
 //
-// 🔴🔴 **B-18:`catalogData` 被当成两件事用。**
+// 🔴🔴 **`catalogData` 被当成两件事用。**
 // 无头对照实验(2026-09-21,同一个浏览器同一次运行,只差「中间搜没搜」):
 //   A 组 全新进页面        ⇒ 质量页签下拉输入 `dws_channel_roi_daily` ⇒ **1 条,选得到**
 //   B 组 先在目录里搜 `home_orders_`(8 行,不含目标表)⇒ 同一串操作 ⇒ **空态,选不到**
@@ -99,10 +97,10 @@ describe("治理目录搜索:陈旧响应必须被丢弃(B-10)", () => {
 // 而 `catalogData` 的语义是「目录页签当前那次搜索的结果」。⇒ 用户在目录里搜过一次之后,
 // 那四个选择器就只剩搜到的那几张表 —— 而界面上没有任何线索(记忆 one-set-two-meanings-deadlock)。
 //
-// 🔴 这也是我自己判断错的一条:我原先在台账里写「B-16 是判据问题,不许因为它红去改产品」;
+// 🔴 这也是我自己判断错的一条:我原先在台账里写「是判据问题,不许因为它红去改产品」;
 //    对照实验推翻了它 —— 判据确实也有毛病(用了全页下标),但**底下压着一个真产品缺陷**。
 // ════════════════════════════════════════════════════════════════════════════
-describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
+describe("治理页:`catalogData` 只有一个语义", () => {
   const code = stripComments(raw);
 
   it("⑤ 🔴 闭合式:`catalogData` 的消费形态是**封闭清单**(不是枚举违规)", () => {
@@ -112,7 +110,7 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
       /setCatalogData\(/,                                                  // 只由搜索写
       /\{\s*n:\s*catalogData\.length\s*\}/,                                // 目录页签的计数
       /dataSource=\{catalogData\}/,                                        // 目录页签的表格
-      // 序 47d 目录筛选:下面三种都仍是「目录搜索结果」本身 —— 筛选 / 候选项是它的**派生视图**(纯函数 lib/governance/catalog-filters.ts),
+      // 目录筛选:下面三种都仍是「目录搜索结果」本身 —— 筛选 / 候选项是它的**派生视图**(纯函数 lib/governance/catalog-filters.ts),
       //   表格改吃派生出的 filteredCatalog;页签计数在筛选时写成「n / total」,total 仍是搜索结果总数。没有第二份 state、没有第二个作者。
       /applyCatalogFilter\(catalogData,\s*catalogFilter\)/,                 // 派生:筛选后的行
       /catalogFilterOptions\(catalogData,\s*catalogFilter\.db\)/,           // 派生:筛选候选项
@@ -136,10 +134,10 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
     // 四个页签的选择器都必须用它(数字是**下界**:新增页签只会更多,不会更少)
     const n = (code.match(/options=\{assetOptions\}/g) || []).length;
     expect(n, "资产选择器没有全部走 assetOptions").toBeGreaterThanOrEqual(4);
-    // 🔴 负向:不许任何选择器再拿 catalogData 当 options(这就是 B-18 的原始形态)
+    // 🔴 负向:不许任何选择器再拿 catalogData 当 options(这就是该缺陷的原始形态)
     expect(
       /options=\{catalogData/.test(code),
-      "🔴 又有选择器拿「目录搜索结果」当候选清单 ⇒ B-18 原样复发"
+      "🔴 又有选择器拿「目录搜索结果」当候选清单 ⇒ 原缺陷原样复发"
     ).toBe(false);
     // `assetOptions` 只能从 allAssets 派生(否则又多一个作者)
     expect(code).toMatch(/const\s+assetOptions\s*=\s*useMemo\(/);
@@ -161,7 +159,7 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
       expect(
         arg,
         `🔴 loadAllAssets 取数时传了 ${arg || "(空)"} 而不是空字符串字面量 ⇒ ` +
-          `候选清单又能被某个变量左右(B-18 原样复发)`
+          `候选清单又能被某个变量左右(原缺陷原样复发)`
       ).toBe('""');
     }
     // 🔴 负向:它自己不许再直接拼 URL(那就是第二个取数作者)
@@ -195,7 +193,7 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
   // ════════════════════════════════════════════════════════════════════════
   // 🔴🔴 **⑫ 这一条是用一次真实测量换来的,别删。**
   //
-  // B-18 的第一版修法是「初始化各调一次」(`searchCatalog("")` + `loadAllAssets()`),
+  //该缺陷的第一版修法是「初始化各调一次」(`searchCatalog("")` + `loadAllAssets()`),
   // 我还在注释里写了「多一次请求换来语义分离,值得」—— **那句话没有任何依据**。
   // 带时间戳实测(`/tmp/probe_b18_timing.py`)当场否证它:
   //     1.6s REQ keyword=&scope=tgt_home    ← 两条请求**参数逐字节相同**
@@ -237,7 +235,7 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
 
 // ════════════════════════════════════════════════════════════════════════════
 // 🔴🔴 **这一条是把上面那条门禁从「枚举式」升级成「闭合式」** ——
-// B-10 的门禁只判 `searchCatalog` **一个**函数。而 B-18 的修法给这一页添了**第二个**
+//该缺陷的门禁只判 `searchCatalog` **一个**函数。而该缺陷的修法给这一页添了**第二个**
 // 并发写者 `loadAllAssets`:如果门禁还是点名式的,第二个(以及第 N+1 个)就无人看管。
 // 本仓已为此立过纪律:**门禁写成「枚举违规写法」就一定漏掉第 N+1 种**
 // (记忆 gate-enumerates-violations-not-legal-form)。
@@ -245,8 +243,8 @@ describe("治理页:`catalogData` 只有一个语义(B-18)", () => {
 // ⚠️ **同时如实登记一件事(不许掩盖)**:这一页现在共有 14 个「取数后写 state」的函数,
 //    其中**只有 2 个**有序号闸。剩下 12 个里,至少 `loadLineage` / `loadImpact` /
 //    `loadClassification` / `loadQRules` / `loadQResults` 是**真竞态**
-//    (快速切换两个 fqn / 两张表,晚到的旧响应会赢,症状与 B-10 一模一样)。
-//    ⇒ 登记为 **B-19**,下一批修;本判据把它做成**只减不增的棘轮**:
+//    (快速切换两个 fqn / 两张表,晚到的旧响应会赢,症状与一模一样)。
+//    ⇒ 登记为,下一批修;本判据把它做成**只减不增的棘轮**:
 //      · 新增函数不许无闸(总数不许变大);
 //      · 每修掉一个就把数字改小 —— **数字本身就是进度**。
 // ════════════════════════════════════════════════════════════════════════════
@@ -285,7 +283,7 @@ describe("治理页:陈旧响应守卫的覆盖面(闭合式 + 只减不增棘�
   const fetchers = fns.filter(([, b]) => TAKES_DATA.test(b) && WRITES_STATE.test(b));
   // 🔴 闸的形态:自增了某个 SeqRef **且** 拿它比对过(比对可以是 `!==` 丢弃,也可以是 `===` 才写 ——
   //   `bootstrapCatalog` 用的是后者,因为它要分别决定两份 state 各写不写)。
-  // 🔴 **本轮第 6 例「判据钉形态被自己的重构打破」**:B-19 把 12 个函数的闸收进一个
+  // 🔴 **本轮第 6 例「判据钉形态被自己的重构打破」**:把 12 个函数的闸收进一个
   //   `seqRefs` 集合(`++seqRefs.lineage.current`),而这条正则原来只认 `\w*SeqRef.current`
   //   ⇒ 那 12 个刚加的闸**一个都识别不到**。判据钉的**事实**没变(自增 + 比对),变的只是写法
   //   ⇒ 放宽到同时认两种写法,**但绝不放宽「必须自增且必须比对」这两件事**。
@@ -320,14 +318,14 @@ describe("治理页:陈旧响应守卫的覆盖面(闭合式 + 只减不增棘�
     for (const name of ["searchCatalog", "loadAllAssets", "bootstrapCatalog"]) {
       const hit = fetchers.find(([n]) => n === name);
       expect(hit, `找不到 ${name} ⇒ 判据在空转`).toBeTruthy();
-      expect(guarded(hit![1]), `🔴 ${name} 没有「序号自增 + 比对丢弃」⇒ 晚到的陈旧响应会赢(B-10 同形)`).toBe(true);
+      expect(guarded(hit![1]), `🔴 ${name} 没有「序号自增 + 比对丢弃」⇒ 晚到的陈旧响应会赢(同形缺陷)`).toBe(true);
     }
   });
 
   it("⑪ 🔴 棘轮:无闸的取数函数**只减不增**(新增的必须带闸)", () => {
     // 🔴 只减不增。修掉一个就把这个数字改小;**绝不允许改大**。
-    //    2026-09-21 立此数 = 12(B-19 登记在案)。
-    //    2026-09-22 **12 → 0**:B-19 全修完。登记时我写「至少 5 个是真竞态」,
+    //    2026-09-21 立此数 = 12(登记在案)。
+    //    2026-09-22 **12 → 0**:全修完。登记时我写「至少 5 个是真竞态」,
     //    细看**动作型也一样是真竞态**(`runQuality` 点两次 / `addRule` 快速加两条,
     //    晚到的旧响应照样盖掉新的)⇒ 不分等级,12 个全加闸。
     //    🔴 归零之后这条判据的意义变了:它从「欠账计数器」变成「**新增取数函数必须自带闸**」
@@ -337,7 +335,7 @@ describe("治理页:陈旧响应守卫的覆盖面(闭合式 + 只减不增棘�
     expect(
       unguarded.length,
       `🔴 无序号闸的取数函数从 ${UNGUARDED_LIMIT} 变成了 ${unguarded.length} 个 ——\n` +
-        `    新增取数函数必须自带序号闸(B-10 那一类缺陷不许再长出第 N+1 个)。\n` +
+        `    新增取数函数必须自带序号闸(这一类缺陷不许再长出第 N+1 个)。\n` +
         `    当前无闸清单:${unguarded.join(", ")}`
     ).toBeLessThanOrEqual(UNGUARDED_LIMIT);
   });

@@ -1,4 +1,4 @@
-// @kf-batch 50-P50.2c-control-api(v2 @ 50-P50.3a-add-components:组件驱动)
+// (v2 @ 50--add-components:组件驱动)
 // 执行环境栈组的 **CFN Outputs 读取**(finalizeTargetResources 的取数层)。
 //
 // 【为什么是独立模块 + 顶层 import,而不是在 registry.ts 里动态 import】
@@ -11,7 +11,7 @@ import { CloudFormationClient, DescribeStacksCommand } from "@aws-sdk/client-clo
 import { SecretsManagerClient, DescribeSecretCommand } from "@aws-sdk/client-secrets-manager";
 import { toTargetSlug } from "@/lib/exec-env/target-id";
 import { OPTIONAL_IMPLEMENTED_COMPONENTS } from "@/lib/exec-env/implemented-components";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
 
 export interface ExecEnvStackOutputs {
@@ -97,7 +97,7 @@ export async function readExecEnvStackOutputs(region: string, targetId: string):
 }
 
 /**
- * 把 redshift 组件栈吐的 secret **名字**换成真 **ARN**(P50.3a 的跨侧接缝收口)。
+ * 把 redshift 组件栈吐的 secret **名字**换成真 **ARN**(跨侧接缝收口)。
  *
  * 【为什么栈只吐名字】admin 口令走 `manageAdminPassword`,secret 由 **Redshift 服务自己创建**,
  * ARN 尾部带服务生成的 6 位随机后缀 ⇒ CFN 模板里拼不出来,而 `CfnNamespace` 的 GetAtt 属性表里

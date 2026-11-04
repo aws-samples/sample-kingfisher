@@ -1,5 +1,4 @@
-// @kf-batch 50-P50.3-dataplane
-// 数据面下推的**接线覆盖门禁**(P50.3;判据来自 50 SPEC §3.1 / §3.4)。
+// 数据面下推的**接线覆盖门禁**(判据来自 50 SPEC §3.1 / §3.4)。
 //
 // ── 为什么这一组是文本级 ────────────────────────────────────────────────────
 // 仓内没有单测 Next route 的先例(要构造 NextRequest / app-router 上下文),而 `job-service`
@@ -26,10 +25,10 @@ const stripComments = (raw: string) =>
 const read = (rel: string) => stripComments(readFileSync(resolve(SRC, rel), "utf8"));
 
 describe("🔴 写入路径:targetId 必须过服务端校验(`{...body}` 展开是 fail-open)", () => {
-  // @kf-batch 50-P50.3-multibind —— 判据随合同(S1)从单值升到 `targets[]`。
+  // 判据随合同(S1)从单值升到 `targets[]`。
   it("创建路由:逐个校验 targets,且归一值写在 `...body` **之后**", () => {
     const src = read("app/api/etl-jobs/route.ts");
-    // @kf-batch 50-P50.3-fanout —— 判据升到**按引擎**的入口(Glue 只许 home,理由见该函数注释)。
+    // 判据升到**按引擎**的入口(Glue 只许 home,理由见该函数注释)。
     expect(src, "创建路由没校验绑定 ⇒ 客户端可指定作业在哪些区域跑").toContain("assertBindableTargetsForEngine(");
     const spread = src.indexOf("...body");
     const assign = src.indexOf("targets: boundTargets");
@@ -42,14 +41,13 @@ describe("🔴 写入路径:targetId 必须过服务端校验(`{...body}` 展开
     const src = read("app/api/etl-jobs/[id]/route.ts");
     expect(src, "白名单没加 targets ⇒ 改不了执行目标").toMatch(/"scheduleEnabled",\s*"targets"/);
     expect(src, "白名单加了 targets 却没校验 ⇒ 改的口子比建的口子还宽").toContain("assertBindableTargetsForEngine(");
-    // @kf-batch 50-P50.3-fanout —— 🔴 引擎必须取**存量行**:`type` 不在可改字段白名单里,
+    // 🔴 引擎必须取**存量行**:`type` 不在可改字段白名单里,
     // 信 body 的 type 等于给了个"声明成 redshift 就能给 Glue 作业绑非 home"的绕过口。
     expect(src, "更新路由从 body 取引擎 ⇒ 客户端声明 type 即可绕过 Glue 只许 home 的限制").toMatch(
       /assertBindableTargetsForEngine\(\s*\n?\s*String\(\(current/
     );
   });
 
-  // @kf-batch 50-P50.3-fanout
   it("🔴 解绑必须连下线一起做(否则那个区继续按 cron 往自己的数仓写数)", () => {
     const src = read("app/api/etl-jobs/[id]/route.ts");
     expect(src, "PUT 改了绑定却不下线被摘掉的 target ⇒ 孤儿 DAG 永久按 cron 跑").toContain("offlineUnboundTargets(");
@@ -60,8 +58,8 @@ describe("🔴 写入路径:targetId 必须过服务端校验(`{...body}` 展开
 describe("🔴 执行路径:手动与调度必须打**同一个** target", () => {
   it("job-service 的两条提交都走 resolveRedshiftBinding,且用**该 target 的**客户端", () => {
     const src = read("lib/etl/job-service.ts");
-    // @kf-batch 50-B27-codegen-place —— 本文件现在有**两类**调用:提交路径(正式运行 + 试运行,各带 projectId)
-    //   与 Glue 作业定义注入本区数仓事实(`{ targetId: landing.targetId }`,B-27)。分开数,不把总数放宽了事。
+    // 本文件现在有**两类**调用:提交路径(正式运行 + 试运行,各带 projectId)
+    //   与 Glue 作业定义注入本区数仓事实(`{ targetId: landing.targetId }`)。分开数,不把总数放宽了事。
     const factInjection = src.match(/resolveRedshiftBinding\(\{ targetId: landing\.targetId \}\)/g) || [];
     expect(factInjection.length, "Glue 作业定义注入本区数仓事实只许一处").toBe(1);
     const bindings = (src.match(/resolveRedshiftBinding\(/g) || []).length - factInjection.length;
@@ -72,13 +70,13 @@ describe("🔴 执行路径:手动与调度必须打**同一个** target", () =>
     expect(src, "提交仍用模块级 rsData(home region)⇒ 非 home 作业会打回 home").not.toMatch(
       /rsData\.send\(\s*new BatchExecuteStatementCommand/
     );
-    // 🔴 负向:落点解析不许在本文件里另起一条(P50.1 收编的形态)
+    // 🔴 负向:落点解析不许在本文件里另起一条(收编的形态)
     expect(src, "job-service 又自己解析了一次 workgroup ⇒ 第二个落点真值源").not.toContain("resolveWorkgroup(");
   });
 
   it("🔴 轮询必须用**提交时那个 region**(statementId 是 region 内的)", () => {
     const src = read("lib/etl/job-service.ts");
-    // @kf-batch 50-P50.3-multibind —— 判据从"最后一个实参是 binding.region"升级为
+    // 判据从"最后一个实参是 binding.region"升级为
     // "**两样都传了**"(region 用于查 statementId,targetId 用于补章)。
     // 🔴 本条第一版写成 `[^)]*binding\.region\)` —— 多绑定给轮询加了第 7 个实参后它就不匹配了,
     //    当场把我自己咬红。那是门禁该有的样子(锚点太紧会假红、太松会漏),这里改成不依赖参数个数。
@@ -94,7 +92,7 @@ describe("🔴 执行路径:手动与调度必须打**同一个** target", () =>
     expect(src, "轮询仍写死用 rsData").toContain("poller.send(new DescribeStatementCommand");
   });
 
-  // @kf-batch 50-P50.3-fanout —— 判据从"调度路由自己解析绑定"移到**扇出作者**身上:
+  // 判据从"调度路由自己解析绑定"移到**扇出作者**身上
   // 路由现在只调 `publishFanout`,四样的组装在 `lib/etl/dag-fanout.ts`(单一作者)。
   it("扇出作者把四样都喂给 DAG 生成器,并逐 target 指定 targetId/dagId", () => {
     const src = read("lib/etl/dag-fanout.ts");
@@ -123,7 +121,7 @@ describe("🔴 执行路径:手动与调度必须打**同一个** target", () =>
     expect(src, "Glue 提交没带 targetId ⇒ 两条 run 都会跑到同一个区").toMatch(
       /runGlueScriptJob\(job,\s*\{[^}]*targetId[^}]*\}\)/
     );
-    expect(src, "没有逐 target 提交的循环 ⇒ 根本没扇出").toMatch(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>[\s\S]*?\{ sequential: true/); // @kf-batch 50-WP31-place-first-class:L10 唯一写法,逐区顺序
+    expect(src, "没有逐 target 提交的循环 ⇒ 根本没扇出").toMatch(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>[\s\S]*?\{ sequential: true/); // L10 唯一写法,逐区顺序
     expect(src, "子集校验没了 ⇒ 传个不在绑定里的 target 会被静默忽略(等于「我按你说的跑了」而其实没跑)").toContain(
       "不在该作业的绑定里"
     );
@@ -139,7 +137,6 @@ describe("🔴 执行路径:手动与调度必须打**同一个** target", () =>
   });
 });
 
-// @kf-batch 50-P50.3-multibind
 describe("🔴🔴 绑定只有一个真值源:生产代码不许直读 `job.targetId`", () => {
   // 【这条门禁是被自己咬出来的】W3-b 把绑定从单值 `targetId` 迁到 `targets[]` 之后,
   // 有两处仍在直读 `job.targetId` ⇒ 拿到 `undefined` ⇒ **绑了 us-west-2 的作业静默发出 home 的 DAG**。
@@ -201,7 +198,7 @@ describe("🔴 绑定被拒必须是 4xx,不是 500(真环境验收 W3a-9 暴露
   // 【为什么值得一条门禁】`TargetBindingRejected` 全是**用户可修**的原因:目标没装 redshift /
   // 落点冲突 / 缺凭证 / 跨法域。混进 500 会把人引去查平台故障 —— 而正确处置是换目标或清字段。
   // 这类"错误分类错了"的问题不会让功能挂,只会让每次排障多花半小时,所以只能靠门禁钉。
-  // @kf-batch 50-P50.3-fanout —— 🔴 两条路由的**结构不同**,不能再用一条"隔多远"的窗口判据:
+  // 🔴 两条路由的**结构不同**,不能再用一条"隔多远"的窗口判据
   // 扇出把运行路径拆成了「逐 target 收集 → 统一判 allRejected」,原来的 300 字符窗口当场假红,
   // 而我为修它写的负向正则又把调度路由的正常写法误判成红(它紧邻着一个 500 的兜底分支)。
   // ⇒ 拆成两条,各自钉自己那一处的**判据来源**,不猜距离。
@@ -227,7 +224,6 @@ describe("🔴 绑定被拒必须是 4xx,不是 500(真环境验收 W3a-9 暴露
   });
 });
 
-// @kf-batch 50-P50.3-mrquery
 describe("🔴🔴 读回**存储的 statementId** 时必须解出它自己的 region(2026-09-04 用户实测报的 bug)", () => {
   // 【事故经过】用户第一次自己点页面就撞上:非 home 的 Redshift 作业点「日志」显示
   // 「无法获取语句详情: Query does not exist.」。根因 = `statementId` 是 **region 内**的,
@@ -266,9 +262,9 @@ describe("🔴🔴 读回**存储的 statementId** 时必须解出它自己的 r
   });
 
   it("🔴 `redshiftClientForTarget` 解不出 region 时**抛**,不回落 home(回落就是这个 bug 本身)", () => {
-    // @kf-batch 50-WP31-place-first-class —— 🔴 判据改锚到**它要判的那两个函数体**:原来那条正则在整篇上
+    // 🔴 判据改锚到**它要判的那两个函数体**:原来那条正则在整篇上
     //   开 400 字符窗口,实际命中的是 `resolveRedshiftBinding` 上面一个**别的函数**的报错串(假绿;
-    //   WP-31 在那附近加了一行就露馅)。现在:redshiftClientForTarget 只经 regionOfTarget 取区,
+    //   在那附近加了一行就露馅)。现在:redshiftClientForTarget 只经 regionOfTarget 取区,
     //   而 regionOfTarget 缺 region 时抛 TargetBindingRejected(不回落)。
     const src = read("lib/exec-env/data-plane-target.ts");
     const fnBody = (s: string, sig: string) => {
@@ -345,7 +341,6 @@ describe("🔴 呈现端点不许要管理员权限(否则多区域被锁死在�
   });
 });
 
-// @kf-batch 50-P50.3-engines
 describe("🔴🔴 EMR Serverless 也必须逐 target(用户 2026-09-04:三种任务类型都要在多个区域跑成功)", () => {
   it("provider 里**不许有模块级 home 客户端**,且 application/日志/对账全按 run 的 target 解析", () => {
     const src = read("lib/engines/emr/provider.ts");
@@ -367,7 +362,7 @@ describe("🔴🔴 EMR Serverless 也必须逐 target(用户 2026-09-04:三种�
     expect(src, "锁属性没按 target ⇒ 定时与手动算出不同属性名,互斥失效").toMatch(
       /acquireJobRunLock\(TABLES\.ENGINE_JOBS, j\.jobId, emrRunLockWaitMs\(triggeredBy\), targetId\)/
     );
-    // @kf-batch 50-W3f-T0-T3 —— T2 之后第 7 个实参是 runGroupId(只透传);target 仍必须钉在第 6 位。
+    // T2 之后第 7 个实参是 runGroupId(只透传);target 仍必须钉在第 6 位。
     expect(src, "run 记录没盖这次真跑的 target ⇒ 监控页按区筛静默少报").toMatch(
       /createRunRecord\([^;]*triggeredBy, targetId(?:, opts\.runGroupId)?\)/
     );
@@ -393,7 +388,6 @@ describe("🔴🔴 EMR Serverless 也必须逐 target(用户 2026-09-04:三种�
     expect(script, "S3Tables jar 没按 target 备好 ⇒ 非 home 的 run 在拉 jar 那步就失败").toContain("export async function ensureS3TablesJar(");
   });
 
-  // @kf-batch 50-P50.3-mirror
   it("🔴 跨地域元数据镜像:读端点 viewer 可看、写端点管理员、payload 只经 sanitizer", () => {
     // ① 读端点**不许**落在 `/api/admin/**`(middleware 把那一整段强制 bgp-admin ⇒
     //    看板就成了非管理员点不开的死按钮。与 `/api/exec-targets` 同一条判据)
@@ -442,18 +436,18 @@ describe("🔴🔴 EMR Serverless 也必须逐 target(用户 2026-09-04:三种�
   });
 
   it("🔴 engine-job 的运行路由必须扇出,且绑定校验与 etl-jobs 同一个作者", () => {
-    // B-136:提交段(逐区循环 / partial 回报)在长操作执行体;路由只留快校验(targets 子集解析仍在路由)
+    // 提交段(逐区循环 / partial 回报)在长操作执行体;路由只留快校验(targets 子集解析仍在路由)
     const run = read("lib/engines/long-ops.ts");
     expect(read("app/api/engines/[engine]/[id]/run/route.ts"), "路由仍要解析 targets 子集并全部传给执行体").toMatch(/runTargets/);
-    expect(run, "没有逐 target 提交的循环 ⇒ 绑了两个区只跑一个").toMatch(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>[\s\S]*?\{ sequential: true/); // @kf-batch 50-WP31-place-first-class:L10 唯一写法,逐区顺序
+    expect(run, "没有逐 target 提交的循环 ⇒ 绑了两个区只跑一个").toMatch(/forEachTargetPlace\(\s*runTargets,\s*async \(targetId\) =>[\s\S]*?\{ sequential: true/); // L10 唯一写法,逐区顺序
     expect(run, "部分失败没如实回报 ⇒ 把「2 个区跑成 1 个」说成成功").toContain("partial");
     const create = read("app/api/engines/[engine]/route.ts");
     expect(create, "创建时不校验 targets ⇒ 客户端塞什么都原样落库,下次运行才发作").toContain("assertBindableTargetsForEngine(");
   });
 });
 
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色的 env 字面**单作者**(SPEC v3.21 §6.1 段二落地口径 3)
-describe("🔴🔴 WP-3 per-target 执行角色:env 字面只许出现在 target-clients.ts,EMR 提交 / 调度按 target 解析角色", () => {
+// 执行角色的 env 字面**单作者**(SPEC v3.21 §6.1 段二落地口径 3)
+describe("🔴🔴 per-target 执行角色:env 字面只许出现在 target-clients.ts,EMR 提交 / 调度按 target 解析角色", () => {
   const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
   const walk = (dir: string, acc: string[] = []): string[] => {
     for (const e of readdirSync(dir)) {
@@ -481,15 +475,15 @@ describe("🔴🔴 WP-3 per-target 执行角色:env 字面只许出现在 target
   it("EMR provider 的提交按 target 解析执行角色(resolveEmrBinding),customRole 之外只用 landing.executionRoleArn", () => {
     const src = read("lib/engines/emr/provider.ts");
     expect(src).toContain("resolveEmrBinding({ targetId })");
-    // 序 72 B-139:「自定义优先 || 回退该 target 角色」收口到单一作者 resolveExecutionRoleArn,回退值仍只许是 landing.executionRoleArn
+    // 「自定义优先 || 回退该 target 角色」收口到单一作者 resolveExecutionRoleArn,回退值仍只许是 landing.executionRoleArn
     expect(src).toMatch(/resolveExecutionRoleArn\(\{[\s\S]{0,200}fallback: landing\.executionRoleArn/);
     expect(src, "模块级 EXEC_ROLE_ARN 常量必须消失").not.toMatch(/^const EXEC_ROLE_ARN/m);
   });
 
-  it("调度扇出(每个 target 自己的 MWAA,WP-13)逐 target 经 resolveEmrBinding 取**该 target** 的角色,不再自己读 env / 不再钉 home", () => {
+  it("调度扇出(每个 target 自己的 MWAA)逐 target 经 resolveEmrBinding 取**该 target** 的角色,不再自己读 env / 不再钉 home", () => {
     const src = read("lib/engines/emr/schedule-fanout.ts");
     expect(src).toContain("resolveEmrBinding({ targetId })");
-    // 序 72 B-139:「自定义优先 || 回退该 target 角色」收口到单一作者 resolveExecutionRoleArn,回退值仍只许是 landing.executionRoleArn
+    // 「自定义优先 || 回退该 target 角色」收口到单一作者 resolveExecutionRoleArn,回退值仍只许是 landing.executionRoleArn
     expect(src).toMatch(/resolveExecutionRoleArn\(\{[\s\S]{0,200}fallback: landing\.executionRoleArn/);
     expect(src, "调度不许再钉 home 角色").not.toContain("resolveEmrBinding({ targetId: HOME_TARGET_ID })");
     const route = read("app/api/engines/[engine]/[id]/schedule/route.ts");

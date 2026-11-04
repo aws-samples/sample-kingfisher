@@ -1,7 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
-// @kf-batch 50-WP23-xregion-peering —— 执行环境地址池(唯一作者;home 侧那条放行规则按**整池**写一条)
+// 执行环境地址池(唯一作者;home 侧那条放行规则按**整池**写一条)
 import { EXEC_ENV_VPC_CIDR_POOL } from "./exec-env/vpc-cidr";
 
 export class VpcStack extends cdk.Stack {
@@ -43,7 +43,7 @@ export class VpcStack extends cdk.Stack {
       new cdk.CfnOutput(this, "VpcMode", { value: `imported:${existingVpcId}` });
     } else {
       this.imported = false;
-      // 模块 27 (WS2 — 高可用): NAT 网关由 1 提升到 2(每个 AZ 一个)。原先单 NAT 是 P0 单点:
+      // (WS2 — 高可用): NAT 网关由 1 提升到 2(每个 AZ 一个)。原先单 NAT 是 P0 单点
       // 它所在 AZ 故障会让全部私有子网失去出站(平台/RDS/Redshift/OM/MWAA 间通信中断)。
       const vpc = new ec2.Vpc(this, "BgpVpc", {
         maxAzs: 2,
@@ -54,14 +54,14 @@ export class VpcStack extends cdk.Stack {
         ],
       });
 
-      // 模块 27 (WS4 — 审计预留): VPC Flow Logs 在 WS4 接入(→ CloudWatch/S3,加密用 logsKey)。
+      // (WS4 — 审计预留): VPC Flow Logs 在 WS4 接入(→ CloudWatch/S3,加密用 logsKey)。
 
       // S3 Gateway endpoint(免费):多组件受益(Glue COPY staging、DMS Serverless→Redshift 中转、
       // Redshift COPY)。必须与私有路由表【同栈】——否则跨栈引用路由表 export 会把 VpcStack "钉住",
       // 后续任何栈部署一碰 VpcStack 就因 "Cannot delete export ... in use" 回滚(实测踩坑)。常驻、零费用。
       vpc.addGatewayEndpoint("S3Gw", { service: ec2.GatewayVpcEndpointAwsService.S3 });
 
-      // ── 🔴🔴 @kf-batch 50-WP23-xregion-peering:**跨区私网通路的 home 侧落点**(SPEC §3.14ter)──
+      // ── 🔴🔴 **跨区私网通路的 home 侧落点**(SPEC §3.14ter)──
       //
       // 【它承担什么】非 home 执行环境要把 run 台账写回主控区的 `bgp-*` 表(§3.14「控制面回写 =
       //   唯一跨区例外」)。零出网 ⇒ 那条调用不能走公网;而**跨区** PrivateLink 被组织 SCP 拦
@@ -106,7 +106,7 @@ export class VpcStack extends cdk.Stack {
       });
       this.vpc = vpc;
       new cdk.CfnOutput(this, "VpcMode", { value: "created" });
-      // @kf-batch 50-WP23-xregion-peering —— 非 home 的底座栈要靠这三个值建 peering + 路由 + 私有托管域。
+      // 非 home 的底座栈要靠这三个值建 peering + 路由 + 私有托管域。
       // 🔴 跨 region 不能用 CFN Export/ImportValue ⇒ 由部署 buildspec 读**本栈的 Outputs** 后当 `-c` 传下去
       //    (单一真值源仍是这个栈:它才是这些资源的作者)。
       new cdk.CfnOutput(this, "VpcCidr", { value: vpc.vpcCidrBlock });

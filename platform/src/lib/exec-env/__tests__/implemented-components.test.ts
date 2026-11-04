@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3a-add-components
 // "哪些组件已实现" 的 SSOT + 补充部署的**纯判定**单测。
 //
 // 【本文件的三条承重】
@@ -20,7 +19,6 @@ import {
   requiredComponentsFor,
   missingRequiredComponents,
   BASE_REQUIRED_COMPONENTS,
-  // @kf-batch 50-WP22-external-components
   EXTERNAL_COMPONENTS,
   isComponentExternal,
 } from "@/lib/exec-env/implemented-components";
@@ -42,15 +40,15 @@ describe("组件清单(SSOT 自洽)", () => {
     expect(overlap).toEqual([]);
   });
 
-  it("P50.3a 的实现范围如实钉住(改了范围必须同时改这条断言 —— 防悄悄放开)", () => {
-    // @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 落地 ⇒ 从待做移到已实现(名单只许缩短:4 → 3)
-    // @kf-batch 50-WP15-airflow-serverless:airflow-serverless 直接进已实现(不先登记为待做 ⇒ PENDING 名单不变,仍只许缩短)
+  it("实现范围如实钉住(改了范围必须同时改这条断言 —— 防悄悄放开)", () => {
+    // residency-api 片 1 落地 ⇒ 从待做移到已实现(名单只许缩短:4 → 3)
+    // airflow-serverless 直接进已实现(不先登记为待做 ⇒ PENDING 名单不变,仍只许缩短)
     expect([...IMPLEMENTED_COMPONENTS]).toEqual(["core", "redshift", "dms", "flink", "residency-api", "mwaa", "airflow-serverless"]);
-    // @kf-batch 50-WP22-external-components:agentcore 从「待后续批次」搬去 `EXTERNAL_COMPONENTS`
+    // agentcore 从「待后续批次」搬去 `EXTERNAL_COMPONENTS`
     //   —— 它**已经装了**(由平台自己的栈部署),只是不由 exec-env 栈组建。名单仍只许缩短:2 → 1。
     expect([...PENDING_COMPONENTS]).toEqual(["kafka"]);
     expect([...EXTERNAL_COMPONENTS]).toEqual(["agentcore"]);
-    // 🔴 三份名单必须**两两不相交**(重叠 = 两条规则打架,夹缝里的对象会被永久堵死 —— WP-22 的病根)
+    // 🔴 三份名单必须**两两不相交**(重叠 = 两条规则打架,夹缝里的对象会被永久堵死 —— 病根)
     const all = [...IMPLEMENTED_COMPONENTS, ...PENDING_COMPONENTS, ...EXTERNAL_COMPONENTS];
     expect(new Set(all).size, `三份名单有重叠:${all.join(",")}`).toBe(all.length);
   });
@@ -68,12 +66,12 @@ describe("组件清单(SSOT 自洽)", () => {
   });
 });
 
-// @kf-batch 50-PROD-B-seq33 ②:planComponentAddition 的第三参(它是谁)必填
+// ②:planComponentAddition 的第三参(它是谁)必填
 const S = { isHome: false, jurisdiction: "home" };
 const FULL = ["core", "redshift", "dms", "flink", "airflow-serverless"];
 
 describe("planComponentAddition(补充部署的判定)", () => {
-  // @kf-batch 50-PROD-B-seq33 ②:补充部署 = 补齐到完整组件集(不提供精简形态)
+  // ②:补充部署 = 补齐到完整组件集(不提供精简形态)
   it("正常:core-only 的存量环境补齐 ⇒ 全集 = 完整组件集 + added 只含缺的", () => {
     const p = planComponentAddition(["core"], ["core", "redshift", "dms", "flink", "airflow-serverless"], S);
     expect(p).toEqual({ ok: true, wanted: ["core", "redshift", "dms", "flink", "airflow-serverless"], added: ["redshift", "dms", "flink", "airflow-serverless"] });
@@ -120,7 +118,7 @@ describe("planComponentAddition(补充部署的判定)", () => {
     expect(p.ok === false && p.message).toMatch(/没有要新增的组件/);
   });
 
-  // @kf-batch 50-W5-seg1-WP3 —— 升级预演(SPEC §2.1 v3.21):preview 传 allowNoAddition,同集放行且 added=[]
+  // 升级预演(SPEC §2.1 v3.21):preview 传 allowNoAddition,同集放行且 added=[]
   it("allowNoAddition(升级预演):全集 == 已装 ⇒ ok 且 added=[];减组件照旧拒", () => {
     expect(planComponentAddition(FULL, [...FULL].reverse(), S, { allowNoAddition: true })).toEqual({ ok: true, wanted: FULL, added: [] });
     const p = planComponentAddition(FULL, ["core"], S, { allowNoAddition: true });
@@ -133,7 +131,7 @@ describe("planComponentAddition(补充部署的判定)", () => {
     expect(p).toEqual({ ok: true, wanted: FULL, added: ["flink"] });
   });
 
-  // ── @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态(用户 2026-10-10)──
+  // ── ② —— 🔴🔴 不提供精简形态(用户 2026-10-10)──
   it("🔴 只补一半(补完仍不完整)⇒ 拒,拒因点名还缺的", () => {
     const p = planComponentAddition(["core"], ["core", "redshift"], S);
     expect(p.ok).toBe(false);
@@ -206,8 +204,7 @@ describe("🔴 与 infra 侧 IMPLEMENTED_COMPONENTS 必须逐字一致(跨构建
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP22-external-components
-// 🔴🔴 WP-22:`components` 被当成两件事用 ⇒ 夹缝里的已装组件把整条「补充部署」堵死
+// 🔴🔴 `components` 被当成两件事用 ⇒ 夹缝里的已装组件把整条「补充部署」堵死
 // ══════════════════════════════════════════════════════════════════════════════
 describe("🔴🔴 external 组件(由平台自己的栈部署)不许把补充部署堵死", () => {
   // 真环境形状:home 装了 core/redshift/dms/flink/airflow-serverless/**agentcore**,
@@ -217,7 +214,7 @@ describe("🔴🔴 external 组件(由平台自己的栈部署)不许把补充�
   const HS = { isHome: true, jurisdiction: "home" };
 
   it("🔴 已装 external 组件的 target **能**补装别的组件,且 added 只含真正新增的那个", () => {
-    // @kf-batch 50-PROD-B-seq33 ②:补的必须是要求集里缺的 ⇒ 用「缺 flink 的 home」造形状
+    // ②:补的必须是要求集里缺的 ⇒ 用「缺 flink 的 home」造形状
     const r = planComponentAddition(HOME.filter((c) => c !== "flink"), HOME, HS);
     expect(r.ok, r.ok ? "" : `被拒了:${r.message}`).toBe(true);
     if (r.ok) {

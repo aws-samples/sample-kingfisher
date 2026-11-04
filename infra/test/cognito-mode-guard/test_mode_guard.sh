@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 序 39 第二刀 —— scripts/10-bootstrap-cognito.sh 里 `resolve_deploy_mode` 的离线真跑判据(假 aws 驱动每条分支)。
+# scripts/10-bootstrap-cognito.sh 里 `resolve_deploy_mode` 的离线真跑判据(假 aws 驱动每条分支)。
 #
 # 🔴 为什么:单独重跑建号脚本时,原来只看 env BGP_DEPLOY_MODE ⇒ 在已按 production 部署的环境上手敲 demo 重跑,
 #   就会冒出四个测试账号。护栏 = SSM /bgp/deploy-mode 有值即以它为准、env 给别的值就拒绝;SSM 读不到才按 env(缺省 production)。

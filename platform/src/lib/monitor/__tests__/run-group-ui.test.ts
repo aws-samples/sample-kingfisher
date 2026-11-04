@@ -1,5 +1,4 @@
-// @kf-batch 50-WP5-rungroup
-// O2 前端门禁(判据 ACCEPTANCE 段 `o2` E-160 / E-162 / E-163 / E-165 / E-166 / E-168)。
+// O2 前端门禁(判据 ACCEPTANCE 段 `o2`)。
 //
 // 🔴 为什么是文本门禁:这两个组件要 antd + ScopeProvider + fetch 一整套才跑得起来,
 //    真行为由**无头页面级验收**(段 `o2`)覆盖;这里钉的是「机械可识别的形状」——
@@ -15,7 +14,7 @@ const read = (rel: string) => readFileSync(resolve(SRC, rel), "utf8");
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1 ");
 
 const PANEL = "components/monitor/RunGroupPanel.tsx";
-// @kf-batch 50-WP18-workflow-fanout —— 运行对话框已搬进自己的文件(理由:`/workflow` 页只用弹窗,
+// 运行对话框已搬进自己的文件(理由:`/workflow` 页只用弹窗,
 // 却因为同文件里有 `/api/run-groups` 的读取而被读取级台账算成欠账)。判据跟着指到它现在住的地方。
 const RUN_MODAL = "components/monitor/RunTargetsModal.tsx";
 const PAGES: Array<[string, string]> = [
@@ -23,7 +22,7 @@ const PAGES: Array<[string, string]> = [
   ["components/engines/EmrJobPanel.tsx", "engine-job"],
 ];
 
-describe("🔴 运行对话框:默认跟随视角(E-165),且**绝不**动顶栏的执行范围", () => {
+describe("🔴 运行对话框:默认跟随视角,且**绝不**动顶栏的执行范围", () => {
   const src = strip(read(RUN_MODAL));
 
   it("target 视角 ⇒ 默认只勾本区;compare / global ⇒ 勾全部绑定", () => {
@@ -95,7 +94,7 @@ describe("🔴 组行:只看服务端派生值 / 不折状态 / 逐区如实回�
     expect(src, "把异常吞成空数组就是撒谎").not.toContain("setRows([])");
   });
 
-  it("E-168:子行必须显示**定义版本**(跨区版本差要看得见,它刻意不进分组键)", () => {
+  it("子行必须显示**定义版本**(跨区版本差要看得见,它刻意不进分组键)", () => {
     expect(src).toContain('dataIndex: "definitionVersion"');
     expect(src).toContain('data-testid="rg-child-defver"');
   });

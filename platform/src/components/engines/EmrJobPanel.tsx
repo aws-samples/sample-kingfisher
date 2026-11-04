@@ -1,17 +1,17 @@
 "use client";
-// 模块 33-A — EMR Serverless 作业面板（自包含）。
+// EMR Serverless 作业面板（自包含）。
 // etl-jobs 页选中 EMR 引擎作业时渲染本组件，与老 Glue/Redshift 分支完全隔离（老执行逻辑零改动）。
 // 覆盖：PySpark 脚本编辑 + 规格全暴露 + 连接信息前置(嵌网络顾问) + 参数顾问 + 运行/停止 + 运行历史 + 日志。
 
-// @kf-batch 50-WP13-mwaa-region —— 缺 MWAA 警示卡(EMR 定时逐 target 扇出;缺的区当场列全 + 直达补装)
+// 缺 MWAA 警示卡(EMR 定时逐 target 扇出;缺的区当场列全 + 直达补装)
 import { fetchExecTargets } from "@/lib/exec-env/exec-targets-client";
 import { runNowLabel } from "@/lib/scope/run-now-label";
-// @kf-batch 50-WP5-rungroup —— O2:运行对话框(默认跟随视角)+ 多区联动运行组行
+// O2:运行对话框(默认跟随视角)+ 多区联动运行组行
 import { RunTargetsModal, RunGroupsPanel } from "@/components/monitor/RunGroupPanel";
 import MwaaMissingNotice from "@/components/scheduler/MwaaMissingNotice";
 import { extractMwaaMissing, type MwaaMissingPayload } from "@/lib/scheduler/mwaa-missing";
 import React, { useEffect, useRef, useState } from "react";
-// @kf-batch 50-P50.3-engines —— home 的常量与别处同一个来源(不许再写一个字面量)
+// home 的常量与别处同一个来源(不许再写一个字面量)
 const HOME_TARGET = "tgt_home";
 import {
   Button, Card, Input, Select, Space, Table, Tag, Alert, message, Modal, Tabs,
@@ -24,25 +24,25 @@ import {
 import dynamic from "next/dynamic";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
-// 序 72 B-139:执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
+// 执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 import VersionHistoryDrawer from "@/components/common/VersionHistoryDrawer";
 import PromoteButton from "@/components/common/PromoteButton";
 import EnvTag from "@/components/common/EnvTag";
 import EnvPromotionStatus from "@/components/common/EnvPromotionStatus";
 import { useT } from "@/lib/i18n/useT";
-// B-117:页面「删除」读响应的唯一作者(失败 ⇒ 服务端原话)
+// 页面「删除」读响应的唯一作者(失败 ⇒ 服务端原话)
 import { deleteJson } from "@/lib/http/delete-json";
-// 序 73 模块 57(R3):运行历史「触发」格(工作流回链)唯一作者;页签可由页面控制(深链 `?tab=runs`)
+// 运行历史「触发」格(工作流回链)唯一作者;页签可由页面控制(深链 `?tab=runs`)
 import RunTriggerCell from "@/components/monitor/RunTriggerCell";
 import { isEtlJobsTab, type EtlJobsTab } from "@/lib/workflow/back-links";
 import { CodegenGroundedOn, type CodegenGroundedOnValue } from "@/components/ai/CodegenGroundedOn";
-// @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+// 免责告知弹窗(409 驱动,同意后重试)
 import { useResidencyAck } from "@/components/residency/useResidencyAck";
 import { fetchWithResidencyAck } from "@/lib/residency/client";
 import {
@@ -69,7 +69,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   const [ownTab, setOwnTab] = useState<EtlJobsTab>("edit");
   const tab = activeTab ?? ownTab;
   const setTab = (k: string) => { if (!isEtlJobsTab(k)) return; setOwnTab(k); onTabChange?.(k); };
-  // @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)
+  // 免责告知弹窗(409 驱动,同意后重试)
   const { residencyModal, resolveAckRequired } = useResidencyAck();
   const { getToken } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -82,7 +82,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   const [netVpcs, setNetVpcs] = useState<any[]>([]);
   const [netSubnets, setNetSubnets] = useState<any[]>([]);
   const [netSgs, setNetSgs] = useState<any[]>([]);
-  // @kf-batch 50-WP4quater-reads(工单 SC-30)—— 这份网络清单是哪个区的(护栏 2:落点必须一眼可见)
+  // 这份网络清单是哪个区的(护栏 2:落点必须一眼可见)
   const [netRegion, setNetRegion] = useState("");
   const [netVpc, setNetVpc] = useState<string | undefined>(undefined);
   const [sparkConf, setSparkConf] = useState<Array<{ k: string; v: string }>>(
@@ -102,9 +102,9 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   const [bfStart, setBfStart] = useState<string>("");
   const [bfEnd, setBfEnd] = useState<string>("");
   const [cron, setCron] = useState<string>(job.cronExpression || "");
-  const [mwaaMissing, setMwaaMissing] = useState<MwaaMissingPayload | null>(null); // @kf-batch 50-WP13-mwaa-region
+  const [mwaaMissing, setMwaaMissing] = useState<MwaaMissingPayload | null>(null);
   const [versionOpen, setVersionOpen] = useState(false);
-  // @kf-batch 50-P50.3-engines —— 执行区域(这个 Spark 作业在哪些区跑)。
+  // 执行区域(这个 Spark 作业在哪些区跑)。
   // 🔴 与离线作业面板同一个范式(多选 + 可见标签 + 全选按钮):多选 Select 在只勾一个值时
   //    长得跟单选一模一样,用户第一反应就是"只能选一个区域"(2026-09-04 用户实测反馈过一次)。
   const [targets, setTargets] = useState<string[]>(
@@ -114,7 +114,6 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   // 护栏 2 用:只绑一个区时那个区的 region(拿不到退回原文案,不显示 targetId 充数)
   const runRegion = targets.length === 1 ? (execTargets.find((x) => x.targetId === targets[0])?.region || "") : "";
   const [targetsErr, setTargetsErr] = useState("");
-  // @kf-batch 50-WP5-rungroup
   const [runPick, setRunPick] = useState(false);
   const [groupKey, setGroupKey] = useState(0);
 
@@ -133,11 +132,11 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   }, [job.jobId]);
 
   // 拉真实 VPC/子网/SG(供连接信息下拉);失败静默(仍可手动/用顾问)。
-  // @kf-batch 50-WP4quater-reads(工单 SC-30)—— 🔴 网络是**区域资源**,必须按这个作业的执行目标取。
+  // 🔴 网络是**区域资源**,必须按这个作业的执行目标取。
   // 原来这里固定取主控区 ⇒ 一个只在 us-west-2 跑的 EMR 作业,网络下拉里给的是主控区的子网 / 安全组,
   // 选中后写进作业配置,提交 EMR 时才炸,而报错指向网络配置本身(排障会去查子网,而真因是区错了)。
   // 🔴 作业下发到**多个区**时,单独一份 network 配置本身就不成立(每个区的子网 / SG 都不同)——
-  //    这里如实标注只列了第一个 target 的区,不假装那份配置对所有区都有效(见 SCOPE-COVERAGE-TASKS SC-30b)。
+  //    这里如实标注只列了第一个 target 的区,不假装那份配置对所有区都有效(见 SCOPE-COVERAGE-TASKS)。
   useEffect(() => {
     const netTid = targets[0] || HOME_TARGET;
     fetch(`/api/flink/network?targetId=${encodeURIComponent(netTid)}`).then((r) => r.json()).then((d) => {
@@ -156,7 +155,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   // 可下推的执行目标清单(服务端已过准入 + 组件 + 法域)。
   // 🔴 读失败要**显式说出来**:静默留空 = 界面上只剩 home 可选,用户会以为第二区域没建好。
   useEffect(() => {
-    // @kf-batch 50-WP15-airflow-serverless —— W3e-12 真撞:路由回 {targets},这里曾按数组读 ⇒ .map is not a function ⇒「全选当前活跃区(0)」灰掉;读法收成单一作者
+    // W3e-12 真撞:路由回 {targets},这里曾按数组读 ⇒ .map is not a function ⇒「全选当前活跃区(0)」灰掉;读法收成单一作者
     fetchExecTargets("redshift").then(setExecTargets).catch((e) => setTargetsErr(String(e?.message || e)));
   }, []);
 
@@ -194,7 +193,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     }, 8000);
   };
 
-  // @kf-batch 50-WP5-rungroup —— 绑多区就先问「这次在哪些区跑」(默认跟随视角,E-165);单绑定直接跑(存量动线不变)
+  // 绑多区就先问「这次在哪些区跑」(默认跟随视角);单绑定直接跑(存量动线不变)
   const runOrAsk = () => {
     if (targets.length > 1) setRunPick(true);
     else void doRun();
@@ -209,14 +208,13 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     setBusy(true);
     try {
       if (!(await doSave())) return;
-      // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 首次运行 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
+      // 跨法域 target 首次运行 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
       const payload: Record<string, unknown> = { runDate };
       if (o.targets?.length) payload.targets = o.targets;
       if (o.retryOfRunGroupId) payload.retryOfRunGroupId = o.retryOfRunGroupId;
       const { body: d, cancelled } = await fetchWithResidencyAck(`/api/engines/${ENGINE}/${job.jobId}/run`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }, resolveAckRequired);
       if (cancelled) return;
       if (d?.success) {
-        // @kf-batch 50-P50.3-engines
         // 🔴 **把"提交到了哪几个区"说出来**:只说"已提交运行"的话,多区域执行这件事在界面上
         //    完全不可见(离线作业那边正是因此被用户实测反馈过「看起来只能选一个区域」)。
         //    部分失败也要如实说 —— 不许把"2 个区跑成 1 个"显示成成功。
@@ -246,7 +244,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
       await deleteJson(`/api/engines/${ENGINE}/${job.jobId}`);
       message.success(t("已删除作业（含 EMR application）")); onDeleted();
     } catch (e) {
-      // 序 73 模块 57 R7 / B-117 口径:服务端拒绝(如 409 JOB_IN_USE 仍被工作流引用)⇒ 原话呈现,不再一句「删除失败」吞掉
+      // R7 口径:服务端拒绝(如 409 JOB_IN_USE 仍被工作流引用)⇒ 原话呈现,不再一句「删除失败」吞掉
       message.error((e as Error).message || t("删除失败"));
     }
   };
@@ -269,7 +267,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     try {
       const d = await aiFetchJson("/api/engines/generate", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        // @kf-batch 50-B27-codegen-place —— 按作业的章生成
+        // 按作业的章生成
         body: JSON.stringify({ prompt: aiPrompt, currentCode: script.trim() ? script : undefined, targetId: targets[0] }),
       });
       if (d?.success) setAiResult({ code: d.data.code, explanation: d.data.explanation, groundedOn: d.data.groundedOn });
@@ -332,7 +330,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     } finally { setBusy(false); }
   };
 
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6)—— 〔触发一次调度〕(与离线计算页同口径;S-7)
+  // 〔触发一次调度〕(与离线计算页同口径)
   const doTrigger = async () => {
     setBusy(true);
     try {
@@ -398,7 +396,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
                   options={EMR_ARCHITECTURES.map((x) => ({ label: x, value: x }))} />
                 <InputNumber size="small" min={1} max={100} value={spec.executorCount} onChange={(v) => setSpec({ ...spec, executorCount: Number(v) || 1 })} addonBefore="Executors" style={{ width: 150 }} />
               </Space>
-              {/* 执行角色(留空=该区平台 EMR 角色;序 72 B-139:账号内任何 emr-serverless.amazonaws.com 可承担的角色都能选,StartJobRun 时生效,无需重建 application) */}
+              {/* 执行角色(留空=该区平台 EMR 角色;:账号内任何 emr-serverless.amazonaws.com 可承担的角色都能选,StartJobRun 时生效,无需重建 application) */}
               <div style={{ marginBottom: 8 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>{t("执行角色")}</Text>
                 <ExecutionRolePicker
@@ -457,7 +455,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
                       title={t("EMR 网络连通性顾问")}
                     />
                     {/* VPC → 子网 → 安全组 三级下拉(真实资源,复用 /api/flink/network),对齐 Flink CDC 网络选择。 */}
-                    {/* @kf-batch 50-WP4quater-reads(工单 SC-30)—— 护栏 2:这份清单属于哪个区必须一眼可见;
+                    {/* 护栏 2:这份清单属于哪个区必须一眼可见;
                         作业下发到多个区时,一份 network 配置覆盖不了所有区,如实说出来而不是默认它对。 */}
                     <Space wrap size={4}>
                       <span style={{ color: "#888", fontSize: 12 }}>{t("网络清单区域")}:</span>
@@ -490,7 +488,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
               <div style={{ border: "1px solid #1d4254", borderRadius: 8, overflow: "hidden", marginBottom: 12 }}>
                 <MonacoEditor height="320px" language="python" theme="vs-dark" value={script} onChange={(v) => setScript(v || "")} options={{ minimap: { enabled: false }, fontSize: 13 }} />
               </div>
-              {/* @kf-batch 50-P50.3-engines —— 执行区域**多选**(一个 Spark 作业可绑多个区,INTERACTION §2.1)。
+              {/* 执行区域**多选**(一个 Spark 作业可绑多个区,INTERACTION §2.1)。
                   🔴 标签 + placeholder + 计数标签三件一起,"这是多选、现在绑了几个区"才一眼可见。 */}
               <Space wrap style={{ marginBottom: 8 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>{t("执行区域(可多选)")}</Text>
@@ -571,7 +569,6 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
               <Table size="small" rowKey="runId" dataSource={runs} pagination={{ pageSize: 10 }}
                 columns={[
                   { title: t("状态"), dataIndex: "status", width: 90, render: (v: string) => <Tag color={STATUS_COLOR[v] || "default"}>{v}</Tag> },
-                  // @kf-batch 50-P50.3-engines
                   // 🔴 这一列是"多区域一起执行"在界面上**唯一**的可见证据:扇出后同一次点击产生 N 条 run,
                   //    没有它,两条 run 在界面上完全无法区分(用户会觉得"还是单区域")。
                   //    值取 run 记录的章(不是作业当前绑定 —— 那样改绑定会把历史改写)。
@@ -579,15 +576,15 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
                     title: t("执行区域"), dataIndex: "targetId", width: 130,
                     render: (v: string) => (!v || v === HOME_TARGET ? <Tag>{t("本地")}</Tag> : <Tag color="cyan">{v}</Tag>),
                   },
-                  // @kf-batch 50-W5-seg2-WP10a —— 跨法域 run 的区域审计 ID(全量留在该区;home 为空)
+                  // 跨法域 run 的区域审计 ID(全量留在该区;home 为空)
                   {
                     title: t("审计"), dataIndex: "residencyAuditId", width: 100,
                     render: (v: string) => v && !String(v).startsWith("pending#")
                       ? <code data-testid="run-audit-id" style={{ fontSize: 11 }} title={v}>#{String(v).slice(-8)}</code>
                       : "-",
                   },
-                  // @kf-batch 50-WP15-airflow-serverless —— 运行历史每行带调度器 tag
-                  // 序 73 模块 57(R3):工作流触发的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者 RunTriggerCell)
+                  // 运行历史每行带调度器 tag
+                  // 工作流触发的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者 RunTriggerCell)
                   { title: t("触发"), dataIndex: "triggeredBy", width: 200, render: (_v: string, r: any) => <RunTriggerCell run={r} /> },
                   { title: t("业务日期"), dataIndex: "runDate", width: 110, render: (v: string) => v || "-" },
                   { title: t("开始"), dataIndex: "startedAt", render: (v: string) => v?.slice(0, 19).replace("T", " ") },
@@ -607,21 +604,21 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
           ),
         },
         {
-          // @kf-batch 50-WP5-rungroup —— O2:一次点击跑了多个区 ⇒ 这里出现一行「联动运行」
+          // O2:一次点击跑了多个区 ⇒ 这里出现一行「联动运行」
           key: "rungroups", label: t("联动运行"), children: (
             <RunGroupsPanel kind="engine-job" definitionId={job.jobId} engine={ENGINE} refreshKey={groupKey}
               onRetry={async (plan) => { await doRun({ targets: plan.targets, retryOfRunGroupId: plan.retryOfRunGroupId }); }} />
           ),
         },
       ]} />
-      {/* @kf-batch 50-WP5-rungroup —— 运行对话框(默认跟随执行范围视角) */}
+      {/* 运行对话框(默认跟随执行范围视角) */}
       <RunTargetsModal open={runPick} bindings={targets} busy={busy}
         onCancel={() => setRunPick(false)}
         onRun={(picked) => { setRunPick(false); void doRun({ targets: picked }); }} />
 
       <Modal title={<Space><FileTextOutlined /> {t("运行日志")} {logModal.status && <Tag color={STATUS_COLOR[logModal.status] || "default"}>{logModal.status}</Tag>}
           {logModal.scheduler === "serverless" ? <Text type="secondary" style={{ fontSize: 12 }} data-testid="run-log-source">CloudWatch · {logModal.logGroup || "/aws/mwaa-serverless/"}</Text> : null}
-          {/* @kf-batch 50-WP15-airflow-serverless(T-13)服务侧触发来源 */}
+          {/* 服务侧触发来源 */}
           {logModal.runType ? <Tag data-testid="run-log-trigger" color={logModal.runType === "SCHEDULED" ? "blue" : "purple"} style={{ fontSize: 11 }}>{logModal.runType === "SCHEDULED" ? t("本次触发:定时(服务侧)") : t("本次触发:手动(服务侧)")}</Tag> : null}</Space>}
         open={logModal.open} onCancel={() => setLogModal({ ...logModal, open: false })} width={1000}
         footer={[

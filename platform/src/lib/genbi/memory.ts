@@ -1,9 +1,9 @@
-// 模块 26 — GenBI on AgentCore：对话存储（可切换记忆后端）。
+// GenBI on AgentCore：对话存储（可切换记忆后端）。
 // GENBI_MEMORY_BACKEND=selfmanaged(默认) | agentcore
 //  • selfmanaged：短期=DynamoDB bgp-genbi-turns(TTL~24h)；长期=S3 摘要(Bedrock 生成)。
 //  • agentcore：AgentCore 托管 Memory。短期=会话事件(CreateEvent/ListEvents)；
 //    长期=语义策略自动抽取的记忆记录(RetrieveMemoryRecords，托管向量语义检索)。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import { BatchWriteCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
@@ -14,7 +14,7 @@ import {
   BedrockAgentCoreClient, CreateEventCommand, ListEventsCommand, RetrieveMemoryRecordsCommand, DeleteEventCommand,
 } from "@aws-sdk/client-bedrock-agentcore";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:长期摘要的 modelId 改为调用时经 invokeConverse 求值(能力 key genbi-memory);
+// 长期摘要的 modelId 改为调用时经 invokeConverse 求值(能力 key genbi-memory);
 // 删掉此前的模块加载期顶层常量 MODEL_ID = resolveModelId()(DESIGN §1.2 #3「最易漏」的那个)。
 import { invokeConverse } from "@/lib/ai/invoke";
 
@@ -123,7 +123,7 @@ export async function maybeSummarize(conversationId: string, projectId: string):
   const convoText = turns.map((t) => `Q: ${t.question}\nA: ${(t.answer || "").slice(0, 300)}\nSQL: ${t.sql || ""}`).join("\n---\n");
   let summary = "";
   try {
-    // @kf-batch 50-W5-seg2-WP8:modelId 每次调用求值(genbi-memory),经 invokeConverse 退避/降级。
+    // modelId 每次调用求值(genbi-memory),经 invokeConverse 退避/降级。
     const { response: resp } = await invokeConverse("genbi-memory", undefined, bedrock, (modelId) => new ConverseCommand({
       modelId,
       system: [{ text: "你是数据分析助理。把以下智能问数对话总结成一段中文长期记忆：用户关注的业务口径/常用表/结论要点/偏好。只输出摘要本身，120字内，不要敏感明细数据。" }],
@@ -207,7 +207,7 @@ async function loadLongTermAgentCore(projectId: string, question: string, limit:
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// @kf-batch 54-genbi-session-cards —— 模块 54:打开一张会话卡片时**重建短期记忆**(54 DESIGN v1.2 §3.3)
+// 打开一张会话卡片时**重建短期记忆**(54 DESIGN v1.2 §3.3)
 //
 // 【为什么必须回灌,而不是「把 conversationId 塞回去就行」】
 //   短期记忆 TTL 只有 24h(`TURN_TTL_HOURS`),AgentCore 侧也是托管会话。三周后打开那张卡,

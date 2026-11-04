@@ -1,5 +1,4 @@
-// @kf-batch 50-WP13-mwaa-region
-// 🔴 接线守卫(ACCEPTANCE E-216 后半):「哪个 target 用哪套 Airflow」只许一个作者,调度入口在**任何写之前**核 MWAA。
+// 🔴 接线守卫(ACCEPTANCE 后半):「哪个 target 用哪套 Airflow」只许一个作者,调度入口在**任何写之前**核 MWAA。
 // 为什么必须是静态守卫:这类 bug 的形状是「不报错、只是把该区的 DAG 又发到了 home」—— 单测跑不到那条路由就永远绿。
 // 变异 M-1 去掉 publishFanout 的 requireMwaaForTargets ⇒ 红;M-2 offlineDag 调用方不带 targetId ⇒ 红;
 // M-3 EMR DAG 的 ddb 用 EXEC_REGION ⇒ 红;M-4 任一路由回退 process.env.MWAA_ENV_NAME ⇒ 红。
@@ -69,7 +68,7 @@ describe("🔴 调度入口:任何写之前先核 MWAA(缺 ⇒ 零产物,409 直
     before(src, "await requireMwaaForTargets(targets)", "await ensureApplication(", "建 application 已是副作用");
     before(src, "await requireMwaaForTargets(targets)", "new PutObjectCommand({", "缺 MWAA 必须零产物");
     expect(src).toContain("execRegion: landing.region");
-    expect(src).toContain("ctrlRegion: homeRegion()"); // WP-31 L4:主控区只经唯一作者 lib/place/home-region 读
+    expect(src).toContain("ctrlRegion: homeRegion()"); // L4:主控区只经唯一作者 lib/place/home-region 读
     expect(src).toContain("executionRoleArn: execRoleArn");
     expect(src).toContain("await offlineDag(dagId, targetId)");
   });
@@ -89,7 +88,7 @@ describe("🔴 调度入口:任何写之前先核 MWAA(缺 ⇒ 零产物,409 直
   });
   it("下线助手:offlineDag(dagId, targetId) 经 endpoint 删该区桶、pause 该区环境;缺 MWAA 如实 skipped 不去 home 乱删", () => {
     const src = strip(read("lib/scheduler/mwaa-offline.ts"));
-    // @kf-batch 50-WP17-serverless-workflow —— 🔴 **默认值已删**(WP-13 那个 `= HOME_TARGET_ID` 正是
+    // 🔴 **默认值已删**(那个 `= HOME_TARGET_ID` 正是
     //   「漏传落点不报错、只是删错区的 DAG」的入口;真环境在 unpublish 路由上坐实)。落点现在必填,
     //   漏传是 tsc 错。本条判据跟着改成钉「必填」,并由 region-seam 门禁再钉一次「默认值不许回来」。
     expect(src).toContain("export async function offlineDag(dagId: string, targetId: string)");
@@ -118,7 +117,7 @@ describe("🔴 前端:调度区接了缺 MWAA 警示卡(不是 toast)+ 直达补
     expect(page).toContain("highlightComponent={deepLink?.highlight");
     const detail = strip(read("app/exec-envs/TargetDetail.tsx"));
     expect(detail).toContain("data-testid={`component-row-${c.key}`}");
-    // @kf-batch 50-PROD-B-seq33 ②:逐个「+ 补充部署」已取消 ⇒ 补装直达落到唯一的〔补齐缺失组件〕
+    // ②:逐个「+ 补充部署」已取消 ⇒ 补装直达落到唯一的〔补齐缺失组件〕
     expect(detail).toContain('data-testid="fill-missing-components"');
     expect(detail).toContain('data-testid="component-highlight-alert"');
     const wizard = strip(read("app/exec-envs/CreateWizard.tsx"));

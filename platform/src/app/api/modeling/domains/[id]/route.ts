@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { getDomain, updateDomain, deleteDomain } from "@/lib/modeling/service";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 35: 数据域/主题域 详情 / 改 / 删。
+// 数据域/主题域 详情 / 改 / 删。
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);

@@ -1,13 +1,13 @@
-// @kf-batch 37-sync-backfill —— 序 37 ⑥⑦ 改动前**钉现状**(A3):`POST /api/sync/<id>/start` 的 glue 通道
+// 改动前**钉现状**(A3):`POST /api/sync/<id>/start` 的 glue 通道
 // 把「解析落点 → 建 / 更新作业 → 启动 → 写 run → 挂轮询 → OM 推送」从路由搬到 lib/sync/start-run.ts 之前,
 // 先用本判据把**现在**发出的 AWS / DDB 调用序列与关键入参录下来;搬完必须逐条相同(纯搬移的证据)。
 //
 // 🔴 只 mock 真外部:AWS SDK 客户端(经按区工厂 target-clients 注入假客户端)、DDB docClient、落点解析
 //   (描述符注册表)、项目守卫、审计、OM HTTP、下游扇出。sync 目录内的兄弟模块(脚本生成器 / 唯一写通道 /
 //   任务形态判定)与 run 台账写通道**一律走真实现** —— 接缝要被观察到,不能被 mock 抹平。
-// 🔴 快照有意重录两处(序 37 第五路,2026-10-12;重录前后的 diff 只有这两处,已逐行核过):
-//   · 脚本 Body 的摘要:B-60 给 S3 Tables 的 CREATE TABLE 加了平台标记属性(写 S3 的任务脚本都变一行);
-//   · B-62 落库顺序:run 行终态(status / metrics / logS3Key)那一笔 UpdateCommand 提前到水位回写与 OM 回填之前
+// 🔴 快照有意重录两处(第五路,2026-10-12;重录前后的 diff 只有这两处,已逐行核过):
+//   · 脚本 Body 的摘要:给 S3 Tables 的 CREATE TABLE 加了平台标记属性(写 S3 的任务脚本都变一行);
+//   · 落库顺序:run 行终态(status / metrics / logS3Key)那一笔 UpdateCommand 提前到水位回写与 OM 回填之前
 //     (原来排在 OM 回填之后 ⇒ 页面上「成功 · 0 · 0 · 日志尚未生成」好几分钟)。其余调用一条不多一条不少。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createHash } from "node:crypto";
@@ -73,7 +73,7 @@ function fakeClient(svc: string) {
       rec(svc, cmd);
       const n = cmd.constructor.name;
       if (svc === "glue") {
-        // 序 38 B-68:作业存在性由 GetJob 判(存在 ⇒ UpdateJob;不存在 ⇒ CreateJob);不再有「去掉 --conf 重建一次」
+        // 作业存在性由 GetJob 判(存在 ⇒ UpdateJob;不存在 ⇒ CreateJob);不再有「去掉 --conf 重建一次」
         if (n === "GetJobCommand") {
           if (S.createJob === "exists") return { Job: { Name: cmd.input.JobName } };
           const e = new Error(`Job with name: ${cmd.input.JobName} not found`); e.name = "EntityNotFoundException"; throw e;
@@ -201,7 +201,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法)", () => {
+describe("搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面的发法)", () => {
   it("home · 写两端 · 首次建作业:调用序列 + 关键入参 + 后台轮询收口,逐条录下", async () => {
     const res = await POST(post(), { params: { id: baseTask.taskId } });
     const body = await res.json();
@@ -225,7 +225,7 @@ describe("序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
     expect(S.audits).toMatchSnapshot("home-both-create-audit");
   });
 
-  // 序 38 B-68(2026-10-13 客户生产环境):下面两条**有意**改判 —— 原「先 CreateJob,报 already exists 才 UpdateJob」在定义有变时
+  // (2026-10-13 客户生产环境):下面两条**有意**改判 —— 原「先 CreateJob,报 already exists 才 UpdateJob」在定义有变时
   //   被 Glue 的 IdempotentParameterMismatch 拒成 500;原「报其它错就去掉 --conf 重建」是条静默降级(建出的作业写不了 S3 Tables)。
   it("作业已存在 ⇒ GetJob 判存在 → UpdateJob(定义以最新为准)再启动;**不再先试 CreateJob**", async () => {
     S.createJob = "exists";
@@ -318,8 +318,8 @@ describe("序 37 ⑥⑦ 搬移前钉现状:glue 通道启动(空请求体 = 现�
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @kf-batch 37-sync-backfill —— 序 37 ⑥ 新行为:可选请求体 `{ runDate }`(上面那组是改动前的基线,这组是新增判据)
-describe("序 37 ⑥ 手动运行指定业务日期", () => {
+// 新行为:可选请求体 `{ runDate }`(上面那组是改动前的基线,这组是新增判据)
+describe("手动运行指定业务日期", () => {
   const startCall = () => calls.find((c) => c.cmd === "StartJobRunCommand");
   const runItem = () => (calls.find((c) => c.cmd === "PutCommand")?.input.Item || {}) as Record<string, unknown>;
 

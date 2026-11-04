@@ -2,7 +2,7 @@ import * as cdk from "aws-cdk-lib";
 import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 
-// 模块 27 (WS4b-1) — AWS WAF(CLOUDFRONT scope)。
+// (WS4b-1) — AWS WAF(CLOUDFRONT scope)。
 //
 // 在平台 CloudFront 前置 WebACL:AWS 托管规则集(常见攻击/已知坏输入/IP 信誉)+ 速率限制
 // (单 IP 限速,缓解 CC/暴力扫描)。纯增量,只在边缘拦截恶意流量,不影响正常请求。
@@ -15,7 +15,7 @@ import { Construct } from "constructs";
  * 【为什么必须有这张表】托管通用规则集的 `SizeRestrictions_BODY` 会拦掉**一切 >8KB 的请求体**,
  * 而 CloudFront 拦下时回的是一张 **403 HTML 错误页** —— 应用层一个字都说不上,用户看到的是
  * 「保存失败」而查不出原因。改动前这里只有一条一次性放行(Flink 连接器上传);
- * 于是模块 54「会话卡片」——**平台第一个持久化查询结果行**的功能 —— 一上线就会在
+ * 于是「会话卡片」——**平台第一个持久化查询结果行**的功能 —— 一上线就会在
  * 「对话稍微长一点」时被边缘层静默拦掉。
  *
  * 【纪律】新增任何会发大请求体的路由,**同笔提交**往这张表加一行;否则它会在真环境表现成
@@ -38,7 +38,6 @@ export const LARGE_BODY_ROUTES: ReadonlyArray<{
     why: "上传 Flink 连接器 JAR(可达数十 MB;后端另有 250MB 应用层校验)",
   },
   {
-    // @kf-batch 54-genbi-session-cards
     name: "AllowGenbiCardSave",
     uriPath: "/api/genbi/cards",
     method: "POST",
@@ -143,7 +142,7 @@ export class WafStack extends cdk.Stack {
           visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: "AWSManagedIpReputation", sampledRequestsEnabled: true },
         },
         // 4) 速率限制:单 IP 5 分钟内超 4000 请求即拦截(缓解 CC / 暴力扫描)。
-        //    B-96(用户 2026-10-20 定值 2000 → 4000):规则作用于整个 CloudFront 分发(含 _next/static 静态资源),
+        //    (用户 2026-10-20 定值 2000 → 4000):规则作用于整个 CloudFront 分发(含 _next/static 静态资源),
         //    同一出口 IP 后的多客户端并发会被 CloudFront 直接回 403 拦截页;2000 在真环境硬门里撞到过。
         {
           name: "RateLimit",

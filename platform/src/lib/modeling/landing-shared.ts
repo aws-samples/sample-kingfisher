@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-modeling
 // 建模落地的**纯函数部分**(判态 / 列签名规范化 / 字段级 diff)—— 唯一作者。
 //
 // 🔴 **为什么单独一个文件**:落地面板是**客户端组件**,而 `landing.ts` 依赖 `node:crypto` 与 AWS SDK
@@ -10,7 +9,7 @@
 export interface LandedRecord {
   /**
    * 落地/观测时的**观测态**。
-   * 🔴 `drift` **绝不**显示为 ✓(INTERACTION §4ter)。@kf-batch 50-W5-seg1-WP10a:`residency-blocked` 态已删(不设法务门)。
+   * 🔴 `drift` **绝不**显示为 ✓(INTERACTION §4ter)。:`residency-blocked` 态已删(不设法务门)。
    */
   status: "ok" | "drift" | "credential-gap" | "failed";
   /** 落地时的**定义哈希**。读侧拿它与当前定义比 ⇒ 不用查库就能判「版本不齐」。 */
@@ -38,7 +37,7 @@ export type LandedState =
    * 🔴 **合同缺口(如实登记,不是"漏做")**:非 home 的建模落地**当前没有合法凭证通道**。
    * · §3.9a 定案「admin 级 DDL 一律走闭合执行器」,而合同的 `land-code-table` 模板
    *   **刻意不做数据写入**(灌数移出 admin 通道,走「窄权 shared-writer」);
-   * · 那条窄权通道是 **P52.5a 的遗留交付项,至今没有**;
+   * · 那条窄权通道是 **遗留交付项,至今没有**;
    * · 就算传一个 project 也不行:per-project 身份对 `public` 无权。
    * ⇒ 本期建模产物**只能落 home**。硬绕只有两条路,都不可接受:
    *   砍掉灌数(=废掉码表落地)、或把 raw admin ARN 交给调用方(=违反 §3.9a 的安全定案)。

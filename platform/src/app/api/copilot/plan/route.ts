@@ -1,7 +1,6 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
-// @kf-batch 50-WP4quater-reads(工单 SC-17)
 import { readScope, filterRowsByScope } from "@/lib/exec-env/scope";
 import { isValidTargetId, HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -41,8 +40,8 @@ export async function POST(req: NextRequest) {
   const token = authz.startsWith("Bearer ") ? authz.slice(7) : "";
 
   try {
-    // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 🔴 落点从 **body** 来(写/执行路由不读 `?scope=`,SPEC §2.6.3)。
-    // 🔴 @kf-batch 50-B39-plan-target:**这里是计划落点唯一的决定处**。
+    // 🔴 落点从 **body** 来(写/执行路由不读 `?scope=`,SPEC §2.6.3)。
+    // 🔴 **这里是计划落点唯一的决定处**。
     //   · 带了 targetId ⇒ 必须合法,否则 400(原来非法值静默改成主控区 = fail-open);
     //   · 没带 = 页面在「全部区域」视角(计划页只在选了区时才带)⇒ **显式**定为主控区,并原样落库、写审计。
     const rawTarget = (body as { targetId?: unknown })?.targetId;
@@ -75,7 +74,7 @@ export async function GET(req: NextRequest) {
   if (!identity) return apiError("未认证或登录态已失效,请重新登录", 401);
   const projectId = getActiveProjectId(req);
   try {
-    // @kf-batch 50-WP4quater-reads(工单 SC-17)—— 按执行范围过滤:「这个区有哪些计划要落地」。
+    // 按执行范围过滤:「这个区有哪些计划要落地」。
     // 🔴 无章的存量计划回落主控区(落章之前 Copilot 建的 draft 确实都在主控区跑)。
     const plans = await listPlans(projectId);
     const scope = readScope(req);

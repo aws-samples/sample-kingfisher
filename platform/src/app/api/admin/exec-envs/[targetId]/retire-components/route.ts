@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 50-WP20-retire-classic-mwaa
 // POST /api/admin/exec-envs/[targetId]/retire-components —— **摘掉一个已经不在现网的组件**。
 //
 // 【为什么必须有这个端点(2026-09-14 真环境撞出来的缺口)】平台有「补充部署」(加组件)却没有反向动作。

@@ -121,7 +121,7 @@ else
 fi
 
 sec "7) Bedrock:🔴 列表里 ACTIVE 不算可用,必须**真 converse** 一次(候选链逐个试,任一通过即可)"
-# @kf-batch 51-v2-multi-vendor(模块 51 v2.0,51 SPEC §7.7)—— 不再只探出厂默认一个:交给 resolve-home-model.sh 按
+# 不再只探出厂默认一个:交给 resolve-home-model.sh 按
 #   platform/ai-model.json 的 candidateModelIds(Claude Opus → GLM 5.3 → Kimi K3)逐候选展开本区推理配置并真 converse,
 #   与 deploy-all 选型用的是**同一段逻辑**(这里只读、不写任何资源)。
 CANDS=$(python3 -c "import json;c=json.load(open('$ROOT/platform/ai-model.json'));print(' / '.join(c.get('candidateModelIds') or [c['defaultModelId']]))" 2>/dev/null || true)

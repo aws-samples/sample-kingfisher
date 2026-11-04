@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // §2.1 register 写通道单测(SPEC:153 / §1.1a)。
 //
 // 【本文件的三条承重】
@@ -53,14 +52,14 @@ const VALID = {
   partition: "aws",
   accountId: "123456789012",
   jurisdiction: "home",
-  // @kf-batch 50-PROD-B-seq33 ②:注册必须带完整组件集(不提供精简形态)
+  // ②:注册必须带完整组件集(不提供精简形态)
   components: ["core", "redshift", "dms", "flink", "airflow-serverless"],
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   putMock.mockResolvedValue({});
-  // @kf-batch 50-WP23-xregion-peering:register 现在要先读一遍全量描述符来分配 VPC 地址段
+  // register 现在要先读一遍全量描述符来分配 VPC 地址段
   //   (地址不重叠是**账号内全局**性质)⇒ 这个默认返回不给,所有用例都会死在 `reading 'Items'`。
   queryMock.mockResolvedValue({ Items: [] });
 });
@@ -224,7 +223,6 @@ describe("🔴 写入的 item 形状(与 SPEC §1.1 字段表逐项对)", () => 
       jurisdiction: "home",
       status: "registered",
       components: ["core", "redshift", "dms", "flink", "airflow-serverless"],
-      // @kf-batch 52-P52.5a-supply
       // 🔴 **本条原来断的是 `legacy-seeded` —— 那是把一处现网 fail-open 钉住了**。
       // §3.9b 权威合同:「仅部署迁移脚本显式登记的**存量 home** 可 `legacy-seeded`;
       // **新 target 从 `provisioning` 开始**」。差别是硬的:`legacy-seeded` 不要求 deadline
@@ -267,7 +265,7 @@ describe("🔴 写入的 item 形状(与 SPEC §1.1 字段表逐项对)", () => 
   });
 });
 
-// @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):注册的组件集必须逐项等于完整组件集
+// ② —— 🔴🔴 不提供精简形态(用户 2026-10-10):注册的组件集必须逐项等于完整组件集
 describe("🔴🔴 注册:组件集必须等于完整组件集(少一个 / 多一个都拒)", () => {
   const FULL_HOME = ["core", "redshift", "dms", "flink", "airflow-serverless"];
   const cases: Array<[string, Record<string, unknown>, RegExp]> = [
@@ -311,7 +309,6 @@ describe("listTargetsRaw(管理面口径)", () => {
   });
 });
 
-// @kf-batch 50-WP23-xregion-peering
 // 🔴 VPC 地址段必须在**注册这一刻**落进描述符:broker 只读描述符,而 CDK 不给 ipAddresses 时
 //    的默认段与主控区逐位相同 ⇒ 跨区 peering 建不出来(症状是栈全绿、台账回写静默超时)。
 describe("🔴 register 分配 VPC 地址段", () => {
@@ -342,7 +339,6 @@ describe("🔴 register 分配 VPC 地址段", () => {
   });
 });
 
-// @kf-batch 50-WP23-one-env-per-region
 // 🔴🔴 用户 2026-09-15(第 N 次):「一个 region 只能有一个执行环境」。
 //   这条约束今天**真的被违反了** —— 验收段的一条判据为了证明字母空间不是 3,在 us-west-2
 //   注册了 `_b/_c/_d`,而**平台一个都没拦**,页面上出现 4 个。凡靠「记得别这么做」维持的约束
@@ -393,7 +389,7 @@ describe("🔴🔴 一个 region 只允许一套执行环境(产品硬拒,不是
   });
 });
 
-// @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 摘组件不许把环境摘成精简形态(行为判据:真调 retireComponents)
+// ② —— 🔴🔴 摘组件不许把环境摘成精简形态(行为判据:真调 retireComponents)
 describe("🔴🔴 摘组件:完整组件集里的一个都不许摘;要求集以外的存量组件(mwaa)照旧可摘", () => {
   const item = (components: string[]) => ({
     Item: {

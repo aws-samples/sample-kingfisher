@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
-// POST /api/admin/exec-envs/[targetId]/provisioning-deadline —— **延期** provisioning 窗口(50 SPEC §3.9b;WP-9 合同差分 ③-2)。
+// POST /api/admin/exec-envs/[targetId]/provisioning-deadline —— **延期** provisioning 窗口(50 SPEC §3.9b;合同差分 ③-2)。
 //
 // 请求体:`{ extendDays: 1..30 | provisioningDeadlineAt: ISO, reason: string, expectedEpoch?: number }`
 //

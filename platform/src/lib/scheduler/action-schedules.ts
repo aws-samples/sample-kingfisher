@@ -1,7 +1,6 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **平台动作的调度对象**(治理定时任务 / 问数卡片定时刷新)—— 行形状 + 读写 + 载体(发布 / 下线 / 落后检测)。
 //
-// 【载体不新造:照抄 WP-26】同步任务的定时调度已经证明了这条路:合成一个**单节点工作流**,
+// 【载体不新造:照抄】同步任务的定时调度已经证明了这条路:合成一个**单节点工作流**,
 //   由 `publishWorkflowDag` 按 `targets` **逐区**发到该区的 MWAA Serverless(用户拍板:每区自治调度,
 //   绝不回落主控区);运行台账靠 `__start` / `__finish` 收口;下线复用 `unpublishWorkflowDag`。
 //   唯一的差别是节点类型:这里是 `platform-action`(往主控区命令表投命令 + 轮询终态,见 node-exec-py.ts)。
@@ -10,7 +9,7 @@
 //   run 台账 `taskType` = 种类(`governance` / `genbi-card`),**不回写** `bgp-workflows`(那里没有它的行)。
 //
 // 【先办载体再改记录】启用:发布失败**不许**写 enabled(那就是空壳);停用:撤不下来**不许**改记录
-//   (WP-18d 铁律:孤儿 workflow 会继续按 cron 跑,而平台已认为它下线了)。两条都在 `setActionScheduleEnabled` 一处。
+//   (铁律:孤儿 workflow 会继续按 cron 跑,而平台已认为它下线了)。两条都在 `setActionScheduleEnabled` 一处。
 import { DeleteCommand, GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { publishWorkflowDag, unpublishWorkflowDag } from "@/lib/workflow/publish-dag";
@@ -87,7 +86,7 @@ export function buildActionCarrierWorkflow(row: ActionScheduleRow, cron: string 
     userId: USER_ID,
     workflowId: row.taskId,
     name: `${row.name}(定时平台动作)`,
-    description: "平台动作的定时调度载体(WP-28):单节点 platform-action 工作流,由该区的 MWAA Serverless 按 cron 触发",
+    description: "平台动作的定时调度载体:单节点 platform-action 工作流,由该区的 MWAA Serverless 按 cron 触发",
     projectId: row.projectId,
     dagDefinition: {
       nodes: [{ id: "action", type: "platform-action", data: { action: row.action, params: row.params, name: row.name } }],
@@ -139,7 +138,6 @@ export async function listActionSchedules(kind: ActionScheduleTaskType): Promise
 }
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 某一种调度对象里**归属该项目**的行(删项目前置校验用)。
  *
  * 🔴 与 `listActionSchedules` 的两点区别(都是删除守卫要、列表页不要的):

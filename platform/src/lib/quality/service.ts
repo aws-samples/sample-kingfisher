@@ -1,9 +1,9 @@
-// 模块 19 — 数据质量服务 (v1.10.0)
+// 数据质量服务 (v1.10.0)
 //
 // 规则 CRUD + 运行引擎：对 Redshift 执行模板生成的校验 SQL（统一 admin 身份，复用 v1.6.1），
 // 判定每条规则、计算质量评分（加权通过率 + 维度分）与 SLA（新鲜度违约），写结果与历史。
 
-// @kf-batch 50-WP2-directquery —— 裸客户端 + 自带轮询已收编进 `lib/redshift/direct-query.ts`
+// 裸客户端 + 自带轮询已收编进 `lib/redshift/direct-query.ts`
 import {
   directQueryRaw,
   resolveDirectQueryPlaceSafe,
@@ -141,7 +141,6 @@ function coerceCell(cell: any): number | null {
 }
 
 // Execute a single-row check SQL and return its row as { alias: number|null }. Throws on error.
-// @kf-batch 50-WP2-directquery
 // 🔴 收编:落点 / 客户端 / 轮询三件全部交给 `directQuery`(单一作者)。本函数只留**行形状** ——
 //    质量的归一口径是「非数字字符串 ⇒ null」,与指标那边(原样返回字符串)**不同**,
 //    所以归一必须留在各自领域里,不能上提(见 direct-query.ts 规矩 ①)。
@@ -185,8 +184,7 @@ export interface RunSummary {
   ts: string;
 }
 
-// @kf-batch 50-WP2-directquery
-// 🔴 @kf-batch 50-WP31-place-first-class:`scope.targetId` 必填(原来缺省 = 主控区)。在**那个区的数仓**上跑这批规则。
+// 🔴 `scope.targetId` 必填(原来缺省 = 主控区)。在**那个区的数仓**上跑这批规则。
 // 🔴 「该区没装数仓」**不是规则执行失败** —— 把它塞进 `status:"error"` 会让页面显示
 //    「17 条规则全部执行失败」,用户会去查 SQL;正确呈现是整页降级(路由把 `unavailable` 透传出去)。
 export async function runChecks(
@@ -195,7 +193,7 @@ export async function runChecks(
 ): Promise<{ summary: RunSummary; results: RuleResult[] } | DirectQueryUnavailable> {
   const rules = (await listRules(fqn)).filter((r) => r.enabled);
   if (!rules.length) throw new Error("该表暂无启用的质量规则");
-  // @kf-batch 50-WP2-directquery —— 落点解析一次;「该区没装数仓」⇒ 整体降级(见函数头注释)
+  // 落点解析一次;「该区没装数仓」⇒ 整体降级(见函数头注释)
   const pre = await resolveDirectQueryPlaceSafe(scope);
   if (pre.capability === "unavailable") return pre;
   const place = pre.place;

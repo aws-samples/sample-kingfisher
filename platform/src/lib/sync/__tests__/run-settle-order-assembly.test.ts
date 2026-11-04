@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 B-62 的装配层判据:启动核心 startGlueSyncRun(真)→ 后台轮询(真)→ 日志解析 run-metrics(真)
+// 该缺陷的装配层判据:启动核心 startGlueSyncRun(真)→ 后台轮询(真)→ 日志解析 run-metrics(真)
 //   → run 台账唯一写通道 updateRunRecord(真)→ 水位回写 / OM 回填 / 任务终态 / 下游扇出。
 //   两件事同一条链上观察:
 //   ① 落库顺序:run 行的终态字段(status / metrics / logS3Key …)必须在 OM 回填**之前**落库 —— 真环境实测回填 > 3 分钟,
@@ -130,7 +130,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("🔴 B-62 落库顺序:run 行终态在 OM 回填之前落库;rowsWritten 来自写入侧标记", () => {
+describe("🔴 落库顺序:run 行终态在 OM 回填之前落库;rowsWritten 来自写入侧标记", () => {
   it("正常:updateRunRecord(终态 + metrics)在 backfillSyncOmAfterSuccess 之前;任务终态与扇出仍在回填之后", async () => {
     const res = await startGlueSyncRun({ task: task(), taskId: TASK_ID, ds, tid: "tgt_home", dsOwner: "tgt_home", triggeredBy: "manual" });
     expect(res.started, JSON.stringify(res)).toBe(true);
@@ -163,7 +163,7 @@ describe("🔴 B-62 落库顺序:run 行终态在 OM 回填之前落库;rowsWrit
     expect((taskTerminalUpdates()[0].input.ExpressionAttributeValues as any)[":s"]).toBe("succeeded");
     expect(calls.some((c) => c.svc === "fanout")).toBe(true);
   });
-  it("判别力(B-62 解析):SYNC_VERIFY 的 target_rows(3)≠ ROWS_READ(2)时 run 行写的是 3,不是抄读数", async () => {
+  it("判别力(解析):SYNC_VERIFY 的 target_rows(3)≠ ROWS_READ(2)时 run 行写的是 3,不是抄读数", async () => {
     S.logLines = ["SYNC_VERIFY target=s3tables table=s3tablescatalog.gamedb.players scope=merge source_rows=2 target_rows=3", "ROWS_READ table=players rows=2"];
     await startGlueSyncRun({ task: { ...task(), writeMode: "merge", mergeKeys: ["id"] }, taskId: TASK_ID, ds, tid: "tgt_home", dsOwner: "tgt_home", triggeredBy: "manual" });
     await drainUntil(() => taskTerminalUpdates().length > 0, "后台轮询没走到任务终态");

@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-CAPSEED-seed-dispatch(登记 CAP-SEED 交付)
+// (登记 CAP-SEED 交付)
 // POST /api/seed/run  { targetId, dataset }  —— 「立即造数」:在**点名的那个执行范围**跑一次部署期的造数作业。
 //
 // 🔴 与定时造数**同一个作者** `runSeedOnce`(白名单 seed.run-once 的 author 就是它)。

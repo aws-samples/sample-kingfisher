@@ -1,4 +1,4 @@
-// 模块 22 — 需求流水线服务 (v1.14.0)
+// 需求流水线服务 (v1.14.0)
 //
 // 需求（Requirement）：把 GenBI 洞察沉淀为可治理、可指派、可交付的研发需求。
 // 单逻辑分区(pk="requirement") + ULID 排序键，列表 Query 后按角色在内存过滤（量级与 approvals 相当）。
@@ -60,7 +60,7 @@ export interface Implementation {
   generatedAt?: string;
   generatedBy?: string;
   /**
-   * @kf-batch 50-WP31-place-first-class(B-36)—— 这份代码是按**哪个执行环境的目录**生成的(codegen 的 `groundedOn.targetId`)。
+   * 这份代码是按**哪个执行环境的目录**生成的(codegen 的 `groundedOn.targetId`)。
    * 「创建作业」据此判:绑定区里必须含它 —— 否则就是「按 us-west-2 的表生成、却建成主控区作业」。存量行没有它 = 按主控区生成的(历史事实)。
    */
   groundedTargetId?: string;

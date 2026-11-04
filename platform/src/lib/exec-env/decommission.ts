@@ -1,7 +1,6 @@
-// @kf-batch 50-WP30-decommission
-// WP-30 路 B「下线销毁」—— 装过(或装了一半、有栈)的执行环境的删除流程编排(唯一作者)。
+// 「下线销毁」—— 装过(或装了一半、有栈)的执行环境的删除流程编排(唯一作者)。
 //
-// 流程(INTERACTION §1.4 四道闸 + WORK-PACKAGES WP-30 ③):
+// 流程(INTERACTION §1.4 四道闸 + ③):
 //   drain(停止承接;intent 路由 / drain 路由同一个写通道 setSpecIntent)
 //   → 影响预览(delete-impact.ts:绑定 / 启用调度 / 运行中 run,三个数必须都是 0)
 //   → 输 region 名强确认 + previewHash ⇒ `requestDelete` 建 bgp-approvals(type=exec-env-delete)
@@ -52,7 +51,7 @@ import { createApproval, listApprovals, type Approval } from "@/lib/projects/pro
 import { DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 import type { ApiErrorCode } from "@/lib/api-response";
 
-/** bgp-approvals 的审批类型(复用模块 13 审批流;决策人只许平台 admin —— approvals/[id] 路由按类型硬判)。 */
+/** bgp-approvals 的审批类型(复用审批流;决策人只许平台 admin —— approvals/[id] 路由按类型硬判)。 */
 export const EXEC_ENV_DELETE_APPROVAL_TYPE = "exec-env-delete";
 
 /** 停止承接后页面 / 拒因里的那句话(与 lifecycle.serviceabilityReason 的开头一致)。 */
@@ -70,7 +69,7 @@ export class DecommissionRefused extends Error {
   }
 }
 
-const GO_DISCARD = "这个环境从没部署过 —— 请用「弃置」(路 A),不需要销毁";
+const GO_DISCARD = "这个环境从没部署过 —— 请用「弃置」,不需要销毁";
 
 async function loadTarget(targetId: string): Promise<ExecutionTarget> {
   const t = await getTargetRaw(targetId);
@@ -304,7 +303,7 @@ export async function retryDestroy(targetId: string, input: { confirm: unknown }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 观测与收口(施工序 5)
+// 观测与收口
 // ══════════════════════════════════════════════════════════════════════════════
 
 export interface DecommissionFacts {

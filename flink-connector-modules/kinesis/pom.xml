@@ -11,7 +11,7 @@
   <artifactId>flink-module-kinesis</artifactId>
   <packaging>jar</packaging>
 
-  <!-- 模块 32-CR — Kinesis 源连接器模块。connector id = "kinesis"(对齐 connector-modules.ts)。
+  <!-- Kinesis 源连接器模块。connector id = "kinesis"(对齐 connector-modules.ts)。
        fat jar(bundled 连接器 + 传递依赖),无主类;Flink core provided(不打入)。运行期由 mergeJars 拼入。 -->
   <dependencies>
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>

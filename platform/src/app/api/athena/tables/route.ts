@@ -1,18 +1,18 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { requireProject } from "@/lib/projects/guard";
 import { listNamespaceTreeAll, ATHENA_CATALOG_REF, resolveS3TablesPlaces } from "@/lib/athena/s3tables";
 
 // S3 Tables 命名空间 + 表树（供前端左侧浏览/点表生成 SELECT）。RBAC: viewer。
-// 序 38 B-71:树 = 该区平台表桶 + 平台管理员登记的外部表桶(每个命名空间带 bucket / catalog / external;
+// 树 = 该区平台表桶 + 平台管理员登记的外部表桶(每个命名空间带 bucket / catalog / external;
 //   `catalog` 仍是平台表桶的目录引用,存量消费者不变;新增 `catalogs` 列出全部)。
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
   try {
-    // @kf-batch 50-WP4ter-coverage —— 工单 SC-4:表树按**编辑器自己的执行目标**取
+    // 表树按**编辑器自己的执行目标**取
     // (与 `/redshift` 左侧树同款:一棵树只能显示一个区的结构)。
     const places = await resolveS3TablesPlaces(requestedTargetId(req.nextUrl.searchParams.get("targetId"), "列数据湖表"));
     const primary = places[0];

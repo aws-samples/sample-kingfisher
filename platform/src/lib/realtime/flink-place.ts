@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-5)
 /**
  * **MSAF(Flink)落点** —— 「这个流作业在哪个区跑、用哪个角色、代码从哪个桶取、产物写哪」的唯一出口。
  *
@@ -12,10 +11,10 @@
  *   · 用主控区的角色去 `CreateApplication` ⇒ AccessDenied,界面上只显示「启动失败」;
  *   · 更坏的一种:**应用跑在那个区、产物写回主控区** —— 数据驻留承诺当场破,而一切看起来正常。
  *
- * @kf-batch 50-WP31-place-first-class 序 3 收尾:主控区也读描述符(见 `resolveFlinkPlace` 的注释:值逐项不变的依据)。
+ * 收尾:主控区也读描述符(见 `resolveFlinkPlace` 的注释:值逐项不变的依据)。
  */
 import { FLINK } from "./flink-config";
-// @kf-batch 50-WP31-place-first-class —— 落点唯一作者(主控区也读描述符)+ 资源唯一取法
+// 落点唯一作者(主控区也读描述符)+ 资源唯一取法
 import { resolvePlace, placeResource } from "@/lib/place/resolve";
 import { PlaceUnavailable, type TargetRef } from "@/lib/place/types";
 import {
@@ -45,12 +44,12 @@ export interface FlinkPlace {
   home: boolean;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 🔴 落点**必填**(原来 `targetId || HOME_TARGET_ID`),且决策**在分支之前**记账:
+// 🔴 落点**必填**(原来 `targetId || HOME_TARGET_ID`),且决策**在分支之前**记账
 //   原来主控区分支直接 return、一次决策都不记 ⇒ 一次列表请求里混着两个区的作业时,主控区那次 Describe 在观测器里
 //   「无决策」,被拿去和别区的决策比对 ⇒ 误报越区(2026-10-03 09:20Z 实测:`kinesisanalytics DescribeApplication @ us-east-1`,
 //   作业是 `targets=[tgt_home]` 的示范流作业,调用其实打对了区)。主控区与其他区同一条路记账(D11)。
 //
-// @kf-batch 50-WP31-place-first-class —— 序 3 收尾:🔴🔴 **主控区分支删掉,改走描述符**(L1:主控区也是一个 target)。
+// 收尾:🔴🔴 **主控区分支删掉,改走描述符**(L1:主控区也是一个 target)。
 //   原来主控区直接回 `FLINK` 常量(部署期 env 快照),一次都不核描述符 ⇒ 两个后果:
 //   ① 主控区「装没装 flink」从来不核(没装也照样往下走,CreateApplication 才炸);
 //   ② 同一个作者里两套口径(主控区读 env、别的区读资源袋),改一边另一边不跟 —— 正是落点 bug 越修越多的那个形状。
@@ -111,11 +110,11 @@ export async function flinkClients(p: FlinkPlace) {
  * 一次服务端复制,幂等、无出网、与既有 `ensureLogGroup` 是同一种「ensure」模式。
  *
  * 🔴 复制失败**必须抛**:静默跳过的后果是 MSAF 在 CreateApplication 时报「取不到 fileKey」,
- * 而那条报错完全指不到「JAR 没送到这个区」这件事上(本仓 P42.6b 第 4 条就是这个形状:
+ * 而那条报错完全指不到「JAR 没送到这个区」这件事上(本仓第 4 条就是这个形状
  * 部署漏传模块 jar ⇒ 启动即 error / key not exist)。
  */
 export async function ensureRunnerJar(p: FlinkPlace, codeKey: string): Promise<void> {
-  // @kf-batch 50-WP31-place-first-class —— 原来 `if (p.home) return`(按身份分支)。真正的条件是「本区代码桶**就是** JAR 的源桶」
+  // 原来 `if (p.home) return`(按身份分支)。真正的条件是「本区代码桶**就是** JAR 的源桶」
   //   (deploy-all.sh 只往那一只桶传):按事实判,不按「是不是主控区」判 —— 主控区的描述符 scriptsBucket 与源桶同名 ⇒ 行为不变。
   if (FLINK.codeBucket && p.codeBucket === FLINK.codeBucket) return;
   const { s3 } = await flinkClients(p);

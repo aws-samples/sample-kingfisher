@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 🔴 **`bgp-task-runs` 写入点的 AST 清单**(W2-a / P52.2 的量具)。
+ * 🔴 **`bgp-task-runs` 写入点的 AST 清单**(W2-a 的量具)。
  *
  * 【为什么必须是 AST 而不是 grep】同一个数字在三份文档里有三种写法:
  * 50 ROADMAP 写「13 写入点」、52 DESIGN §11.3 写「27 处」、50 SPEC §5 写「13 建行 + 14 回写 = 27」。

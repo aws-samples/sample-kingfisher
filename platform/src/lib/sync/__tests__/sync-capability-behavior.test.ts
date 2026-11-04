@@ -1,6 +1,6 @@
-// @kf-batch 37-sync-capability —— 序 37 的**行为**判据:生成的 Glue 脚本原样在假的 Spark / Redshift 上跑
+// **行为**判据:生成的 Glue 脚本原样在假的 Spark / Redshift 上跑
 // (glue-harness.py),断最终表状态与失败时是否原样。判别力:同一组断言喂改动前的脚本(__golden__ 里的覆盖形态)
-// 必须红 —— 证明判据看得见 B-53(见最后一组)。
+// 必须红 —— 证明判据看得(见最后一组)。
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
@@ -40,7 +40,7 @@ const src0 = { players: { cols: COLS, rows: [] } };
 const old3 = [{ id: 7, name: "x" }, { id: 8, name: "y" }, { id: 9, name: "z" }];
 const S3T = "s3tablescatalog.gamedb.players";
 
-describe("B-53 S3 Tables 整表覆盖:一次提交 · 空结果失败 · 写后对数", () => {
+describe("S3 Tables 整表覆盖:一次提交 · 空结果失败 · 写后对数", () => {
   const task = { ...base, sourceTables: ["players"], targetType: "s3-tables", writeMode: "overwrite" };
   it("正常:旧 3 行被替换成新 2 行,只有一次提交,不再发 DELETE", () => {
     const o = run(task, { source: src2, s3_tables: { [S3T]: { rows: old3 } } });
@@ -79,7 +79,7 @@ describe("B-53 S3 Tables 整表覆盖:一次提交 · 空结果失败 · 写后�
   });
 });
 
-describe("B-53 Redshift 整表覆盖:暂存表 + 一个事务换入 + 写后对数", () => {
+describe("Redshift 整表覆盖:暂存表 + 一个事务换入 + 写后对数", () => {
   const task = { ...base, sourceTables: ["players"], targetType: "redshift", writeMode: "overwrite" };
   const RT = "public.players";
   const rsOld = { [RT]: { rows: old3, marked: true } };
@@ -126,7 +126,7 @@ describe("B-53 Redshift 整表覆盖:暂存表 + 一个事务换入 + 写后对�
   });
 });
 
-describe("B-52 过滤条件真下推 + ④⑥ 日期变量", () => {
+describe("过滤条件真下推 + ④⑥ 日期变量", () => {
   it("WHERE 带变量:按 --ds 渲染后下推成子查询", () => {
     const t = { ...base, sourceTables: ["players"], targetType: "redshift", writeMode: "append", whereClause: "status = 'done' AND d >= '${run_date}'" };
     const o = run(t, { source: src2, argv: ["--ds", "2026-07-03"] });
@@ -235,7 +235,7 @@ describe("存量非覆盖形态在夹具上照常跑通(夹具保真 + 无回归
   }
 });
 
-describe("判别力:改动前的覆盖脚本过不了上面的判据(B-53 看得见)", () => {
+describe("判别力:改动前的覆盖脚本过不了上面的判据(看得见)", () => {
   const { readFileSync } = require("node:fs") as typeof import("node:fs");
   const golden = (n: string) => readFileSync(join(__dirname, "__golden__", `${n}.py`), "utf8");
   it("旧 S3 覆盖脚本:写入失败后目标表被清空", () => {
@@ -349,7 +349,7 @@ describe("按列名写入 + sourceColumns(客户切换到已有表的同形)", (
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// 序 37 第五路:B-61 merge 真做 · B-60 S3 Tables 外来表覆盖确认守卫
+// 第五路:merge 真做 S3 Tables 外来表覆盖确认守卫
 // ══════════════════════════════════════════════════════════════════════════════
 const MARKER = "bgp-platform-created";
 const MARKER_KEY = "bgp.created-by";
@@ -360,7 +360,7 @@ const existing3 = () => [{ id: 1, name: "a" }, { id: 2, name: "b" }, { id: 3, na
 const upsert2 = { players: { cols: COLS, rows: [{ id: 1, name: "A1" }, { id: 5, name: "e" }] } };
 const byId = (rows: Row[]) => Object.fromEntries(rows.map((r) => [String(r.id), r]));
 
-describe("B-61 S3 Tables 按键合并(merge 不再是 append)", () => {
+describe("S3 Tables 按键合并(merge 不再是 append)", () => {
   const task = { ...base, sourceTables: ["players"], targetType: "s3-tables", writeMode: "merge", mergeKeys: ["id"] };
   it("正常:旧 3 行 + 本批 2 行(id=1 改值、id=5 新增)⇒ 4 行、id=1 已更新、只一次提交、没有 DELETE / INSERT INTO", () => {
     const o = run(task, { source: upsert2, s3_tables: { [S3T]: { rows: existing3() } } });
@@ -445,7 +445,7 @@ describe("B-61 S3 Tables 按键合并(merge 不再是 append)", () => {
   });
 });
 
-describe("B-61 Redshift 按键合并:暂存表 + 一个事务(DELETE USING + INSERT SELECT)+ 按键对数", () => {
+describe("Redshift 按键合并:暂存表 + 一个事务(DELETE USING + INSERT SELECT)+ 按键对数", () => {
   const task = { ...base, sourceTables: ["players"], targetType: "redshift", writeMode: "merge", mergeKeys: ["id"] };
   const rsOld = () => ({ [RT]: { rows: [{ id: "1", name: "a" }, { id: "2", name: "b" }, { id: "3", name: "c" }], marked: true } });
   it("正常:目标 4 行、id=1 已更新;单批 = DELETE USING + INSERT SELECT;暂存表不留;没有整表 DELETE", () => {
@@ -506,7 +506,7 @@ describe("B-61 Redshift 按键合并:暂存表 + 一个事务(DELETE USING + INS
     expect(empty.rs_sql.some((q) => /^DELETE FROM/.test(q))).toBe(false);
     expect(Object.keys(byId(empty.s3[S3T].rows)).sort()).toEqual(["1", "2", "3", "5"]);
   });
-  it("判别力:B-61 改动前的 merge 脚本(保留为 jdbc-both-merge.pre-b61.py)在同一夹具上跑出**重复行**", () => {
+  it("判别力:改动前的 merge 脚本(保留为 jdbc-both-merge.pre-b61.py)在同一夹具上跑出**重复行**", () => {
     const old = runScript(readFileSync(join(__dirname, "__golden__", "jdbc-both-merge.pre-b61.py"), "utf8"), {
       source: { players: upsert2.players, orders: upsert2.players },
       s3_tables: { [S3T]: { rows: existing3() }, [S3T_ORDERS]: { rows: existing3() } },
@@ -519,7 +519,7 @@ describe("B-61 Redshift 按键合并:暂存表 + 一个事务(DELETE USING + INS
   });
 });
 
-describe("B-60 S3 Tables 外来表覆盖确认守卫(与 Redshift 规则逐字对齐)", () => {
+describe("S3 Tables 外来表覆盖确认守卫(与 Redshift 规则逐字对齐)", () => {
   const task = { ...base, sourceTables: ["players"], targetType: "s3-tables", writeMode: "overwrite" };
   const foreign = () => ({ [S3T]: { rows: existing3(), marked: false } });
   it("外来表(无标记)+ overwrite ⇒ SYNC_REFUSED_CLEAR_FOREIGN_TABLE,行原样,零提交,没发任何写语句", () => {

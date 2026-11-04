@@ -1,4 +1,4 @@
-// 模块 43-A — reconcile-on-read 沉淀路径(零侵入模块25)。设计 §6.1 认可的退路,也是 A.1 的
+// reconcile-on-read 沉淀路径(零侵入)。设计 §6.1 认可的退路,也是 A.1 的
 // 主沉淀入口:扫 bgp-diagnostics 中 done 的记录,对每条调 recordIncident(幂等,靠 diagnosticId
 // 去重)。由 /api/incidents 列表与 /api/incidents/health 在读时触发一次(轻量、限流),让"知识
 // 资产从 0 到 1"无需改诊断主流程即可发生。升 AgentCore(A.2)后可改为诊断完成即时 hook。

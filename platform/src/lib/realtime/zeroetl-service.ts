@@ -1,4 +1,4 @@
-// 模块 31 (Zero-ETL) — RDS MySQL → Redshift 真·CDC 增量同步编排服务层(修复 B6)。
+// (Zero-ETL) — RDS MySQL → Redshift 真·CDC 增量同步编排服务层(修复 B6)。
 //
 // "增量同步(incremental)" 的正道通道 = 托管 Zero-ETL Integration(近实时 CDC),
 // 替代此前 Glue 批处理靠 WHERE 谓词模拟的"假增量"。本服务把人工 CLI 实测打通的全链路
@@ -21,8 +21,8 @@
 //   · 凭证零硬编码(红线②):独立 namespace admin 密码随机生成、仅写入 Secrets Manager。
 
 import { homeRegion } from "@/lib/place/home-region";
-// G6(模块 50):凭证缓存改复合键 —— 见下方 getZeroEtlSecretArn 的注释。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// G6:凭证缓存改复合键 —— 见下方 getZeroEtlSecretArn 的注释。
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 import { credCacheKey, ProcessCache } from "@/lib/exec-env/cred-cache";
@@ -74,7 +74,7 @@ const notFound = (e: any) =>
 
 // 独立 namespace admin 密钥 ARN(缓存)。缺失返回 undefined,查询时回退 IAM 临时凭证。
 //
-// ── 🔴 G6(模块 50)改造:进程级**单值**缓存 → **复合键**缓存 ───────────────────────
+// ── 🔴 G6改造:进程级**单值**缓存 → **复合键**缓存 ───────────────────────
 // 这是 R9 才发现的**第二个**凭证缓存。只改 `redshift/admin-secret.ts` 那一个的话,
 // **zero-etl 查询路径会绕过隔离**(`redshift/execute` 与 zero-etl 是两条分叉:
 // 前者按 workgroup 三元分派,后者用本函数),等于隔离只做了一半、还看不出任何异常。
@@ -285,7 +285,7 @@ export async function getIntegrationStatus(integrationArn: string): Promise<{ st
 
 // 在独立 wg 上以 admin(superuser)身份执行 SQL,等 FINISHED。缺密钥则回退 IAM 临时凭证。
 async function execZeroEtlSql(sql: string, database = "dev"): Promise<string> {
-  // @kf-batch 50-WP2-directquery —— 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
+  // 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
   // 有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)⇒ 这条路不存在"按 target 取 region"。
   const client = redshiftClientForHomeOnly("zeroetl-home-namespace");
   const SecretArn = await getZeroEtlSecretArn();
@@ -303,7 +303,7 @@ async function execZeroEtlSql(sql: string, database = "dev"): Promise<string> {
 
 // 目标库是否已存在(幂等建库前置)。
 export async function destinationDatabaseExists(destDb: string): Promise<boolean> {
-  // @kf-batch 50-WP2-directquery —— 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
+  // 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
   // 有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)⇒ 这条路不存在"按 target 取 region"。
   const client = redshiftClientForHomeOnly("zeroetl-home-namespace");
   const SecretArn = await getZeroEtlSecretArn();
@@ -337,7 +337,7 @@ export async function ensureDestinationDatabase(destDb: string, integrationId: s
 
 // 查各表已复制行数(供详情页/验证展示)。某表查不到(同步中/无 PK)返回 null,不臆造。
 export async function getReplicatedCounts(destDb: string, schema: string, tables: string[]): Promise<{ table: string; rows: number | null }[]> {
-  // @kf-batch 50-WP2-directquery —— 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
+  // 合同 home-only:zero-ETL 是**主控区里的独立 namespace**,
   // 有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)⇒ 这条路不存在"按 target 取 region"。
   const client = redshiftClientForHomeOnly("zeroetl-home-namespace");
   const SecretArn = await getZeroEtlSecretArn();

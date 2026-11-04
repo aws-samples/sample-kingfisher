@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4ter-coverage
-// `/api/finops/tasks` 的执行范围过滤 + **按区计数的口径**(工单 SC-11)。
+// `/api/finops/tasks` 的执行范围过滤 + **按区计数的口径**。
 //
 // 🔴 最容易写错的一条:计数必须在**过滤之前**算 —— 反了的话「别处还有 N 条」永远是 0,
 //    界面等于告诉用户「别的区没有成本」,而那是撒谎。
@@ -7,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 let runs: Array<Record<string, unknown>> = [];
-// @kf-batch 50-WP6-cost-by-region —— 账单行(v2)按月返回;对账要用
+// 账单行(v2)按月返回;对账要用
 let bill: Array<Record<string, unknown>> = [];
 vi.mock("@/lib/finops/store", () => ({
   scanAllCostRuns: vi.fn(async () => runs),
@@ -75,7 +74,6 @@ describe("拒因", () => {
   });
 });
 
-// @kf-batch 50-WP6-cost-by-region(WP-6 施工序 3,E-171 / E-172)
 describe("O3b:排行按 (task, target) 分行 + 按 region 对账", () => {
   const today = new Date().toISOString().slice(0, 10);
   it("🔴 同一任务扇出到两个区 = 两行,各带 targetId(合成一行就看不出贵的是哪个区)", async () => {
@@ -87,13 +85,13 @@ describe("O3b:排行按 (task, target) 分行 + 按 region 对账", () => {
     expect(d.items.map((i: any) => `${i.taskId}@${i.targetId}=${i.totalUsd}`).sort()).toEqual(["x@tgt_home=1", "x@tgt_usw2_a=4"]);
   });
 
-  it("E-171:scope=usw2 的列表 == targetId=tgt_usw2_a 的成本行集合", async () => {
+  it("scope=usw2 的列表 == targetId=tgt_usw2_a 的成本行集合", async () => {
     const d = await body("?scope=tgt_usw2_a");
     expect(d.items.map((i: any) => i.targetId)).toEqual(["tgt_usw2_a"]);
     expect(d.items.reduce((a: number, i: any) => a + i.totalUsd, 0)).toBe(2);
   });
 
-  it("🔴 E-172:未分摊 = 区账单 − Σ该区**全部**执行环境的归因(同区另一套环境的 run 不许算成未分摊)", async () => {
+  it("🔴 未分摊 = 区账单 − Σ该区**全部**执行环境的归因(同区另一套环境的 run 不许算成未分摊)", async () => {
     bill = [
       { date: today, service: "AWS Glue", region: "us-west-2", amountUsd: 10, category: "engine" },
       { date: today, service: "Amazon Virtual Private Cloud", region: "us-west-2", amountUsd: 5, category: "base" },

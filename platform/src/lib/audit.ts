@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
-// @kf-batch 50-WP4ter-coverage —— targetId 形态判定复用唯一权威(不在这里写正则)
+// targetId 形态判定复用唯一权威(不在这里写正则)
 import { isValidTargetId } from "@/lib/exec-env/target-id";
 import { scalarTargetOf, type TargetScope } from "@/lib/exec-env/scope";
 import { scopeTargets } from "@/lib/scope/scope";
@@ -15,7 +15,6 @@ import { scopeTargets } from "@/lib/scope/scope";
 // partition, shard the pk (e.g. by day) and fan-out the read query.
 export const AUDIT_PK = "audit";
 
-// @kf-batch 52-P52.5a-supply
 /**
  * 审计的**行为主体**。原先它是本文件私有的 `AuditActor`,只能由 `NextRequest` 解出来。
  *
@@ -59,7 +58,6 @@ export interface AuditOptions {
   resourceType?: string; // e.g. "datasource" | "sync" | "workflow"
   resourceId?: string;
   /**
-   * @kf-batch 50-WP4ter-coverage(工单 SC-12)
    * 这次动作**作用在哪个执行环境**上。审计表原来一个区维都没有(50 SPEC §3.3 的设计里写了
    * target 分片,实际没写)⇒ 审计日志页无法回答「谁在哪个区做了什么」,跨法域下还牵涉留区。
    *
@@ -92,7 +90,6 @@ export async function recordAudit(
   }
 }
 
-// @kf-batch 52-P52.5a-supply
 /**
  * 写一条审计记录并返回它的 **auditId**。
  *
@@ -117,7 +114,6 @@ export async function writeAuditRecord(
   return auditId;
 }
 
-// @kf-batch 50-WP9a-durable-jobs
 /**
  * **恰好一次**的审计写(会抛)。
  *
@@ -150,7 +146,6 @@ export async function writeAuditRecordOnce(
   }
 }
 
-// @kf-batch 50-W5-seg2-WP8
 /**
  * 构造一条审计 item(**纯函数,不写库**)。
  *
@@ -170,7 +165,7 @@ export function buildAuditItem(
   const { actor, actorSub, email } = actorRef;
   const ts = new Date().toISOString();
   const auditId = `${ts}#${ulid()}`; // enables reverse-chronological reads (ScanIndexForward=false)
-  // @kf-batch 50-WP4ter-coverage —— **派生规则(单一处)**:`resourceType === "exec-env"` 时
+  // **派生规则(单一处)**:`resourceType === "exec-env"` 时
   // `resourceId` **就是** targetId(全部 12 条 `/api/admin/exec-envs/[targetId]/**` 路由都这么传)。
   // 🔴 写成派生而不是去改 138 个调用点:改 138 处必漏,而漏掉的那处会静默落到「无章」⇒ 归主控区。
   // 数据面的动作(同步启动 / 问数 / 质量运行)另由调用方显式传 `targetId`(它们知道真落点)。
@@ -205,7 +200,6 @@ export function auditActorFromRequest(req: NextRequest): AuditActorRef {
 /**
  * Read the most recent audit entries (reverse-chronological).
  *
- * @kf-batch 50-WP4ter-coverage(工单 SC-12)
  * @param opts.scope 传了就只回**归属该执行范围**的条目。
  *
  * 🔴 **必须翻页**:DDB 的 `Limit` 是**过滤之前**的量。按区过滤后直接返回会让「最近 200 条」
@@ -215,7 +209,7 @@ export function auditActorFromRequest(req: NextRequest): AuditActorRef {
  *
  * 🔴 **无章的存量条目归主控区**(`scalarTargetOf` 的统一回落):审计表落章之前,平台的动作
  * 全部发生在主控区(控制面就在那儿)⇒ 归主控区是历史事实。但**跨区动作的存量条目**因此
- * 也会落在主控区视角 —— 这一点如实登记在 WORK-PACKAGES WP-4ter,不靠猜去补。
+ * 也会落在主控区视角 —— 这一点如实登记在,不靠猜去补。
  */
 export async function queryAuditLog(
   limit = 200,

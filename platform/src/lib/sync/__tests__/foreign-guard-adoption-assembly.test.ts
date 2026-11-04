@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 B-60 升级兼容「既有目标收养」的装配层判据:
+// 升级兼容「既有目标收养」的装配层判据
 //   startGlueSyncRun(真)→ adoptExistingTargetsOnce(真)→ run 台账查询单一作者 listRunsByTask(真)→ 任务唯一写通道(真)
 //   → generateGlueScript(真)→ 上传脚本。只 mock 真外部:DDB docClient、按区 SDK 客户端工厂、落点解析、OM、下游扇出。
 //   lib/sync 的兄弟模块一个都不 mock —— 「收养写进任务记录」与「生成脚本的 OVERWRITE_CONFIRMED 真含那些名字」是同一条链上
@@ -94,7 +94,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("🔴🔴 B-60 升级兼容:守卫上线前已成功运行过的任务,首次运行时收养当时的目标表(一次性)", () => {
+describe("🔴🔴 升级兼容:守卫上线前已成功运行过的任务,首次运行时收养当时的目标表(一次性)", () => {
   it("老任务(overwrite · both · 无 stamp)有 succeeded run ⇒ 记录被 stamp 且确认清单 = Redshift 全名 ∪ S3 三段名;生成脚本的 OVERWRITE_CONFIRMED 含全部", async () => {
     S.runs = [{ runId: "r1", status: "error" }, { runId: "r2", status: "succeeded" }, { runId: "r3", status: "running" }];
     const task = oldTask();

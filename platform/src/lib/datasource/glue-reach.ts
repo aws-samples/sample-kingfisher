@@ -1,4 +1,4 @@
-// 序 38 B-70 —— 数据源「经自己的 Glue 连接」探测与发现表(唯一作者)。
+// 数据源「经自己的 Glue 连接」探测与发现表(唯一作者)。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】客户源库在客户自己的 VPC(192.168.0.0/16),平台控制面 ECS 在平台 VPC(10.0.0.0/16),
 //   两者无 peering ⇒ 控制面直连**本来就到不了**。而页面「检测」(DS-05 心跳)与「浏览表」都是控制面直连:
@@ -21,12 +21,12 @@ import { targetOfStamp } from "@/lib/exec-env/target-id";
 import { upsertGlueJob, type GlueJobDefinition } from "@/lib/aws/glue-job-upsert";
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 import { toSourceRef } from "@/lib/datasource-spi/normalize";
-// 序 31 二刀 ⑤:读在途发现作业(`readDiscovery` 用的是记录里的 region,不经 resolveGlueBinding)也替这条源所在区做事 ⇒ 推进入口先记落点决策
+// 读在途发现作业(`readDiscovery` 用的是记录里的 region,不经 resolveGlueBinding)也替这条源所在区做事 ⇒ 推进入口先记落点决策
 import { noteDatasourceRowPlace } from "@/lib/datasource/ds-place";
-// 序 61 B-133 —— 发现作业起之前核对 / 自愈源的外部网络对象(平台组 / 连接被平台外删除 ⇒ 按源行重建接回;用户自带缺失 ⇒ 可读失败)
+// 发现作业起之前核对 / 自愈源的外部网络对象(平台组 / 连接被平台外删除 ⇒ 按源行重建接回;用户自带缺失 ⇒ 可读失败)
 import { reconcileDatasourceNetwork, DatasourceNetworkBrokenError } from "@/lib/datasource/network-reconcile";
 import type { DataSource } from "@/types/datasource";
-// 序 53:发现作业的 Glue 版本跟平台缺省走(单一作者;缺省 = 清单最高)
+// 发现作业的 Glue 版本跟平台缺省走(单一作者;缺省 = 清单最高)
 import { GLUE_VERSION_DEFAULT } from "@/lib/sync/glue-version";
 
 /** 发现作业等待上限(作业本身 Timeout 15 分钟;超过 ⇒ timeout:浏览表按失败处理,探测按 unknown 处理 —— 不猜可达 / 不可达)。 */
@@ -121,7 +121,7 @@ export function buildDiscoveryScript(a: DiscoveryScriptArgs): string {
   const sql = discoverySqlFor(a.dbType);
   const defSchema = defaultSchemaFor(a.dbType);
   const timeoutOpts = jdbcTimeoutOptionsFor(a.dbType).map(([k, v]) => `\n      .option(${JSON.stringify(k)}, ${JSON.stringify(v)})`).join("");
-  return `# 序 38 B-70 —— 数据源表发现(经数据源自己的 Glue 连接跑;与同步作业同一份 JDBC URL / driver / secret)
+  return `# 数据源表发现(经数据源自己的 Glue 连接跑;与同步作业同一份 JDBC URL / driver / secret)
 # 同一个作业也是「检测」的载体:成功 = 源可达(表清单顺带带回),失败 = 源不可达(登录 / 读取超时见下面的 driver 超时属性)
 import sys, json, datetime, boto3
 from awsglue.utils import getResolvedOptions
@@ -162,7 +162,7 @@ for r in sorted(rows, key=lambda x: (str(x["tbl_schema"] or ""), str(x["tbl_name
         "key": str(r["col_key"] or ""),
         "comment": str(r["col_comment"] or ""),
     })
-# 序 53:Python 3.13(Glue 6.0)起 datetime.utcnow() 已弃用 ⇒ 用带时区的 now(UTC),输出形状不变
+# Python 3.13(Glue 6.0)起 datetime.utcnow() 已弃用 ⇒ 用带时区的 now(UTC),输出形状不变
 out = {"database": db_name, "generatedAt": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"), "via": "glue-discovery",
        "tables": [tables[k] for k in sorted(tables.keys())]}
 uri = args["result_uri"]
@@ -192,7 +192,7 @@ export function isConcurrentRunsExceeded(e: unknown): boolean {
  *   ① 先看这个作业有没有**在途**运行(别人 / 页面另一处刚起的那次,且 `--database` 相同)⇒ 认领它(它的结论就是这次要的);
  *   ② 没有在途运行(Glue 的并发计数在上一次运行**刚结束后**会滞后几十秒才释放)⇒ 退避 backoffMs 再起,最多 attempts 次;
  *   ③ 仍被拒 ⇒ 原错误抛出(调用方照旧 502,如实)。其它错误一律直接抛,不吞。
- * 🔴 B-97(2026-10-18 第三十九轮硬门 s38 70f,CloudTrail 坐实):同一发现作业 07:32:04Z 起一次(SUCCEEDED),07:34:13Z 用户再
+ * 🔴 (2026-10-18 第三十九轮硬门 s38 70f,CloudTrail 坐实):同一发现作业 07:32:04Z 起一次(SUCCEEDED),07:34:13Z 用户再
  *   「刷新」时 StartJobRun 被拒 ConcurrentRunsExceededException ⇒ 页面收到 502「经 Glue 连接发现表失败: Concurrent runs exceeded.」。
  *   用户在表刚发现完就点刷新是正常操作,不该看到这个。认领 / 退避的算法只写在这里,`startDiscovery` 必须经它起运行。
  */
@@ -227,7 +227,7 @@ export async function startRunAdoptingConcurrent(
   throw lastErr;
 }
 
-/** 起一次发现:生成脚本 → 写脚本桶 → 建 / 更新作业(upsertGlueJob,与同步作业同一作者)→ StartJobRun(经 startRunAdoptingConcurrent,B-97)。 */
+/** 起一次发现:生成脚本 → 写脚本桶 → 建 / 更新作业(upsertGlueJob,与同步作业同一作者)→ StartJobRun(经 startRunAdoptingConcurrent)。 */
 export async function startDiscovery(ds: GlueReachDs, database: string): Promise<DiscoveryRecord> {
   if (!dsCanUseGlueReach(ds)) throw new Error("该数据源没有 Glue 连接或不是 JDBC 源,无法经 Glue 连接发现表");
   if (!ds.secretArn) throw new Error("该数据源没有凭证(secretArn),发现作业无法登录源库");
@@ -237,7 +237,7 @@ export async function startDiscovery(ds: GlueReachDs, database: string): Promise
   const s3 = await s3ClientFor(b.region);
   const cm = getProvider(ds.type).buildConnection(toSourceRef(ds as unknown as Parameters<typeof toSourceRef>[0]));
   if (!cm.jdbcUrl || !cm.driverClass) throw new Error(`数据源类型 ${ds.type} 没有 JDBC 连接模型,无法经 Glue 连接发现表`);
-  // 序 61 B-133:发现作业要经数据源自己的 Glue 连接登录源库 ⇒ 连接 / 平台组 / 子网先核对自愈(与同步启动核心同一作者);
+  // 发现作业要经数据源自己的 Glue 连接登录源库 ⇒ 连接 / 平台组 / 子网先核对自愈(与同步启动核心同一作者);
   //   用户自带对象 / 密钥缺失 ⇒ 抛类型化错误,调用方(reachability-probe / tables 路由)按可读失败落心跳,不冒 500 / 不留「测试中」。
   const net = await reconcileDatasourceNetwork(ds, { via: "ds.discovery" });
   if (net.kind === "broken") throw new DatasourceNetworkBrokenError(net.issue);
@@ -248,7 +248,7 @@ export async function startDiscovery(ds: GlueReachDs, database: string): Promise
   const jobName = discoveryJobName(ds.datasourceId);
   const def: GlueJobDefinition = {
     Role: b.roleArn,
-    Description: `数据源 ${ds.datasourceId} 经 Glue 连接发现表(序 38 B-70;平台托管,勿手工运行)`,
+    Description: `数据源 ${ds.datasourceId} 经 Glue 连接发现表(平台托管,勿手工运行)`,
     Command: { Name: "glueetl", ScriptLocation: `s3://${bucket}/${scriptKey}`, PythonVersion: "3" },
     GlueVersion: GLUE_DISCOVERY_JOB.glueVersion,
     NumberOfWorkers: GLUE_DISCOVERY_JOB.numberOfWorkers,
@@ -304,7 +304,7 @@ export async function readDiscovery(rec: DiscoveryRecord, now: Date = new Date()
 
 // ── 推进一步(浏览表 / 向导 / 检测共用;落库由调用方的 persist 执行,本模块只管 Glue)─────────────────
 
-// 序 60 B-132:回写函数回「patched / gone」(源已删即丢弃),这里只关心它完成,不关心结论
+// 回写函数回「patched / gone」(源已删即丢弃),这里只关心它完成,不关心结论
 export type DiscoveryPersist = (patch: Record<string, unknown>) => Promise<unknown>;
 
 export type DiscoveryStep =
@@ -355,7 +355,7 @@ export type GlueProbeStart = { startedAt: string; jobRunId: string; reused: bool
  * 前一次已经结束但还没人读 ⇒ 先把它的结论落库,再起新的。
  */
 export async function startGlueProbe(ds: GlueReachDs, persist: DiscoveryPersist): Promise<GlueProbeStart> {
-  noteDatasourceRowPlace(ds); // 序 31 二刀 ⑤:建源收口 / 检测起探都从这里打 Glue(第一个 await 之前)
+  noteDatasourceRowPlace(ds); // 建源收口 / 检测起探都从这里打 Glue(第一个 await 之前)
   if (!dsCanUseGlueReach(ds)) throw new Error("该数据源没有 Glue 连接或不是 JDBC 源,无法经 Glue 连接探测");
   const rec = ds.discovery;
   if (rec && rec.state === "running") {
@@ -380,7 +380,7 @@ export type GlueProbeRead =
  *   超预算 / 记录没了 / 结束时间早于起点 ⇒ unknown(如实说没结果,不猜)。
  */
 export async function readGlueProbe(ds: GlueReachDs, hb: { startedAt: string }, persist: DiscoveryPersist): Promise<GlueProbeRead> {
-  noteDatasourceRowPlace(ds); // 序 31 二刀 ⑤:列表 / 单条 / 心跳 GET 经 settleGlueProbeRows 推进「验证中」行 ⇒ GetJobRun 在这里(2026-10-23 …9435 复验:`glue.GetJobRun /api/datasources` 仍未归因的根因 —— 此前只在 advanceDiscovery 记)
+  noteDatasourceRowPlace(ds); // 列表 / 单条 / 心跳 GET 经 settleGlueProbeRows 推进「验证中」行 ⇒ GetJobRun 在这里(2026-10-23 …9435 复验:`glue.GetJobRun /api/datasources` 仍未归因的根因 —— 此前只在 advanceDiscovery 记)
   const rec = ds.discovery;
   if (!rec) return { state: "unknown", reason: "探测对应的发现作业记录不存在(可能已被删除),请再点一次「检测」" };
   const started = new Date(hb.startedAt).getTime();
@@ -405,7 +405,7 @@ export async function readGlueProbe(ds: GlueReachDs, hb: { startedAt: string }, 
 }
 
 /**
- * 删数据源时连带撤掉发现作业与它的脚本 / 结果对象(WP-24 同一原则:删对象不留孤儿)。
+ * 删数据源时连带撤掉发现作业与它的脚本 / 结果对象(同一原则:删对象不留孤儿)。
  * 最佳努力:作业不存在不算错;别的错记日志不阻塞删行(返回残留清单让调用方写进日志)。
  */
 export async function teardownDiscoveryArtifacts(ds: Pick<GlueReachDs, "datasourceId" | "ownerTargetId" | "discovery">): Promise<string[]> {

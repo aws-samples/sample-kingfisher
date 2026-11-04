@@ -1,11 +1,11 @@
-// @kf-batch 18-classification-masking —— B-119(2026-10-23):结果列 → 物理列解析(字段脱敏按物理列对分级的前提)。
+// 结果列 → 物理列解析(字段脱敏按物理列对分级的前提)。
 // 纯函数,不碰外部。判据钉的是「事实」:每个结果列叫什么、引用了哪些物理列;不钉实现细节。
 import { describe, it, expect } from "vitest";
 import { parseSelectOutputs } from "../sql-lineage";
 
 const top = (sql: string) => parseSelectOutputs(sql).top;
 
-describe("parseSelectOutputs —— 结果列 → 物理列(B-119)", () => {
+describe("parseSelectOutputs —— 结果列 → 物理列", () => {
   it("🔴 问数模型的典型 SQL:中文别名 + 聚合 ⇒ 「地区」引用 country、「客户数」不引用任何列", () => {
     const t = top("SELECT country AS 地区, COUNT(*) AS 客户数 FROM public.players GROUP BY country ORDER BY 2 DESC LIMIT 3");
     expect(t).toEqual([

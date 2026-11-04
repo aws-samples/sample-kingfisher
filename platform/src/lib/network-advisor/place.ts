@@ -1,4 +1,3 @@
-// @kf-batch 41-B115-netadvisor-place
 // 网络顾问的落点决定 —— 三条路由(probe / advise / apply)与长操作共用的**唯一**一处。
 //
 // 不另造「按区建客户端」的轮子:落点点名经 `requestedTargetId`(缺 ⇒ 400,不默认主控区),

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { NextRequest } from "next/server";
 import { CognitoIdentityProviderClient, ListUsersCommand, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminDisableUserCommand, AdminEnableUserCommand, AdminAddUserToGroupCommand, AdminRemoveUserFromGroupCommand, AdminListGroupsForUserCommand } from "@aws-sdk/client-cognito-identity-provider";
@@ -84,7 +84,7 @@ export async function PUT(req: NextRequest) {
   if (!username) return apiError("缺少 username");
   // 🔴 未知动作原来被静默当成功(页面提示「操作成功」而什么都没做)⇒ 一律 400
   if (!["disable", "enable", "changeRole", "resetPassword"].includes(action)) return apiError(`未知操作:${action}`);
-  // @kf-batch 50-PROD-A-launch-hardening —— 平台管理员给任何用户(含 admin 自己)设新密码。
+  // 平台管理员给任何用户(含 admin 自己)设新密码。
   //   服务端按用户池同一份策略先校验(前端预校验可被绕过);设成**永久**口令,对方下次直接用它登录。
   if (action === "resetPassword") {
     const bad = passwordPolicyError(String(password ?? ""));

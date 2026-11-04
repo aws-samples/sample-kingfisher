@@ -1,6 +1,6 @@
 "use client";
 
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「新建表」向导(客户 2026-10-19 反馈 c:全平台无图形化建表)。
+// 数据目录「新建表」向导(客户 2026-10-19 反馈 c:全平台无图形化建表)。
 // 三步:① 落点与名称(Redshift schema / S3 Tables 命名空间 + 执行区 + 表名)② 列定义 ③ DDL 预览 → 执行。
 // 服务端:POST /api/governance/tables/preview(纯预览)/ POST /api/governance/tables(执行;prod 环境回 202 审批单)。
 // 跨法域执行区首次操作 ⇒ 服务端 409 ⇒ 免责告知 ⇒ 自动重试(与建模页落地同一个 `fetchWithResidencyAck`)。
@@ -46,7 +46,7 @@ export default function CreateTableWizard({ open, onClose, onDone, defaultTarget
   const [targetsErr, setTargetsErr] = useState("");
   const [targetId, setTargetId] = useState(defaultTargetId || "");
   const [schema, setSchema] = useState("");
-  // 序 49 ⑦ UX ③:该执行区已有的 schema(Redshift)/ 命名空间(S3 Tables)清单 —— 下拉可选,也可输新名(用户 10-20 拍板)
+  // UX ③:该执行区已有的 schema(Redshift)/ 命名空间(S3 Tables)清单 —— 下拉可选,也可输新名(用户 10-20 拍板)
   const [schemaOptions, setSchemaOptions] = useState<string[]>([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [table, setTable] = useState("");
@@ -56,7 +56,7 @@ export default function CreateTableWizard({ open, onClose, onDone, defaultTarget
   const [previewErr, setPreviewErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; pending?: boolean; approvalId?: string; text: string } | null>(null);
-  // B-138:环境标识来自 localStorage,首帧按 dev(= 服务端)渲染,挂载后再读,避免 React 19 水合不一致
+  // 环境标识来自 localStorage,首帧按 dev(= 服务端)渲染,挂载后再读,避免 React 19 水合不一致
   const [env] = useBrowserInitialState<string>("dev", () => getActiveEnv());
   const protectedEnv = isProtectedEnv(env);
 
@@ -79,7 +79,7 @@ export default function CreateTableWizard({ open, onClose, onDone, defaultTarget
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, kind]);
 
-  // 序 49 ⑦ UX ③:选定执行区后读它已有的 schema / 命名空间(带 targetId 的读取;读失败只影响候选清单,照样可以手输)。
+  // UX ③:选定执行区后读它已有的 schema / 命名空间(带 targetId 的读取;读失败只影响候选清单,照样可以手输)。
   //   Redshift 走 /api/redshift/schemas?mode=schemas(只列 schema 名,含空 schema);S3 Tables 走 /api/athena/tables 的 namespaces。
   //   项目私有 schema(proj_*,lib/exec-env/project-schema.ts 的合同形态)不是建表落点,从候选里剔掉(服务端校验仍是权威)。
   useEffect(() => {
@@ -194,7 +194,7 @@ export default function CreateTableWizard({ open, onClose, onDone, defaultTarget
           <Space style={{ width: "100%" }} align="start">
             <div style={{ width: 300 }}>
               <Typography.Text strong>{kind === "redshift" ? t("目标 schema") : t("命名空间")}</Typography.Text>
-              {/* 序 49 ⑦ UX ③:下拉列出该区已有的 schema / 命名空间,也可直接输入新名(AutoComplete;testid 仍在内层 input 上) */}
+              {/* UX ③:下拉列出该区已有的 schema / 命名空间,也可直接输入新名(AutoComplete;testid 仍在内层 input 上) */}
               <AutoComplete style={{ width: "100%", marginTop: 6 }} value={schema} onChange={(v) => setSchema(String(v ?? ""))}
                 options={schemaOptions.filter((n) => !schema || n.toLowerCase().includes(schema.toLowerCase())).map((n) => ({ value: n, label: n }))}
                 popupMatchSelectWidth>

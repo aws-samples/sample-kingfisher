@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
-// /api/admin/exec-envs/[targetId]/canary —— permission canary(WORK-PACKAGES WP-9 ④-3 / 施工序 3)。
+// /api/admin/exec-envs/[targetId]/canary —— permission canary(④-3)。
 //
 //   GET                                   各在用项目**最新**判定完成的 canary(七条明细 + 绑定 epoch + 时间)
 //   POST {}                               给全部在用项目入队 canary(202 + 作业 id)
@@ -84,7 +83,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ targetId
       }
       // 闭合执行器自己写意图 / 结果审计(fail-closed-on-audit);单条语句,同步执行即可
       const r = await executeAdminDdl(actor, { operation: "revoke-public-create", targetId: params.targetId });
-      // @kf-batch 42-B80-revoke-readback —— 🔴 语句到终态 ≠ 别的身份已经看见(第三十七轮 MIG-CN-5:回 200 后立刻复跑 canary,C-6 仍建成)。
+      // 🔴 语句到终态 ≠ 别的身份已经看见(第三十七轮 MIG-CN-5:回 200 后立刻复跑 canary,C-6 仍建成)。
       //   用项目自己的身份回读 nspacl + has_schema_privilege 直到 public 对它已无 CREATE 才回 200;预算内读不到 ⇒ 如实 502,不算完成。
       //   没有带凭证的在用项目 ⇒ 回读做不了,200 里如实写 verified:false(canary 同样跑不了,不冒充已验证)。
       const readback = await readbackPublicCreateRevokedAsProject(t, { statementName: `revoke-public-create readback ${r.auditId}` });

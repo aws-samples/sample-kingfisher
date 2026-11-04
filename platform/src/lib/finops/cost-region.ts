@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-24)
 /**
  * 「当前执行范围对应哪些 **AWS region 字面量**」—— 成本按区筛的唯一换算处。
  *
@@ -9,9 +8,9 @@
  *
  * 🔴 一个 region 可能对应**多个 target**(同一区两套环境):所以是 targets → region **集合**,
  * 且反向不唯一 —— 这也是为什么成本只能算到 region 粒度、算不到 target 粒度。
- * 这件事如实登记在 WORK-PACKAGES SC-24:CE 的维度里没有「执行环境」这个概念。
+ * 这件事如实登记在:CE 的维度里没有「执行环境」这个概念。
  *
- * @kf-batch 50-WP6-cost-by-region —— 新增 `regionOfTargets`(target → region 的**逐个**映射,O3b 对账要用)
+ * 新增 `regionOfTargets`(target → region 的**逐个**映射,O3b 对账要用)
  * 与 `allInstalledTargetIds`(原在 advice 路由里的私有副本,搬到这里成为唯一作者)。
  * `listActiveTargetsForScope` 改为由 `regionOfTargets` 派生 —— 两者不许各写一遍解析规则。
  */
@@ -54,7 +53,7 @@ export async function listActiveTargetsForScope(targetIds: readonly string[]): P
  * 🔴 用 `listTargetsRaw`(不过「能不能承接」那道门):装出来的每个区都要算,
  *    包括暂时不可服务的 —— 一个坏掉的区里空转的实例照样在计费(记忆
  *    `scope-view-vs-serviceable-lesson`:呈现面别用「能不能跑」当判据)。
- * @kf-batch 50-WP6-cost-by-region —— 🔴 读不到注册表就**抛**(调用方 500),不再「读不到 ⇒ 只当有主控区」:
+ * 🔴 读不到注册表就**抛**(调用方 500),不再「读不到 ⇒ 只当有主控区」:
  *    那是「静默合法默认值」—— 页面会说「全平台无优化建议」,而实际上是别的区一个都没探。
  */
 export async function allInstalledTargetIds(): Promise<string[]> {
@@ -64,7 +63,7 @@ export async function allInstalledTargetIds(): Promise<string[]> {
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— 「这个视角看哪些区的钱」的**唯一**入口;`null` = 全部视角(不按区筛)。
+ * 「这个视角看哪些区的钱」的**唯一**入口;`null` = 全部视角(不按区筛)。
  *
  * 🔴 为什么必须有这一处(本包勘定时发现的现行缺陷,一并根治):overview / budgets / advice 原来各写一遍
  *    `scope ? await listActiveTargetsForScope(scopeTargets(scope)) : null`。而 `readScope` 对**缺省参数**

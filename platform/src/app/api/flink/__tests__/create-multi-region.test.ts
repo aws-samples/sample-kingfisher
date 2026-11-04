@@ -1,4 +1,3 @@
-// @kf-batch 50-WP18-flink-multi-region
 // 实时计算「一次提交 → 每个区各建一个作业」的**行为**判据。
 //
 // 🔴 为什么必须是行为而不是文本:第一版只在 `flink-place.test.ts` 里断了源码里有那几个字符串,
@@ -27,7 +26,7 @@ vi.mock("@/lib/projects/guard", () => ({
   envFilter: vi.fn(() => ({ clause: "1=1", values: {} })),
 }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
-// @kf-batch 50-WP31-place-first-class —— 新建侧的真解析改走启动侧同一个作者 `resolveFlinkPlace`(主控区也读描述符)
+// 新建侧的真解析改走启动侧同一个作者 `resolveFlinkPlace`(主控区也读描述符)
 const unresolvable = new Set<string>();
 vi.mock("@/lib/realtime/flink-place", () => ({
   resolveFlinkPlace: vi.fn(async (t: string) => {

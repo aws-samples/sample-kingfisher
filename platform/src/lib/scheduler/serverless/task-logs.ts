@@ -1,5 +1,4 @@
-// @kf-batch 50-WP15-airflow-serverless(施工序 6)
-// serverless 调度跑出来的 run 的任务日志(INTERACTION §2.2b / ACCEPTANCE S-11):
+// serverless 调度跑出来的 run 的任务日志(INTERACTION §2.2b / ACCEPTANCE):
 //   台账 run 行(runtime 写,runId = Airflow dag_run.run_id)→ 该 target 的 workflow(台账 deployments[targetId].workflowArn)
 //   → ListWorkflowRuns 里按**时间窗**对到服务侧 RunId(服务把 dag_id 重写成 ex_<uuid>,run_id 与服务 RunId 不同名,spike 坐实)
 //   → ListTaskInstances 取 run_job 那条 → GetTaskInstance.LogStream → CloudWatch /aws/mwaa-serverless/<workflow 全名>/。
@@ -7,9 +6,9 @@
 import { GetLogEventsCommand } from "@aws-sdk/client-cloudwatch-logs";
 import { logsClientFor } from "@/lib/exec-env/target-clients";
 import { getTaskInstance, getWorkflowRun, listTaskInstances, listWorkflowRuns, workflowNameOf } from "./workflow-client";
-// @kf-batch 50-WP17-serverless-workflow —— 台账 runId 的口径唯一作者(raw 段 = 服务侧 per-run dag_id)
+// 台账 runId 的口径唯一作者(raw 段 = 服务侧 per-run dag_id)
 import { rawRunIdOf } from "@/lib/monitor/run-key";
-// @kf-batch 56-B128-channel-reconcile —— ARN 切段 + 形态校验的唯一作者;文案留在本文件
+// ARN 切段 + 形态校验的唯一作者;文案留在本文件
 import { regionOfArn } from "@/lib/aws/arn";
 
 /** `arn:aws:airflow-serverless:<region>:<acct>:workflow/<name>-<suffix>` → region(第 4 段)。 */
@@ -56,13 +55,12 @@ export function pickRunForLedger(runs: RunSummaryLike[], ledger: { startedAt?: s
 }
 
 /**
- * @kf-batch 50-WP17-serverless-workflow
  * 台账行 → 服务侧 RunId 的**精确**对法(不是时间窗猜)。
  *
- * 🔴 为什么能精确:台账 runId 的 raw 段就是**服务侧 per-run dag_id**(`ex_<uuid>`,T-12),
+ * 🔴 为什么能精确:台账 runId 的 raw 段就是**服务侧 per-run dag_id**(`ex_<uuid>`),
  * 而任务实例 id 实测形如 `<ex_uuid>_<task_id>_<attempt>` ⇒ 前缀一比就知道这个 run 是不是那一次。
  * 时间窗(`pickRunForLedger`)只作**兜底**:一次手动 + 一次 cron 落在同 2 分钟里时,窗口法会对错;
- * 而 T-12 之前写下的存量台账行没有 `ex_` 段,只能靠窗口。
+ * 而此前写下的存量台账行没有 `ex_` 段,只能靠窗口。
  * 探测按「时间上最近」排序,默认只探前 4 个(每探一次 = 一次 ListTaskInstances)。
  */
 export function taskInstanceBelongsToRun(taskInstanceId: string, rawRunId: string): boolean {
@@ -209,7 +207,7 @@ export interface ServerlessTaskLogs {
   workflowRunId?: string;
   taskStatus?: string;
   logs: string[];
-  /** @kf-batch 50-WP15-airflow-serverless(T-13)服务侧 RunType(SCHEDULED / ON_DEMAND)—— **唯一真值源**。
+  /** 服务侧 RunType(SCHEDULED / ON_DEMAND)—— **唯一真值源**。
    *  worker 侧分不出 cron 与手动(实测 run_id 同为常量、run_type 同为 DagRunType.SCHEDULED、conf 空、
    *  OverrideParameters 不进环境变量)⇒ 运行时不再往台账写 runType,改由这里按需向服务问。 */
   runType?: string;
@@ -221,7 +219,6 @@ export async function readServerlessTaskLogs(args: {
   ledger: { runId: string; startedAt?: string; finishedAt?: string };
   limit?: number;
   /**
-   * @kf-batch 50-WP17-serverless-workflow
    * 要看哪个 task 的日志。单作业只有一个 task(`run_job`,缺省);多节点编排要指定节点的 task_id。
    */
   taskId?: string;
@@ -229,12 +226,12 @@ export async function readServerlessTaskLogs(args: {
   const region = regionOfWorkflowArn(args.workflowArn);
   const logGroup = logGroupOf(args.workflowArn);
   const runs = (await listWorkflowRuns(region, args.workflowArn)) as RunSummaryLike[];
-  // @kf-batch 50-WP17-serverless-workflow —— 先用**精确**对法(任务实例前缀 = 台账 runId 的 raw 段),
-  //   对不上再退回时间窗(存量 T-12 之前的行只能靠窗口)。
+  // 先用**精确**对法(任务实例前缀 = 台账 runId 的 raw 段),
+  //   对不上再退回时间窗(存量此前的行只能靠窗口)。
   const resolved = await resolveServiceRunId({ region, workflowArn: args.workflowArn, ledger: args.ledger, runs });
   const runId = resolved.runId;
   if (!runId) return { logGroup, logs: [`(在 workflow 最近 ${runs.length} 次运行里没有与该台账行匹配的 run;可在 CloudWatch ${logGroup} 按时间查看)`] };
-  // 🔴 T-13 订正(2026-09-07 真环境 S-11):触发来源要在**任何**返回路径上都带着 —— 原来它取在任务实例之后,
+  // 🔴 订正:触发来源要在**任何**返回路径上都带着 —— 原来它取在任务实例之后,
   //   于是「该 run 尚无任务实例」这条早返回不带 runType,页面上既没日志也不知道这次是定时还是手动。
   let runType: string | undefined;
   try {

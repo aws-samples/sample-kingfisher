@@ -1,7 +1,7 @@
 // 网络顾问配置 — 镜像 genbi/config.ts 的做法：环境相关全走 env，默认值中性（无账号特定值）。
 // 复用与 GenBI 相同的 Bedrock 模型/区域，保持平台大模型调用一致。
 import { homeRegion } from "@/lib/place/home-region";
-import { resolveModelId } from "@/lib/ai/model"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
+import { resolveModelId } from "@/lib/ai/model"; // 模型 ID 收敛 SSOT(ai-model.json)
 
 function int(name: string, fallback: number): number {
   const v = parseInt(process.env[name] || "", 10);
@@ -17,7 +17,7 @@ function bool(name: string, fallback: boolean): boolean {
 
 export const NET_ADVISOR = {
   region: homeRegion(),
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:@deprecated 保留字段不动对象形状;advisor-agent.ts 已改为调用时
+  // @deprecated 保留字段不动对象形状;advisor-agent.ts 已改为调用时
   // 经运行时解析链求值(bgp-settings → env → SSOT)。此处只是部署期快照,不反映页面切换后的生效值。
   /** @deprecated 模块加载期快照(env ‖ SSOT),不含运行时配置层;勿在新代码读取。 */
   modelId: resolveModelId(),

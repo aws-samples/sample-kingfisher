@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 计划服务纯函数单测(照补数 plan.test.ts 范式:零 AWS 依赖,锁死不变量)。
+// Copilot 计划服务纯函数单测(照补数 plan.test.ts 范式:零 AWS 依赖,锁死不变量)。
 // 重点验证【新增 gated 两态】的状态派生正确 + Progress 键与 StepStatus 名一一对应的硬契约。
 
 import { describe, it, expect } from "vitest";

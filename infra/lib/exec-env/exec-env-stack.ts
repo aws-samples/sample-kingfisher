@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2a-exec-env-stackgroup
 // 执行环境栈的**公共基类**:唯一职责是让整个栈组的 `cdk synth` **零 context 查找**。
 //
 // 【为什么需要它 —— 实测踩出来的】
@@ -19,7 +18,7 @@
 // 🔴 代价与配套(必须一起做,否则只是把风险从 synth 推到 CFN):AZ 名 `<region>a/b` 在绝大多数 region
 //    存在,但 **AZ 可用性是账号级的**(个别账号在某 region 缺某 AZ 或需 opt-in)。
 //    ⇒ 部署前必须 preflight `aws ec2 describe-availability-zones` 校验,不可用就报错并提示
-//      `-c exec-env-azs=` 换 —— 该 preflight 归 **P50.2 切片 b** 的 buildspec。
+//      `-c exec-env-azs=` 换 —— 该 preflight 归 **切片 b** 的 buildspec。
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import type { ExecEnvContext } from "./context";

@@ -1,4 +1,4 @@
-// 序 38 B-68 —— 建 / 更新 Glue 同步作业的装配层判据(唯一作者 ensureGlueSyncJob,真客户端序列)。
+// 建 / 更新 Glue 同步作业的装配层判据(唯一作者 ensureGlueSyncJob,真客户端序列)。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】作业已存在而定义有变(改 Glue 版本 / 改目标表桶 ⇒ --conf 变)时,
 //   原实现「先 CreateJob,报 already exists 才 UpdateJob」撞上 Glue 的 IdempotentParameterMismatchException
@@ -94,7 +94,7 @@ beforeEach(() => {
   process.env.AWS_ACCOUNT_ID = "123456789012";
 });
 
-describe("🔴 B-68 ensureGlueSyncJob:建 / 更新作业", () => {
+describe("🔴 ensureGlueSyncJob:建 / 更新作业", () => {
   it("作业已存在 ⇒ GetJob → UpdateJob,**不调 CreateJob**;JobUpdate 带任务当前的 GlueVersion / Worker / --conf 里的表桶", async () => {
     const r = await ensureGlueSyncJob({ task: task(), taskId: TASK_ID, ds, tid: "tgt_home" });
     expect(r.ok, JSON.stringify(r)).toBe(true);
@@ -152,7 +152,7 @@ describe("🔴 B-68 ensureGlueSyncJob:建 / 更新作业", () => {
   });
 });
 
-describe("🔴 B-69 ensureGlueSyncJob 处的 fail-closed:写 S3 Tables 的任务 Glue 版本 < 5.1 ⇒ 400,零 Glue 作业调用", () => {
+describe("🔴 ensureGlueSyncJob 处的 fail-closed:写 S3 Tables 的任务 Glue 版本 < 5.1 ⇒ 400,零 Glue 作业调用", () => {
   it("glueVersion 5.0 + s3-tables ⇒ ok=false / 400 / 说明含 5.1;不写脚本、不建 / 更新作业", async () => {
     const r = await ensureGlueSyncJob({ task: task({ glueConfig: { glueVersion: "5.0" } }), taskId: TASK_ID, ds, tid: "tgt_home" });
     expect(r.ok).toBe(false);
@@ -165,7 +165,7 @@ describe("🔴 B-69 ensureGlueSyncJob 处的 fail-closed:写 S3 Tables 的任务
     expect(r.ok, JSON.stringify(r)).toBe(true);
     expect((glue("UpdateJobCommand")[0].input.JobUpdate as Record<string, unknown>).GlueVersion).toBe("5.0");
   });
-  it("🔴 序 53:记录里不带 glueVersion 的存量任务 ⇒ 按它被写下时的缺省 5.1 跑(不跟新缺省 6.0 走,升级不改存量任务);作业定义不带 Spark 4 兼容开关", async () => {
+  it("🔴 记录里不带 glueVersion 的存量任务 ⇒ 按它被写下时的缺省 5.1 跑(不跟新缺省 6.0 走,升级不改存量任务);作业定义不带 Spark 4 兼容开关", async () => {
     const r = await ensureGlueSyncJob({ task: task({ glueConfig: {} }), taskId: TASK_ID, ds, tid: "tgt_home" });
     expect(r.ok).toBe(true);
     const upd = glue("UpdateJobCommand")[0].input.JobUpdate as Record<string, any>;
@@ -174,7 +174,7 @@ describe("🔴 B-69 ensureGlueSyncJob 处的 fail-closed:写 S3 Tables 的任务
     expect(String(upd.DefaultArguments["--conf"])).not.toContain("spark.sql.ansi.enabled");
     expect(String(upd.DefaultArguments["--conf"])).not.toContain("spark.sql.legacy.");
   });
-  it("🔴 序 53:glueVersion 6.0 ⇒ 作业定义 GlueVersion 6.0,且 --conf 链尾带全部 Spark 4 兼容开关(ANSI 关 + JDBC legacy 映射),S3 Tables 目录 conf 原样在前", async () => {
+  it("🔴 glueVersion 6.0 ⇒ 作业定义 GlueVersion 6.0,且 --conf 链尾带全部 Spark 4 兼容开关(ANSI 关 + JDBC legacy 映射),S3 Tables 目录 conf 原样在前", async () => {
     const r = await ensureGlueSyncJob({ task: task({ glueConfig: { glueVersion: "6.0" } }), taskId: TASK_ID, ds, tid: "tgt_home" });
     expect(r.ok, JSON.stringify(r)).toBe(true);
     const upd = glue("UpdateJobCommand")[0].input.JobUpdate as Record<string, any>;
@@ -185,7 +185,7 @@ describe("🔴 B-69 ensureGlueSyncJob 处的 fail-closed:写 S3 Tables 的任务
     expect(GLUE_SYNC_SPARK4_COMPAT_CONF).toContain("spark.sql.ansi.enabled=false");
     expect(GLUE_SYNC_SPARK4_COMPAT_CONF).toContain("spark.sql.legacy.mysql.bitArrayMapping.enabled=true");
   });
-  it("序 53:glueVersion 存了清单外的值 ⇒ 400 如实拒(不替用户猜),零 Glue 作业调用", async () => {
+  it("glueVersion 存了清单外的值 ⇒ 400 如实拒(不替用户猜),零 Glue 作业调用", async () => {
     const r = await ensureGlueSyncJob({ task: task({ glueConfig: { glueVersion: "3.0" }, targetType: "redshift", redshiftConfig: { schema: "public" } }), taskId: TASK_ID, ds, tid: "tgt_home" });
     expect(r.ok).toBe(false);
     if (!r.ok) { expect(r.status).toBe(400); expect(r.message).toContain("不合法"); }

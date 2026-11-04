@@ -1,4 +1,3 @@
-// @kf-batch 50-WP18b-fanout-seam
 /**
  * 扇出**接缝**的行为判据(2026-09-16 段 slsw 真环境抓到的一族缺陷)。
  *
@@ -23,7 +22,7 @@ import { ServerlessNodeUnsupported } from "@/lib/scheduler/serverless/workflow-y
 const notInstalled = () =>
   new MwaaNotInstalled([{ targetId: "tgt_usw2_a", region: "us-west-2", reason: "未安装调度组件" } as never]);
 
-describe("扇出聚合不许抹平类型化拒因(WP-18b)", () => {
+describe("扇出聚合不许抹平类型化拒因", () => {
   it("① 单区失败:聚合后仍然 instanceof MwaaNotInstalled,且 missing 字段还在(补装链接靠它拼)", () => {
     const cause = notInstalled();
     const agg = fanoutRejection([cause], [{ targetId: "tgt_usw2_a", ok: false }], "全部执行范围都没发布成功:…");

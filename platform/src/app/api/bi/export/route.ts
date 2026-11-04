@@ -1,4 +1,4 @@
-// 模块 37 — CSV 导出:POST body={source, filters?, filterValues?, filename?}。
+// CSV 导出:POST body={source, filters?, filterValues?, filename?}。
 // 复用 executeBiQuery(结果已脱敏)→ 服务端拼 CSV,返回 text/csv 附件。viewer 权限。
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       result = await executeBiDataApi(ctx.projectId, source.apiId, source.params || {}, ctx.identity, cid);
     } else {
       result = await executeBiQuery(source, {
-        // @kf-batch 50-WP31-place-first-class —— 已保存视觉对象的章(无章 = 「全部」视角建的 = 主控区),显式传下去
+        // 已保存视觉对象的章(无章 = 「全部」视角建的 = 主控区),显式传下去
         targetId: biLandingOf(source, body?.targetId, "saved"),
         identity: ctx.identity,
         projectId: ctx.projectId,
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const pr = placeErrorResponse(e);
     if (pr) return pr;
     if (isBiQueryError(e)) {
-      // @kf-batch 50-W5-seg2-WP1 — BiQueryError 自带 code 时优先透传(数据服务下线的 410 GONE),否则按 status 归类。
+      // BiQueryError 自带 code 时优先透传(数据服务下线的 410 GONE),否则按 status 归类。
       const code = e.code ?? (e.status === 504 ? "UPSTREAM_TIMEOUT" : e.status >= 500 ? "UPSTREAM_ERROR" : "VALIDATION_FAILED");
       return apiError(e.error, e.status, { code, correlationId: cid });
     }

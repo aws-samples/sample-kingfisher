@@ -1,17 +1,16 @@
-// @kf-batch 50-project-delete-orphans
 // 删项目空间之后,**回收**该项目在各执行区的 per-project 凭证 secret(`bgp/project/<targetSlug>/<projectId>`)。
 //
-// 【为什么要有】真环境清理 128 个夹具项目时发现:项目删了,WP-9a 给它供给的凭证 secret 还留在每个执行区 ——
+// 【为什么要有】真环境清理 128 个夹具项目时发现:项目删了,给它供给的凭证 secret 还留在每个执行区
 //   · 它是**系统代管**的东西(人没建过、页面上也看不见),所以不能像用户资源那样「阻断删除 + 让人去删」;
 //   · 它是一份**仍然可用的数据库口令**(登录用户还在那个区的数仓里),留着 = 一个没有主人的有效凭证。
 // ⇒ 删项目由产品**自动回收**,不让人处置。
 //
-// 【为什么做成数据面作业(WP-9a 的 `bgp-dataplane-jobs`),而不是在 DELETE 请求里原地删】
-//   · 跨区:每个执行区一次 Secrets Manager 调用,与供给同一个「跨区 504」风险面 —— WP-9a 正是为此把供给作业化的;
+// 【为什么做成数据面作业(`bgp-dataplane-jobs`),而不是在 DELETE 请求里原地删】
+//   · 跨区:每个执行区一次 Secrets Manager 调用,与供给同一个「跨区 504」风险面 —— 正是为此把供给作业化的;
 //   · 失败要**有人看得见、能自动重试**:原地删失败时项目已经没了,再没有入口重试(只能写一条审计然后祈祷);
 //     作业失败按 runner 的有界退避重试,终态失败停在该执行环境的作业清单里(`/api/admin/exec-envs/<t>/jobs`);
 //   · 进程被杀不丢:入队是一次条件写,之后由泵推进;
-//   · 在途作业会挡住「删除执行环境」(WP-30 的 `countActiveJobs`)—— 不会出现环境先没了、回收无处可做。
+//   · 在途作业会挡住「删除执行环境」(`countActiveJobs`)—— 不会出现环境先没了、回收无处可做。
 //
 // 【入队在删项目**之前**,handler 等项目真的没了才动手】(顺序是这一层的承重)
 //   · 入队失败 ⇒ 路由**拒绝删除**(项目还在,可以重试)—— 绝不出现「项目删了、回收作业一条都没入队」;
@@ -31,7 +30,7 @@ import { sanitizeAwsErrorMessage } from "@/lib/exec-env/deploy-control";
 import type { JobHandler, StepContext, StepResult } from "@/lib/dataplane-jobs/handler";
 import { createJob, getJob } from "@/lib/dataplane-jobs/store";
 import { dataplaneJobId, isTerminalPhase, type DataplaneJobRow } from "@/lib/dataplane-jobs/model";
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤:回收步在泵的内部请求里跑(`/api/internal/dataplane-jobs/step`),
+// 回收步在泵的内部请求里跑(`/api/internal/dataplane-jobs/step`),
 //   删该区 secret 之前按作业落点记一笔决策 —— 否则观测器把 `secretsmanager.DeleteSecret` 记成未归因(测试账号 4 次)。
 import { notePlaceDecision } from "@/lib/place/context";
 
@@ -83,7 +82,7 @@ export const reclaimJobHandler: JobHandler = {
           reason: `执行环境 ${job.targetId} 已不在注册表 ⇒ 无法定位该区,凭证 secret 需人工核对(名字由 projectSecretName 派生)`,
         });
       }
-      // ③ 🔴 B-48(序 36 真环境):已删除、且**从没装出数仓**的执行环境(例:被组织 SCP 拦死的区注册后弃置)——
+      // ③ 🔴 已删除、且**从没装出数仓**的执行环境(例:被组织 SCP 拦死的区注册后弃置)——
       //   供给的两个作者(project-cred-supply / admin-ddl-executor)都要先经 resolveTargetWarehouse 拿到数仓落点,
       //   没有 redshiftWorkgroup 就建不出 secret ⇒ 这里**可证明**没有东西要回收。原来照样去删 ⇒ 每删一个项目
       //   就给那个死环境留一条重试 6 次后失败的作业。只认「deleted + 无数仓」:在用环境缺资源是异常,照旧重试给人看。

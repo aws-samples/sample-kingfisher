@@ -43,7 +43,7 @@ export class OmServiceStack extends cdk.Stack {
         DB_SCHEME: "mysql",
         DB_HOST: props.db.dbInstanceEndpointAddress,
         DB_PORT: props.db.dbInstanceEndpointPort,
-        // 模块 27 (WS1 — 传输加密): OM ↔ MySQL 由明文改为 TLS。
+        // (WS1 — 传输加密): OM ↔ MySQL 由明文改为 TLS。
         DB_USE_SSL: "true",
         OM_DATABASE: "openmetadata_db",
         SEARCH_TYPE: "opensearch",
@@ -91,7 +91,7 @@ export class OmServiceStack extends cdk.Stack {
     const ORIGIN_HEADER = "X-Bgp-Origin-Verify";
     const originVerifyValue = originVerify.secretValue.unsafeUnwrap(); // 合成为 {{resolve:secretsmanager:…}} 动态引用
     new cdk.CfnOutput(this, "OmAdminSecretArn", { value: omAdminSecret.secretArn });
-    // @kf-batch 50-WP4sexies-home-region —— 🔴 原来这里是 `if (omCfPrefixListId) { …addIngressRule }`:
+    // 🔴 原来这里是 `if (omCfPrefixListId) { …addIngressRule }`:
     //   查不到 id 就**静默跳过**,于是 OM 的 ALB 少一条 CloudFront 入站规则 —— 部署一路绿灯、
     //   OM 页面却打不开(源站对 CloudFront 不可达)。现在与 platform-stack **同一个作者、同一种失败语义**:
     //   取不到就抛,不许悄悄少一条规则。
@@ -104,7 +104,7 @@ export class OmServiceStack extends cdk.Stack {
       );
     }
 
-    // 模块 27 (WS2 — 可用性): OM 保持 desiredCount=1。OM server 启动会跑 `migrate`(DB schema
+    // (WS2 — 可用性): OM 保持 desiredCount=1。OM server 启动会跑 `migrate`(DB schema
     // 迁移),并发多副本同时迁移有竞态/损坏风险——真正的 OM 多副本需把迁移外置为一次性 Job
     // (留待后续)。当前依赖 ECS 在任务/AZ 故障时自动重新调度实现"重启级"可用性;底层 OM-DB
     // 已 Multi-AZ(WS2),OpenSearch 已多节点(WS2),故 OM 的有状态依赖均已去单点。

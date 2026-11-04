@@ -6,8 +6,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Space, Table, Tag, message } from "antd";
 import { ReloadOutlined, BellOutlined, LinkOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-11):任务级异常按区检测。
-// @kf-batch 50-WP6-cost-by-region —— 服务级(来自账单)也已按区检测(账单 v2 带 region),不再有 `unscoped`;
+// 执行范围:任务级异常按区检测。
+// 服务级(来自账单)也已按区检测(账单 v2 带 region),不再有 `unscoped`;
 // 每条异常都显示它「属于哪里」:任务级 = 执行环境,服务级 = AWS region。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { toScopeParam } from "@/lib/scope/scope";
@@ -25,7 +25,7 @@ interface AnomalyRowBase {
 }
 
 /**
- * @kf-batch 50-WP6-cost-by-region —— 与服务端 `CostAnomaly` 同形的判别联合:
+ * 与服务端 `CostAnomaly` 同形的判别联合
  * 任务级必带 `targetId`(基线按 (task, target) 各算各的),服务级必带 `region`(按 (service, region))。
  */
 type AnomalyRow =
@@ -39,7 +39,6 @@ export default function AnomalyTab() {
   const [items, setItems] = useState<AnomalyRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(false);
-  // @kf-batch 50-WP4ter-coverage
   const { scope, targets } = useScope();
   const targetName = (id: string) => (targets || []).find((x) => x.targetId === id)?.displayName || id;
   const scopeParam = toScopeParam(scope);
@@ -95,7 +94,7 @@ export default function AnomalyTab() {
             render: (s: string) => <Tag color={s === "task" ? "blue" : "gold"}>{s === "task" ? t("任务") : t("服务")}</Tag>,
           },
           { title: t("对象"), dataIndex: "displayName", ellipsis: true },
-          // @kf-batch 50-WP6-cost-by-region —— 「属于哪里」:任务级 = 执行环境,服务级 = AWS region
+          // 「属于哪里」:任务级 = 执行环境,服务级 = AWS region
           {
             title: t("执行范围"), key: "where", width: 180,
             render: (_: unknown, r: AnomalyRow) =>

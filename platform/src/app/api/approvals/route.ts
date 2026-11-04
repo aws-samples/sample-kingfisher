@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-D4
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
@@ -12,13 +11,13 @@ import {
 import { isProjectRole } from "@/lib/projects/constants";
 import { canManageProjectConfig } from "@/lib/projects/config-permissions";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP4quater-reads(工单 SC-33)—— 审批按执行范围。
+// 审批按执行范围。
 // 🔴 只筛**带区的**审批(`deploy` 类从被晋升作业的 targets[] 派生);`membership` 是控制面动作、
-// `data-access` 的 fqn 至今没有区维(SC-8)⇒ 这两类**不藏**。
+// `data-access` 的 fqn 至今没有区维⇒ 这两类**不藏**。
 // 🔴 而且要回一个 `hiddenByScope` 计数:审批收件箱是「我必须处理的事」,
 // 被筛掉几条必须让用户看得见,否则就是静默漏办(护栏 1)。
 import { readScope, filterRowsByApplicableScope } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP30-decommission —— 删除执行环境的审批单:只给平台管理员看 / 批;只许经专用入口建
+// 删除执行环境的审批单:只给平台管理员看 / 批;只许经专用入口建
 import { EXEC_ENV_DELETE_APPROVAL_TYPE } from "@/lib/exec-env/decommission";
 
 /** 🔴 删除执行环境的审批单只有平台管理员能决策(INTERACTION §1.4 机制 C)⇒ 也只给平台管理员看(看得见却按不动 = 撕裂)。 */
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
       const role = await resolveRole(identity, a.projectId);
       if (canManageProjectConfig(identity.groups, role) && visibleTo(a, identity)) out.push(a);
     }
-    // @kf-batch 50-WP4quater-reads(工单 SC-33)—— 按执行范围筛,但**未标区的一条都不藏**,
+    // 按执行范围筛,但**未标区的一条都不藏**,
     // 并把「藏了几条」如实回出来:审批收件箱漏一条 = 一件该批的事没人批,而界面上毫无痕迹。
     const scope = readScope(req);
     if (!scope) return apiOk(out);
@@ -87,7 +86,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   if (!body?.projectId) return apiError("缺少 projectId");
   const type = body.type || "membership";
-  // @kf-batch 50-WP30-decommission —— 🔴 删除执行环境的申请**只能**经 delete-request 建(那里过了 drain / 影响预览 / 强确认 / 指纹);
+  // 🔴 删除执行环境的申请**只能**经 delete-request 建(那里过了 drain / 影响预览 / 强确认 / 指纹);
   //   这里放行 = 任何登录用户都能伪造一张带任意 targetId 的删除审批单。
   if (type === EXEC_ENV_DELETE_APPROVAL_TYPE) {
     return apiError("删除执行环境的申请只能在执行环境详情页提交(POST /api/admin/exec-envs/[targetId]/delete-request)", 400, { code: "VALIDATION_FAILED" });

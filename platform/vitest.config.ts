@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
-// 模块 27 (WS0) — 单元测试配置。
+// 单元测试配置。
 // 只跑纯逻辑/安全关键模块的单测,与 `next build` 完全解耦:
 //  - 测试文件位于 src/**/__tests__/*.test.ts,已在 tsconfig.json 的 exclude 中,故 next build
 //    不会去类型检查它们;

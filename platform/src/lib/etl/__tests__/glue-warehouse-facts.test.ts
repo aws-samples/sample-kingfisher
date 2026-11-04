@@ -1,5 +1,4 @@
-// @kf-batch 50-B27-codegen-place
-// 🔴🔴 B-27:Glue 作业原来**没有**本区数仓事实可读(EMR 早有 `spark.bgp.redshift*`)⇒ 配方只能教 AI「写死 bgp-workgroup」
+// 🔴🔴 Glue 作业原来**没有**本区数仓事实可读(EMR 早有 `spark.bgp.redshift*`)⇒ 配方只能教 AI「写死 bgp-workgroup」
 //   ⇒ 绑到别的区的作业打到主控区的工作组名。现在 ensureGlueJob 注入 `--bgp_redshift_workgroup/_database/_secret_arn`
 //   (与 EMR 同一个作者 `resolveRedshiftBinding`),且列为保留键(用户 jobParameters 盖不掉)。
 // 只 mock 真外部:Glue / S3 客户端(target-clients)与落点解析(注册表边界,data-plane-target)。

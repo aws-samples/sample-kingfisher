@@ -5,21 +5,19 @@
 
 import { homeRegion } from "@/lib/place/home-region";
 import type { EtlJob } from "@/types/etl-job";
-// @kf-batch 52-P52.2-W2a-run-stamp
 // MWAA 旁路的建行点:章在**生成时**注入(DAG 在 MWAA 里跑,拿不到平台的写通道)。
 // 片段由 `run-records.pythonStampFields` 唯一产出 ⇒ 属性名与 TS 侧同源。
-// @kf-batch 50-WP15-airflow-serverless(T-12)台账行键唯一作者
+// 台账行键唯一作者
 import { pyRunKeyFields } from "@/lib/monitor/run-key";
 import { pythonStampFields, resolveRunStamp } from "@/lib/monitor/run-records";
-// @kf-batch 50-W5-seg1-WP10a —— Glue 作业名 per-target 单一作者(同 region 多 target 不许同名,E-142)
+// Glue 作业名 per-target 单一作者(同 region 多 target 不许同名)
 import { glueJobNameFor } from "@/lib/etl/glue-job-name";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { resolveWorkgroup } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-P50.3-dataplane
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { lockAttrFor } from "@/lib/etl/run-lock";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 37-emr-run-date —— 业务日期参数在 Python 里按同一张表算(单一作者;与「立即运行」job-service 同一组参数名)
+// 业务日期参数在 Python 里按同一张表算(单一作者;与「立即运行」job-service 同一组参数名)
 import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 
 export function splitSql(script: string): string[] {
@@ -43,13 +41,11 @@ export function generateEtlJobDag(
   job: EtlJob,
   opts: {
     redshiftSecretArn?: string;
-    // @kf-batch 50-P50.3-dataplane
     /** **执行面** region(glue / redshift-data)。缺省 = env(即 home,逐字节等价) */
     execRegion?: string;
     /** 该 target 的实际 workgroup / database。非 home 时**必传**(见下方 fail-closed) */
     workgroup?: string;
     database?: string;
-    // @kf-batch 50-P50.3-fanout
     /**
      * 🔴 **本份 DAG 服务于哪一个 target**(扇出下发时逐个传)。
      * 缺省 = `bindingTargets(job)[0]`(单绑时就是它自己,逐字节等价)。
@@ -70,7 +66,6 @@ export function generateEtlJobDag(
     );
   }
   const schedule = job.cronExpression || "None";
-  // @kf-batch 50-P50.3-dataplane
   // 🔴🔴 **拆执行面 / 控制面两个 region**(50 SPEC §3.1 的 `_mk_exec` / `_mk_ctrl`)。
   // 原来 glue / redshift-data / **dynamodb** 共用一个 `region` 变量。DDB 是**控制面**:
   // 作业锁写的是 home 的 `bgp-etl-jobs`,而 Node 侧 `run-lock.ts` 也写同一张表同一属性
@@ -79,22 +74,21 @@ export function generateEtlJobDag(
   // 症状是 DROP+CTAS 撞同表 OID —— 裂缝C 修过的那个事故原地复活。
   const ctrlRegion = homeRegion(); // 控制面固定 home
   const execRegion = opts.execRegion || ctrlRegion; // 执行面跟着作业绑定的 target
-  // @kf-batch 50-P50.3-multibind —— 走归一口(字段已迁 `targets[]`;直读单值字段会拿到 undefined
+  // 走归一口(字段已迁 `targets[]`;直读单值字段会拿到 undefined
   // ⇒ 非 home 的作业被当成 home,缺参校验与锁属性一起失效)。
-  // @kf-batch 50-P50.3-fanout —— 扇出时由调用方逐个指定;缺省仍取绑定的第一个(单绑逐字节等价)。
+  // 扇出时由调用方逐个指定;缺省仍取绑定的第一个(单绑逐字节等价)。
   const boundTarget = opts.targetId || bindingTargets(job)[0];
-  // @kf-batch 50-P50.3-fanout
   // 🔴 章必须盖**这份 DAG 真正执行的那个 target**,不能只喂 `job`:
   // 作业行迁到 `targets[]` 之后 `job.targetId` 恒为 undefined ⇒ `resolveRunStamp(job)` 会把
   // us-west-2 那份 DAG 的 run 全部盖成 `tgt_home`。那种错最阴 —— 作业跑对了、监控页却归错区,
   // 于是「按区域筛运行历史」从此不可信,而且没有任何报错。home 时取值与旧口径**逐字节相同**。
   const stampFields = pythonStampFields(resolveRunStamp(job, boundTarget)); // 值非法即抛,不生成缺章的 DAG
-  // @kf-batch 50-WP15-airflow-serverless(T-12)台账行键:runId 带 target 段 + taskTargetKey(唯一作者 lib/monitor/run-key.ts)
+  // 台账行键:runId 带 target 段 + taskTargetKey(唯一作者 lib/monitor/run-key.ts)
   const runKeyFields = pyRunKeyFields({ taskIdExpr: "JOB_ID", rawExpr: "run_id", targetId: boundTarget });
-  // 🔴 P50.1 收编时补齐了 env 层:原来这里是两级兜底(跳过 REDSHIFT_WORKGROUP),
+  // 🔴 收编时补齐了 env 层:原来这里是两级兜底(跳过 REDSHIFT_WORKGROUP),
   // 而同一作业的「立即运行」路径(job-service)是三级 ⇒ env 一改,手动与调度会打到两个数仓。
-  // 🔴 P50.3:非 home 的落点**只能由调用方按描述符传进来**,不许在这里兜底 ——
-  // 兜底的后果不是报错,而是"手动跑在第二区域、定时跑回了 home",正是 P50.1 刚消灭的那类分叉。
+  // 🔴 非 home 的落点**只能由调用方按描述符传进来**,不许在这里兜底
+  // 兜底的后果不是报错,而是"手动跑在第二区域、定时跑回了 home",正是刚消灭的那类分叉。
   const nonHome = boundTarget !== HOME_TARGET_ID;
   if (nonHome && (!opts.workgroup || !opts.database || !opts.execRegion)) {
     throw new Error(
@@ -103,13 +97,12 @@ export function generateEtlJobDag(
     );
   }
   if (nonHome && !opts.redshiftSecretArn && job.type === "redshift") {
-    // 非 home 没有 SecretArn ⇒ DAG 里会省掉该参数、退回 MWAA worker 的联邦身份 = 属主分叉(P52.1-L1)。
+    // 非 home 没有 SecretArn ⇒ DAG 里会省掉该参数、退回 MWAA worker 的联邦身份 = 属主分叉。
     throw new Error(
       `作业 ${job.jobId} 绑定非 home 目标 ${boundTarget} 但没有解析到执行凭证 ⇒ 拒绝生成 DAG` +
         `(§3.9a:禁 IAM fallback,不许省略 SecretArn)`
     );
   }
-  // @kf-batch 50-P50.3-multibind
   // 🔴 锁属性名由 **TS 侧的唯一作者**算好后注入字面量(SPEC §3.6 的 4 家之②)——
   // 不让 python 再算一遍:少一处实现就少一处漂移,而这类漂移**不报错**,只是两侧各锁各的属性
   // ⇒ 定时执行体与手动 run 根本不互斥,症状是偶发撞 OID。
@@ -229,7 +222,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 import boto3, json, time, re, sys
 
-# @kf-batch 50-P50.3-dataplane —— 执行面 / 控制面两个 region(50 SPEC §3.1 _mk_exec / _mk_ctrl)。
+# 执行面 / 控制面两个 region(50 SPEC §3.1 _mk_exec / _mk_ctrl)。
 # 🔴 ddb 必须留控制面(home):作业锁与 run 记录都在 home 的表里,而 Node 侧写的是同一张表同一属性。
 EXEC_REGION = "${execRegion}"
 CTRL_REGION = "${ctrlRegion}"
@@ -243,7 +236,7 @@ ${RUN_PARAMS_PY}
 ${taskBody}
 
 def _record(run_id, status, **ctx):
-        # 🔴 T-12(2026-09-07 真环境):台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
+        # 🔴 台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
         #   两区的 run 行同键、**后写盖掉先写**(实测两区都跑成功而台账只剩一行)。口径单一作者 = lib/monitor/run-key.ts。
     try:
         ddb.Table("bgp-task-runs").put_item(Item={
@@ -260,7 +253,7 @@ def _record(run_id, status, **ctx):
             ExpressionAttributeValues={":s": status, ":t": datetime.utcnow().isoformat() + "Z"},
         )
     except Exception as e:
-        # 🔴 T-12「写不成即拒」:台账是运行历史与成本归因的唯一真值源。这里是**任务**(done),抛出去让本次 run 显红,
+        # 🔴 「写不成即拒」:台账是运行历史与成本归因的唯一真值源。这里是**任务**(done),抛出去让本次 run 显红,
         #   而不是吞掉、留下一次「看板上不存在」的成功运行。失败回调侧另有 try 包裹,避免掩盖原始错误。
         print("record failed", e)
         raise

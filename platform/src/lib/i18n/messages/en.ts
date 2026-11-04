@@ -10,11 +10,11 @@
 // Small additions can be hand-edited; large batches go through i18n-extract.mjs -> translate -> i18n-merge.mjs.
 
 export const EN: Record<string, string> = {
-  // 序 73 模块 57(R3 / R8 ③)—— 运行历史「触发」格的工作流回链与节点详情里点回作业 / 同步任务
+  // 运行历史「触发」格的工作流回链与节点详情里点回作业 / 同步任务
   "由工作流「{name}」触发": "Triggered by workflow \"{name}\"",
   "作业运行历史": "Job run history",
   "同步运行历史": "Sync run history",
-  // 模块 55 / 序 50 —— 长操作统一框架(全局提示 + kind 标签;键 = lib/long-ops/kinds.ts LONG_OP_LABELS 的中文源串)
+  // 长操作统一框架(全局提示 + kind 标签;键 = lib/long-ops/kinds.ts LONG_OP_LABELS 的中文源串)
   "正在后台执行:{label}(已 {n} 秒)": "Running in background: {label} ({n}s elapsed)",
   "长操作": "Long-running operation",
   "网络连通性建议": "Network connectivity advice",
@@ -46,9 +46,9 @@ export const EN: Record<string, string> = {
   "为 S3 数据源建 Athena 外部表": "Create Athena external table for S3 data source",
   "计算模型指标": "Compute model metric",
   "计算指标": "Compute metric",
-  // 第三批 kind 标签(55 DESIGN §6;B-136)
+  // 第三批 kind 标签
   "运行引擎作业": "Run engine job",
-  // @kf-batch 50-WP9a-durable-jobs 执行环境详情 · 凭证隔离 + 延期供给截止
+  // 执行环境详情 · 凭证隔离 + 延期供给截止
   "凭证隔离": "Credential isolation",
   "未知": "Unknown",
   "凭证世代 {e}": "Credential epoch {e}",
@@ -62,7 +62,7 @@ export const EN: Record<string, string> = {
   "延期理由(必填,至少 4 个字)": "Reason (required, at least 4 characters)",
   "已延期:新截止 {d}(凭证世代 {e})": "Extended: new deadline {d} (credential epoch {e})",
   "延期失败:{e}": "Extension failed: {e}",
-  // 序 33 ② 取消精简执行区
+  // 取消精简执行区
   "从调度页跳转到此:点上方〔补齐缺失组件〕": "You came from the scheduling page: click Complete missing components above",
   "补齐缺失组件": "Complete missing components",
   "执行环境不完整:缺少 {m}": "Execution environment incomplete: missing {m}",
@@ -73,9 +73,9 @@ export const EN: Record<string, string> = {
   "每个执行环境都装齐全部组件,不提供精简形态": "Every execution environment gets all components; there is no reduced variant",
   "组件由法域决定:每个区都装 core / redshift / dms / flink / airflow-serverless;法域不是 home 时另装 residency-api。成本口径:Redshift Serverless 按 RPU 用量计费、空闲不计费;DMS 复制实例与 Flink 作业按需;airflow-serverless 按任务运行秒数;零出网,无 NAT 常驻费用": "Components are determined by jurisdiction: every region gets core / redshift / dms / flink / airflow-serverless; residency-api is added when the jurisdiction is not home. Cost: Redshift Serverless bills by RPU usage (idle is free); DMS replication instances and Flink jobs are on demand; airflow-serverless bills by task seconds; zero egress, no standing NAT cost",
   "cellId(可选)": "cellId (optional)",
-  // 序 33 ④ 向导法域提示
+  // 向导法域提示
   "执行区与主控区不在同一法域时,请修改法域标记": "If this execution region is in a different jurisdiction from the home region, change the jurisdiction label",
-  // 模块42 P42.6 — MSK / Kafka 数据源建源 UI。
+  // MSK / Kafka 数据源建源 UI。
   "MSK / Kafka": "MSK / Kafka",
   "连接方式": "Connection type",
   "MSK 托管集群": "MSK managed cluster",
@@ -94,7 +94,7 @@ export const EN: Record<string, string> = {
   "IAM 认证无需密钥,用执行角色访问。broker 在私有 VPC,作业消费时需选 VPC 子网+安全组。topic 在建作业时指定。": "IAM auth needs no secret; access via execution role. Brokers are in a private VPC — select VPC subnets + security groups when the job consumes. Topic is specified when creating the job.",
   "SASL/SCRAM 账密将存入 Secrets Manager(不入库)。broker 在私有 VPC,作业消费时需选 VPC 子网+安全组。topic 在建作业时指定。": "SASL/SCRAM credentials are stored in Secrets Manager (never persisted). Brokers are in a private VPC — select VPC subnets + security groups when the job consumes. Topic is specified when creating the job.",
   "MSK / Kafka 数据源创建成功": "MSK / Kafka data source created",
-  // P42.7 Kinesis 建源遗留词条(同模块一并补齐)。
+  // Kinesis 建源遗留词条(同模块一并补齐)。
   "请输入流名称": "Please enter a stream name",
   "请选择一个已有的 Kinesis 流": "Please select an existing Kinesis stream",
   "账号内暂无 Kinesis 流(可切「新建」创建)": "No Kinesis streams in the account (switch to \"New\" to create one)",
@@ -116,7 +116,7 @@ export const EN: Record<string, string> = {
   "IAM 角色(无需密钥)": "IAM role (no secret needed)",
   "仅允许 字母/数字/_.-,≤128 字符": "Only letters/digits/_.- allowed, ≤128 chars",
   "加载中…": "Loading…",
-  // 模块42 P42.5 DynamoDB 源 + P42.4 S3 源(建源表单/列表/完成页新增)
+  // DynamoDB 源 + S3 源(建源表单/列表/完成页新增)
   "表名": "Table name",
   "请输入 DynamoDB 表名": "Please enter the DynamoDB table name",
   "仅允许 字母/数字/_.-,长度 3~255": "Only letters/digits/_.- allowed, length 3–255",
@@ -138,12 +138,12 @@ export const EN: Record<string, string> = {
   "已注册为数据源,可经 Athena 外部表直查或 Glue 读入湖仓": "Registered as a data source; query directly via an Athena external table or read into the lakehouse via Glue",
   "路径": "Path",
   "流": "Stream",
-  // 模块44 智能中枢菜单组 + Copilot 计划中心(本会话新增菜单项)
+  // 智能中枢菜单组 + Copilot 计划中心(本会话新增菜单项)
   "智能中枢": "AI Hub",
   "Copilot 计划中心": "Copilot Plan Center",
   "执行计划": "Execution Plan",
   "工程配方库": "Engineering Cookbook",
-  // 模块44 Copilot 计划中心页 / 抽屉 / 执行计划卡 / 配方库(全量补齐,此前系统性遗漏)
+  // Copilot 计划中心页 / 抽屉 / 执行计划卡 / 配方库(全量补齐,此前系统性遗漏)
   "Copilot 会先查现状(数据在哪·有无现成指标·同步了没),再产出一份可逐步确认的执行计划。执行仍由你在对应页面点。": "Copilot first checks the current state (where the data is, whether a metric already exists, whether it's synced), then produces a step-by-step plan you confirm. Execution still happens on the corresponding pages.",
   "Copilot 可帮你查询与创建配置,但不会运行/发布/删除任务——这些请在对应页面确认执行。": "Copilot can query and create configurations, but never runs/publishes/deletes tasks — please confirm those on the corresponding pages.",
   "一句话描述诉求…（Enter 生成计划）": "Describe your goal in one sentence… (Enter to generate a plan)",
@@ -283,7 +283,7 @@ export const EN: Record<string, string> = {
   "选择命名空间": "Select namespace",
   "选私有子网": "Select private subnets",
   "部分降级": "Partially degraded",
-  // 模块45 cookbook 方言校验回显(离线开发页)
+  // cookbook 方言校验回显(离线开发页)
   "已按平台方言规则自动修正 {n} 处": "Auto-corrected {n} issue(s) per platform dialect rules",
   "检出 {n} 处方言问题(运行前会再次校验,error 级会拦截执行)": "Found {n} dialect issue(s) (re-validated before run; error-level ones block execution)",
   // 离线开发页历史遗漏(commit 44c0563 执行角色/网络功能,顺手补齐)
@@ -1032,7 +1032,7 @@ export const EN: Record<string, string> = {
   "取消": "Cancel",
   "去重计数 (count distinct)": "Distinct count (count distinct)",
   "全部": "All",
-  // @kf-batch 50-WP4quinquies-pushdown —— 顶栏执行范围在英文界面下原来渲染成 `All(1 个区)`(中英混排):
+  // 顶栏执行范围在英文界面下原来渲染成 `All(1 个区)`(中英混排):
   //   `t("全部")` 命中词条、紧跟的 `t("个区")` 没词条 ⇒ 原样回落中文。全新账号首装时一眼可见。
   "个区": "region(s)",
   "全部(不限)": "All (unlimited)",
@@ -1572,7 +1572,6 @@ export const EN: Record<string, string> = {
   "已取消": "Cancelled",
   "已删除": "Deleted",
   "已删除(并清理 MSAF 应用)": "Deleted (MSAF application cleaned up)",
-  // @kf-batch 50-B28b-flink-delete-async
   "停止中": "Stopping",
   "删除中": "Deleting",
   "删除已受理,停稳后会自动销毁并从列表移除": "Deletion accepted — the application will be destroyed and removed from the list once it has fully stopped",
@@ -1776,7 +1775,7 @@ export const EN: Record<string, string> = {
   "质量评分": "Quality Score",
   "智能分析": "Smart Analytics",
   "智能分析网络": "Analyze network",
-  // @kf-batch 41-B115-netadvisor-place —— 顾问面板的落点选择
+  // 顾问面板的落点选择
   "选择要分析的执行环境": "Choose the execution environment to analyze",
   "这个对象绑定了多个执行环境:先选一个,顾问按它所在的区探测网络": "This object is bound to several execution environments: pick one first; the advisor probes the network in that environment's region",
   "请先选择执行环境:顾问按该环境所在的区探测 VPC / 子网 / 安全组,不会默认主控区": "Select an execution environment first: the advisor probes VPCs / subnets / security groups in that environment's region and never defaults to the home region",
@@ -2066,7 +2065,7 @@ export const EN: Record<string, string> = {
   "Zero-ETL 需 Redshift namespace 资源策略授权源 ARN": "Zero-ETL requires the Redshift namespace resource policy to authorize the source ARN",
   "Zero-ETL 源 RDS 需开启 ROW 格式 binlog": "Zero-ETL source RDS must enable ROW-format binlog",
   "Zero-ETL 增量同步 (托管 CDC)": "Zero-ETL Incremental Sync (managed CDC)",
-  // ── 模块 34 — 智能运维 / 统一告警中心 / 运维大屏 ──
+  // ── — 智能运维 / 统一告警中心 / 运维大屏 ──
   "(该规则未绑定通道)": "(this rule has no channel bound)",
   "Top 慢任务（耗时秒）": "Top Slow Tasks (seconds)",
   "个": "total",
@@ -2160,7 +2159,7 @@ export const EN: Record<string, string> = {
   "运维大屏": "Ops Dashboard",
   "补数中心": "Backfill Center",
   "SLA 基线预警": "SLA & Baseline Alerts",
-  // ── 模块 43-C — 生产级补数据 ──
+  // ── — 生产级补数据 ──
   "任务": "Task",
   "发起补数": "New Backfill",
   "同时运行的实例数上限,防打爆引擎": "Max concurrent instances (protects the engine)",
@@ -2222,7 +2221,7 @@ export const EN: Record<string, string> = {
   "基线学习已排除补数(backfill)运行,并用 MAD 去异常,补数大跑不会拉高基线。": "Baseline learning excludes backfill runs and removes outliers with MAD, so heavy backfills never inflate the baseline.",
   "样本不足 7 次的任务标「冷启动」,不触发时长早警,避免新任务误报。": "Tasks with fewer than 7 samples are marked 'cold start' and skip early duration alerts, avoiding false alarms on new tasks.",
   "预测破线做多窗口确认(短窗急、长窗稳),单点抖动不误报;同一次运行只推一次(去重)。": "Breach prediction uses multi-window confirmation (short window reactive, long window stable) so single-point jitter doesn't false-alarm; each run alerts only once (deduped).",
-  // ── 模块 43-B — 智能基线 / SLA 预测 ──
+  // ── — 智能基线 / SLA 预测 ──
   "SLA 定义": "SLA definitions",
   "SLA 风险看板": "SLA risk board",
   "{m} 分钟": "{m} min",
@@ -2282,7 +2281,7 @@ export const EN: Record<string, string> = {
   "任务「{name}」运行时长 {mins} 分钟，超过阈值 {thr} 分钟": "Task \"{name}\" ran for {mins} min, over the {thr} min threshold",
   "作用域内最近 {win} 分钟成功率 {rate}%（{ok}/{total}），低于阈值 {thr}%": "Success rate in scope over last {win} min is {rate}% ({ok}/{total}), below the {thr}% threshold",
   "作用域内最近 {win} 分钟无成功运行（疑似断流/调度停摆）": "No successful run in scope over last {win} min (possible data-flow interruption / scheduler stall)",
-  // ── 模块 36 治理深化：E5 敏感扫描 + E2 治理工作台 ──────────────────────────────
+  // ── 治理深化：E5 敏感扫描 + E2 治理工作台 ──────────────────────────────
   // E5 敏感扫描 tab（governance 页）
   "敏感扫描": "Sensitive Scan",
   "平台管理员：自动扫描数据表列，识别可能的敏感字段（邮箱/信用卡/电话/凭证等，检测器全球通用+可插拔）。扫描只读且抽样值不落库；识别结果为「建议」，勾选后「采纳」才写入数据分级。":
@@ -2366,7 +2365,7 @@ export const EN: Record<string, string> = {
   "选安全组(可多选)": "Select security groups (multi-select)",
   "EMR Serverless application 需私有子网 + 安全组(选真实 VPC 资源;或用上方网络顾问一键预填)。修改后需保存并重建 application 才生效（新建作业时即建）。":
     "EMR Serverless application requires private subnets + security groups (pick real VPC resources, or use the network advisor above to auto-fill). Changes require saving and rebuilding the application to take effect (built on job creation).",
-  // 模块 37 — BI 报表/仪表盘搭建器
+  // BI 报表/仪表盘搭建器
   "报表搭建器": "Report Builder",
   "自助 BI:把一条查询(自由 SQL / 数据服务 / AI 问数)配成报表卡片,多个卡片拼成仪表盘,支持筛选器联动与 CSV 导出。取数复用平台查询引擎并自动脱敏。":
     "Self-service BI: turn a query (free SQL / data service / AI ask) into a report card, compose cards into a dashboard, with linked filters and CSV export. Data fetching reuses the platform query engines and is automatically masked.",
@@ -2442,7 +2441,7 @@ export const EN: Record<string, string> = {
   "导出失败": "Export failed",
   "请填写报表名称": "Please enter a report name",
   "请填写仪表盘名称": "Please enter a dashboard name",
-  // 模块 37 v2 — 字段配置器 + 拖拽布局
+  // 字段配置器 + 拖拽布局
   "可视化配置": "Visual builder",
   "选表→勾字段→自动出图,无需写 SQL(推荐)": "Pick a table → choose fields → auto chart, no SQL needed (recommended)",
   "选择数据表(无需写 SQL)": "Select a table (no SQL needed)",
@@ -2543,7 +2542,7 @@ export const EN: Record<string, string> = {
   "如:统计广告点击后 7 日内的付费金额,含税": "e.g. paid amount within 7 days after an ad click, tax included",
   "技术口径(聚合@表)": "Technical spec (agg@table)",
   "未填": "Not set",
-  // 模块 43-A.2 — 诊断报告的"同类故障历史"引用(DiagnosisButton)。
+  // 诊断报告的"同类故障历史"引用(DiagnosisButton)。
   "同类故障历史：此故障与知识库中已沉淀的同类故障同签名": "Similar incident history: this failure shares a signature with incidents already recorded in the knowledge base",
   "累计": "total",
   "最近于": "most recently on",
@@ -2551,7 +2550,7 @@ export const EN: Record<string, string> = {
   "已有人工验证的修复手册。": "A manually verified fix runbook exists.",
   "本次诊断已把该历史已验证修复注入证据，供 DevOps Agent 对照根因。": "This diagnosis injected the verified historical fix into the evidence for the DevOps Agent to compare against the root cause.",
   "查看修复详情": "View fix details",
-  // 模块 43-A.1 — 运维知识库 /incidents 页词条(补齐英文盲区)。
+  // 运维知识库 /incidents 页词条(补齐英文盲区)。
   "运维知识库": "Incident Knowledge Base",
   "故障类别数": "Incident categories",
   "已验证修复覆盖率": "Verified-fix coverage",
@@ -2573,7 +2572,7 @@ export const EN: Record<string, string> = {
   "未解决": "Unresolved",
   "已验证修复": "Verified fix",
   "已抑制": "Silenced",
-  // 模块 43-A.1 — /incidents 页余下英文盲区(健康度卡/抽屉时间线/修复手册编辑/抑制)。
+  // /incidents 页余下英文盲区(健康度卡/抽屉时间线/修复手册编辑/抑制)。
   "{n} 类有已验证修复": "{n} categories have a verified fix",
   "加载详情失败": "Failed to load details",
   "发生时间线": "Occurrence timeline",
@@ -2596,7 +2595,7 @@ export const EN: Record<string, string> = {
   // ── 调度运维收敛(2026-07-13)──────────────────────────────
   "运行实例": "Run instances",
   "调度配置": "Schedule config",
-  // ── 模块 40 FinOps ──────────────────────────────────────────
+  // ── FinOps ──────────────────────────────────────────
   "成本治理 FinOps": "FinOps",
   "成本大盘": "Cost overview",
   "任务成本": "Task costs",
@@ -2622,7 +2621,7 @@ export const EN: Record<string, string> = {
   "本月构成(底座/引擎/其他)": "MTD breakdown (base / engine / other)",
   "近 14 天花费趋势(USD)": "14-day spend trend (USD)",
   "本月 Top 服务": "Top services MTD",
-  // @kf-batch 50-WP6-cost-by-region —— 区卡片 / 按区对账 / 执行范围列
+  // 区卡片 / 按区对账 / 执行范围列
   "按区成本(本月累计)": "Cost by region (month to date)",
   "按 AWS region 分组,非 target 归因": "Grouped by AWS region, not attributed to execution targets",
   "上月同期无数据": "No data for the same period last month",
@@ -2690,7 +2689,7 @@ export const EN: Record<string, string> = {
   "运行记录读取失败": "Failed to load run records",
   "存量运行记录没有执行目标维度(视为主区域)": "Legacy run records have no execution target (treated as the home region)",
 
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51「AI 模型」卡(components/settings/AiModelCard.tsx)词条,只在末尾追加。
+  // 「AI 模型」卡(components/settings/AiModelCard.tsx)词条,只在末尾追加。
   "AI 模型": "AI model",
   "这里配置平台所有 AI 功能(智能问数 / Copilot / 顾问 / 代码生成等 9 项能力)用的大模型;改动对所有人立即生效(≤5s),不需要重新部署。": "Configure the LLM used by all 9 AI capabilities (GenBI, Copilot, advisors, codegen, ...). Changes take effect for everyone within ~5s, no redeploy.",
   "点「更换全局默认」,在两系列(Claude Opus / GPT-5.6)目录里选一个模型": "Click Change global default and pick a model from the two series (Claude Opus / GPT-5.6)",
@@ -2752,7 +2751,7 @@ export const EN: Record<string, string> = {
   "配置刚被其他管理员修改,已刷新,请重新选择": "Another admin just changed the config; refreshed, please choose again",
   "GPT 系列一期未开放(待传输门控放行)": "GPT series is not open in phase 1 (transport gate)",
   "该模型不在可选两系列目录内": "This model is not in the selectable two-series catalog",
-  // @kf-batch 51-v2-multi-vendor 模块 51 v2.0 多厂商模型通道(GLM 5 / Kimi K3;系列标题来自 lib/ai/core/vendors.ts 的 label)
+  // 多厂商模型通道(GLM 5 / Kimi K3;系列标题来自 lib/ai/core/vendors.ts 的 label)
   "该模型不在可选系列目录内": "This model is not in the selectable series catalog",
   "该模型在 Converse 下不能调用工具(tool-use 探测未通过),问数 / Copilot / 顾问会哑火,不能设为全局默认": "This model cannot call tools under Converse (tool-use probe failed); GenBI / Copilot / advisors would go silent, so it cannot be the global default",
   "此模型对本账号未开放(Bedrock 返回「not available for this account」,是账号级限制,与 region / 权限 / Marketplace 无关)。请联系 AWS 账号团队开通,或改选同系列其它版本 / 其它厂商。": "This model is not enabled for this account (Bedrock says \"not available for this account\" - an account-level restriction unrelated to region / IAM / Marketplace). Ask your AWS account team to enable it, or pick another version or vendor.",
@@ -2792,10 +2791,10 @@ export const EN: Record<string, string> = {
   "此模型在当前 region 不可用。请换 region 已上线的模型(下拉已按本 region 过滤,若仍失败可能是刚下线)。": "This model is unavailable in the current region. Pick one that is live here (the list is region-filtered; it may have just been retired).",
   "此模型需在 AWS Marketplace 订阅,但你的账号策略(SCP)禁止订阅第三方模型。请改用 Anthropic 一方模型,或联系账号管理员放开订阅。": "This model requires an AWS Marketplace subscription, but your account policy (SCP) forbids subscribing to third-party models. Use a first-party Anthropic model or ask your account admin to allow subscriptions.",
   "探测被限流,请稍候重试。": "The probe was throttled; please retry shortly.",
-  // @kf-batch 51-v3-probe-budget —— 序 46 / B-106:探测超时单列一类(不冒充限流);二探超时与「不支持工具」文案分开
+  // 探测超时单列一类(不冒充限流);二探超时与「不支持工具」文案分开
   "探测超时:模型在本系列的预算时间内没有响应(推理模型首字延迟可达数十秒,与限流无关)。请稍候再测一次;反复超时可换 global. 推理配置,或联系 AWS 账号团队。": "Probe timed out: the model did not respond within this family's budget (reasoning models can take tens of seconds to start; this is not throttling). Test again shortly; if it keeps timing out, switch to the global. inference profile or contact your AWS account team.",
   "tool-use 探测超时,请再测一次": "tool-use probe timed out; test again",
-  // @kf-batch 50-W5-seg2-WP10a —— 模块 50 第二段(免责告知 / 区域审计 / 同意留存)+ WP-1「数据服务已下线」占位
+  // 第二段(免责告知 / 区域审计 / 同意留存)+「数据服务已下线」占位
   "数据服务已下线": "Data service retired",
   "⚠️ 免责告知({v})": "⚠️ Disclaimer ({v})",
   "同意并继续": "Agree and continue",
@@ -2815,7 +2814,7 @@ export const EN: Record<string, string> = {
   "读取区域 SQL 原文失败": "Failed to read the regional SQL text",
   "并置展示是缺省形态:结果留在各自 sheet;合并是你的显式动作,并已审计。": "Side-by-side is the default: results stay in their own sheets; merging is your explicit action and is audited.",
   "若探活未全绿,它会留在「排空中」并把原因显示出来。": "If the probes are not all green it stays in Draining and shows the reason.",
-  // @kf-batch 53-guide-v1 —— 操作指引壳层字串(指引正文按中文源串回落,后续按需补英文)
+  // 操作指引壳层字串(指引正文按中文源串回落,后续按需补英文)
   "操作指引": "User guide",
   "本页怎么用": "How to use this page",
   "快速上手": "Getting started",
@@ -2833,17 +2832,15 @@ export const EN: Record<string, string> = {
   "去执行环境": "Go to Execution Environments",
   "按角色三步走:建项目与账号 → 接数据源与执行环境 → 写作业多区运行;每页右上角 ❓ 有「本页怎么用」。": "Three steps by role: create projects and accounts → connect data sources and execution environments → write jobs and run them across regions. The ❓ at the top right explains every page.",
   "一套代码多 region 执行:环境先建好,再授权给项目,作业与查询就能选多个区一次运行;跨法域首次操作弹免责告知,全过程可审计。": "One codebase, many regions: build the environment, grant it to projects, then jobs and queries can run across regions in one go. The first action on a target in another jurisdiction shows a disclaimer, and everything is audited.",
-  // @kf-batch 50-init-region-enablement
   "控制面尚未放行该 region:部署可以完成,但「检测初始化」会在放行前失败": "The control plane has not enabled this region yet: the deployment can finish, but Probe will fail until it is enabled",
   "控制面尚未放行 region {r}:「检测初始化」会在放行前失败": "Control plane has not enabled region {r}: Probe will fail until it is enabled",
   "运维:bash scripts/redeploy-platform.sh <profile> <home-region>(§1b 自动从执行环境注册表推导放行清单并重部署控制面;控制面 ECS 会滚动一次),完成后再点「检测初始化」。": "Ops: run bash scripts/redeploy-platform.sh <profile> <home-region> (step 1b derives the enabled-region list from the registry and redeploys the control plane; its ECS service rolls once), then click Probe again.",
   "完成序(finalize)未通过 —— 这是下面红项的真因": "Finalize did not pass. This is the root cause of the red items below",
-  // @kf-batch 50-WP13-mwaa-region
   "以下执行环境未安装 MWAA 调度服务,无法在该区域配置定时 / 编排": "These execution environments have no MWAA scheduler installed, so scheduling / orchestration cannot be configured there",
   "每个区域的定时任务只能由本区域的 MWAA 执行;请先到执行环境补装 mwaa 组件(预演 → 批准 → 部署约 30 分钟),装好后回来再发布。": "Scheduled tasks of a region can only be executed by that region's MWAA. Add the mwaa component to the execution environment first (preview → approve → deploy, about 30 minutes), then publish again.",
   "去执行环境补装 MWAA": "Add MWAA in Execution Environments",
   "定时调度 / 编排(本区域 Airflow;非 home 区要配调度必装)": "Scheduling / orchestration (this region's Airflow; required to schedule in a non-home region)",
-  // @kf-batch 50-WP15-airflow-serverless(K-5 网络规模)
+  // (K-5 网络规模)
   "网络规模": "Network profile",
   "标准(2 NAT,双可用区)": "Standard (2 NAT, two AZs)",
   "精简(1 NAT)": "Economy (1 NAT)",
@@ -2857,7 +2854,7 @@ export const EN: Record<string, string> = {
   "失败原因": "Failure reason",
   "已记录期望;NAT 数量在下一次「触发部署 / 补充部署」落到 base 栈(P0-E 会要审批)": "Recorded; the NAT count applies on the next deploy / add-components (P0-E will require approval)",
   "已是该档,未改": "Already on this profile; no change",
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6:调度器种类可见性 / 触发一次 / 偏好 / CloudWatch 任务日志)
+  // (调度器种类可见性 / 触发一次 / 偏好 / CloudWatch 任务日志)
   "以下执行环境未安装调度组件,无法在该区域配置定时 / 编排": "The following execution environments have no scheduler component; scheduling / orchestration cannot be configured for that region",
   "可选:airflow-serverless(推荐,分钟级开通、按任务秒计费)/ mwaa(常驻,约 30 分钟)": "Options: airflow-serverless (recommended; minutes to provision, billed per task-second) / mwaa (always-on, ~30 min)",
   "每个区域的定时任务只能由本区域的调度器执行;请先到执行环境补装调度组件(推荐 airflow-serverless:预演 → 批准 → 部署约 5 分钟),装好后回来再发布。": "Scheduled tasks of a region run only on that region's scheduler; add a scheduler component in Execution Environments first (recommended airflow-serverless: preview → approve → deploy in ~5 min), then publish again.",
@@ -2878,16 +2875,14 @@ export const EN: Record<string, string> = {
   "改调度器偏好失败:{e}": "Failed to change scheduler preference: {e}",
   "已记录;只影响之后的发布 —— 已发布作业保持原调度器,重新发布时会先下线旧产物再切": "Recorded; affects future publishes only — published jobs keep their scheduler until republished, which first retires the old artifact",
   "已是该偏好,未改": "Already the preferred scheduler; no change",
-  // @kf-batch 50-B26-lake-place
   "{region} · 数据湖 Athena 工作组 {wg}": "{region} · data lake Athena workgroup {wg}",
   "{region} · 数据仓库 Redshift 工作组 {wg}": "{region} · warehouse Redshift workgroup {wg}",
-  // @kf-batch 50-WP30-discard
   "危险区": "Danger zone",
   "弃置这个执行环境": "Discard this execution environment",
   "这个环境从没装出来(目标区域里没有它的资源)。弃置后它显示为「已删除」,并释放 {region} 的执行环境名额,可以在该区重新注册。": "This environment was never installed (it has no resources in the target region). After discarding it shows as \"Deleted\" and frees the execution-environment slot in {region}, so you can register again there.",
   "弃置这个环境": "Discard this environment",
   "删除执行环境": "Delete execution environment",
-  "这个环境装出来过:删除要先停止承接,再经影响预览、输名确认、审批后销毁(数据桶 / 表桶保留)。这条流程还在施工(WP-30 序 2–6),暂不可用。": "This environment was installed: deleting it means draining first, then impact preview, typed-name confirmation and approval before teardown (data and table buckets are retained). This flow is still under construction and not yet available.",
+  "这个环境装出来过:删除要先停止承接,再经影响预览、输名确认、审批后销毁(数据桶 / 表桶保留)。这条流程还在施工,暂不可用。": "This environment was installed: deleting it means draining first, then impact preview, typed-name confirmation and approval before teardown (data and table buckets are retained). This flow is still under construction and not yet available.",
   "发起删除": "Request deletion",
   "确认弃置 {tid}": "Confirm discarding {tid}",
   "弃置": "Discard",
@@ -2922,14 +2917,14 @@ export const EN: Record<string, string> = {
   "需包含数字": "Must contain a digit",
   "需包含符号": "Must contain a symbol",
   "未登录": "Not signed in",
-  // @kf-batch 50-PROD-A-launch-hardening:新建执行环境向导「刷新」候选区
+  // 新建执行环境向导「刷新」候选区
   "账号已启用 {n} 个 region · 查询于 {at}": "{n} regions enabled in this account · queried at {at}",
-  // @kf-batch 50-PROD-A-launch-hardening:用户管理「重置密码」
+  // 用户管理「重置密码」
   "重置密码": "Reset password",
   "重置 {name} 的密码": "Reset password for {name}",
   "确认重置": "Reset",
   "至少 12 位,需包含大写字母、小写字母、数字和符号。设置后立即生效,对方下次登录用新密码": "At least 12 characters with upper-case, lower-case, digit and symbol. Takes effect immediately; the user signs in with it next time",
-  // @kf-batch 50-CAPSEED-seed-dispatch:数据源页「示范数据造数」+ 监控页「造数」类型
+  // 数据源页「示范数据造数」+ 监控页「造数」类型
   "下发": "Dispatch",
   "下发失败": "Dispatch failed",
   "主控区造数会 DROP 并重建源库(RDS MySQL gamedata)的 7 张示范表,约 5–8 分钟;正在读这个源库的同步任务会受影响。": "Seeding the control region DROPs and rebuilds the 7 demo tables in the source database (RDS MySQL gamedata), about 5–8 minutes; sync tasks reading this source are affected.",
@@ -2960,7 +2955,7 @@ export const EN: Record<string, string> = {
   "还没有定时造数任务": "No scheduled seeding tasks yet",
   "选择要造的数据集": "Choose the dataset to seed",
   "问数卡片": "Ask-data card",
-  // @kf-batch 50-WP30-decommission 删除执行环境(路 B)+ 50-B40 候选区组织策略
+  // 删除执行环境+ 50-B40 候选区组织策略
   "将保留(不删):数据类资源需人工确认后单独清理,平台不代决": "Retained (not deleted): data resources must be cleaned up separately after a human confirms; the platform does not decide for you",
   "影响预览读取失败": "Failed to load the impact preview",
   "正在读取删除流程状态…": "Loading deletion status…",
@@ -3024,7 +3019,7 @@ export const EN: Record<string, string> = {
   "维度 / 事实表": "Dimension / fact table",
   "补数计划": "Backfill plan",
   "平台定时任务": "Platform scheduled task",
-  // @kf-batch 37-sync-capability 同步向导:过滤条件预览 / 表名模板 / 业务日期时区 / 派生列 / 覆盖范围 / 空结果开关
+  // 同步向导:过滤条件预览 / 表名模板 / 业务日期时区 / 派生列 / 覆盖范围 / 空结果开关
   "(「最近7天」是 MySQL 写法,仅适用于 MySQL 源)": "(“Last 7 days” uses MySQL syntax and only applies to MySQL sources)",
   "该条件会下推到源库执行,请使用源库自己的 SQL 方言;只写 WHERE 后面的部分,不要带分号。": "This condition is pushed down and executed on the source database, so use the source database's SQL dialect. Write only the part after WHERE, without a semicolon.",
   "按今天({ds},{tz})渲染后的条件:": "Condition rendered for today ({ds}, {tz}):",
@@ -3049,7 +3044,7 @@ export const EN: Record<string, string> = {
   "整表": "Whole table",
   "按分区": "By partition",
   "分区列": "Partition columns",
-  // @kf-batch 37-sync-capability B-61 合并键
+  // 合并键
   "合并写入选项": "Merge options",
   "合并键": "Merge keys",
   "按这些列判定「同一行」:键命中的行整行更新,其余插入。至少一列;候选 = 已选源表的列,也可手输。": "Rows are matched on these columns: matching rows are updated in full, the rest are inserted. At least one column; candidates = columns of the selected source tables, or type your own.",
@@ -3066,7 +3061,7 @@ export const EN: Record<string, string> = {
   "这个表名模板已经添加过了": "This table name template has already been added",
   "必须为它指定一个固定的目标表名": "A fixed target table name is required for it",
   "目标表名不能带变量": "The target table name cannot contain variables",
-  // @kf-batch 37-sync-backfill 序 37 ⑥ 手动运行指定业务日期 / ⑦ 补数中心支持同步任务
+  // 手动运行指定业务日期 / ⑦ 补数中心支持同步任务
   "指定日期运行": "Run for a date",
   "指定业务日期运行": "Run for a business date",
   "选择业务日期": "Select business date",
@@ -3075,14 +3070,14 @@ export const EN: Record<string, string> = {
   "这个任务没有用到日期变量,指定哪一天跑出来的结果都相同。": "This task uses no date variables, so the result is the same whichever date you pick.",
   "不可补数": "Not backfillable",
   "同步任务按业务日期逐天补数:每个日期跑一次该任务(Glue 作业带上这个日期),并发固定为 1(同一个 Glue 作业不能同时跑两个日期);只支持按天 / 按周。": "Sync tasks are backfilled one business date at a time: each date runs the task once (the Glue job receives that date). Concurrency is fixed at 1 (the same Glue job cannot run two dates at once). Only daily / weekly granularity is supported.",
-  // @kf-batch 37-wf-sync-backfill 序 37:工作流里的数据同步节点可补数
+  // 工作流里的数据同步节点可补数
   "该工作流含数据同步节点:每个业务日期会把节点关联的同步任务跑一次(Glue 作业带上这个日期),并发固定为 1(同一个 Glue 作业不能同时跑两个日期)。关联的同步任务须是 Glue 通道、全量且用到日期变量,否则该节点的实例会如实失败(级联时其下游跳过)。": "This workflow contains a data sync node: for each business date the node's linked sync task runs once (the Glue job receives that date), and concurrency is fixed at 1 (the same Glue job cannot run two dates at once). The linked sync task must use the Glue channel, be a full sync, and reference a date variable; otherwise that node's instances fail honestly (and in cascade mode their downstream is skipped).",
-  // @kf-batch 50-SEQ47d-catalog-filters 序 47d:数据目录筛选栏(客户 2026-10-19 反馈)
+  // 数据目录筛选栏(客户 2026-10-19 反馈)
   "库 / 表桶": "Database / Table bucket",
   "Schema / 命名空间": "Schema / Namespace",
   "数据目录 ({n} / {total})": "Data Catalog ({n} / {total})",
   "筛出 {n} / {total}": "Filtered {n} / {total}",
-  // @kf-batch 50-SEQ47a-promote-ux 序 47a:「发布到环境」可发现性(客户 2026-10-19 反馈 B-102)
+  // 「发布到环境」可发现性
   "发布到环境": "Publish to environment",
   "已提交发布审批": "Publish approval submitted",
   "发布到 {toEnv} 属受保护环境,需项目 owner 在「项目空间」页批准;批准后资源才会出现在 {toEnv} 环境,批准人会得到「切到 {toEnv} 查看」的入口。": "{toEnv} is a protected environment: a project owner must approve on the Project Spaces page. The resource appears in {toEnv} only after approval; the approver gets a \"switch to {toEnv}\" shortcut.",
@@ -3105,11 +3100,11 @@ export const EN: Record<string, string> = {
   "发布到调度": "Publish to scheduler",
   "已批准并发布到 {toEnv}": "Approved and published to {toEnv}",
   "{name} 已{action}到 {toEnv} 环境(v{ver})。你现在看的是别的环境,切过去才能看到它。": "{name} {action} in {toEnv} (v{ver}). You are viewing another environment; switch to see it.",
-  // 序 48:执行区候选预授权 —— 新建向导选区标签
+  // 执行区候选预授权 —— 新建向导选区标签
   "已放行,建完即可用": "pre-authorized, usable right after the build",
   "构建后需运维放行一次": "ops must release it once after the build",
   "其中控制面已放行 {n} 个区(建完即可用);其余区构建完成后需运维跑一次放行命令再「检测初始化」": "{n} of them are pre-authorized by the control plane (usable right after the build); the others need ops to run the release command once after the build, then \"Probe\".",
-  // 序 47b(B-101):补数中心实例可观测 —— 实例抽屉 / 写入行数 / 成功但 0 行 / 日志与监控页跳转
+  // 补数中心实例可观测 —— 实例抽屉 / 写入行数 / 成功但 0 行 / 日志与监控页跳转
   "成功(0 行)": "Succeeded (0 rows)",
   "写入 {n} 行": "{n} rows written",
   "行数未上报": "Row count not reported",
@@ -3139,7 +3134,7 @@ export const EN: Record<string, string> = {
   "未上报(该类运行不产出行数指标)": "Not reported (this run type produces no row metrics)",
   "依赖触发": "Upstream dependency",
   "点进度矩阵里的色块看该实例的写入行数 / 错误原话 / 运行日志,或一键跳到任务监控页;「成功但写入 0 行」会标黄并给排查方向。": "Click a cell in the progress matrix to see that instance's rows written / error text / run log, or jump to Monitor; \"succeeded with 0 rows\" is highlighted in amber with what to check.",
-  // @kf-batch 50-SEQ47c-catalog-ddl 序 47c:数据目录图形化建表 / 改表
+  // 数据目录图形化建表 / 改表
   "Redshift 数仓表": "Redshift warehouse table",
   "S3 Tables 数据湖表(Iceberg)": "S3 Tables lake table (Iceberg)",
   "S3 Tables 表的结构变更需经 Spark 作业做 Iceberg 模式演进,本版不提供图形化;可用离线作业跑 ALTER TABLE … ADD COLUMNS": "Schema changes on S3 Tables need a Spark job (Iceberg schema evolution); this version has no visual editor for it. Run ALTER TABLE … ADD COLUMNS in an offline job instead",
@@ -3193,9 +3188,9 @@ export const EN: Record<string, string> = {
   "建表 {fq}({kind},{env} 环境)": "Create table {fq} ({kind}, {env} environment)",
   "改表 {fq}({n} 条语句,{env} 环境)": "Alter table {fq} ({n} statements, {env} environment)",
   "建表 / 改表": "DDL",
-  // 序 49 ③ B-95 删项目空间进度文案(「正在唤醒数仓」202 协议已于序 50 第二批退役,其三条文案随之删除)
+  // 删项目空间进度文案(「正在唤醒数仓」202 协议已于退役,其三条文案随之删除)
   "删除中…": "Deleting…",
-  // 序 49 ⑤ UX ① —— 2026-10-21 英文模式补齐:t() 已包、英文词典缺条的 680 条(用户 10-20 走查「英文模式整站中英混排」拍板补齐;覆盖守卫 en-coverage-guard.test 盯住不再回退)
+  // UX ① —— 2026-10-21 英文模式补齐:t() 已包、英文词典缺条的 680 条(用户 10-20 走查「英文模式整站中英混排」拍板补齐;覆盖守卫 en-coverage-guard.test 盯住不再回退)
   ";home 豁免过期判定": "; home exempt from staleness check",
   "VPC 端点 {n} 个": "{n} VPC endpoints",
   "buildId {id};预演产生的 change set 与空壳栈会被自动清理": "buildId {id}; the change set and empty shell stacks created by the dry run are cleaned up automatically",
@@ -3759,7 +3754,7 @@ export const EN: Record<string, string> = {
   "暂无执行环境记录 —— home(当前环境)的描述符还没 seed 进注册表": "No execution environment records yet — the descriptor of home (the current environment) has not been seeded into the registry",
   "最近探活时间(探活写入方随切片 e 交付)": "Last probe time (the probe writer ships with slice e)",
   "未探活": "Not probed",
-  " · 本页的数据还没有按执行范围过滤,你现在看到的是": " · Data on this page is not yet filtered by execution scope; the data you see now covers ",
+  "本页的数据还没有按执行范围过滤,你现在看到的是": "Data on this page is not yet filtered by execution scope; the data you see now covers ",
   "。想按区域看数据,请到": ". To view data by region, go to",
   "全部区域": "all regions",
   "切到「全部」": "Switch to 'All'",
@@ -3867,7 +3862,7 @@ export const EN: Record<string, string> = {
   "全平台合计": "Platform-wide total",
   "带我走一遍": "Walk me through",
   "点「带我走一遍」会一步步高亮该点哪里(可随时上一步 / 跳过,换页也接着走);每页右上角 ❓ 有「本页怎么用」。": "Click 'Walk me through' to highlight where to click step by step (go back / skip anytime; it continues across pages); the ❓ at the top right of every page has 'How to use this page'.",
-  "保存后是**全平台默认**(按区分别设默认模型见工单 SC-25 / 51 WP-8)": "Saved as the **platform-wide default** (per-region default models: see ticket SC-25 / 51 WP-8)",
+  "保存后是**全平台默认**(暂不支持按区分别设默认模型)": "Saved as the **platform-wide default** (per-region default models are not yet supported)",
   "可用模型清单来自": "Available models from",
   "通过 Amazon Athena 查询当前执行目标的 S3 Tables 表桶（Iceberg）。统一": "Query the current execution target's S3 Tables table bucket (Iceberg) via Amazon Athena. Strictly ",
   "计划已创建,但它的执行区不在当前执行范围内 —— 请切到「全部」查看": "Plan created, but its execution target is outside the current execution scope — switch to 'All' to view it",
@@ -3876,13 +3871,13 @@ export const EN: Record<string, string> = {
   "落章前·无区维": "Pre-tagging · no region dimension",
   "成本运行": "Cost runs",
   "带我走一遍(一步步高亮该点哪里)": "Walk me through (highlights where to click step by step)",
-  // 序 49 ⑤ UX ① —— 原本没走 t() 的裸中文(导览出口按钮 / 两个占位符)
+  // UX ① —— 原本没走 t() 的裸中文(导览出口按钮 / 两个占位符)
   "跳过这一步": "Skip this step",
   "结束导览": "End tour",
   "跳过导览": "Skip tour",
   "如 aggregate / upsert / s3table-write": "e.g. aggregate / upsert / s3table-write",
   "# 受限执行:仅纯计算(禁 import/open/exec 等),可用 params/xcom/result": "# Restricted execution: pure computation only (no import/open/exec); params/xcom/result are available",
-  // 序 49 ⑦ UX ③ —— 建表向导 schema / 命名空间「下拉已有 + 可输新」
+  // UX ③ —— 建表向导 schema / 命名空间「下拉已有 + 可输新」
   "先选择执行区": "Select an execution target first",
   "选已有 schema 或输入新名,如 dwd;不能是项目私有 schema(proj_*)": "Pick an existing schema or type a new name, e.g. dwd; project-private schemas (proj_*) are not allowed",
   "选已有命名空间或输入新名(小写字母 / 数字 / 下划线)": "Pick an existing namespace or type a new name (lowercase letters / digits / underscores)",
@@ -3892,7 +3887,7 @@ export const EN: Record<string, string> = {
   "正在读取该区已有的命名空间…": "Loading existing namespaces in this region…",
   "该区已有 {n} 个命名空间可直接选,也可输入新名称": "{n} existing namespace(s) in this region can be picked directly; you can also type a new name",
   "该区还没有可选的命名空间,输入新名称即可": "No existing namespace in this region yet; just type a new name",
-  // 序 49 ⑤ UX ① —— 对象字面量里的状态 / 提示文案(多区看板 / 建模落地 / 元数据镜像 / 执行环境 / 构建进度 / 运行组),经 t(x.text) 动态键渲染,静态扫描看不到,由 p49 UX1 真环境抓到
+  // UX ① —— 对象字面量里的状态 / 提示文案(多区看板 / 建模落地 / 元数据镜像 / 执行环境 / 构建进度 / 运行组),经 t(x.text) 动态键渲染,静态扫描看不到,由 p49 UX1 真环境抓到
   "构建中": "Building",
   "构建成功": "Build succeeded",
   "当前无构建": "No build in progress",
@@ -3913,7 +3908,7 @@ export const EN: Record<string, string> = {
   "数据迁移/CDC": "Data migration / CDC",
   "流计算(MSAF)": "Stream processing (MSAF)",
   "本 region 问数三件套": "Ask-Your-Data trio for this region",
-  "区域审计 / 结果存储(非 home 法域必装 —— 技术前置,不是审批;WP-10a)": "Regional audit / result storage (required for non-home jurisdictions — a technical prerequisite, not an approval; WP-10a)",
+  "区域审计 / 结果存储(非 home 法域必装 —— 技术前置,不是审批)": "Regional audit / result storage (required for non-home jurisdictions — a technical prerequisite, not an approval)",
   "⚠ 版本不齐": "⚠ Version mismatch",
   "⊘ 待重新落地": "⊘ Needs re-landing",
   "⚠ 未落": "⚠ Not landed",
@@ -3957,7 +3952,7 @@ export const EN: Record<string, string> = {
   "提交中": "Submitting",
   "全部成功": "All succeeded",
   "全部失败": "All failed",
-  // 序 39 第二刀 —— 平台版本(登录页页脚 / 系统设置卡)
+  // 平台版本(登录页页脚 / 系统设置卡)
   "构建信息不可用(镜像不是从 git 克隆构建的)": "Build info unavailable (the image was not built from a git clone)",
   "未发版": "unreleased",
   "平台版本": "Platform version",
@@ -3967,7 +3962,7 @@ export const EN: Record<string, string> = {
   "提交时间": "Committed at",
   "版本文件": "VERSION file",
   "升级 / 回滚按客户生产部署手册 §7ter;对账以发版标签为准,未发版构建以产品提交为准": "Upgrade / rollback per the customer production deployment manual §7ter; reconcile by release tag, or by product commit for unreleased builds",
-  // 序 52 / B-124 —— 数据源页 S3 源行「建外部表(Athena 直查)」弹窗(app/datasources/S3ExternalTableModal.tsx)
+  // 数据源页 S3 源行「建外部表(Athena 直查)」弹窗(app/datasources/S3ExternalTableModal.tsx)
   "建外部表": "External table",
   "把这条 S3 源下的数据集登记成 Athena 外部表,建在它所在的区;建好可在数据湖直查里查询": "Register a dataset under this S3 source as an Athena external table in the source's own region; query it in Lake Query once created",
   "这条数据源的落点不合法": "This data source has an invalid placement stamp",
@@ -3985,7 +3980,7 @@ export const EN: Record<string, string> = {
   "落在 {region} 的 Athena 目录(与这条数据源同一个区);{n} 列,格式 {format},数据位置 {location}": "Created in the Athena catalog of {region} (same region as this data source); {n} columns, format {format}, data at {location}",
   "去数据湖直查": "Open in Lake Query",
   "查看建表语句": "Show CREATE TABLE statement",
-  // 序 56 B-127 —— 执行环境自有表桶:向导下拉「未登记」标 / 提示 / 去登记;系统设置登记卡文案
+  // 执行环境自有表桶:向导下拉「未登记」标 / 提示 / 去登记;系统设置登记卡文案
   "未登记": "Not registered",
   "表桶 {b} 还没有为执行环境 {tid} 登记:保存 / 启动都会被拒。先去「系统设置 → 数据湖外部表桶」登记(登记一次 = 同步可写入、直查 / 治理目录 / 问数可见),或清空改用平台表桶。": "Table bucket {b} is not registered for execution environment {tid}: saving and starting will be rejected. Register it first under System Settings → Lake external table buckets (one registration = sync can write to it and Lake Query / governance catalog / Ask-Your-Data can see it), or clear the field to use the platform table bucket.",
   "表桶 {b} 还没有登记:主控区的同步可以写入它,但直查表树 / 治理目录 / 问数看不到里面的表;建议去「系统设置 → 数据湖外部表桶」登记。": "Table bucket {b} is not registered: syncs in the home region can write to it, but Lake Query / governance catalog / Ask-Your-Data will not see its tables; register it under System Settings → Lake external table buckets.",
@@ -3994,7 +3989,7 @@ export const EN: Record<string, string> = {
   "留空 = 按该数据源所在执行环境的表桶自动解析(推荐);选客户自有表桶时,非主控区的执行环境须先在「系统设置 → 数据湖外部表桶」登记该桶": "Leave blank to resolve the table bucket of the execution environment this data source lives in (recommended); to use your own table bucket in a non-home execution environment, register it first under System Settings → Lake external table buckets",
   "登记 = 可见 + 可写:平台不主动写它,只有把它选为 Table Bucket 的同步任务才在里面建命名空间 / 表": "Registered = visible + writable: the platform never writes to it on its own; only sync tasks that pick it as Table Bucket create namespaces / tables in it",
   "该区的平台表桶 {b} 默认就在表树里;客户自己的表桶登记后:直查表树 / 治理目录同步 / 问数都能看到里面的表,且该执行环境的同步任务可以把它选为 Table Bucket 写入(非主控区不登记就不能写,保存时即提示)。": "The platform table bucket {b} of this region is always in the table tree. Once your own table bucket is registered, Lake Query / governance catalog sync / Ask-Your-Data can see its tables, and sync tasks of this execution environment may pick it as Table Bucket (in a non-home region an unregistered bucket cannot be written; you are told when saving).",
-  // 序 56(客户 2026-10-27 反馈):带日期变量的表名 —— 样例表(只读列结构)+ 模板实例黄标 + 目标表名撞车守卫
+  // 带日期变量的表名 —— 样例表(只读列结构)+ 模板实例黄标 + 目标表名撞车守卫
   "源库里按日期分表(例如每月一张:{a}、{b})时,把表名里的日期写成变量({tpl}),每次运行只读业务日期对应的那一张,并写到一个固定的目标表(例如 {target})。": "When the source splits tables by date (e.g. one per month: {a}, {b}), write the date part of the name as a variable ({tpl}); each run reads only the table for its business date and writes to one fixed target table (e.g. {target}).",
   "要看列结构、做字段映射、预览建表,请为它选一张同结构的真表作「样例表」:样例表只用来读列,不会被同步。不要再在上面的清单里勾选这些月表 —— 勾了就会多同步一份,并与模板写同一张目标表。": "To see the columns, map fields or preview the DDL, pick a real table with the same structure as its “sample table”: the sample is only used to read columns and is never synced. Do not also tick those monthly tables in the list above — ticking one syncs an extra copy into the same target table as the template.",
   "样例表(只读列结构)": "Sample table (columns only)",
@@ -4003,14 +3998,14 @@ export const EN: Record<string, string> = {
   "这张表是「{tpl}」按日期渲染出来的一张实例表:勾选它 = 把它当普通表再同步一份,并与模板写同一张目标表(覆盖模式下互相覆盖)。只想借它的列结构,请在下方把它设为该模板的样例表,再取消这里的勾选。": "This table is one dated instance of “{tpl}”: ticking it syncs an extra copy as a regular table into the same target table as the template (in overwrite mode they overwrite each other). If you only need its columns, set it as the template's sample table below and untick it here.",
   "样例表:{s}": "Sample table: {s}",
   "列结构来自样例表,只读;运行时按业务日期读对应那张表": "Columns come from the sample table (read-only); at run time the table for the business date is read",
-  // 序 58 B-130 —— 系统设置「后台清理任务」卡
+  // 系统设置「后台清理任务」卡
   "后台清理任务": "Background cleanup jobs",
   "没有待处理的清理任务": "No pending cleanup jobs",
   "阶段": "Phase",
   "入队时间": "Enqueued at",
   "仍有 {n} 张网卡引用,等待释放": "{n} network interface(s) still attached, waiting for release",
   "平台自建的安全组在网卡释放后自动删除;「failed」= 30 分钟内仍被占用,需人工确认网卡释放后删除该组": "Platform-created security groups are deleted automatically once their network interfaces are released; 'failed' = still in use after 30 minutes, please verify and delete the group manually",
-  // 序 61 B-133 —— 数据源外部网络对象漂移:状态格标签 + 系统设置「数据源网络对象」卡
+  // 数据源外部网络对象漂移:状态格标签 + 系统设置「数据源网络对象」卡
   "数据源依赖的网络对象已不存在": "A network object this data source depends on no longer exists",
   "网络对象缺失": "Network object missing",
   "平台自建的安全组 / Glue 连接曾被平台外删除,已自动重建并接回;最近一次 {at}。请排查账号里是否有清理工具在删带 bgp:managed 标签的对象": "A platform-created security group / Glue connection was deleted outside the platform and has been rebuilt and re-attached automatically; last time {at}. Check whether a cleanup tool in the account is deleting objects tagged bgp:managed",
@@ -4030,7 +4025,7 @@ export const EN: Record<string, string> = {
   "确认清理?服务端会重新核对「无数据源引用 + 网卡为 0」,过了才交给后台清理任务删除": "Clean up? The server re-verifies 'no data source references + ENI count 0' before handing the group to the background cleanup job",
   "清理": "Clean up",
   "已交给后台清理任务(网卡为 0 时删除):{id}": "Handed to the background cleanup job (deleted once ENI count is 0): {id}",
-  // 序 72 B-139(模块 56)—— 执行角色选择器(components/exec-roles/ExecutionRolePicker.tsx)与四处表单
+  // 执行角色选择器(components/exec-roles/ExecutionRolePicker.tsx)与四处表单
   "已刷新,{n} 个可选角色": "Refreshed: {n} roles available",
   "平台默认(推荐,权限齐)": "Platform default (recommended, permissions complete)",
   "平台默认角色 · {name}": "Platform default role · {name}",
@@ -4059,7 +4054,7 @@ export const EN: Record<string, string> = {
   "执行角色决定同步作业能访问哪些 AWS 资源。留空=用平台默认角色;自建角色须信任 glue.amazonaws.com。": "The execution role decides which AWS resources the sync job can access. Empty = platform default role; your own role must trust glue.amazonaws.com.",
   "保存失败:服务端拒绝了这次保存": "Save rejected by the server",
   "保存失败:{reason}": "Save failed: {reason}",
-  // 序 73 模块 57:编排 DAG 的离线作业节点
+  // 编排 DAG 的离线作业节点
   "离线作业节点": "Batch Job Node",
   "离线作业节点「{nm}」未关联离线作业": "Batch Job node \"{nm}\" is not linked to a batch job",
   "关联离线作业": "Linked batch job",

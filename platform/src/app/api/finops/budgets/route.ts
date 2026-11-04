@@ -7,7 +7,7 @@ import { DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 import { listBudgets, putBudget, budgetPk } from "@/lib/finops/store";
 import type { Budget, BudgetScope } from "@/lib/finops/types";
 import { requireScope } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP6-cost-by-region —— 视角 → 区集合的唯一入口(全部视角 = null;原写法在全部视角下把区预算全筛掉)
+// 视角 → 区集合的唯一入口(全部视角 = null;原写法在全部视角下把区预算全筛掉)
 import { regionsInViewOf } from "@/lib/finops/cost-region";
 
 // 预算横切账号级,统一落 default 分区(与告警中心口径一致);写权限=owner。
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   if (scope instanceof NextResponse) return scope;
   try {
     const all = await listBudgets(DEFAULT_PROJECT_ID);
-    // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 按执行范围过滤。
+    // 按执行范围过滤。
     // 🔴 只过滤 `region` 作用域的预算;account / service / project 作用域**横切所有区**
     // (与治理约定「未声明适用区 = 全平台通用」同一条道理)—— 把它们也筛掉会让
     // 「账号总预算」在单区视角消失,而那条预算恰恰是最该一直看得见的。
@@ -39,7 +39,7 @@ function parseScope(v: unknown): BudgetScope | null {
   if (s?.kind === "account") return { kind: "account" };
   if (s?.kind === "service" && s.service) return { kind: "service", service: s.service };
   if (s?.kind === "project" && s.projectId) return { kind: "project", projectId: s.projectId };
-  // @kf-batch 50-WP4quater-reads(工单 SC-24)—— 给某个区单独设预算
+  // 给某个区单独设预算
   if (s?.kind === "region" && (s as { region?: string }).region) return { kind: "region", region: String((s as { region: string }).region) };
   return null;
 }

@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 54-genbi-session-cards
 // 问数「会话卡片」的三个交互件(54 DESIGN v1.5 §6):保存弹框 / 我的卡片抽屉 / 打开别范围卡片时的二选一。
 //
 // 🔴 「打开一张属于别范围的卡片」**不是本文件自创的交互**,而是通用协议
@@ -12,7 +11,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Drawer, Empty, Form, Input, List, Modal, Popconfirm, Space, Spin, Switch, Table, Tag, Typography, message } from "antd";
 import { ClockCircleOutlined, DeleteOutlined, HistoryOutlined, ReloadOutlined, SaveOutlined, SyncOutlined } from "@ant-design/icons";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)—— 卡片定时刷新的 cron 编辑器(与调度中心同一个组件)
+// (问数)—— 卡片定时刷新的 cron 编辑器(与调度中心同一个组件)
 import CronEditor from "@/components/common/CronEditor";
 import { useT } from "@/lib/i18n/useT";
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -33,7 +32,7 @@ export interface CardRow {
   createdAt: string;
   updatedAt: string;
   state: "ready" | "deleting";
-  // @kf-batch 50-WP28-platform-action-node —— 刷新的非数据戳(中央指针上)
+  // 刷新的非数据戳(中央指针上)
   lastRefreshedAt?: string;
   lastRefreshStatus?: "succeeded" | "failed";
   refreshCount?: number;
@@ -161,7 +160,7 @@ export function ScopeSwitchConfirm({
     <Modal open={open} onCancel={onCancel} footer={null} data-testid="genbi-card-scope-switch"
            title={t("这张卡片属于 {tid}({region})", { tid: card.targetId, region: card.region })}>
       {/* 🔴 §9.7 第 3 条:必须同时复述 targetId + region + **对象标识** —— 只写 region 不够
-          (同一个 region 可能有多个执行目标,WP-4sexies 的教训) */}
+          (同一个 region 可能有多个执行目标,教训)*/}
       <Paragraph data-testid="genbi-card-scope-restate">
         {t("「{title}」· {n} 轮 · {at}", {
           title: card.title || t("(标题在该区域,当前读不到)"), n: card.turnCount, at: card.updatedAt.slice(0, 16).replace("T", " "),
@@ -250,7 +249,7 @@ export function MyCardsDrawer({
 
   const rows = (data?.items || []).filter((x) => !kw || (x.title || "").toLowerCase().includes(kw.toLowerCase()));
 
-  // @kf-batch 50-WP28-platform-action-node(WP-29 问数)—— 刷新 / 定时刷新 / 历史
+  // (问数)—— 刷新 / 定时刷新 / 历史
   // 🔴 刷新的是**同一张**卡(不占额度);定时载体发到**卡片自己那个区**的 MWAA Serverless。
   const [scheds, setScheds] = useState<Record<string, any>>({});
   const [refreshing, setRefreshing] = useState("");
@@ -362,7 +361,7 @@ export function MyCardsDrawer({
               renderItem={(c) => (
                 <List.Item data-testid={`genbi-card-row-${c.cardId}`} actions={[
                   <a key="open" onClick={() => onOpenCard(c, true)} data-testid={`genbi-card-open-${c.cardId}`}>{t("打开续聊")}</a>,
-                  // @kf-batch 50-WP28-platform-action-node —— 立即刷新 / 定时刷新 / 历史
+                  // 立即刷新 / 定时刷新 / 历史
                   <a key="refresh" onClick={() => { if (refreshing !== c.cardId) void refreshNow(c); }} data-testid={`genbi-card-refresh-${c.cardId}`}>
                     <SyncOutlined spin={refreshing === c.cardId} /> {t("立即刷新")}
                   </a>,
@@ -390,7 +389,7 @@ export function MyCardsDrawer({
                         <Text type="secondary" style={{ fontSize: 12 }}>{c.updatedAt.slice(0, 16).replace("T", " ")}</Text>
                         <Tag color="cyan">🌍 {c.region}</Tag>
                         {c.state === "deleting" && <Tag color="orange" data-testid={`genbi-card-cleanup-${c.cardId}`}>{t("清理未完成")}</Tag>}
-                        {/* @kf-batch 50-WP28-platform-action-node —— 绿标只给真有载体的(看产物,不看 enabled) */}
+                        {/* 绿标只给真有载体的(看产物,不看 enabled) */}
                         {armedOf(scheds[c.cardId]) && (
                           <Tag color="green" data-testid={`genbi-card-schedule-armed-${c.cardId}`}>{t("定时 {cron}", { cron: scheds[c.cardId].cronExpression })}</Tag>
                         )}
@@ -408,7 +407,7 @@ export function MyCardsDrawer({
               )} />
       )}
 
-      {/* @kf-batch 50-WP28-platform-action-node —— 定时刷新弹框 */}
+      {/* 定时刷新弹框 */}
       <Modal open={Boolean(schedModal)} title={t("定时刷新这张卡片")} onCancel={() => setSchedModal(null)} onOk={() => void saveSchedule()}
              confirmLoading={schedSaving} okText={t("保存")} okButtonProps={{ "data-testid": "genbi-card-schedule-save" } as never}
              data-testid="genbi-card-schedule-modal" width={560}>
@@ -425,7 +424,7 @@ export function MyCardsDrawer({
         )}
       </Modal>
 
-      {/* @kf-batch 50-WP28-platform-action-node —— 刷新历史(手动 + 定时;同一条 taskId) */}
+      {/* 刷新历史(手动 + 定时;同一条 taskId) */}
       <Modal open={Boolean(history)} title={t("刷新历史")} onCancel={() => setHistory(null)} footer={null} width={720} data-testid="genbi-card-history-modal">
         {history?.err && <Alert type="error" showIcon message={history.err} data-testid="genbi-card-history-error" />}
         <Table size="small" rowKey="runId" loading={history?.loading} dataSource={history?.runs || []} pagination={{ pageSize: 10 }}

@@ -1,15 +1,15 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP13-mwaa-region —— MWAA 桶只经解析器
+// MWAA 桶只经解析器
 import { homeMwaaConfigured, homeMwaaEndpoint } from "@/lib/scheduler/mwaa-endpoint";
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk } from "@/lib/api-response";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51 INTERACTION §3「非 admin 只读展示当前生效模型 + 来源」:/api/admin/** 对非 admin 403,
+// INTERACTION §3「非 admin 只读展示当前生效模型 + 来源」:/api/admin/** 对非 admin 403,
 // 故把只读的生效值挂在本端点(登录即可读;不含 overrides / 探测明细 / 配置能力)。
 import { resolveModelRuntime } from "@/lib/ai/model";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-22)。
+// 执行范围。
 // 🔴🔴 这一页原来是**全平台唯一一处硬撒谎**:它声明「此页属于全局控制平面,不受当前执行范围影响」,
 // 却把**主控区的** Redshift 工作组 / Glue 脚本桶 / MWAA DAG 桶 / 默认 VPC / AWS Region 当作
 // 「平台配置」渲染给**所有**区看。切到 us-west-2 的用户看到的是主控区的桶名 —— 而且页面还
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
 
   const payload = {
     aiModel: aiBlock,
-    // @kf-batch 50-WP4ter-coverage —— 这几项现在是「**这个执行环境的**」而不是「平台的」
+    // 这几项现在是「**这个执行环境的**」而不是「平台的」
     targetId,
     displayName: t?.displayName || (isHome(targetId) ? "Home(控制面所在区)" : targetId),
     isHome: isHome(targetId),
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     valuesAreForSingleTarget: viewIsSingleTarget,
     components,
     warehouseInstalled: components.includes("redshift"),
-    // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+    // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
     region: t?.region || (homeFallback ? homeRegion() : NOT_CONFIGURED),
     // 身份是单池全局资源:它**不随区变**,页面上要单独标注(不然用户会以为它也是这个区的)
     cognitoUserPoolId:

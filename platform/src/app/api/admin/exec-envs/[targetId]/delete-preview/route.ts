@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-decommission
 // GET /api/admin/exec-envs/[targetId]/delete-preview —— 删除前的影响预览(INTERACTION §1.4 机制 B;只读)。
 // 绑定资源 / 启用调度 / 运行中 run 三个数(计数唯一作者 lib/exec-env/delete-impact.ts)+ 明细(给「去解绑」直达)
 // + 将保留(不删)的数据资源清单 + `previewHash`(申请删除时带回,服务端重算比对)+ 当前在删除流程的哪一步。

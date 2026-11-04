@@ -124,7 +124,7 @@ describe("接线(写了 ≠ 接上了)", () => {
 
   it("🔴🔴 EMR 提交路径必须在 StartJobRun **之前**做执行角色预检(钉顺序,不只钉存在)", () => {
     const src = stripImports(stripComments(SRC("lib/engines/emr/provider.ts")));
-    // 序 72 B-139:提交路径改走落点化统一入口 preflightExecutionRole(内部仍是 preflightRole 这一个量法)
+    // 提交路径改走落点化统一入口 preflightExecutionRole(内部仍是 preflightRole 这一个量法)
     const pf = src.indexOf("preflightExecutionRole(");
     const start = src.indexOf("StartJobRunCommand(");
     expect(pf, "provider 里必须调 preflightExecutionRole").toBeGreaterThan(-1);

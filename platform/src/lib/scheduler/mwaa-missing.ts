@@ -1,4 +1,3 @@
-// @kf-batch 50-WP13-mwaa-region
 // 客户端安全的「缺 MWAA」响应解析(零依赖:不 import 任何服务端模块,组件与页面都能用)。
 // 服务端形状(50 SPEC v3.26 §2.1):{ success:false, error:{ code:"MWAA_NOT_INSTALLED", message, detail:{ missing:[…], fix:{label, href} } } }
 export interface MwaaMissingItem {
@@ -14,7 +13,7 @@ export interface MwaaMissingPayload {
 }
 
 export const MWAA_NOT_INSTALLED = "MWAA_NOT_INSTALLED";
-// @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §2.1):新码;旧码保留一版,两个都认
+// (SPEC v3.27 §2.1):新码;旧码保留一版,两个都认
 export const SCHEDULER_NOT_INSTALLED = "SCHEDULER_NOT_INSTALLED";
 export const SCHEDULER_MISSING_CODES: readonly string[] = [SCHEDULER_NOT_INSTALLED, MWAA_NOT_INSTALLED];
 
@@ -58,7 +57,7 @@ export function mwaaMissingFromPreviewRows(rows: unknown): MwaaMissingPayload | 
   return {
     message: "",
     missing,
-    // @kf-batch 50-WP15-airflow-serverless:默认高亮 serverless(INTERACTION v2.19 §2.2a)
+    // 默认高亮 serverless(INTERACTION v2.19 §2.2a)
     fix: { label: "去执行环境补装调度", href: `/exec-envs?target=${encodeURIComponent(missing[0].targetId)}&highlight=airflow-serverless` },
   };
 }

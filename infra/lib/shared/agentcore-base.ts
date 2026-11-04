@@ -1,4 +1,4 @@
-// 模块47 L1 — AgentCore 协议层共享装配基类。
+// AgentCore 协议层共享装配基类。
 //
 // 三个 AI 能力(GenBI / netadvisor / paramadvisor)的 AgentCore 栈,协议层(Gateway/GatewayTarget/
 // Runtime 门控/托管 Memory + Memory 角色 + Outputs)【逐字节同构】,此前是三份 copy-paste(754 行)。

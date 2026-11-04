@@ -1,4 +1,4 @@
-// 模块 34 — 自测 sink 存储。generic 通道可指向平台自身 api/alerting/test-sink,收到的 payload
+// 自测 sink 存储。generic 通道可指向平台自身 api/alerting/test-sink,收到的 payload
 // 存进 bgp-alert-events 的保留分区(ruleId="__testsink__"),供无头验证「投递确实到达」+ 页面回看。
 // 复用告警事件表(带 TTL,自动清理),不新增表。
 

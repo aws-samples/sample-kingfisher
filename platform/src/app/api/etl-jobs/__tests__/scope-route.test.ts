@@ -1,5 +1,4 @@
-// @kf-batch 50-WP4-o1-scope
-// `GET /api/etl-jobs` 的执行范围过滤(合同 SPEC v3.36 §2.6;判据 E-150 / E-154 / E-156 / E-158)。
+// `GET /api/etl-jobs` 的执行范围过滤(合同 SPEC v3.36 §2.6;判据)。
 //
 // 🔴 为什么必须可执行:本单元最容易出的两个错都不是「忘了写」,而是「写在了错的位置」——
 //   ① 在**对账之前**过滤 ⇒ 缺省 global 下的副作用变了(别区那几条不再被回写状态);
@@ -74,7 +73,7 @@ beforeEach(() => {
 });
 
 describe("缺省(不带 scope)= 现状", () => {
-  it("全部返回,且**没有**往 DDB 下推任何 target 过滤(回滚点 E-158)", async () => {
+  it("全部返回,且**没有**往 DDB 下推任何 target 过滤(回滚点)", async () => {
     const res = await GET(req());
     const b = await res.json();
     expect(res.status).toBe(200);
@@ -135,7 +134,7 @@ describe("拒因(一律不回落)", () => {
     expect(JSON.stringify(b)).not.toContain("jobId");
   });
 
-  it("🔴 请求头篡改无效(E-156):头指向 usw2、URL 说 home ⇒ 按 home 过滤", async () => {
+  it("🔴 请求头篡改无效:头指向 usw2、URL 说 home ⇒ 按 home 过滤", async () => {
     const res = await GET(
       new NextRequest("https://x.test/api/etl-jobs?scope=tgt_home", {
         headers: { "x-bgp-target-id": "tgt_usw2_a" },

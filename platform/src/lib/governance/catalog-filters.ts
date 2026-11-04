@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47d-catalog-filters —— 数据目录页的筛选(来源 / 库·表桶 / schema·命名空间 / 格式 / 敏感级别)。
+// 数据目录页的筛选(来源 / 库·表桶 / schema·命名空间 / 格式 / 敏感级别)。
 //
 // 🔴 为什么是一个纯模块而不是写在页面里:客户 2026-10-19 反馈「数据目录缺少数据库类型、schema、bucket 等筛选条件」;
 //   目录行的「数据库」一列是 `<db>.<schema>` 一个字符串(Redshift = `dev.public`;S3 Tables 的 FQN 约定

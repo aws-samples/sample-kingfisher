@@ -22,7 +22,7 @@ db_pass = secret["password"]
 
 jdbc_url = "jdbc:mysql://db.example.internal:3306/gamedb"
 tables = ["players","orders"]
-# @kf-batch 50-WP24b-vacuous-sync —— 🔴 零表就**响亮失败**(不许空转成功)。
+# 🔴 零表就**响亮失败**(不许空转成功)。
 # 真环境实测:表清单为空时本脚本一路跑到 "SYNC RESULTS: {}" 然后 SUCCEEDED,
 # 于是平台把任务标成 succeeded 而数仓里连表都没建 —— 看板全绿、什么都没发生。
 if not tables:
@@ -40,7 +40,7 @@ BT = chr(96)
 S3T_BUCKET = BT + S3T_BUCKET_RAW + BT
 S3T_NAMESPACE = "gamedb"
 
-# ── PlaceWire v1 读取函数(WP-31 L6;单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
+# ── PlaceWire v1 读取函数(L6;单一作者 = platform/src/lib/place/wire-py.ts,勿手改)─────────
 import json as _pw_json
 import re as _pw_re
 
@@ -132,7 +132,7 @@ def bgp_place_leg(place, leg):
     return v
 # ── PlaceWire v1 读取函数 结束 ─────────────────────────────────────────────────────────
 
-# @kf-batch 50-WP31-place-first-class —— 序 4(L6):数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
+# 数仓落点 = PlaceWire v1(平台生成期产出并自校验;本脚本用同源读取函数再读一遍,
 #   缺 / 不合法 / 没有数仓腿 ⇒ 当场抛,不会落到任何缺省区或工作组)。
 _BGP_PLACE = bgp_read_place("{\"v\":1,\"targetId\":\"tgt_home\",\"region\":\"us-east-1\",\"redshift\":{\"workgroup\":\"bgp-workgroup\",\"database\":\"dev\",\"secretArn\":\"arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift!bgp-namespace-admin-AbCdEf\"}}")
 _BGP_RS = bgp_place_leg(_BGP_PLACE, "redshift")
@@ -143,7 +143,7 @@ for table_name in tables:
     print(f"{'='*60}")
     # SYNC-07: resolve the target table name (defaults to the source name).
     target_name = target_names.get(table_name, table_name)
-    # 模块42 P42.4/P42.5: 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
+    # 目标表名【标识符安全化】。DynamoDB/S3 源的"表名"来自 AWS 资源名,允许连字符/点
     # (如 bgp-orders / my.table),但 Redshift/S3Tables 的 SQL 标识符不允许裸连字符 → 建表 DDL 语法错
     # (真 bug: "syntax error at or near '-' in context 'public.bgp-'")。JDBC 源表名本是 SQL 标识符不受影响。
     # 统一把非法字符(非字母/数字/下划线)→ 下划线,数字开头补 _。覆盖 Redshift + S3Tables 两个目标。
@@ -219,7 +219,7 @@ for table_name in tables:
     # 改用 **Redshift 托管 admin secret**(与 DMS 路径 execAdminSql 一致,有全权),所有 Data API 语句
     # 都带 SecretArn=admin 执行,从而能建 schema/表/授权。admin secret 名固定 redshift!bgp-namespace-admin。
     import time
-    # @kf-batch 50-WP7-sync-pushdown:数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
+    # 数仓四样(区/workgroup/库/凭证)全部来自注入的 binding。
     rs_client = boto3.client("redshift-data", region_name=_BGP_PLACE["region"])
     rs_workgroup = _BGP_RS["workgroup"]
     rs_database = _BGP_RS["database"]
@@ -229,7 +229,7 @@ for table_name in tables:
     RS_SORT_KEYS = ["created_at","id"]
     RS_DIST_KEY = "id"
     RS_DIST_STYLE = "key"
-    # 🔴 WP-7:执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
+    # 🔴 执行凭证 ARN 由平台生成期从 binding 解析后**注入**(home = 既有 admin secret,
     # 与旧运行期探名拿到的是同一把;非 home = 该 target 自己的凭证)。原先 Python 侧按 home 命名
     # 运行期探名的写法已退役 —— 那个名字是主控区的,非 home 区按它探,探到 = 连错身份,
     # 探不到 = 静默回 IAM,两头都是错。值为 None(无密钥裸环境)= 回退 IAM 身份(旧语义不变)。
@@ -350,7 +350,7 @@ for table_name in tables:
         ensure_schema(f"CREATE SCHEMA IF NOT EXISTS {rs_schema}", "CREATE SCHEMA")
         # Create table if missing. 用 DELETE 而不是 TRUNCATE:①TRUNCATE 是 owner-only;
         # ②增量幂等路径要按 WHERE 精确删区间(见下方 inc_where),TRUNCATE 做不到。
-        # 🔴 L1(52 P52.1)后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
+        # 🔴 L1后**不再需要**"向导预建的表 owner 不同"这层担心:sync/execute-ddl
         #    已改用同一个 admin secret ⇒ 两侧同 owner,不靠任何补授权。
         #    (本注释在 TS 模板串里,禁写反引号——它会当场截断模板字符串。)
         # SYNC-FIX(sortkey): 建表带上 DISTKEY/DISTSTYLE/SORTKEY(与预览 DDL 一致;此前执行脚本裸建表丢了它们)。

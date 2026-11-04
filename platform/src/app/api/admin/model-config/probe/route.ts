@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — POST /api/admin/model-config/probe(51 SPEC §2 / §3.4a:真 invoke 探测,6 次/分钟/管理员,写回探测缓存)。
+// POST /api/admin/model-config/probe(51 SPEC §2 / §3.4a:真 invoke 探测,6 次/分钟/管理员,写回探测缓存)。
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
@@ -27,7 +26,7 @@ export async function POST(req: NextRequest) {
     return modelConfigError("ValidationFailed", 400, { message: "modelId 格式不合法" });
   }
 
-  // @kf-batch 50-WP31-place-first-class —— B-35 同形:探测的区从描述符来(原来 probeModel 缺省 process.env.AWS_REGION)。
+  // 同类缺陷:探测的区从描述符来(原来 probeModel 缺省 process.env.AWS_REGION)。
   //   一期探测只作用于主控区;主控区的 region 也读描述符,不存在 / 没装好 ⇒ 409(放在限频之前:落点解析不开不该吃掉一次额度)。
   let place;
   try {

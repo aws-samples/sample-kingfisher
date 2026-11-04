@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2e2-seed-home
 // home 描述符的**部署期 seed 真调用方**(SPEC §1.1;G 批 P1-1 定案里一直欠着的那半边)。
 //
 // 【为什么现在才有】G 批刻意规定"在真实 seed 调用方落地前 home 不被 seed、`getHomeTarget()`
@@ -25,7 +24,7 @@ import { EC2Client, DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
 import { SecretsManagerClient, DescribeSecretCommand } from "@aws-sdk/client-secrets-manager";
 import { DatabaseMigrationServiceClient, DescribeReplicationSubnetGroupsCommand } from "@aws-sdk/client-database-migration-service";
 import { IAMClient, GetRoleCommand } from "@aws-sdk/client-iam";
-// @kf-batch 50-WP20-retire-classic-mwaa —— 探「经典 MWAA 环境到底在不在」
+// 探「经典 MWAA 环境到底在不在」
 import { MWAAClient, GetEnvironmentCommand } from "@aws-sdk/client-mwaa";
 import {
   BedrockAgentCoreControlClient, GetAgentRuntimeCommand, GetMemoryCommand, ListGatewaysCommand, GetGatewayCommand,
@@ -34,7 +33,7 @@ import { resourceName } from "@/lib/aws/naming";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { getControlPlaneContext } from "@/lib/exec-env/aws-context";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-WP31-seq5-dataplane-role —— 散建收口到唯一工厂(序 5:数据面凭证注入点只有这一处)
+// 散建收口到唯一工厂(数据面凭证注入点只有这一处)
 import { sdkClient } from "@/lib/aws/clients";
 
 const HOME_REGION = homeRegion();
@@ -65,7 +64,6 @@ export interface HomeFacts {
   /** 门控组件的探测结果(查到才声称)。 */
   dmsPresent: boolean;
   /**
-   * @kf-batch 50-WP20-retire-classic-mwaa
    * 🔴 经典 MWAA 是否**真的存在**(用户 2026-09-14:「把 MWAA 的部署版本去掉,都走 MWAA Serverless」)。
    *
    * 改动前这里是**写死的** `"mwaa"` —— 而 home 不再部署经典 MWAA 之后,写死就等于**描述符撒谎**:
@@ -76,12 +74,12 @@ export interface HomeFacts {
   flinkPresent: boolean;
   flinkRoleArn?: string;
   /**
-   * agentcore 门控(P50.2e3,用户实测反馈驱动:「home 缺 agentcore」):
+   * agentcore 门控(用户实测反馈驱动:「home 缺 agentcore」):
    * runtime READY ∧ memory ACTIVE ∧ gateway READY(带真 URL)三者齐 ⇒ 才声称;
    * 三字段是 §1.1 agentcore 袋的必填集,缺一声称就会被 §3.1a 配套校验拒 —— 拒得对。
    */
   agentcore?: { genbiRuntimeArn: string; genbiMemoryId: string; gatewayUrl: string };
-  /** @kf-batch 50-WP15-airflow-serverless:home 的 MWAA Serverless 入口(桶 / 角色 / SG 三样按 SSOT 名探到才声称) */
+  /** home 的 MWAA Serverless 入口(桶 / 角色 / SG 三样按 SSOT 名探到才声称) */
   airflowServerless?: { workflowBucket: string; roleArn: string; sgId: string };
 }
 
@@ -89,7 +87,6 @@ export interface HomeFacts {
  * 采集 home 的运行时真值。core 三项(SG/子网/secret)**任一缺失即抛**(fail-closed:
  * 缺一角就写库 = 半份描述符,§20.11-N2 的教训);门控组件查不到只是"不声称",不是错误。
  */
-// @kf-batch 50-WP15-airflow-serverless
 // 🔴 可选组件探测的错误分类:只有「资源不存在」才等于「未部署 ⇒ 不声称」;权限 / 网络 / 限流等其它错误**必须抛出**。
 //    真环境撞过:TaskRole 缺 iam:GetRole(bgp-airflow-sls-role)⇒ AccessDenied 被 catch 吞成「没装」,seed-home 回 200 却不声称组件,
 //    页面上没有任何线索。把权限错当「未部署」= 静默 fail-open 到错误结论,与「查不到就撒谎」同罪。
@@ -151,7 +148,6 @@ export async function fetchHomeFacts(): Promise<HomeFacts> {
     if (!isNotFoundError(e)) throw optionalProbeError("flink", e);
     flinkPresent = false;
   }
-  // @kf-batch 50-WP20-retire-classic-mwaa
   // 🔴 经典 MWAA:**探到才声称**。用户 2026-09-14 拍板不再部署它(常驻 ≈$350/月,而 serverless 按任务秒计费、
   //    部署分钟级、用法基本一样)。存量环境里它可能还在 ⇒ 这里不是「一律不声称」,而是「按事实」。
   let mwaaPresent = false;
@@ -163,7 +159,7 @@ export async function fetchHomeFacts(): Promise<HomeFacts> {
     mwaaPresent = false;
   }
 
-  // @kf-batch 50-WP15-airflow-serverless:三样按 SSOT 名探(桶 HeadBucket / 角色 GetRole / SG 按名查 id);任一缺 ⇒ 不声称
+  // 三样按 SSOT 名探(桶 HeadBucket / 角色 GetRole / SG 按名查 id);任一缺 ⇒ 不声称
   let airflowServerless: HomeFacts["airflowServerless"];
   try {
     const wb = resourceName("workflowBucket", { targetId: HOME_TARGET_ID, account: ctx.accountId });
@@ -223,12 +219,11 @@ export function buildHomeDescriptor(
   const components = [
     "core",
     "redshift",
-    // @kf-batch 50-WP20-retire-classic-mwaa —— 探到才声称(原来写死;见 HomeFacts.mwaaPresent 的理由)
+    // 探到才声称(原来写死;见 HomeFacts.mwaaPresent 的理由)
     ...(facts.mwaaPresent ? ["mwaa"] : []),
     ...(facts.dmsPresent ? ["dms"] : []),
     ...(facts.flinkPresent ? ["flink"] : []),
     ...(facts.agentcore ? ["agentcore"] : []),
-    // @kf-batch 50-WP15-airflow-serverless
     ...(facts.airflowServerless ? ["airflow-serverless"] : []),
   ];
   const resources: Record<string, unknown> = {
@@ -244,7 +239,7 @@ export function buildHomeDescriptor(
     redshiftSecretArn: facts.redshiftSecretArn,
     // dagBucket 由**平台栈**建(经典 MWAA 与 serverless 都不拥有它)⇒ 恒声称
     dagBucket: home("dagBucket"),
-    // @kf-batch 50-WP20-retire-classic-mwaa —— 环境名只在**真有那个环境**时才写(配套规则 mwaa → [dagBucket, mwaaEnvName])
+    // 环境名只在**真有那个环境**时才写(配套规则 mwaa → [dagBucket, mwaaEnvName])
     ...(facts.mwaaPresent ? { mwaaEnvName: home("mwaaEnvName") } : {}),
   };
   if (facts.dmsPresent) resources.dmsSubnetGroup = home("dmsSubnetGroup");

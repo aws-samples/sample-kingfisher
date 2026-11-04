@@ -20,7 +20,7 @@
    ② **控制面放行该 region**:平台 IAM 的 `aws:RequestedRegion` 条件是**部署时静态**写进策略的,
       不放行就会在「检测初始化」被平台自己的 IAM 拒(向导 Step3 会当场把这句话和运维命令贴出来)。
       放行清单由 `redeploy-platform.sh` **从注册表推导** ⇒ 必须在①之后跑。
-      序 48 起:该区若已是安装 / 升级时预授权的候选区(列表接口 controlPlaneRegionEnabled=true),本步**自动跳过**。
+      起:该区若已是安装 / 升级时预授权的候选区(列表接口 controlPlaneRegionEnabled=true),本步**自动跳过**。
       🔴 顺序还有一层:放行要等 CodeBuild **跑完**再做 —— `redeploy-platform` 会顺手刷新
       `BgpExecEnvDeployStack`(CodeBuild 项目本身),在构建中途改它是自找麻烦。
    ③ 页面「检测初始化」全绿 → 页面「启用」⇒ status=active,才开始承接下推。
@@ -53,7 +53,7 @@ except ImportError:  # pragma: no cover
 
 TERMINAL = {"SUCCEEDED", "FAILED", "FAULT", "TIMED_OUT", "STOPPED"}
 
-# 🔴 默认组件**必须含 `airflow-serverless`**(2026-09-16 血的教训):经典 MWAA 在 WP-20 已停止提供,
+# 🔴 默认组件**必须含 `airflow-serverless`**(2026-09-16 血的教训):经典 MWAA 在已停止提供,
 #   写 `mwaa` 等于一个调度组件都没装上 ⇒ 那个区没有编排/调度载体,而症状会散成 20+ 条互不相干的红。
 DEFAULT_COMPONENTS = ["redshift", "dms", "flink", "airflow-serverless"]
 
@@ -129,7 +129,7 @@ def run_redeploy(profile: str, home_region: str) -> tuple[bool, str]:
     p = subprocess.run(cmd, cwd=os.path.dirname(HERE), capture_output=True, text=True)
     tail = (p.stdout or "")[-1200:] + (p.stderr or "")[-600:]
     # 🔴 读**机读裁决行**,不 grep 中文话术(话术改一个字就会静默判错)。
-    #   `env-blocked` = IAM 模拟门没有真红,只有若干行**在本账号里验不了**(被账号所在组织的 SCP 拦住;或 B-114:放行清单已覆盖
+    #   `env-blocked` = IAM 模拟门没有真红,只有若干行**在本账号里验不了**(被账号所在组织的 SCP 拦住;或:放行清单已覆盖
     #   本账号能挑出的每一个区 ⇒ any-region 轴没有探测区)⇒ 放行这件事是成功的
     #   (那不是那些 region 的属性,也不是平台缺权;换账号必复验)。判成失败就等于「某个区永久不可用」。
     verdict = ""
@@ -148,7 +148,7 @@ async def main() -> int:
     ap.add_argument("--region", required=True, help="要装执行环境的 region(如 us-west-2)")
     ap.add_argument("--home-region", default=os.environ.get("KF_HOME_REGION", "us-east-1"))
     ap.add_argument("--components", default=",".join(DEFAULT_COMPONENTS),
-                    help="期望的组件集(只用来与向导只读清单比对;序 33 ② 起实际组件由产品按法域决定,不能勾选)")
+                    help="期望的组件集(只用来与向导只读清单比对;实际组件由产品按法域决定,不能勾选)")
     ap.add_argument("--no-enable-region", action="store_true",
                     help="不自动跑 redeploy-platform 放行(那你必须自己跑,否则「检测初始化」必被平台自己的 IAM 拒)")
     ap.add_argument("--build-budget", type=int, default=int(os.environ.get("KF_INIT_BUILD_BUDGET", "3900")))
@@ -198,7 +198,7 @@ async def main() -> int:
             except Exception:
                 await L.shot(pg, a.shots, "addregion-00-step1-noregions")
                 sys.exit(f"向导 Step1 的 region 清单 30 s 内没加载出来;页面原文:{(await modal.inner_text())[:300]}")
-            # 序 48:页面在选区那一刻就说「控制面已放行 N 个区」;下拉项标「已放行,建完即可用」/「构建后需运维放行一次」。
+            # 页面在选区那一刻就说「控制面已放行 N 个区」;下拉项标「已放行,建完即可用」/「构建后需运维放行一次」。
             #   把这两处页面原文记进日志(页面证据;候选区预授权的可见性判据)。
             pre = modal.locator('[data-testid="wizard-region-preauth"]')
             L.log(f"[addregion] 向导放行说明:{(await pre.inner_text()) if await pre.count() else '(本版页面没有 wizard-region-preauth)'}")
@@ -228,7 +228,7 @@ async def main() -> int:
             await L.shot(pg, a.shots, "addregion-00-step1")
             await L.click_btn(modal, "下一步", "Next")
             await pg.wait_for_timeout(1200)
-            # Step2:序 33 ②(2026-10-10)起是**只读完整组件清单**(每区必装完整集,没有勾选)⇒ 只读出清单
+            # Step2:是**只读完整组件清单**(每区必装完整集,没有勾选)⇒ 只读出清单
             #        并与期望集比对;少了哪个就如实记下来(那个区会缺相应能力)。组件按 data-testid 认,不靠本地化标签。
             ro = modal.locator("[data-testid=wizard-components-readonly]")
             shown = []
@@ -267,7 +267,7 @@ async def main() -> int:
                 L.log("[addregion] 页面已明示:控制面还没放行该 region —— 本脚本第 ② 步会处理")
 
         tid = t2["targetId"]
-        # 序 48:该区是否已被控制面放行(安装 / 升级时预授权的候选区)—— 列表接口逐 target 带 controlPlaneRegionEnabled。
+        # 该区是否已被控制面放行(安装 / 升级时预授权的候选区)—— 列表接口逐 target 带 controlPlaneRegionEnabled。
         #   已放行 ⇒ 第 ② 步**跳过**(再跑 redeploy 只是白滚一次 ECS);未放行 ⇒ 照旧放行。两种情形都把判断依据打出来。
         region_enabled = t2.get("controlPlaneRegionEnabled")
         L.log(f"[addregion] 控制面对 {a.region} 的放行状态(列表接口 controlPlaneRegionEnabled)= {region_enabled}")
@@ -313,12 +313,12 @@ async def main() -> int:
                 return 1
 
         # ── ② 控制面放行该 region(必须在构建之后、检测初始化之前)──────────────
-        #   序 48:候选区内的区构建完就已放行(IAM 条件在安装 / 升级时就含它)⇒ 不跑 redeploy,直接进第 ③ 步;
+        #   候选区内的区构建完就已放行(IAM 条件在安装 / 升级时就含它)⇒ 不跑 redeploy,直接进第 ③ 步;
         #   复核以构建后的列表接口为准(不是注册那一刻的值)。
         t2 = pick(await list_targets(pg), a.region) or t2
         region_enabled = t2.get("controlPlaneRegionEnabled")
         if region_enabled is True:
-            L.log("[addregion] ✅ 控制面已预授权该 region(候选区,序 48)⇒ 跳过放行,不滚 ECS,直接「检测初始化」")
+            L.log("[addregion] ✅ 控制面已预授权该 region(候选区)⇒ 跳过放行,不滚 ECS,直接「检测初始化」")
         elif not a.no_enable_region:
             await ctx.close()
             await b.close()
@@ -363,7 +363,7 @@ async def main() -> int:
                       f"`scripts/redeploy-platform.sh {a.profile} {a.home_region}` 后重跑本脚本")
             return 1
         # 🔴 「启用」只对 status=testing(相位 verifying)开放;探活全绿 ≠ 相位已推进 —— 完成序(reconcileAfterProbe)还要
-        #   「探活精确覆盖声明组件」等栅栏。B-105(2026-10-19)就是:18 项全绿、按钮在但**灰**,相位停在 provisioning。
+        #   「探活精确覆盖声明组件」等栅栏。就是:18 项全绿、按钮在但**灰**,相位停在 provisioning。
         #   判据必须等那件事真发生(status 变 testing)再点;等不到就把 status 与抽屉标题原文记下来,别把「灰」报成「找不到」。
         status_after = None
         for _ in range(12):

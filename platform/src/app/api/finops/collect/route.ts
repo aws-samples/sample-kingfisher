@@ -4,7 +4,6 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { collectDailyCosts } from "@/lib/finops/collector";
 import { sweepTaskCosts } from "@/lib/finops/sweep";
-// @kf-batch 50-W3f-T0-T3
 import { backfillCostRunStamps } from "@/lib/finops/stamp-backfill";
 
 // POST /api/finops/collect?backfill=1 — 手动触发采集(CE 日成本 + 任务归因扫描)。

@@ -1,7 +1,7 @@
-// 序 73 模块 57(57 DESIGN §3.8 / §4)—— 页面组件服务端真渲染(renderToStaticMarkup + 真 I18nProvider):
+// 页面组件服务端真渲染(renderToStaticMarkup + 真 I18nProvider):
 //   ① JobNode:testid dag-node-job;已关联 ⇒ 作业名 + 引擎 Tag;未关联 ⇒ 「未关联离线作业」;作业不存在 ⇒ 「作业不存在…」;
 //   ② NodeConfigForm(job):testid job-node-picker 的 antd Select、「关联离线作业」、候选按执行区过滤的说明(带区名)、候选读取失败红字;
-//      Form.Item 注入的 id=jobRef 透传到控件(B-94 教训);sync 节点下拉 testid sync-node-picker;
+//      Form.Item 注入的 id=jobRef 透传到控件(教训);sync 节点下拉 testid sync-node-picker;
 //   ③ 接线(源码字面):调色板自动出现(userPlaceable)、DagEditor nodeTypes 有 job、详情页把 wfTargets 传进编辑器、面板的三条候选 URL 都带 scope=;
 //   ④ jobRef ⇄ Select 标量值的编解码闭合(kind 不在清单 ⇒ 不选中)。
 import { describe, it, expect } from "vitest";

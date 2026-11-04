@@ -1,4 +1,4 @@
-// 模块 32 — 自定义连接器(用户上传的 sink JAR)注册表 + 启动时装配。
+// 自定义连接器(用户上传的 sink JAR)注册表 + 启动时装配。
 //
 // 生产顶层设计:MSAF 应用代码只认【单一 uber-jar】(≤512MB)。自定义 sink = 用户上传一个连接器 JAR,
 // 平台在【作业启动时】把它与基础 runner(flink-sql-runner.jar)合并成一个 per-job uber-jar(合并
@@ -6,7 +6,7 @@
 //
 // JAR 本体存代码桶(FLINK_CODE_BUCKET)的 flink/connectors/ 前缀;元数据存 DynamoDB(连接器标识/大小/
 // 上传者/项目+环境)。不硬编码任何账号/桶名 —— 全部来自 flink-config(CDK 注入的 env 派生)。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand,
@@ -19,18 +19,17 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { FLINK } from "./flink-config";
 import { resolveModules, type ConnectorModuleId } from "./connector-modules";
 
-// @kf-batch 50-WP4quater-reads(工单 SC-5)
 // 🔴 这里原来是一个模块级主控区 S3 客户端 + 到处直接用 `FLINK.codeBucket`。后果非常具体:
 // 一个自定义 sink 作业在 us-west-2 启动时,合并出的 per-job uber-jar 被写进**主控区**的桶,
 // 而 MSAF 应用去**本区**的桶找那个 key ⇒ 「取不到 fileKey」启动即失败
-// (与 P42.6b 第 4 条「部署漏传模块 jar」是同一个形状)。
+// (与第 4 条「部署漏传模块 jar」是同一个形状)。
 //
 // 分工定死:**连接器 JAR 的规范副本永远在主控区**(用户上传一次,不必按区各传一份);
 // 装配时**从主控区读源、把合并结果写进作业所在区**的代码桶 —— 一次跨区读、一次本区写。
 const homeS3 = sdkClient("data-plane", S3Client, { region: FLINK.region });
 
 /** 装配落点(只需要「写到哪个桶、用哪个区的客户端」两件事)。
- *  @kf-batch 50-WP31-place-first-class —— 序 3 收尾:三个入口的落点**必填**(原来缺省 `HOME_JAR_PLACE` = 主控区代码桶,
+ *  收尾:三个入口的落点**必填**(原来缺省 `HOME_JAR_PLACE` = 主控区代码桶,
  *  漏传 ⇒ 合并结果静默写回主控区,而 MSAF 去本区找 ⇒「取不到 fileKey」)。 */
 export interface JarPlace { region: string; codeBucket: string }
 async function s3For(place: JarPlace) {
@@ -95,7 +94,7 @@ export async function deleteConnector(connectorId: string): Promise<void> {
   await docClient.send(new DeleteCommand({ TableName: TABLES.FLINK_CONNECTORS, Key: { userId: USER_ID, connectorId } }));
 }
 
-// 模块 32-CR §2.4 约束②:字节级冲突检测的"稳定门面"白名单。
+// §2.4 约束②:字节级冲突检测的"稳定门面"白名单。
 //  同名类字节不同时:命中白名单前缀 → WARN 放行(先加入者胜安全);否则(核心库)→ FAIL 抛错。
 //  🔴 白名单只收「API 极稳、多版本行为一致,且现有已跑通实证」的日志门面:
 //     commons-logging —— 现有 base runner 本就内嵌 30 个同类并已跑通多时(实测)。
@@ -199,7 +198,7 @@ export function uberCacheKey(baseKey: string, modules: string[], userKeys: strin
   return `${FLINK.uberCachePrefix}uber-${hash}.jar`;
 }
 
-/** 模块 32-CR §2.1 第4点 — 模块化按需拼装 + 内容哈希缓存。
+/** §2.1 第4点 — 模块化按需拼装 + 内容哈希缓存。
  *
  *  由【已注入的 finalSql】解析所需连接器模块(resolveModules,CR.1)+ 可选用户上传连接器 → 薄基础 + 各模块
  *  合并成 per-job uber-jar。内容哈希缓存:相同(base+模块集合+用户连接器)→ 同 cacheKey → 命中则复用,零重建。

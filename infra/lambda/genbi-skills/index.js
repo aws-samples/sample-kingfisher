@@ -20,7 +20,7 @@ const HTTP_ALLOWLIST = (process.env.GENBI_HTTP_ALLOWLIST || "")
 const HTTP_TIMEOUT_MS = parseInt(process.env.GENBI_HTTP_TIMEOUT_MS || "8000", 10);
 const HTTP_MAX_BYTES = parseInt(process.env.GENBI_HTTP_MAX_BYTES || "200000", 10);
 
-// ── OpenMetadata 只读描述(供容器 retrieval 语义检索用；模块46 阶段3 路线B)──
+// ── OpenMetadata 只读描述(供容器 retrieval 语义检索用；当前阶段3 路线B)──
 // 容器(AgentCore Runtime)非 VPC、无 secretsmanager 权限;OM 读取放在此 Lambda(有 secretsmanager
 // + 公网出站),容器经 MCP 工具 fetch_om_descriptions 取表描述,自己只做 LLM 重排。与平台
 // lib/openmetadata/om-client.ts 同源认证(bot token 优先,回退 admin basic-auth 登录)。
@@ -39,8 +39,7 @@ async function omAdminPassword() {
   } catch { return ""; }
 }
 
-// @kf-batch 50-B26-lake-place
-// 🔴🔴 B-26:Athena 两个工具原来用模块级主控区客户端 + 主控区工作组 + 主控区联邦目录前缀 ⇒ 别的区问数据湖全落回主控区。
+// 🔴🔴 Athena 两个工具原来用模块级主控区客户端 + 主控区工作组 + 主控区联邦目录前缀 ⇒ 别的区问数据湖全落回主控区。
 //   现在落点逐次从入参取(`H.athPlaceOf(args)`,容器在唯一漏斗里注入),并把**真落点**回报给容器(`ranIn`)。
 async function athenaQuery(sql, database, args) {
   // Athena 用 Trino 方言只读守卫(放行 SHOW/DESCRIBE/EXPLAIN 元数据语句;此前误用 Redshift 版
@@ -104,7 +103,7 @@ function toolNameOf(context) {
   return parts[parts.length - 1] || raw;
 }
 
-// ── fetch_om_descriptions 工具(模块46 阶段3 路线B):读 OpenMetadata 表描述供容器 retrieval ──
+// ── fetch_om_descriptions 工具(当前阶段3 路线B):读 OpenMetadata 表描述供容器 retrieval ──
 // 认证与平台 om-client.ts 同源:优先 SecretsManager 里的 ingestion-bot JWT,回退 admin basic-auth 登录。
 // best-effort:任何失败返回空 map,retrieval 侧会回退全表 grounding,绝不阻断问数。
 let _omToken = null, _omTokenExpiry = 0;
@@ -364,10 +363,10 @@ exports.handler = async (event, context) => {
   let result;
   try {
     switch (tool) {
-      // @kf-batch 50-WP2-one-agentcore-one-om —— 落点随 args 传下去(容器确定性注入,不由模型决定)
+      // 落点随 args 传下去(容器确定性注入,不由模型决定)
       case "run_redshift_sql": result = await H.runRedshiftSql(args.sql || "", args); break;
       case "introspect_redshift_schema": result = await H.introspectRedshift(args); break;
-      // @kf-batch 50-B26-lake-place —— Athena 两个工具也随 args 拿落点(与 Redshift 同一手法)
+      // Athena 两个工具也随 args 拿落点(与 Redshift 同一手法)
       case "run_athena_sql": result = await athenaQuery(args.sql || "", args.namespace || args.database, args); break;
       case "introspect_s3tables_schema": result = await introspectS3Tables(args.namespace || args.database, args); break;
       case "lookup_business_context": result = await lookupBusinessContext(args); break;

@@ -1,5 +1,4 @@
-// @kf-batch 50-G7-P0P1P2
-// G1/G7(模块 50)—— 执行目标注册表读侧单测。
+// G1/G7—— 执行目标注册表读侧单测。
 //
 // 【为什么必须有这个测试】外部审核 P0-4 抓到设计稿里那行 `registry.getTarget(id) ?? homeTarget`
 // 是整份设计最危险的一行:**unknown / 已删 / 未 ready 的 target 被当成 home** ⇒ 跨法域守卫下一步的
@@ -335,7 +334,7 @@ describe("🔴 P0-1 stale 的可执行定义(SPEC §1.1 v3.4)", () => {
 
   // 🔴 home 豁免拆成三条独立断言:变异测试显示"合在一个 it 里"只会红 1 条,
   // 而这个豁免一旦被删就是**全平台 fail-closed**级别的事故,值得三面各钉一条。
-  it("🔴 home 豁免 stale ①:updatedAt 很旧也放行(探活写入方随 P50.2 才来)", async () => {
+  it("🔴 home 豁免 stale ①:updatedAt 很旧也放行(探活写入方才来)", async () => {
     getMock.mockResolvedValue({ Item: homeTarget({ updatedAt: isoAgo(OLD), probe: undefined }) });
     await expect(getHomeTarget()).resolves.toMatchObject({ targetId: HOME_TARGET_ID });
   });
@@ -445,7 +444,7 @@ describe("🔴 P1-4 描述符运行时整包校验 —— 裸 `as ExecutionTarge
     expect(descriptorViolation(target({ someFutureField: { a: 1 } }), "tgt_usw2_a")).toBeNull();
   });
 
-  it("capabilities:存在须为字符串数组;**缺失不拒**(词表未定稿,归 P50.2)", () => {
+  it("capabilities:存在须为字符串数组;**缺失不拒**(词表未定稿)", () => {
     expect(descriptorViolation(target({ capabilities: undefined }), "tgt_usw2_a")).toBeNull();
     expect(descriptorViolation(target({ capabilities: ["x"] }), "tgt_usw2_a")).toBeNull();
     expect(descriptorViolation(target({ capabilities: "x" }), "tgt_usw2_a")).toMatch(/schema/);
@@ -705,7 +704,7 @@ describe("🔴 P1-1 reconcileTarget:带 version 条件的修补", () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 
-  // 🔴🔴 E-19(外部审核 v3 的 N1 整改):安全承重字段的修改面必须用**允许列表**。
+  // 🔴🔴 (外部审核 v3 的 N1 整改):安全承重字段的修改面必须用**允许列表**。
   // 上一版只禁 `pk/sk/targetId/ready` ⇒ 这个"修补"函数顺带能把 §3.9b 的单调状态机改回去,
   // 还能把 target 指向另一个账号。这条测试**逐字段穷举**,而不是只测我想到的那 4 个。
   it("🔴🔴 允许列表:只放行内容类字段,其余**逐个**被拒", async () => {
@@ -992,7 +991,7 @@ describe("🔴 v3-P1-2:资源袋逐项形态 + 组件↔资源配套(实测 malf
         dmsSubnetGroup: "bgp-dms-sg",
         flinkRoleArn: `arn:aws:iam::${ACCOUNT}:role/flink`,
         flinkSubnetIds: ["subnet-0123456789abcdef0"],
-        // @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 三样(SPEC v3.22 §1.3a S4)
+        // residency-api 片 1 三样(SPEC v3.22 §1.3a S4)
         residencyAuditTable: "bgp-region-audit-tgt-usw2-a",
         residencyResultsTable: "bgp-region-results-tgt-usw2-a",
         residencyBucket: `bgp-region-results-${ACCOUNT}-tgt-usw2-a`,

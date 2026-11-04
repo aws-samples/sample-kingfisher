@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-seq5-dataplane-role
-// WP-31 序 5 第一刀 —— 数据面凭证三态的**装配层**判据(真 SDK 客户端 + 假 HTTP 处理器,永不出网)。
+// 数据面凭证三态的**装配层**判据(真 SDK 客户端 + 假 HTTP 处理器,永不出网)。
 // 判的是「这次请求**真正用哪把钥匙签的**」(Authorization 头里的 Credential=AKID),不是某个配置字段:
 //   taskrole ⇒ 任务角色的钥匙;enforce ⇒ 只用数据面角色的钥匙;observe ⇒ 角色先签,IAM 拒才用任务角色重发并记账。
 // 只 mock 真外部(STS);区 → 角色由注入点给(注册表是 DDB);兄弟模块(clients / dataplane-creds / naming)全真。
@@ -70,7 +69,7 @@ afterEach(() => {
 
 const list = () => new ListObjectsV2Command({ Bucket: "bgp-x" });
 
-describe("序 5 数据面凭证三态(按签名用的钥匙判)", () => {
+describe("数据面凭证三态(按签名用的钥匙判)", () => {
   it("开关只认 observe / enforce 两个字面值;其余(含拼错、空)一律 taskrole", () => {
     for (const [v, want] of [["observe", "observe"], ["enforce", "enforce"], ["Enforce", "taskrole"], ["", "taskrole"], [undefined, "taskrole"], ["on", "taskrole"]] as const) {
       if (v === undefined) delete process.env.BGP_DATAPLANE_CREDS;
@@ -110,7 +109,7 @@ describe("序 5 数据面凭证三态(按签名用的钥匙判)", () => {
     expect(String(d[0].detail)).toContain("s3:ListBucket");
   });
 
-  it("🔴 B-47 记账的 operation 来自 SDK 操作模式而不是类名(Next 产物里类名被压成单字母)", async () => {
+  it("🔴 记账的 operation 来自 SDK 操作模式而不是类名(Next 产物里类名被压成单字母)", async () => {
     process.env.BGP_DATAPLANE_CREDS = "observe";
     const X = class extends ListObjectsV2Command {};
     expect(X.name).not.toBe("ListObjectsV2Command");
@@ -119,7 +118,7 @@ describe("序 5 数据面凭证三态(按签名用的钥匙判)", () => {
     expect(lines.filter((l) => l.event === "place.creds.denied").map((l) => l.operation)).toEqual(["ListObjectsV2"]);
   });
 
-  it("🔴 B-49 observe:带要交给服务的角色 ARN(PassRole)⇒ 不试数据面角色、直接任务角色并记 identity-sensitive —— DMS 对 PassRole 不足回的是 InvalidParameterValue 而不是 AccessDenied", async () => {
+  it("🔴 observe:带要交给服务的角色 ARN(PassRole)⇒ 不试数据面角色、直接任务角色并记 identity-sensitive —— DMS 对 PassRole 不足回的是 InvalidParameterValue 而不是 AccessDenied", async () => {
     process.env.BGP_DATAPLANE_CREDS = "observe";
     const { DatabaseMigrationServiceClient, CreateEndpointCommand } = await import("@aws-sdk/client-database-migration-service");
     const seen: Seen[] = [];
@@ -283,7 +282,7 @@ describe("分类器", () => {
     expect(isIdentitySensitive({ Sqls: ["a"], WorkgroupName: "w" })).toBe(true);
     expect(isIdentitySensitive({ Sql: "select 1", WorkgroupName: "w", SecretArn: "arn:x" })).toBe(false);
     expect(isIdentitySensitive({ Bucket: "b" })).toBe(false);
-    // B-49:深层带角色 ARN ⇒ 身份敏感;别的 ARN(secret / bucket)不算
+    // 深层带角色 ARN ⇒ 身份敏感;别的 ARN(secret / bucket)不算
     expect(isIdentitySensitive({ RedshiftSettings: { SecretsManagerAccessRoleArn: "arn:aws:iam::000000000000:role/r" } })).toBe(true);
     expect(isIdentitySensitive({ jobDriver: {}, executionRoleArn: "arn:aws-cn:iam::000000000000:role/r" })).toBe(true);
     expect(isIdentitySensitive({ SecretId: "arn:aws:secretsmanager:us-east-1:000000000000:secret:s", Bucket: "arn:aws:s3:::b" })).toBe(false);

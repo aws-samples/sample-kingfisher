@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-dataplane
 // 调度 DAG 的 **执行面 / 控制面 region 拆分** 门禁(50 SPEC §3.1 的 `_mk_exec` / `_mk_ctrl`)。
 //
 // 🔴 这里的承重不是"执行面跟着 target 走",而是**控制面绝不跟着 target 走**:
@@ -9,7 +8,7 @@
 // 而且**不报错**,只是偶发失败。所以这条必须是负向可执行断言,不是注释。
 //
 // 第二条承重:非 home 缺参**必须抛**。兜底的后果不是报错,而是"手动跑在第二区域、定时跑回了 home"
-// —— P50.1 刚为同一个病收编过 workgroup 兜底,不能在这里重新开一个。
+// 刚为同一个病收编过 workgroup 兜底,不能在这里重新开一个。
 import { describe, it, expect, beforeEach } from "vitest";
 import { generateEtlJobDag } from "@/lib/etl/dag-generator";
 import type { EtlJob } from "@/types/etl-job";

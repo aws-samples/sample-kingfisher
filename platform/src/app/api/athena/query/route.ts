@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { requireProject } from "@/lib/projects/guard";
 import { sanitizeReadOnly } from "@/lib/athena/sql-guard";
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
 
-  // @kf-batch 50-WP4ter-coverage —— 工单 SC-4:执行落点只来自 **body.targetId**
+  // 执行落点只来自 **body.targetId**
   // (SPEC §2.6.3:写/执行路由不读 `?scope=` —— 地址栏是视图状态,不该决定在哪个区真跑)。
   const body = await req.json().catch(() => ({} as { sql?: string; targetId?: unknown }));
   const sql: string = body?.sql || "";

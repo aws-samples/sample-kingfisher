@@ -1,4 +1,3 @@
-// @kf-batch 50-CAPSEED-seed-dispatch
 // 🔴🔴 **「在该区下发一次造数」的唯一作者**(登记 CAP-SEED 的交付)。
 //
 // 【谁调它】两条路,同一个函数:

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-# @kf-batch 50-WP27-9cap-matrix
 """IAM 模拟门的**三态裁决**离线判据(`scripts/iam-simulate-gate.py` 的 `classify` / `org_blocked_of` / `sim_regions_for` / `verdict_code`)。
 
-🔴 B-114(2026-10-22 测试账号 all-enabled 升级真撞):放行清单覆盖了所有固定备选探测区 ⇒ redeploy 第 4 步 die。修后门认
+🔴 (2026-10-22 测试账号 all-enabled 升级真撞):放行清单覆盖了所有固定备选探测区 ⇒ redeploy 第 4 步 die。修后门认
   `--probe-region none`:any-region 轴只在 home 模拟、「放行集之外也 allowed」这一半记未验、退 4 —— 本文件钉的是
   「未验绝不许退 0」与「none 时不在 home 之外的任何区模拟」这两条(纯函数,离线打)。
 
@@ -70,7 +69,7 @@ REGIONS = ["us-east-1", "us-west-2", "eu-central-1"]
 CASES_SIM = [
     # (name, axis, probe, 期望 regions, 期望 unverified)
     ("any-region + 探测区 ⇒ [探测区, home],已验", "any-region", "af-south-1", ["af-south-1", "us-east-1"], False),
-    ("any-region + none(B-114)⇒ 只 home,记未验", "any-region", "none", ["us-east-1"], True),
+    ("any-region + none ⇒ 只 home,记未验", "any-region", "none", ["us-east-1"], True),
     ("execution ⇒ 放行集每个区(与探测区无关)", "execution", "none", REGIONS, False),
     ("home 轴 ⇒ 只 home(与探测区无关)", "home", "none", ["us-east-1"], False),
     ("home 轴 + 探测区 ⇒ 仍只 home", "home", "af-south-1", ["us-east-1"], False),
@@ -80,7 +79,7 @@ CASES_VERDICT = [
     ("全 allowed ⇒ 0", False, False, False, 0),
     ("有真红 ⇒ 1(压过一切)", True, True, True, 1),
     ("无真红、有 SCP ⛔ ⇒ 4", False, True, False, 4),
-    ("无真红、any-region 轴未验(B-114)⇒ 4,不许退 0", False, False, True, 4),
+    ("无真红、any-region 轴未验 ⇒ 4,不许退 0", False, False, True, 4),
     ("⛔ 与未验同时有 ⇒ 4", False, True, True, 4),
 ]
 
@@ -118,7 +117,7 @@ def main() -> int:
         print(f"  {mark} verdict_code:{name} ⇒ {got}(期望 {want})")
         if got != want:
             fails.append(name)
-    # 🔴 B-114 的字面常量:redeploy-platform.sh 传的就是这个词;两边各写一份就会漂
+    # 🔴该缺陷的字面常量:redeploy-platform.sh 传的就是这个词;两边各写一份就会漂
     n += 1
     if g.PROBE_NONE == "none":
         print("  ✅ PROBE_NONE 字面 = none(与 redeploy-platform.sh 的 IAM_PROBE_REGION=none 同词)")

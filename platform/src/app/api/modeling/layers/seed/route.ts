@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { seedLayers } from "@/lib/modeling/service";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 35: 一键预置标准分层 ODS/DWD/DWS/ADS(幂等;仅平台管理员)。
+// 一键预置标准分层 ODS/DWD/DWS/ADS(幂等;仅平台管理员)。
 export async function POST(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);

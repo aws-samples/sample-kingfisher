@@ -1,10 +1,9 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
 // `GET /api/monitor/runs` 的**可执行**门禁(52 SPEC §1 读侧 + 50 INTERACTION §3.3)。
 //
 // 🔴 为什么必须可执行、不能扫源码:本批修的两件事里,
 // 「`Limit` 与 `FilterExpression` 同时用 ⇒ 过滤在 Limit 之后 ⇒ 带筛选时静默少报」
 // **只能靠跑一遍来证明** —— 源码里有没有 `ExclusiveStartKey` 这个词跟"翻页对不对"是两件事
-// (P52.1-D4 那条假门禁就是这么绿的)。所以这里打桩一个**分页的** DDB:
+// (那条假门禁就是这么绿的)。所以这里打桩一个**分页的** DDB:
 // 让命中的那条 run 落在**第三页**,原实现必红、现实现必绿。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";

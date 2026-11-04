@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 34 — 告警中心。三 Tab:规则 / 通道 / 事件。
+// 告警中心。三 Tab:规则 / 通道 / 事件。
 // 全局 fetch 拦截器自动带 Authorization + x-bgp-project(见 AuthProvider),故直接 fetch。
 
 import React, { useEffect, useState, useCallback } from "react";
@@ -14,7 +14,7 @@ import {
 } from "@ant-design/icons";
 import SlaPanel from "@/components/alerting/SlaPanel";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-10)。🔴 这一页最要紧的不是过滤,
+// 执行范围。🔴 这一页最要紧的不是过滤,
 // 而是**聚合类条件默认按区分别评估**(见 lib/alerting/evaluate.ts):池化会让一个区全挂
 // 被健康区平均掉 ⇒ 不告警。页面这里做两件事:按区看规则/事件 + 事件列表显示「哪个区」。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -34,7 +34,7 @@ const CHANNEL_LABEL: Record<ChannelType, string> = { dingtalk: "钉钉", wecom: 
 export default function AlertingPage() {
   const t = useT();
   // 旧 /sla URL 重定向带 ?tab=sla 直达该 Tab(2026-07-13 调度运维收敛)。
-  // B-138:首帧固定 rules(= 服务端),挂载后按 ?tab=sla 切换;初值函数里读 window.location 会让 React 19 报水合不一致
+  // 首帧固定 rules(= 服务端),挂载后按 ?tab=sla 切换;初值函数里读 window.location 会让 React 19 报水合不一致
   const [tab, setTab] = useBrowserInitialState<string>("rules", () =>
     new URLSearchParams(window.location.search).get("tab") === "sla" ? "sla" : "rules"
   );
@@ -72,7 +72,7 @@ function RulesTab({ active }: { active: boolean }) {
   const [editing, setEditing] = useState<any>(null);
   const [form] = Form.useForm();
 
-  // @kf-batch 50-WP4ter-coverage —— 规则按区看(盯全部区的规则在任何视角下都出现)
+  // 规则按区看(盯全部区的规则在任何视角下都出现)
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
@@ -114,7 +114,7 @@ function RulesTab({ active }: { active: boolean }) {
   };
 
   const submit = async () => {
-    const v = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const v = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!v) return;
     const payload = { ...v };
     const url = editing ? `/api/alerting/rules/${editing.ruleId}` : "/api/alerting/rules";
@@ -314,7 +314,7 @@ function ChannelsTab({ active }: { active: boolean }) {
   };
 
   const submit = async () => {
-    const v = await form.validateFields().catch(() => null); // 序 43 nit:校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
+    const v = await form.validateFields().catch(() => null); // 校验不过时 antd 已在表单上标红,别让 rejection 冒成控制台 Uncaught Object
     if (!v) return;
     const payload: any = { name: v.name, type: v.type };
     if (v.webhookUrl) payload.webhookUrl = v.webhookUrl;
@@ -419,7 +419,6 @@ function EventsTab({ active }: { active: boolean }) {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // @kf-batch 50-WP4ter-coverage
   const { scope: evScope, targets: evTargets } = useScope();
   const evScopeParam = toScopeParam(evScope);
   const evScopeQs = evScopeParam ? `?scope=${encodeURIComponent(evScopeParam)}` : "";
@@ -472,7 +471,7 @@ function EventsTab({ active }: { active: boolean }) {
         columns={[
           { title: t("级别"), dataIndex: "severity", width: 70, render: (v: Severity) => <Tag color={SEVERITY_COLOR[v]}>{v}</Tag> },
           { title: t("规则"), dataIndex: "ruleName", width: 160 },
-          // @kf-batch 50-WP4ter-coverage —— 值班第一个问题是「哪个区挂了」⇒ 单独一列
+          // 值班第一个问题是「哪个区挂了」⇒ 单独一列
           {
             title: t("执行环境"), dataIndex: "targetId", width: 130,
             render: (v?: string) => (v ? <Tag color="blue">{regionOf(v)}</Tag> : <Tag>{t("全平台合计")}</Tag>),

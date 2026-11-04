@@ -1,6 +1,5 @@
-// @kf-batch 50-P50.3b-2a-reconciler
 // deriveHealthFromProbe(纯,穷举 green/streak/core-red)+ reconcileTelemetry(周期 telemetry 窄通道)。
-// 🔴 本文件钉住 P50.3b-2a 最承重不变量:**fail-open 反转禁令** —— 探活红 ⇒ health 降级 ⇒ 派生 status≠active
+// 🔴 本文件钉住-2a 最承重不变量:**fail-open 反转禁令** —— 探活红 ⇒ health 降级 ⇒ 派生 status≠active
 //    (绝不因 reconciler 刷新了 probe.at 就把红探活的 target 当"新鲜+active"放行)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -198,7 +197,7 @@ describe("reconcileTelemetry(窄通道)", () => {
   });
 });
 
-describe("adoptLegacy 据 stored probe.ok DEMOTE(P50.3b-2a legacy 侧 fail-open 反转禁令;re-audit 揪出的回归)", () => {
+describe("adoptLegacy 据 stored probe.ok DEMOTE(2a legacy 侧 fail-open 反转禁令;re-audit 揪出的回归)", () => {
   // 🔴 reconciler 对 legacy target 也无条件刷新顶层 probe.at,废掉"红探活 15min 后 stale"安全网 ⇒
   //    adoptLegacy 必须据 stored probe.ok DEMOTE(红→unknown fail-closed),否则红探活的 legacy active 目标永远可服务。
   const legacy = (probe?: ProbeResult): ExecutionTarget =>

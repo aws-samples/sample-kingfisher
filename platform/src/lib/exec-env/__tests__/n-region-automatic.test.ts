@@ -1,4 +1,3 @@
-// @kf-batch 50-WP27b-n-region-auto
 // 🔴🔴 **「多区域自动」必须是机械可查的,不能靠「我们记得别写死」**
 //
 // 【用户 2026-09-20 原话】
@@ -45,7 +44,7 @@ function stripComments(s: string): string {
     .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
 }
 
-describe("多区域自动:不许把区数 / 区名写死(WP-27b)", () => {
+describe("多区域自动:不许把区数 / 区名写死", () => {
   it("① 新建向导的候选区来自**账号真值**,不是写死的候选表", () => {
     const wiz = read("app/exec-envs/CreateWizard.tsx");
     // 写死的候选表必须已经没了
@@ -101,7 +100,7 @@ describe("多区域自动:不许把区数 / 区名写死(WP-27b)", () => {
     ).toBeLessThanOrEqual(HARDCODED_REGION_LIMIT);
   });
 
-  // @kf-batch 50-PROD-A-launch-hardening —— 用户 2026-10-09:「每次刷新列表都去真实查询一次」
+  // 用户 2026-10-09:「每次刷新列表都去真实查询一次」
   it("⑥ 候选区**每次都真查**:路由 no-store + 回带查询时刻 · 客户端 no-store · 向导有「刷新」且它触发重新取数", () => {
     const route = stripComments(read("app/api/admin/exec-envs/candidate-regions/route.ts"));
     expect(route, "路由没禁缓存 ⇒ 浏览器 / CloudFront 可能回旧清单").toMatch(/Cache-Control["']\s*,\s*["']no-store/);

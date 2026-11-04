@@ -1,14 +1,14 @@
 "use client";
 
-// 模块 44 — 统一 Copilot 全局入口(P44.1)。自包含组件:一个 Header 图标 + 右侧抽屉。
-// 挂在 Header,任意页可唤起,不打断当前页。P44.1 仅只读问答;安全边界提示常驻底部。
+// 统一 Copilot 全局入口。自包含组件:一个 Header 图标 + 右侧抽屉。
+// 挂在 Header,任意页可唤起,不打断当前页。仅只读问答;安全边界提示常驻底部。
 // 全局 fetch 拦截器已自动附带 Cognito token + 项目/环境头(AuthProvider),此处直接 fetch 即可。
 
 import React, { useRef, useState } from "react";
 import { Drawer, Input, Button, Tooltip, Spin, Tag, Empty, Segmented } from "antd";
 import { RobotOutlined, SendOutlined, ClearOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 import ExecutionPlanCard, { type Plan, type PlanStep } from "./ExecutionPlanCard";
 

@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // invokeWithFallback 单测(51 SPEC §3.5;ACCEPTANCE M9 冷悬崖降级 / M14 回显实际值)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invokeWithFallback, invokeConverse, invokeAgent, isThrottleError, isUnavailableError, MAX_RETRY, BACKOFF_BASE_MS } from "../invoke";
@@ -110,7 +109,7 @@ describe("两形态薄壳", () => {
   });
 });
 
-// @kf-batch 51-v2-multi-vendor —— 51 SPEC §7.2 平台落点:invokeConverse 整形 + 学到字段同层重试一次
+// 51 SPEC §7.2 平台落点:invokeConverse 整形 + 学到字段同层重试一次
 describe("D12 请求整形(invokeConverse 唯一落点)", () => {
   const KIMI = "global.moonshotai.kimi-k3";
   const CLAUDE = "us.anthropic.claude-opus-4-5-20251101-v1:0";

@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { NextRequest, NextResponse } from "next/server";
 import { KinesisClient, ListStreamsCommand } from "@aws-sdk/client-kinesis";
@@ -10,7 +10,7 @@ import { requireProject } from "@/lib/projects/guard";
 const REGION = homeRegion();
 
 // GET /api/datasources/kinesis-streams — 列出本账号本区已存在的 Kinesis 流(供建源"使用已有流"下拉)。
-//  模块42 P42.7:让用户从下拉选已有流,而非手敲流名(更符合用户行为)。分页续拉直到 HasMoreStreams=false。
+//  让用户从下拉选已有流,而非手敲流名(更符合用户行为)。分页续拉直到 HasMoreStreams=false。
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;

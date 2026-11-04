@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47a-promote-ux —— GET /api/promote/lineage 路由判据:参数校验 / 404 / 只读守卫 viewer / 透传 lineageStatus。
+// GET /api/promote/lineage 路由判据:参数校验 / 404 / 只读守卫 viewer / 透传 lineageStatus。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
 

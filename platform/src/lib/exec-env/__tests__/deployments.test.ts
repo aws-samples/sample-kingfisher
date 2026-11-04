@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-multibind
 // 版本一致性矩阵的**格子语义**门禁(INTERACTION §3.1 + §2bis.4 + SPEC §1.3a-S1)。
 //
 // 🔴 这个纯函数是整张看板的正确性支点,而它最容易犯的错**不是漏报,是误报**。
@@ -154,7 +153,6 @@ describe("行汇总", () => {
   });
 });
 
-// @kf-batch 50-P50.3-fanout
 describe("🔴 台账是运行态,不许进版本快照(否则回滚会造出「假台账」)", () => {
   it("`getResourceConfig` 不含 deployments —— 回滚/晋升都不许把台账带过去", async () => {
     const { getResourceConfig } = await import("@/lib/versions/version-service");

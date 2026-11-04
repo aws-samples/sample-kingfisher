@@ -1,4 +1,4 @@
-// @kf-batch 50-WP6-cost-by-region —— 区卡片 / 对账 / 采集窗口 / 视角换算的纯函数判据。
+// 区卡片 / 对账 / 采集窗口 / 视角换算的纯函数判据。
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/exec-env/registry", () => ({

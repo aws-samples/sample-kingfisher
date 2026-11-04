@@ -13,7 +13,7 @@ export type ParamChannel =
   | "glue-sync" // 数据同步 Glue 通道(sync 表单):retry/timeout + Iceberg + Redshift 目标参数
   | "flink" // 实时计算 MSAF:parallelism/parallelismPerKPU/autoScaling
   | "dms" // 实时同步 DMS 通道:实例规格/迁移类型/LOB + Redshift 目标参数
-  | "emr"; // 离线多引擎 EMR Serverless Spark 作业(模块 33-A):driver/executor 规格 + release/架构 + executor 数 + sparkConf
+  | "emr"; // 离线多引擎 EMR Serverless Spark 作业:driver/executor 规格 + release/架构 + executor 数 + sparkConf
 
 // 单个参数的目录定义——对齐托管服务 console 创建页([[full-param-parity-with-managed-consoles]]的机器可读化)。
 export interface ParamDef {

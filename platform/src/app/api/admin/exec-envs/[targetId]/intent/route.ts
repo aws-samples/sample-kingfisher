@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3b-4-drain
 // POST /api/admin/exec-envs/[targetId]/intent —— 排空 / 回服务(SPEC §1.1 双轴:spec 由人写)。
 //
 // 【它买到什么】排空(drain)= "这个 target 不再承接**新**工作,在途的让它跑完"。运维在维护、腾挪、
@@ -9,7 +8,7 @@ export const dynamic = "force-dynamic";
 //
 // 🔴 三条闸(缺一条都会变成"看起来能点其实有害"):
 //   ① **只允许 serve / drain** —— `delete` 会把 phase 推向 decommissioning/gone,而**真销毁栈**是 §4.6
-//      (影响预览 → 输名强确认 → 审批 → 销毁;数据桶 RETAIN)、归 P50.3。放开它就会造出
+//      (影响预览 → 输名强确认 → 审批 → 销毁;数据桶 RETAIN)、。放开它就会造出
 //      "标成已退役而资源全在"的 tombstone 谎,比不做更糟;
 //   ② 🔴 **home 不许排空** —— home 是控制面自己的执行环境,排空它 = 平台自断双腿(自我 DoS)。
 //      与"home 不显示删除入口"同一条口径;

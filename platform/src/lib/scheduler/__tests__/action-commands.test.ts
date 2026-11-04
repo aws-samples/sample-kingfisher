@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **「按时跑一次平台动作」的合同**:白名单 = 安全边界;命令形状 = python/TS 两侧同源。
 //
 // 【这组判据钉五件事】
@@ -7,7 +6,7 @@
 //   ② 白名单外的动作**一律不是合法命令**(`parseActionCommand` 直接回 null);
 //   ③ 形态 fail-closed:缺字段 / 状态非法 / 不是对象 ⇒ null,**不许猜**
 //      (本仓的案底:非 home 数仓落点猜错不会报错,而是「看起来正常地连到了别的区域」);
-//   ④ 三条缺口能力都被覆盖到(`seed` / `governance` / `genbi`)—— 否则 WP-29 落不下来;
+//   ④ 三条缺口能力都被覆盖到(`seed` / `governance` / `genbi`)—— 否则落不下来;
 //   ⑤ 🔴 **不许出现危险动作**:删除 / 下线 / 停用这类不该被无人值守触发的动作不得进白名单。
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
@@ -39,7 +38,7 @@ const OK = {
   status: "pending",
 };
 
-describe("平台动作命令的合同(WP-28)", () => {
+describe("平台动作命令的合同", () => {
   it("① 白名单是闭合式的:每条都要有路由 / 能力 / 「为什么可无人值守」", () => {
     expect(DISPATCHABLE_ACTIONS.length).toBeGreaterThanOrEqual(3);
     for (const a of DISPATCHABLE_ACTIONS) {
@@ -83,7 +82,7 @@ describe("平台动作命令的合同(WP-28)", () => {
     expect(full).toMatchObject({ runId: "r1", taskId: "t1", projectId: "p1", params: { a: 1 } });
   });
 
-  // @kf-batch 50-CAPSEED-seed-dispatch —— 造数载体交付:原来那条「seed 不许占位」按约定改成正向断言
+  // 造数载体交付:原来那条「seed 不许占位」按约定改成正向断言
   //   (作者 = lib/seed/run-once#runSeedOnce;下面「路由真实存在 + 库函数真实导出 + 路由真调用它」那条同样覆盖它)。
   it("④ 三类缺口能力都覆盖到(seed / governance / genbi),且造数只有一个动作、走它自己的单一作者", () => {
     const caps = new Set(DISPATCHABLE_ACTIONS.map((a) => a.capability));

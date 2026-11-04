@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
 // POST /api/internal/dataplane-jobs/step  { jobId } —— **平台内部端点**(唯一调用方:本进程的推进泵,回环)。
 //
-// 一步 = 抢 lease → 执行 / 轮询一步 → 写回(墙钟 45s;WORK-PACKAGES WP-9 ④-2)。逻辑全在 `runJobStep`,
+// 一步 = 抢 lease → 执行 / 轮询一步 → 写回(墙钟 45s;④-2)。逻辑全在 `runJobStep`,
 // 页面「立即推进」走同一份(admin 鉴权)。
-// 🔴 鉴权复用 WP-28 的内部守卫(不经 CloudFront + 来源头 + Secrets Manager 共享密钥),来源名 `dataplane-job-pump`;
+// 🔴 鉴权复用 内部守卫(不经 CloudFront + 来源头 + Secrets Manager 共享密钥),来源名 `dataplane-job-pump`;
 //    分发 Lambda 的来源敲不开这里(`expectedSource` 精确判)。
 // 🔴 请求体只认 jobId:做什么、以谁的名义做,都从作业行读(入队时由有权的路由写定)。
 // 🔴 被拒必留痕;正常推进不逐次写审计(15s 一轮会把审计表刷成噪声)—— 作业里每个 admin 动作自己有意图 / 结果审计。

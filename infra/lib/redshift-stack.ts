@@ -4,12 +4,12 @@ import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
-// @kf-batch 50-P50.1-workgroup-ssot — home 的 workgroup 名取自命名 SSOT(部署侧出口)。
+// home 的 workgroup 名取自命名 SSOT(部署侧出口)。
 import { resourceName, HOME_TARGET_ID } from "./shared/naming";
 
 interface RedshiftStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
-  dataKey: kms.IKey; // 模块 27 (WS1) — 数据域 CMK
+  dataKey: kms.IKey; // 数据域 CMK
 }
 
 export class RedshiftStack extends cdk.Stack {
@@ -19,7 +19,7 @@ export class RedshiftStack extends cdk.Stack {
     const sg = new ec2.SecurityGroup(this, "RedshiftSg", { vpc: props.vpc, description: "Redshift Serverless SG" });
     sg.addIngressRule(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(5439));
 
-    // 模块 27 (WS1 — 加密): 命名空间用数据域 CMK 静态加密。CfnNamespace 是 L1 构造,CDK 不会
+    // (WS1 — 加密): 命名空间用数据域 CMK 静态加密。CfnNamespace 是 L1 构造,CDK 不会
     // 像 L2 那样自动补 key policy——故显式授权 Redshift 服务主体使用该 key(含 CreateGrant)。
     props.dataKey.grant(
       new iam.ServicePrincipal("redshift.amazonaws.com"),

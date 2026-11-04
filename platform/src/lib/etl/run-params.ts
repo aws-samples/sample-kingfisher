@@ -1,11 +1,11 @@
-// 模块 16 — 运行参数化 (v1.7.0): business-date template variables for ETL jobs.
+// 运行参数化 (v1.7.0): business-date template variables for ETL jobs.
 //
 // Jobs can reference ${ds} (business date YYYY-MM-DD) and friends in their script. At run
 // time the platform renders them for a given runDate (UTC). Redshift SQL jobs get text
 // substitution; Glue jobs receive the values as job arguments (--ds, ...); EMR Serverless jobs
 // receive the same names as entryPointArguments (--ds <value> ...).
 //
-// @kf-batch 37-emr-run-date —— 🔴 业务日期变量的**单一作者**(全平台一张表,15 个键)。
+// 🔴 业务日期变量的**单一作者**(全平台一张表,15 个键)。
 //   原来有三套作者:这里 6 个 / lib/sync/run-vars.ts 的 syncRunVars 15 个 / MWAA 运行时与经典 DAG 的 Python 各自手算 4 个。
 //   现在:TS 侧只有 `paramSet`;Python 侧只有 `bgp_sync_run_vars`(lib/sync/run-vars-py.ts,经 lib/etl/run-params-py.ts
 //   转出给调度运行时与经典 DAG)。两侧逐日 parity 判据:lib/etl/__tests__/run-params-parity.test.ts。
@@ -29,7 +29,7 @@ export function todayDs(): string {
 export function isValidDs(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const d = new Date(`${s}T00:00:00Z`);
-  // @kf-batch 37-sync-capability —— 🔴 Date.parse 会把 2026-02-30 顺延成 3 月 2 日(V8 行为)⇒ 原来这里放过不存在的日子,
+  // 🔴 Date.parse 会把 2026-02-30 顺延成 3 月 2 日(V8 行为)⇒ 原来这里放过不存在的日子,
   //   作业带着 ds="2026-02-30" 一路跑到脚本里才炸。往返一次:格式对且真实存在才算合法。
   return !Number.isNaN(d.getTime()) && toDs(d) === s;
 }

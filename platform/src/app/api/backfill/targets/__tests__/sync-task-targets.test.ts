@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-backfill —— 序 37 ⑦:补数目标下拉加上同步任务,但**只在显式要时**(`?include=sync-task`)。
+// 补数目标下拉加上同步任务,但**只在显式要时**(`?include=sync-task`)。
 // 🔴 本接口另一个消费者是告警页 SLA 面板 ⇒ 不带参数时响应必须与改动前逐字节相同(连 Scan 都不多发一个)。
 // 只 mock 真外部:DDB(按表回行)、项目守卫。scope 过滤与「能不能补」走真实现。
 import { describe, it, expect, vi, beforeEach } from "vitest";

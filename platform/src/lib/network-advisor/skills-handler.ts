@@ -179,7 +179,7 @@ export const handler = async (event: SkillEvent, context: LambdaContext) => {
   const req = event?.request;
   let result: { success: boolean; [k: string]: unknown };
   try {
-    // @kf-batch 41-B115-netadvisor-place —— 落点(targetId + 描述符解析出的 region)由平台路由写进 request 再注入 Runtime;
+    // 落点(targetId + 描述符解析出的 region)由平台路由写进 request 再注入 Runtime;
     //   没有它就不知道该探哪个区的网络,fail-closed(不默认 Lambda 自己的 AWS_REGION = 主控区)。
     if (!req || !req.computeKind || !Array.isArray(req.targets) || !req.targetId || !req.region) {
       result = { success: false, error: "缺少 request(需含 computeKind + targets + targetId + region;落点由平台按 targetId 解析后写入)" };

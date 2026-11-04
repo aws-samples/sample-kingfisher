@@ -1,9 +1,9 @@
-// @kf-batch 37-sync-capability —— 同步脚本里**运行时**解析业务日期与日期变量的 Python 片段(单一作者)。
+// 同步脚本里**运行时**解析业务日期与日期变量的 Python 片段(单一作者)。
 // 取值表与 TS 侧 `syncRunVars`(lib/sync/run-vars.ts)逐项同源;判据 run-vars-parity.test.ts 用真 python3 逐日比对。
 // 🔴 只在任务真用到日期变量时才进脚本(存量任务的脚本逐字节不变)。
 // 🔴 本串会被嵌进 TS 模板字符串:禁写反引号与「美元 + 左花括号」的连写(Python 里用 "$" + "{" 拼)。
 export const SYNC_RUN_VARS_PY = String.raw`
-# ── 序 37:业务日期与日期变量(平台生成;取值表与平台 TS 侧 syncRunVars 同源)──
+# ── 业务日期与日期变量(平台生成;取值表与平台 TS 侧 syncRunVars 同源)──
 from datetime import datetime as _bgp_dt, timedelta as _bgp_td, date as _bgp_date
 _BGP_VAR_RE = re.compile(r"\$\{([^}]*)\}")
 

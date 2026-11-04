@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 3 第一批 —— 「落点必须点名」的三个作者 + 入口路由:
+// 「落点必须点名」的三个作者 + 入口路由
 //   · requestedTargetId:请求里点名的落点(缺 / 空 / 非法 ⇒ 400,不默认主控区)
 //   · targetOfStamp:记录上的章(无章 = 存量主控区,章非法 ⇒ 抛)
 //   · landingOfScope:前端按视角算新建 / 取区域资源的落点(单区 = 那个区;分组 / 全部 = 主控区,显式)
@@ -23,7 +22,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
 });
 vi.mock("@/lib/auth/identity", () => ({ resolveIdentity: vi.fn(async () => ({ username: "admin", sub: "s", isPlatformAdmin: true })) }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
-// 序 50 第二批:建模指标计算 / 同步向导两条建表入口经 submitLongOp ⇒ 任务表 bgp-long-ops 是真外部(内存夹具真求值条件写);其余表这里不碰
+// 建模指标计算 / 同步向导两条建表入口经 submitLongOp ⇒ 任务表 bgp-long-ops 是真外部(内存夹具真求值条件写);其余表这里不碰
 vi.mock("@/lib/aws/dynamodb", async (orig) => {
   const real: any = await orig();
   const mem = await import("@/lib/long-ops/__tests__/fixtures/mem-long-ops");
@@ -37,7 +36,7 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
     },
   };
 });
-// @kf-batch 50-WP31-place-first-class —— B-35:入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
+// 入口点名改为「已注册且装好」(requestedRegisteredPlace)⇒ 注册表是真外部(DDB 边界),给夹具描述符
 vi.mock("@/lib/exec-env/registry", async (orig) => {
   const real: any = await orig();
   const mk = (targetId: string, region: string) => ({ targetId, region, accountId: "000000000000", partition: "aws", status: "active", ready: true, components: ["core"], resources: {} });
@@ -196,7 +195,7 @@ describe("🔴 新建作业两条入口(段 wp31 W31-E1/E2 坐实:页面不带�
   });
 });
 
-describe("🔴 序 3 第三批:数据湖 / 问数 / BI 入口缺落点 ⇒ 400(原来 = 主控区)", () => {
+describe("🔴 数据湖 / 问数 / BI 入口缺落点 ⇒ 400(原来 = 主控区)", () => {
   const post = (body: unknown, url = "http://x/q") => new NextRequest(url, { method: "POST", body: JSON.stringify(body) });
   it("列数据湖表:不带 ⇒ 400 且一次都不列;带 tgt_usw2_a ⇒ 列的是该区", async () => {
     const r = await lakeTablesGET(new NextRequest("http://x/api/athena/tables"));
@@ -243,7 +242,7 @@ describe("🔴 本来就「缺即拒」的入口收口到点名作者 + 模型�
   });
 });
 
-describe("🔴 序 3 第五批:实时元数据 / Airflow 控制台 / 数仓连接 —— 不带 / 非法 ⇒ 400(原来非法值也静默 = 主控区)", () => {
+describe("🔴 实时元数据 / Airflow 控制台 / 数仓连接 —— 不带 / 非法 ⇒ 400(原来非法值也静默 = 主控区)", () => {
   it("三个读接口", async () => {
     const meta = await import("@/app/api/flink/meta/route");
     const conn = await import("@/app/api/redshift/connections/route");

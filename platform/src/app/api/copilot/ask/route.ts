@@ -6,7 +6,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { getActiveProjectId, getActiveEnv } from "@/lib/projects/guard";
 import { resolveRole } from "@/lib/projects/project-service";
 import { roleAtLeast } from "@/lib/projects/constants";
-// 序 46 B-107 — 通用 AI 长调用:问答主体在 lib/ai/long-op-executors.ts(copilot-ask);45s 未出结果 ⇒ 202 + 轮询。
+// 通用 AI 长调用:问答主体在 lib/ai/long-op-executors.ts(copilot-ask);45s 未出结果 ⇒ 202 + 轮询。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 import { getCorrelationId } from "@/lib/observability/logger";
 
@@ -14,9 +14,9 @@ import { getCorrelationId } from "@/lib/observability/logger";
 // Body: { prompt, conversationId? }
 // 后端由 COPILOT_BACKEND 选择:agentcore(Runtime)| 默认 inprocess(进程内,零基建可用)。
 // 铁律(AgentCore 标准契约 7):agentcore 启用后 try Runtime → catch 回退 inprocess;usedBackend 如实反映。
-// 安全(模块44):P44.1 仅只读工具;Copilot 永不执行/运行/发布/删除(能力面 + 提示词 + 后续守卫三闸)。
+// 安全:仅只读工具;Copilot 永不执行/运行/发布/删除(能力面 + 提示词 + 后续守卫三闸)。
 // 响应:同步 200 `{ answer, steps, usage, backend }` + `_meta`(51 SPEC §3.3a 落点②);推理模型慢时 202 `{ taskId, async:true }`,
-//   客户端传输层(全局 fetch 拦截器)轮询 GET /api/long-ops/[taskId] 拿同形结果(B-107)。
+//   客户端传输层(全局 fetch 拦截器)轮询 GET /api/long-ops/[taskId] 拿同形结果。
 export async function POST(req: NextRequest) {
   let body: { prompt?: string; conversationId?: string };
   try { body = await req.json(); } catch { return apiError("请求体无效"); }

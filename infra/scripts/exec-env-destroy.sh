@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# @kf-batch 50-WP30-decommission
-# 执行环境**下线销毁**(WP-30 路 B 施工序 4)—— 只由 buildspec 的 destroy 分支调用(CodeBuild 里跑,build 角色的权限)。
+# 执行环境**下线销毁**—— 只由 buildspec 的 destroy 分支调用(CodeBuild 里跑,build 角色的权限)。
 #
 # 【顺序是承重】(N-5 的血教训:RETAIN 的托管资源占着 SG / 子网,整条删除链停住)
 #   ① 托管服务先走:Flink 应用 → MWAA Serverless 工作流 → Glue 作业 / 连接 → EMR Serverless 应用 → DMS 复制任务 / 实例

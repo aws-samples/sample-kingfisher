@@ -1,9 +1,8 @@
-// @kf-batch 50-WP4-o1-scope
-// 冷启动决策的穷举单测(合同 SPEC v3.36 §2.6.5b;判据 E-157 / E-157a / E-154)。
+// 冷启动决策的穷举单测(合同 SPEC v3.36 §2.6.5b;判据)。
 //
 // 🔴 这里最要紧的是**把两条路径分清**:
-//   · URL **显式点名**了坏 target ⇒ 报错、保留 URL、绝不改写(E-154)
-//   · localStorage **播种**的值失效 ⇒ 落回「全部」+ 明确告知(E-157 ④)
+//   · URL **显式点名**了坏 target ⇒ 报错、保留 URL、绝不改写
+//   · localStorage **播种**的值失效 ⇒ 落回「全部」+ 明确告知
 // 把后者写成前者会天天弹错误页;把前者写成后者就是「前端吃掉 4xx 再偷偷切 global」。
 
 import { describe, it, expect } from "vitest";
@@ -103,7 +102,7 @@ describe("④ URL 不带 + 上次选择仍可用 ⇒ 恢复并写回地址栏(�
     });
   });
 
-  it("上次存的是 global ⇒ 就是默认态,不用写回参数(保住 E-158 的回滚点)", () => {
+  it("上次存的是 global ⇒ 就是默认态,不用写回参数(保住 回滚点)", () => {
     expect(resolveInitialScope({ urlParam: null, stored: "global", available: AVAIL })).toEqual({
       kind: "default",
       scope: { kind: "global" },

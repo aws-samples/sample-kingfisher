@@ -1,4 +1,4 @@
-// 模块 43-C — 补数计划展开(纯函数,可单测,零 AWS 依赖)。
+// 补数计划展开(纯函数,可单测,零 AWS 依赖)。
 //
 // 职责:把 [目标 × 日期范围 × 是否级联] 展开成实例规格集(InstanceSpec[]),供:
 //  1) dry-run 预览(不落库,先给用户看"将生成 N 个实例")
@@ -99,7 +99,6 @@ export function analyzeDag(dag: { nodes?: any[]; edges?: any[] } | undefined): D
 
 // 实例 sk 约定:"<date>#<nodeId>"。task 作用域 nodeId 固定为目标 id。
 //
-// @kf-batch 50-P50.3-mrquery
 // 🔴 **多 region:加第三段 `#<targetId>`,而 home 逐字节不变**。
 // 为什么必须 home 不变:存量计划的实例 sk 已经落在库里,`dependsOn` 里存的也是 sk 字符串 ——
 // 换名等于把存量计划的依赖链整体打断(blocked 的实例永远等不到它的前置)。
@@ -121,12 +120,11 @@ export function expandInstances(args: {
   cascade: boolean;
   dag?: { nodes?: any[]; edges?: any[] };
   maxInstances: number;
-  // @kf-batch 50-P50.3-mrquery —— 执行目标集合(缺省 = 单个 home,展开结果与改动前**逐字节相同**)。
+  // 执行目标集合(缺省 = 单个 home,展开结果与改动前**逐字节相同**)。
   execTargets?: string[];
 }): InstanceSpec[] {
   const dates = expandDates(args.dateRange);
   const specs: InstanceSpec[] = [];
-  // @kf-batch 50-P50.3-mrquery
   // 🔴 维度从 (日期 × 节点) 升为 (日期 × 节点 × **target**)。**纯追加**:
   // 每个实例仍是"一次独立的异步提交",runner / 领取 / reconcile / 依赖机制**一行不改**。
   // 🔴 `dependsOn` **限定在同一个 target 内** —— eu 的节点 B 依赖的是 eu 的节点 A,

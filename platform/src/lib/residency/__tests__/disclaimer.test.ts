@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP10a
 // disclaimer.ts —— 免责告知文案单作者(DESIGN §18 决策 6quinquies ④;INTERACTION v2.17 §4bis.4)。
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
@@ -30,7 +29,7 @@ describe("🔴 文案 + 版本 + 哈希三者绑定", () => {
   });
 });
 
-describe("🔴 A1 门禁:文案只在 disclaimer.ts 一处定义;全仓产品代码无法务定性文案(ACCEPTANCE E-199)", () => {
+describe("🔴 A1 门禁:文案只在 disclaimer.ts 一处定义;全仓产品代码无法务定性文案(ACCEPTANCE)", () => {
   const walk = (dir: string, acc: string[] = []): string[] => {
     for (const e of readdirSync(dir)) {
       if (e === "node_modules" || e === "__tests__" || e === ".next") continue;

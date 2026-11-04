@@ -1,7 +1,7 @@
-// 序 73 模块 57(57 DESIGN §3.2)—— EMR Serverless 引擎作业的 **serverless 运行 spec 唯一作者**。
+// EMR Serverless 引擎作业的 **serverless 运行 spec 唯一作者**。
 //
 // 【为什么要有这个文件】`ServerlessJobSpec`(emr 分支)的字段集合原来只在 `schedule-fanout.ts#publishEmrFanout` 的 serverless 分支里
-//   以对象字面量存在一份;模块 57 让编排 DAG 的「离线作业节点」跑**同一份 spec**(同一个 application + 执行角色 + spark 参数 +
+//   以对象字面量存在一份;让编排 DAG 的「离线作业节点」跑**同一份 spec**(同一个 application + 执行角色 + spark 参数 +
 //   日志落点)。各抄一份 = 静默分叉 ⇒ 字面量**原样搬到这里**(字段顺序逐字不变,单作业载体 YAML 与已发布产物逐字节相等),
 //   `sparkSubmitParameters` 的拼法也收成一个作者(`emrSparkSubmitParametersFor`,与 provider.submit 逐项同口径)。
 // 【边界】本文件**纯函数、零 AWS 调用**;脚本上传 / jar 复制 / application 建立这些写操作留在调用方
@@ -86,11 +86,11 @@ export function emrJobSpecFor(job: EmrEngineJob, targetId: string, facts: EmrJob
     taskType: "emr-serverless",
     jobsTable: TABLES.ENGINE_JOBS,
     ctrlRegion,
-    // @kf-batch 50-WP31-place-first-class —— 序 4(L6):执行落点 = PlaceWire(原 execRegion;运行时同源读取、缺即拒)
+    // 执行落点 = PlaceWire(原 execRegion;运行时同源读取、缺即拒)
     place: buildPlaceWire({ targetId, region: facts.region }),
     lockAttr: lockAttrFor({ targetId }),
     stamp: { projectId: stamp.projectId, targetId }, // 章的 targetId 就是本份产物的 target(不经 stamp 读,守卫只认绑定持有者)
-    // @kf-batch 50-WP5-rungroup —— O2 定时确定性分组(是否注入由调用方按**全部绑定**判,见 schedule-fanout.ts)
+    // O2 定时确定性分组(是否注入由调用方按**全部绑定**判,见 schedule-fanout.ts)
     ...(facts.scheduledGroup ? { scheduledGroup: facts.scheduledGroup } : {}),
     applicationId: facts.applicationId,
     executionRoleArn: facts.executionRoleArn,

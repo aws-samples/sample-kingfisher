@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * 🔴 **执行环境注册表的写点拓扑门禁**(外部审核 §24.3;P50.3b-2b 补齐 —— 此前仓内没有这道门)。
+ * 🔴 **执行环境注册表的写点拓扑门禁**(外部审核 §24.3;-2b 补齐 —— 此前仓内没有这道门)。
  *
- * 【为什么必须有它】P50.3b 的整个根治都建立在一句话上:"写 `observed`/`spec`/顶层投影/部署锁的地方
+ * 【为什么必须有它】整个根治都建立在一句话上:"写 `observed`/`spec`/顶层投影/部署锁的地方
  *   **只有** `lifecycle.ts` 的少数几个函数"。在没有门禁之前,这句话只是**注释**——
  *   下一个人(或下一个我)在别处再加一个 `UpdateCommand`,1400+ 单测全绿、评审也看不见,
  *   而 bug#9/#11 那类"每长一条业务路径必漏一个前态"的病就原地复发。
@@ -61,9 +61,9 @@ const ALLOWLIST = {
     transitionPhase: ["UpdateCommand"],
     // 周期 telemetry 窄通道:只碰 health/probe/templateVersion,不涨 version,守 attribute_not_exists(operation)
     reconcileTelemetry: ["UpdateCommand"],
-    // 🔴 P50.3b-2b:唯一的**失败路径**写入方(清 operation+锁 必须带已核验处置 + 管理员决定)
+    // 🔴 2b:唯一的**失败路径**写入方(清 operation+锁 必须带已核验处置 + 管理员决定)
     recordOperationFailure: ["UpdateCommand"],
-    // 🔴 P50.3b-4:`spec.intent` 的**唯一**写入方(排空 / 回服务)。为什么这里可以写:
+    // 🔴 4:`spec.intent` 的**唯一**写入方(排空 / 回服务)。为什么这里可以写
     //   ① 只碰 `spec` + 物化投影(status/ready/components),**绝不碰 observed.phase**
     //      (phase 归 transitionPhase)⇒ 不构成第二个生命周期写入方;
     //   ② 条件写绑 version = :expected ∧ attribute_not_exists(observed.operation) ——
@@ -75,10 +75,10 @@ const ALLOWLIST = {
     //   ② 条件写绑 version = :expected ∧ attribute_not_exists(observed.operation) ∧ attribute_not_exists(deployLockOperationId)
     //      —— 部署途中改网络规模会让本次部署与期望不一致(与 setSpecIntent 同一机制互咬);
     //   ③ 值域只 standard / economy(isNetworkProfile 守,与 broker 映射表同源,synth-gate 钉字面)。
-    // @kf-batch 50-WP15-airflow-serverless(施工序 6):setSchedulerPreference —— 顶层 schedulerPreference 的唯一写入方;
+    // setSchedulerPreference —— 顶层 schedulerPreference 的唯一写入方;
     //   只改「之后发布走哪个调度器」,不碰 spec/observed/投影;条件写与 setSpecIntent 同一机制互咬;值域 SSOT scheduler-preference.ts。
     setSchedulerPreference: ["UpdateCommand"],
-    // @kf-batch 50-WP30-decommission —— 删除执行环境(路 B)的两个写点:
+    // 删除执行环境的两个写点
     //   markDecommissionApproved:审批通过 ⇒ `spec.intent = delete` + 顶层删除计划 `decommission`(同一次条件写)。
     //     为什么这里可以写:平台把 intent 置成 delete 的**唯一**入口;条件绑 version ∧ intent=drain ∧ phase 未变 ∧
     //     无 operation ∧ 无部署锁 ∧ attribute_not_exists(decommission);**不碰 observed.phase**(进销毁归 broker 的 destroy 开会话)。
@@ -93,13 +93,13 @@ const ALLOWLIST = {
     seedHomeTarget: ["PutCommand"], // 创建(同上)
     reconcileTarget: ["UpdateCommand"], // 内容修补:RECONCILE_ALLOWED_FIELDS 白名单,不含 spec/observed/status/锁
     mergeComponentResources: ["UpdateCommand"], // 补充部署的窄通道:map-path 只增不改 + 必带 fence(bug#9 现场)
-    // @kf-batch 50-WP15-airflow-serverless:home 组件**只增采纳**通道(SPEC v3.28 §1.1 / §2.1 seed-home)。为什么这里可以写:
+    // home 组件**只增采纳**通道(SPEC v3.28 §1.1 / §2.1 seed-home)。为什么这里可以写
     //   ① 只 home、只增(组件 + 组件私有资源键;既有键值不等即拒;摘组件即拒);② spec.desiredComponents / observed.components /
     //      components 三处同步(broker 的 observed ⊆ desired 与投影一致性);③ 本次真探全绿且覆盖全部组件才写(probe 一并落);
     //   ④ 条件写绑 version = :expected ∧ ready = true ∧ attribute_not_exists(observed.operation) ∧ attribute_not_exists(deployLockOperationId)。
     //   home 的组件由控制面栈建、不经 broker ⇒ 没有 finalize fence 可带,不能借 mergeComponentResources;reconcile 是维修态门(active 必拒)。
     adoptHomeComponents: ["UpdateCommand"],
-    // @kf-batch 50-WP20-retire-classic-mwaa:retireComponents —— **摘掉一个已经不在现网的组件**。
+    // retireComponents —— **摘掉一个已经不在现网的组件**。
     //   为什么必须新开一个写点(而不是塞进上面任何一个):`adoptHomeComponents` 明写「摘组件不是采纳」且要 status=active;
     //   `reconcileTarget` 是维修态门(要 ready=false);`mergeComponentResources` 是只增的窄通道。
     //   ⇒ 「组件在现网被真的删掉」这件事在改动前**没有任何合法出口**,唯一出路是手改 DDB(红线)。
@@ -113,12 +113,12 @@ const ALLOWLIST = {
     // 🔴 §3.9b 凭证隔离状态机(P0-3):**单调不可逆**、五字段专用通道、刻意没有逆向函数。
     //    与生命周期正交(不碰 spec/observed/phase/锁),故独立登记而不是塞进 reconcileTarget。
     advanceCredentialIsolationState: ["UpdateCommand"],
-    // @kf-batch 50-WP9a-durable-jobs:§3.9b 的**延期**专用通道(provisioning → provisioning)。为什么这里可以写:
+    // §3.9b 的**延期**专用通道(provisioning → provisioning)。为什么这里可以写
     //   ① 只碰 provisioningDeadlineAt / credentialEpoch / credentialStateUpdatedAt / provisioningOperationId / version;
     //   ② 条件写校验前态(必须仍是 provisioning)+ 当前 epoch,成功即 epoch++;③ 新 deadline 过 assertProvisioningDeadline(≤30 天,以现在为基准);
     //   ④ 不复用 advanceCredentialIsolationState —— 那个只认两条前进边,为延期放宽它 = 在单调状态机上开自环口子。
     extendProvisioningDeadline: ["UpdateCommand"],
-    // 🔴 @kf-batch 50-W5-seg1-WP10a:项目白名单 `access` 的**唯一**写通道(SPEC v3.22 §1.1 / §2.1 POST .../access)。
+    // 🔴 项目白名单 `access` 的**唯一**写通道(SPEC v3.22 §1.1 / §2.1 POST .../access)。
     //    为什么这里可以写:① `access` 是**授权输入**,不属 resources(路由输入)也不属 spec/observed(生命周期)——
     //    reconcile 只服务维修态、窄通道只碰组件私有资源键,两条都不该为授权开口;② 条件写绑 version 乐观锁;
     //    ③ UpdateExpression 只有 access / version / updatedAt,身份 / 位置 / 状态 / 资源一个都不碰。
@@ -240,7 +240,7 @@ for (const file of files) {
           if (!allowed || !allowed.includes(cmd)) {
             failures.push(
               `${rel}:${line} ${cmd} 在 ${fn}() —— **未登记的执行环境表写点**。` +
-                `P50.3b 的根治靠"写点只此几处",新增写点必须先在 execution-env-writer-gate.mjs 的白名单里` +
+                `根治靠"写点只此几处",新增写点必须先在 execution-env-writer-gate.mjs 的白名单里` +
                 `说明清楚为什么可以写(并配套 fence/条件写),否则 bug#9/#11 那类"漏一个前态"会原地复发`
             );
           }

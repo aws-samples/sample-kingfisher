@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-p0e-preview-flake
 // **P0-E 预演结果判定**(`infra/scripts/preview-outcome.mjs`)的门禁 —— 这一层此前**零离线覆盖**。
 //
 // 【为什么一定要有】2026-09-15 真环境:给 `tgt_usw2_a` 补装 `dms` 的 build 死在 P0-E 闸的第 ① 步 ——

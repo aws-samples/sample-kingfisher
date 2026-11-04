@@ -53,7 +53,7 @@ if [ -z "$SSM_MODE" ]; then
   aws ssm put-parameter --name /bgp/deploy-mode --type String --overwrite --value "$BGP_DEPLOY_MODE" --profile "$PROFILE" --region "$REGION" >/dev/null || true
 fi
 echo "   部署模式 = $BGP_DEPLOY_MODE(SSM /bgp/deploy-mode${SSM_MODE:+ 已有})"
-# @kf-batch 50-WP20-retire-classic-mwaa —— 经典 MWAA 栈还在就别更新平台栈(会 UPDATE_ROLLBACK;理由见该脚本头)
+# 经典 MWAA 栈还在就别更新平台栈(会 UPDATE_ROLLBACK;理由见该脚本头)
 bash "$HERE/preflight-classic-mwaa.sh" "$PROFILE" "$REGION" || exit 1
 export CDK_DEFAULT_REGION="$REGION"
 # 🔴 CDK CLI 解析目标区时 AWS_REGION / AWS_DEFAULT_REGION 优先于 CDK_DEFAULT_REGION(会覆盖它)⇒ 必须一起对齐,
@@ -68,14 +68,14 @@ out()  { aws cloudformation describe-stacks --stack-name "$1" --profile "$PROFIL
            --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text 2>/dev/null; }
 
 # 三个 AI agent 栈的映射表:单一事实源 scripts/lib/agentcore-agents.sh(deploy-all / redeploy-agents 同一份;
-#   原来这里抄了三张表,B-76 2026-10-14 收口)。🔴 本脚本只**读**智能体栈的输出做平台接线,
+#   原来这里抄了三张表,2026-10-14 收口)。🔴 本脚本只**读**智能体栈的输出做平台接线,
 #   **不重建**智能体镜像、不部署智能体栈 —— 那是 redeploy-agents.sh 的事(升级时两个脚本都要跑)。
 # shellcheck source=lib/agentcore-agents.sh
 source "$HERE/lib/agentcore-agents.sh"
-source "$HERE/lib/s3tables-catalog.sh"   # 序 43 B-91:S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(第 3c 步)
-source "$HERE/lib/execution-regions.sh"  # 序 48:放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 1b 步)
+source "$HERE/lib/s3tables-catalog.sh"   # S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(第 3c 步)
+source "$HERE/lib/execution-regions.sh"  # 放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 1b 步)
 
-# @kf-batch 50-PROD-A-launch-hardening(h):默认大模型按主控区账号真值选(与 deploy-all 同一个作者)
+# 默认大模型按主控区账号真值选(与 deploy-all 同一个作者)
 if [ -z "${BEDROCK_MODEL_ID:-}" ]; then
   BEDROCK_MODEL_ID=$(bash "$HERE/resolve-home-model.sh" "$PROFILE" "$REGION") \
     || die "主控区没有能用的默认大模型(见上)"
@@ -100,7 +100,7 @@ for a in genbi netadvisor paramadvisor; do
   info "$a: runtime=${RT_ARN[$a]}  memory=${MEM_ID[$a]}"
 done
 
-# ── 1b) 执行环境 region 列表(模块 50 P50.2f;🔴 P50.2g 真跑撞出:忘了传 = 新 region 静默无权)──
+# ── 1b) 执行环境 region 列表(🔴 真跑撞出:忘了传 = 新 region 静默无权)──
 # 平台 IAM 的 `aws:RequestedRegion` 条件是**部署时静态**写进策略的(切片 f):不传
 # `-c execution-regions=` 就只放行 home,于是注册了第二 region、栈也真建好了,平台去探活/下推
 # 却被 AccessDenied —— 实测就这么卡住过一轮(s3tables:ListTableBuckets on us-west-2 被拒)。
@@ -109,7 +109,7 @@ done
 # 🔴 `status=deleted` 不算(与产品 data-plane-target.ts 同一口径:deleted 是终态,栈已核实删净)。
 #   原来连已删除的也算 ⇒ 平台 TaskRole 对一个已经没有执行环境的区**一直保留权限**,IAM 门也一直在验它
 #   (2026-10-10 弃置 tgt_apn1_a 后 redeploy 实见 regions 仍含 ap-northeast-1)。deleting / draining 等仍要撤资源 ⇒ 保留。
-# ── 序 48(2026-10-19 客户现网法兰克福加区实录):**候选区预授权**,放行从「每加一区跑一次本脚本」变成「零次」──
+# ──(2026-10-19 客户现网法兰克福加区实录):**候选区预授权**,放行从「每加一区跑一次本脚本」变成「零次」──
 #   并集 = home ∪ 注册表在用区 ∪ **候选区**(SSM /bgp/wiring/execution-region-candidates,安装 / 升级 / 本脚本任一次
 #   用环境变量 EXEC_REGION_CANDIDATES 声明一次就持久化)。候选区内在页面新建执行区:构建完直接「检测初始化」→「启用」,
 #   不必再跑本脚本。推导 / 校验 / 持久化只有一个作者 scripts/lib/execution-regions.sh(deploy-all / redeploy-agents 同用)。
@@ -158,14 +158,14 @@ cd "$ROOT/infra"
 npx cdk deploy BgpExecEnvDeployStack --require-approval never --profile "$PROFILE" \
   || die "BgpExecEnvDeployStack 部署失败(没有它,新建 / 重新部署执行环境一律失败)"
 
-# ── 2c) home 的 MWAA Serverless 入口栈随 HEAD 刷新(@kf-batch 50-WP15-airflow-serverless;分钟级、无改动即 no-op)──
+# ── 2c) home 的 MWAA Serverless 入口栈随 HEAD 刷新(分钟级、无改动即 no-op)──
 say "2c) BgpAirflowServerlessStack(home 的 MWAA Serverless 入口)"
 cd "$ROOT/infra"
 npx cdk deploy BgpAirflowServerlessStack --require-approval never --profile "$PROFILE" || die "BgpAirflowServerlessStack 部署失败"
 
-# ── 2c′) DynamoDB 库栈随 HEAD 刷新(序 46 B-108,2026-10-20 …7237 真撞)─────────────────────────────
+# ── 2c′) DynamoDB 库栈随 HEAD 刷新(2026-10-20 …7237 真撞)─────────────────────────────
 # 🔴 为什么必须有这一步:平台栈只按**表名字面**读写表(TABLES),对 BgpDatabaseStack 没有 CDK 依赖 ⇒ 第 3 步
-#   `cdk deploy BgpPlatformStack` 不会连带部署它。新版若新增了表(B-107 的 bgp-ai-tasks 是 tag release-2026-10-13
+#   `cdk deploy BgpPlatformStack` 不会连带部署它。新版若新增了表(该缺陷的 bgp-ai-tasks 是 tag release-2026-10-13
 #   之后第一张),只跑本脚本升级 ⇒ 表不存在 ⇒ 用到它的接口整条 500。库栈所有表 RemovalPolicy.RETAIN + PITR,
 #   既有表字段不变 ⇒ 无改动时秒级 no-op;放在平台栈之前,新代码滚上去时表一定已在。
 #   (FinOps 3 表 / Platform 2 表分别归 BgpFinOpsStack / BgpPlatformStack,后者本脚本本来就部署。)
@@ -174,9 +174,9 @@ cd "$ROOT/infra"
 npx cdk deploy BgpDatabaseStack --require-approval never --profile "$PROFILE" \
   || die "BgpDatabaseStack 部署失败(新版新增的表建不出来,平台启动后用到它的接口会 500)"
 
-# ── 2c″) OpenMetadata 库栈随 HEAD 刷新(序 51,2026-10-26)─────────────────────────────────────────
+# ── 2c″) OpenMetadata 库栈随 HEAD 刷新─────────────────────────────────────────
 # 🔴 为什么要这一步:BgpOmServiceStack 只引用库栈的实例(跨栈 import),部署它**不会**连带部署 BgpOmDatabaseStack ⇒
-#   引擎版本这类库栈自己的变更(序 51:MySQL 8.0 → 8.4,消掉 RDS 扩展支持费)只跑本脚本升级时永远落不下去。
+#   引擎版本这类库栈自己的变更(MySQL 8.0 → 8.4,消掉 RDS 扩展支持费)只跑本脚本升级时永远落不下去。
 #   无改动时秒级 no-op;有大版本变更时是 RDS 原地升级:Multi-AZ 实例一次停机窗口约 10–20 分钟,期间治理目录 / 血缘等
 #   OpenMetadata 功能不可用,RDS 升级前自动留快照(回滚 = 从该快照恢复,见手册 §7ter.2)。放在 OM 服务栈之前:
 #   服务起来时库已是新版本。
@@ -189,7 +189,7 @@ say "2d) OpenMetadata 加固(WAF / 回源校验头 / 管理员口令密钥)—�
 # 🔴 已上线的环境升级时这一步不可省:平台 om-client 不再回落出厂口令 admin,而 bgp/om/admin-password
 #   只由 BgpOmServiceStack 生成 ⇒ 不先部署它,平台读不到口令,治理目录 / 血缘等 OM 功能当场断。
 cd "$ROOT/infra"
-# 🔴 --exclusively(序 39 回滚演练 2026-10-26 真撞):不带它 CDK 会连带部署 BgpOmServiceStack 的依赖栈 BgpOmDatabaseStack。
+# 🔴 --exclusively(回滚演练 2026-10-26 真撞):不带它 CDK 会连带部署 BgpOmServiceStack 的依赖栈 BgpOmDatabaseStack。
 #   库栈在上面 2c″ 步已显式部署过(升级方向 no-op);而从更新的版本**回滚**到本版时,本版模板里的引擎版本比现网低 ⇒
 #   CloudFormation 会试图给 RDS 降大版本 ⇒ 被拒「Cannot upgrade mysql from X to Y」⇒ 整条回滚在这一步中止、平台栈没回滚。
 #   RDS 不支持大版本降级是事实,回滚脚本就不该让 CDK 顺手去碰库栈。release-2026-10-13 的同一行已用热修补上。
@@ -211,22 +211,22 @@ npx cdk deploy BgpPlatformStack --require-approval never --profile "$PROFILE" \
 say "3b) OM 管理员口令:出厂 admin/admin ⇒ Secrets Manager 里的随机口令(幂等,带验证)"
 bash "$HERE/om-secure-admin.sh" "$PROFILE" "$REGION" || die "OM 管理员口令加固失败(见上;OM 对公网可达,不许带着出厂口令收工)"
 
-# ── 3c) S3 Tables 联邦目录 s3tablescatalog(序 43 B-91)──────────────────────────────────────────────
+# ── 3c) S3 Tables 联邦目录 s3tablescatalog──────────────────────────────────────────────
 # 🔴 升级到本版的存量环境(含现网)只要从没跑过「写 S3 Tables 的同步」,这个目录就不存在 ⇒ Athena 直查 / 问数一律
 #   CATALOG_NOT_FOUND。它不是 CDK 资源,这里对主控区 + 每个已注册执行区幂等开通(已在则秒过);运行时另有自愈
 #   (同步启动 / 直查),但安装 / 升级面必须先把前提摆好,问数智能体(自己的角色、不经平台路由)只靠这里。
-# 序 48:只对**真有执行环境的区**(home ∪ 注册表在用区)开通,不含候选区 —— 候选区里还没有任何东西,不为「将来可能用」建对象;
+# 只对**真有执行环境的区**(home ∪ 注册表在用区)开通,不含候选区 —— 候选区里还没有任何东西,不为「将来可能用」建对象;
 #   候选区内新建的执行区由页面「检测初始化」在该区幂等开通(platform/src/lib/exec-env/probe-runner.ts 的 lake:s3tablescatalog 项)。
 say "3c) S3 Tables 联邦目录 s3tablescatalog(regions=$EXEC_REGIONS_ACTUAL;候选区不建)"
 for r in ${EXEC_REGIONS_ACTUAL//,/ }; do ensure_s3tables_catalog "$r"; done
 
-# ── 4) IAM 模拟门(@kf-batch 50-WP15-airflow-serverless T-8)────────────────────────────────────────────
-# 🔴 为什么在这里:WP-15 一刀内 IAM 类缺陷三次(T-2 缺 iam:GetRole / T-7 缺 codebuild:ListBuildsForProject / T-8 CreateWorkflow 资源模式
+# ── 4) IAM 模拟门────────────────────────────────────────────
+# 🔴 为什么在这里:一刀内 IAM 类缺陷三次(缺 iam:GetRole 缺 codebuild:ListBuildsForProject CreateWorkflow 资源模式
 #   bgp* 永不匹配 workflow/*),每次都是部署完、验收跑到下发那一步才炸。SimulatePrincipalPolicy 是离线的(不真调服务、零副作用、十几秒),
 #   拿「平台真实调用清单」(infra/iam/platform-taskrole-calls.json,ARN 只用服务自己报出的形态)去问 IAM:任何一条不是 allowed 就红,不许收工。
 say "4) IAM 模拟门:TaskRole × 平台真实调用清单(infra/iam/platform-taskrole-calls.json;regions=$EXEC_REGIONS)"
-# 序 48:any-region 轴的探测区必须**不在**放行清单里(门自己会拒);候选区一多,写死的 eu-central-1 就可能撞进清单 ⇒ 从备选里挑
-# 🔴 B-114(2026-10-22 测试账号 all-enabled 升级真撞):这里原来是 `[ -n "$IAM_PROBE_REGION" ] || die …` —— all-enabled 把 7 个固定备选区
+# any-region 轴的探测区必须**不在**放行清单里(门自己会拒);候选区一多,写死的 eu-central-1 就可能撞进清单 ⇒ 从备选里挑
+# 🔴 (2026-10-22 测试账号 all-enabled 升级真撞):这里原来是 `[ -n "$IAM_PROBE_REGION" ] || die …` —— all-enabled 把 7 个固定备选区
 #   全放进了清单 ⇒ 挑不出 ⇒ die exit 1:平台栈 / 接线 / 口令 / 联邦目录全做完了却被报成「升级失败」,页面向导也拿不到机读裁决。
 #   根治在 lib(探测区优先取账号未 opt-in 的区,按定义不可能在清单里);这里兜底:真挑不出就把 `none` 交给门,门只验其余轴、
 #   把 any-region 轴记成「本账号验不了」(退 4 ⇒ env-blocked),**不 die** —— 部署已完成,门少验的那几行要如实说,不许连累整条升级链。

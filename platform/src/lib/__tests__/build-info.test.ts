@@ -1,4 +1,4 @@
-// @kf-batch 39-release-visibility —— 序 39 第二刀「发版号可读」的判据。
+// 「发版号可读」的判据。
 //   两轮冷启动演练都把「现网是哪个版本」列为新手第一缺口(AGENTS §9 此前只能靠部署记录推断)。
 //   钉的事实:① 运行时只读环境变量、取不到就 known=false(不编造);② 一行标识 tag 优先、只有提交 ⇒ 未发版;
 //   ③ 🔴 键名三处逐字一致 —— infra 的 build-arg 作者 ↔ Dockerfile ARG / ENV ↔ platform 的读取作者(跨包无法 import,
@@ -16,7 +16,7 @@ const read = (abs: string) => fs.readFileSync(abs, "utf8");
 const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 const KEYS = Object.values(BUILD_INFO_ENV_KEYS);
 
-describe("🔴 序 39 二刀 发版号可读:读取作者", () => {
+describe("🔴 发版号可读:读取作者", () => {
   it("四个变量齐 ⇒ known,各字段原样;空串 / 缺失 ⇒ null;两者都没 ⇒ known=false(不编造)", () => {
     const full = readBuildInfo({
       BGP_BUILD_RELEASE_TAG: "release-2026-10-13-b103",
@@ -50,7 +50,7 @@ describe("🔴 序 39 二刀 发版号可读:读取作者", () => {
   });
 });
 
-describe("🔴🔴 序 39 二刀 键名三处逐字一致(infra 作者 ↔ Dockerfile ↔ platform 作者)", () => {
+describe("🔴🔴 键名三处逐字一致(infra 作者 ↔ Dockerfile ↔ platform 作者)", () => {
   it("infra/lib/shared/build-info.ts 的 BUILD_ARG_KEYS 值集合 == platform BUILD_INFO_ENV_KEYS 值集合", () => {
     const infraSrc = strip(read(path.join(REPO, "infra/lib/shared/build-info.ts")));
     const block = infraSrc.slice(infraSrc.indexOf("export const BUILD_ARG_KEYS"), infraSrc.indexOf("as const;"));
@@ -73,7 +73,7 @@ describe("🔴🔴 序 39 二刀 键名三处逐字一致(infra 作者 ↔ Docke
   });
 });
 
-describe("🔴 序 39 二刀 接缝有调用点", () => {
+describe("🔴 接缝有调用点", () => {
   it("平台镜像 fromAsset 真带 buildArgs: platformImageBuildArgs()(infra 作者的唯一调用点),且 import 自 shared/build-info", () => {
     const stack = strip(read(path.join(REPO, "infra/lib/platform-stack.ts")));
     expect(stack).toContain('ecs.ContainerImage.fromAsset("../platform", { buildArgs: platformImageBuildArgs() })');
@@ -97,7 +97,7 @@ describe("🔴 序 39 二刀 接缝有调用点", () => {
   });
 });
 
-describe("🔴 序 39 二刀 路由真跑", () => {
+describe("🔴 路由真跑", () => {
   const saved: Record<string, string | undefined> = {};
   afterEach(() => {
     for (const key of KEYS) {

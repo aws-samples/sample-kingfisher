@@ -1,11 +1,10 @@
 "use client";
 
-// @kf-batch 50-P50.2c-control-api
 // 执行环境管理页(50 INTERACTION §1.1 列表 + §1.2 向导 + §1.3 详情;URL = /exec-envs,
 // ACCEPTANCE §6 的 L2 契约锚「/exec-envs 页加载、home 卡片在」)。
 //
 // 数据全部来自 /api/admin/exec-envs*(网关层已强制 bgp-admin;非管理员整页 403,给友好提示)。
-// 卡片字段照 §1.1 线框;绑定任务数/月成本两项的**数据源尚不存在**(绑定统计与成本归 P50.3),
+// 卡片字段照 §1.1 线框;绑定任务数/月成本两项的**数据源尚不存在**(绑定统计与成本),
 // 如实不显示,不摆两个恒为「—」的假指标。
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Badge, Button, Card, Col, Empty, Row, Space, Tag, Tooltip, Typography, message, theme as antdTheme } from "antd";
@@ -13,7 +12,7 @@ import { seedHome } from "./api";
 import { CloudOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import FeatureGuide from "@/components/common/FeatureGuide";
-// @kf-batch 50-B02-spec-vs-observed —— 「这个组件装出来了没有」的唯一判断(纯函数,判据钉它)
+// 「这个组件装出来了没有」的唯一判断(纯函数,判据钉它)
 import { componentViewItems, claimsNothingInstalled } from "@/lib/exec-env/component-view";
 import { ApiError, STATUS_META, listTargets, type ExecEnvTarget } from "./api";
 import CreateWizard from "./CreateWizard";
@@ -23,7 +22,7 @@ import { useBrowserInitialState } from "@/lib/hydration/use-browser-initial-stat
 const { Text } = Typography;
 
 export default function ExecEnvsPage() {
-  // @kf-batch 50-rebuild-384-gaps(用户 2026-09-08:列表页只有主控卡醒目、其他区暗且框更小)
+  // (用户 2026-09-08:列表页只有主控卡醒目、其他区暗且框更小)
   // 🔴 颜色**只从主题 token 取**,不写死十六进制:全站有 13 款皮肤(lib/skins/skins.ts 是单一事实源),
   //   页面里硬编码 #e0a23c 这种值换肤后必然与整体风格脱节(原来主控卡就是这么写的)。
   //   token 家族由 antd 从各皮肤主色派生 ⇒ 主控 = 警示色系边框、其他区 = 主色系边框,两者同粗同亮度层级。
@@ -34,9 +33,9 @@ export default function ExecEnvsPage() {
   const [denied, setDenied] = useState<string>("");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [selected, setSelected] = useState<ExecEnvTarget | null>(null);
-  // @kf-batch 50-WP13-mwaa-region —— 深链 `/exec-envs?target=<id>&highlight=<component>`(调度页「去执行环境补装 MWAA」落点):
+  // 深链 `/exec-envs?target=<id>&highlight=<component>`(调度页「去执行环境补装 MWAA」落点):
   //   列表加载后自动打开该 target 的抽屉,并把要补的组件行高亮。只读一次(用户手动关抽屉后不再自动弹回)。
-  //   B-138:首帧 null(= 服务端),挂载后再读地址栏;初值函数里读 window 会让 React 19 报水合不一致
+  //   首帧 null(= 服务端),挂载后再读地址栏;初值函数里读 window 会让 React 19 报水合不一致
   const [deepLink, setDeepLink] = useBrowserInitialState<{ target: string; highlight: string } | null>(null, () => {
     const q = new URLSearchParams(window.location.search);
     const target = q.get("target");
@@ -126,7 +125,7 @@ export default function ExecEnvsPage() {
           "任务/调度即可绑定到该环境执行(数据不出该 region)",
         ]}
         tips={[
-          "🏠 主控(home)环境不可删除;P50.2 阶段新环境仅支持 core 组件,数仓/调度等可事后补充部署",
+          "🏠 主控(home)环境不可删除;当前阶段新环境仅支持 core 组件,数仓/调度等可事后补充部署",
           "删除环境走审批流且数据桶一律保留(RETAIN),不随销毁删除",
         ]}
       />
@@ -190,14 +189,13 @@ export default function ExecEnvsPage() {
                       {x.targetId}
                     </Text>
                     {/*
-                      @kf-batch 50-B02-spec-vs-observed
-                      🔴🔴 **期望态 ≠ 观测态**(P50.3b 双轴,SPEC §1.1)。
+                      🔴🔴 **期望态 ≠ 观测态**(双轴,SPEC §1.1)。
                       改动前这里渲染的是顶层 `components` —— 那是**注册那一刻按用户勾选写进去的期望态**,
                       于是 `registered`(还没部署)的环境在卡片上**看起来已经装好了**。
-                      真环境实测(2026-09-20 B-02,用户从页面复制给我的那三行之一):
+                      真环境实测(2026-09-20,用户从页面复制给我的那三行之一):
                         tgt_euw1_a  status=registered  components=['core','redshift']
                                     observed={}  resources 键数=0  probe.ok=False
-                      ⇒ 界面宣称了**两个根本没有载体的组件**(与 WP-26 那条「界面宣称了没有载体的能力」同族)。
+                      ⇒ 界面宣称了**两个根本没有载体的组件**(与那条「界面宣称了没有载体的能力」同族)。
                       🔴 双轴数据**早就在描述符里**(`observed.components`),只是呈现面这条路没接 ——
                         本仓第 N 次「机制建好了,某条路径没接上」。
                       🔴 刻意 **fail-closed**:`observed.components` 里没有的就**不算已装**,不回落到期望态。

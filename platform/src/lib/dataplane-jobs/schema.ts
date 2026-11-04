@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 数据面长作业(durable async job)的**表形态常量** —— 唯一作者(WORK-PACKAGES WP-9 ④-1 / 52 SPEC §1 `bgp-dataplane-jobs`)。
+// 数据面长作业(durable async job)的**表形态常量** —— 唯一作者(④-1 / 52 SPEC §1 `bgp-dataplane-jobs`)。
 //
 // 🔴 **本文件必须零 node 内置依赖**:推进泵(`pump.ts`)挂在周期 reconciler 上,而 reconciler 在
 //    `instrumentation.ts` 的可达面里 —— 那个图会被 Next 编进 **edge** bundle,碰到 `crypto` 就构建失败
@@ -10,7 +9,7 @@
 //   基表   pk = jobId(确定性:同一件事算出同一个 id ⇒ 重复入队天然幂等,见 model.dataplaneJobId)
 //   GSI ①  byDue    (dueShard S, nextRunAt N)  —— 🔴 **稀疏**:只有未终态的作业带 `dueShard`,
 //                     终态时 REMOVE ⇒ 泵每轮一次 Query 就拿到「到期且未终态」的那几条,不 Scan。
-//   GSI ②  byTarget (targetId S, createdAt S)  —— 某个执行环境下的作业清单(页面 / 前置判据 / WP-30 删除预检)。
+//   GSI ②  byTarget (targetId S, createdAt S)  —— 某个执行环境下的作业清单(页面 / 前置判据 删除预检)。
 import { TABLES } from "@/lib/aws/dynamodb";
 
 export const DATAPLANE_JOBS_TABLE = (): string => TABLES.DATAPLANE_JOBS;
@@ -22,9 +21,9 @@ export const GSI_BY_TARGET = "byTarget";
 export const DUE_SHARD = "due";
 
 /** 作业种类(封闭集合;9a 只实现前两类,其余由 9b / 9c 落地时加 handler)。 */
-// @kf-batch 50-project-delete-orphans —— + `reclaim`:删项目后回收该项目在各执行区的 per-project 凭证 secret
+// + `reclaim`:删项目后回收该项目在各执行区的 per-project 凭证 secret
 //   (一区一条,确定性 id;handler 在 `lib/exec-env/project-cred-reclaim.ts`)。
-// 序 58 B-130 —— + `sg-cleanup`:删数据源 / 建源失败清理后,平台自建安全组 `bgp-ds-*` 按网卡事实收口的持久清理
+// + `sg-cleanup`:删数据源 / 建源失败清理后,平台自建安全组 `bgp-ds-*` 按网卡事实收口的持久清理
 //   (handler 在 `lib/datasource/sg-cleanup-job.ts`;原来是进程内存里 10 × 30 秒的定时重试,耗尽即永久遗留)。
 export const JOB_KINDS = ["supply", "canary", "reclaim", "sg-cleanup"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
@@ -51,10 +50,10 @@ export function dataplaneJobsPaused(): boolean {
 }
 
 /**
- * @kf-batch 50-WP9a-auto-supply-gate —— 「绑定即自动供给」的开关:`BGP_DATAPLANE_AUTO_SUPPLY=on` 才开(缺省关)。
- * 🔴 为什么缺省关(2026-10-11 序 0 真环境勘定):非主控区一旦查到某项目的 per-project secret,该项目在该区就**改用项目身份**
+ * 「绑定即自动供给」的开关:`BGP_DATAPLANE_AUTO_SUPPLY=on` 才开(缺省关)。
+ * 🔴 为什么缺省关(2026-10-真环境勘定):非主控区一旦查到某项目的 per-project secret,该项目在该区就**改用项目身份**
  *    (`data-plane-target.ts`),而项目身份只被授了 `proj_<id>` 与 `shared` —— 现网该区的数据全在 `public`、属主是 admin。
- *    ⇒ 部署后泵 10 分钟内给全部在用项目自动供给 = 这些项目在该区**当场读不到自己的表**(WP-9 ⑩-1 那条风险的真形态)。
+ *    ⇒ 部署后泵 10 分钟内给全部在用项目自动供给 = 这些项目在该区**当场读不到自己的表**(⑩-1 那条风险的真形态)。
  *    必须等 9b 的搬迁 / 只读授权(⑨-5)落地之后再开;在那之前供给只走人点名的〔供给凭证〕(一次一个项目,人看得见后果)。
  * 只认字面 `on`(与 `PER_PROJECT_CRED` 同形):拼错不许变成「开了」。
  */

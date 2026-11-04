@@ -8,7 +8,6 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { isEngineType } from "@/lib/engines/registry";
-// @kf-batch 50-W5-seg2-WP10a
 import { auditObservedScheduledRun } from "@/lib/exec-env/residency-audit";
 
 const USER_ID = "default-user";
@@ -36,7 +35,7 @@ export async function GET(
         Limit: 50,
       })
     );
-    // @kf-batch 50-W5-seg2-WP10a —— 观测后审计(与 etl-jobs 运行列表同一口径;幂等、失败不影响列表)
+    // 观测后审计(与 etl-jobs 运行列表同一口径;幂等、失败不影响列表)
     await Promise.all(
       (Items as Array<Record<string, unknown>>).map(async (r) => {
         const res = await auditObservedScheduledRun({ taskId: params.id, runId: String(r.runId ?? ""), targetId: r.targetId, triggeredBy: r.triggeredBy, residencyAuditId: r.residencyAuditId });

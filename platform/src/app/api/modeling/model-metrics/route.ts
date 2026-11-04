@@ -3,13 +3,13 @@ import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { listModelMetrics, createModelMetric, metricValueFor } from "@/lib/modeling/model-metrics";
-// @kf-batch 50-WP4quater-reads(工单 SC-37)—— 🔴 指标**有计算值**,而值是从某个区的数仓算出来的。
+// 🔴 指标**有计算值**,而值是从某个区的数仓算出来的。
 // 单区视角必须给**那个区的**值;该区没算过就如实回「这个区还没算过」,而不是把别区的数字端出来。
 import { readScope } from "@/lib/exec-env/scope";
 import { scopeTargets } from "@/lib/scope/scope";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 35 P1 D4: 指标体系(原子/派生)。GET 列表(登录可读);POST 建(仅平台管理员)。
+// D4: 指标体系(原子/派生)。GET 列表(登录可读);POST 建(仅平台管理员)。
 export async function GET(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证", 401);

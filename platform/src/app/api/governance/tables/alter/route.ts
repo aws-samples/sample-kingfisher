@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「修改表结构」:POST { targetId, schema, table, desired: 列[], confirmName?, dryRun? }
+// 数据目录「修改表结构」:POST { targetId, schema, table, desired: 列[], confirmName?, dryRun? }
 //   · dryRun ⇒ 只回计划(加 / 删 / 注释 / 加宽)+ 语句 + 拒绝项,任一登录用户可看;
 //   · 执行 ⇒ 仅平台管理员;prod 环境 ⇒ 审批单 type "ddl"(202);其它 ⇒ 当场执行(home 直跑 / 非主控区 admin 执行器 alter-model-table);
 //   · 计划含删列 ⇒ 必须 confirmName === 物理表名,否则 409 DECISION_REQUIRED(不可逆,重档确认)。
 //   🔴 写接口不读 scope;落点只来自请求体 targetId。
-// 模块 55 / 序 50:三个分支都要读一次目标区真实列(数仓冷时 >45s)⇒ 主体整段在 lib/governance/long-ops.ts(catalog-alter-table,
+// 三个分支都要读一次目标区真实列(数仓冷时 >45s)⇒ 主体整段在 lib/governance/long-ops.ts(catalog-alter-table,
 //   mode = dryRun / execute / request-approval),45s 未终态 ⇒ 202(协议 long-op/1)+ 客户端传输层轮询;状态码 / 文案与接入前逐字相同。
 import { NextRequest, NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";

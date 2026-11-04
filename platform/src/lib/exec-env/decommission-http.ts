@@ -1,5 +1,4 @@
-// @kf-batch 50-WP30-decommission
-// 删除执行环境(WP-30 路 B)的错误 → HTTP **唯一映射**(五个路由 + 审批路由共用;各写一份就会出现同一种拒绝两个状态码)。
+// 删除执行环境的错误 → HTTP **唯一映射**(五个路由 + 审批路由共用;各写一份就会出现同一种拒绝两个状态码)。
 import { NextResponse } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { DecommissionRefused } from "@/lib/exec-env/decommission";

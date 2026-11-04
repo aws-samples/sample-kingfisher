@@ -1,5 +1,4 @@
-// @kf-batch 50-WP2-directquery
-// 数仓直查单一作者的可执行门禁(合同 50 SPEC §3.4;施工包 WP-2 ④ B 组)。
+// 数仓直查单一作者的可执行门禁(合同 50 SPEC §3.4;施工包 ④ B 组)。
 //
 // 🔴 这里要钉住的三件事,每一件都是「错了不报错、只是悄悄换了个区/换了身份」:
 //   ① home **不许**把 projectId 递给绑定解析(治理类本无项目,per-project 查找会 fail-closed);
@@ -70,7 +69,6 @@ describe("落点解析:home 与非 home 的 projectId 口径不同", () => {
     for (const c of bindingCalls) expect("projectId" in c).toBe(false);
   });
 
-  // @kf-batch 50-WP31-place-first-class
   it("🔴 落点缺 / 空 / 非法 ⇒ 当场拒,**不回落主控区**(原来「缺省 = 主控区」⇒ 漏传就在主控区数仓上跑)", async () => {
     for (const bad of [undefined, "", "TGT-BAD"]) {
       await expect(resolveDirectQueryPlace({ targetId: bad as unknown as string, projectId: "p" })).rejects.toThrow(/非法 targetId/);

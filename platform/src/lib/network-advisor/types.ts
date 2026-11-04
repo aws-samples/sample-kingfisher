@@ -1,11 +1,11 @@
 // 网络连通性智能顾问 — 全部公共契约（通道无关入参 → 通道无关出参 + 一块通道特定 prefill）。
 //
-// 设计目标：这是一个独立、可复用的能力。任何后续模块（DMS/Glue/Flink/Zero-ETL/DataService(已于 2026-09 下线,@kf-batch 50-W5-seg2-WP1)/
+// 设计目标：这是一个独立、可复用的能力。任何后续模块（DMS/Glue/Flink/Zero-ETL/DataService(已于 2026-09 下线)/
 // Lambda-vpc/EMR…）都只 import 本文件的类型 + index.ts 的函数，无需理解 VPC 内部细节。
 //
 // 三层：L1 环境感知(EnvironmentFacts) → L2 连通性裁决(Ruling) → L3 大模型顾问(ConnectivityRecommendation)。
 
-// 【模块47 L3】ComputeKind/Target/RuleStatus/RemediationType/AwsServiceName 已下沉 @netadvisor/core
+// ComputeKind/Target/RuleStatus/RemediationType/AwsServiceName 已下沉 @netadvisor/core
 // (./core/types)——core 须独立编译成 CJS 给容器 import(rules 目录/renderRulesForPrompt 依赖它们)。
 // 此处 import 供本文件内部类型引用 + 原样 re-export,消费方(本文件 + rules/prompt/judge/remediation/
 // target-resolver…)路径与用法逐字不变,单一定义在 core,杜绝"两个 Target/RemediationType"类型漂移。
@@ -36,9 +36,9 @@ export interface SourcePlacement {
 }
 
 // 顾问入口请求——消费方填这个。
-// @kf-batch 41-B115-netadvisor-place —— 🔴 落点必须点名:`targetId` = 在哪个执行环境分析网络(纪律 1:缺 ⇒ 400,不默认主控区)。
+// 🔴 落点必须点名:`targetId` = 在哪个执行环境分析网络(纪律 1:缺 ⇒ 400,不默认主控区)。
 //   region **不是入参**:由服务端按 targetId 从注册表描述符解析后写进 PlacedConnectivityRequest(客户端给的值不认)。
-//   【缺陷原形 B-115】原来这里有 `region?: string // 默认 NET_ADVISOR.region`,而探测器根本不看它 —— L1 的 EC2 / RDS / Redshift
+//   【缺陷原形】原来这里有 `region?: string // 默认 NET_ADVISOR.region`,而探测器根本不看它 —— L1 的 EC2 / RDS / Redshift
 //   客户端都是模块级主控区客户端;数据源或目标在别的区时,顾问拿到的是主控区的 VPC / 子网 / 安全组事实,裁决与建议按错的 VPC 给。
 export interface ConnectivityRequest {
   computeKind: ComputeKind;

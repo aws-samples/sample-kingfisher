@@ -1,16 +1,16 @@
-// 模块 28 — 平台侧调用网络顾问 AgentCore Runtime（数据面 invoke_agent_runtime，IAM 鉴权）。
+// 平台侧调用网络顾问 AgentCore Runtime（数据面 invoke_agent_runtime，IAM 鉴权）。
 // 平台标准见 docs/design/28-agentcore-standard/DESIGN.md §3 契约 4。照抄 genbi/agentcore-client.ts，
 // 换 env 前缀(NETADVISOR_RUNTIME_ARN)+ Input/Output 接口(匹配容器 agent.js 的入参/返回)。调用骨架不动。
 //
 // 方案 A(用户拍板)：Runtime 是【自包含能力服务】——容器内 Lambda 已做 L2 权威裁决，直接返回结构化结论
 // (verdict/rulings/candidates/remediations + facts 摘要)。平台薄封装只补 prefill/confidence/questions。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockAgentCoreClient, InvokeAgentRuntimeCommand } from "@aws-sdk/client-bedrock-agentcore";
 import type { PlacedConnectivityRequest, Ruling, Remediation, RecommendedPlacement, Verdict } from "./types";
 import type { AiModelUse } from "@/lib/ai/meta";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51(P51.2):payload 透传运行时模型 + 回执校验(缺/不等 ⇒ AgentCoreModelMismatch,fail-closed)。
+// payload 透传运行时模型 + 回执校验(缺/不等 ⇒ AgentCoreModelMismatch,fail-closed)。
 import { resolveModelRuntime } from "@/lib/ai/model";
 import { assertAgentCoreModelMeta, currentReleaseId } from "@/lib/ai/agentcore-contract";
 
@@ -37,7 +37,7 @@ export interface AdvisorInvokeOutput {
   steps?: { tool: string; ok: boolean; error?: string }[];
   llmAvailable: boolean;
   usage: { inputTokens: number; outputTokens: number };
-  // @kf-batch 50-W5-seg2-WP8 — 模块 51:容器回执的实际模型(P51.2 payload 透传 + 回执校验,⑥ 填实)。
+  // 容器回执的实际模型(payload 透传 + 回执校验,⑥ 填实)。
   model?: AiModelUse;
 }
 
@@ -47,7 +47,7 @@ export function isAgentCoreConfigured(): boolean {
 
 export async function invokeNetAdvisorAgent(sessionId: string, input: AdvisorInvokeInput): Promise<AdvisorInvokeOutput> {
   if (!RUNTIME_ARN) throw new Error("NETADVISOR_RUNTIME_ARN 未配置");
-  // @kf-batch 50-W5-seg2-WP8:运行时模型透传 + releaseId。
+  // 运行时模型透传 + releaseId。
   const resolved = await resolveModelRuntime("net-advisor");
   const payload = new TextEncoder().encode(JSON.stringify({ input, modelId: resolved.modelId, releaseId: currentReleaseId() }));
   const resp = await client.send(new InvokeAgentRuntimeCommand({
@@ -69,7 +69,7 @@ export async function invokeNetAdvisorAgent(sessionId: string, input: AdvisorInv
   const parsed = text ? JSON.parse(text) : {};
   const out = parsed.output || parsed;
   if (parsed.error && !out.verdict) throw new Error(String(parsed.error).slice(0, 300));
-  // @kf-batch 50-W5-seg2-WP8:回执校验(缺 / 不等 ⇒ AgentCoreModelMismatch,fail-closed)。
+  // 回执校验(缺 / 不等 ⇒ AgentCoreModelMismatch,fail-closed)。
   const echoed = assertAgentCoreModelMeta(out, resolved.modelId, "net-advisor");
   return {
     model: { modelId: echoed, modelSource: resolved.source },

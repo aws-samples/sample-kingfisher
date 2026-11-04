@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
-// 序 45(客户待改进项 B-93)—— 「数据湖配置」入口表桶下拉的清单接口(只读):
+// (客户待改进项)—— 「数据湖配置」入口表桶下拉的清单接口(只读):
 //   GET ?targetId=   该执行环境所在区账号内的 S3 Tables 表桶(标出平台表桶 / 已登记外部表桶)
 //   任何登录用户可读(同步任务由 editor 建,系统设置登记由 bgp-admin 做 —— 写接口各自守卫;这里只是「能选什么」)。
-// @kf-batch 50-WP31-place-first-class —— 落点只经点名作者 requestedTargetId(缺 / 非法 ⇒ 400,不默认主控区)
+// 落点只经点名作者 requestedTargetId(缺 / 非法 ⇒ 400,不默认主控区)
 import { NextRequest } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";

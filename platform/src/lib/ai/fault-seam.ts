@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — 故障注入 seam(51 SPEC §3.4a 卡点③;机制与 50 ACCEPTANCE §8ter.2 一致:
+// 故障注入 seam(51 SPEC §3.4a 卡点③;机制与 50 ACCEPTANCE §8ter.2 一致
 // **运行期 env 门 + 仅非生产 target 生效**,不是构建期剔除 —— 验收跑的必须是发布镜像)。
 //
 // 目前唯一一条缝:`FAULT_THROTTLE_MODEL=<modelId>` —— `invokeWithFallback` 对该 modelId 强制抛

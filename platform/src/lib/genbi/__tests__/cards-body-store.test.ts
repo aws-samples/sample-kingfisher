@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片**正文**(区域侧 S3)的单测。
 // 🔴 只 mock `s3ClientFor`,**保留真实的 `resolveTargetGlue`** —— 本文件最要证的事就是
 //    「正文落该 target 自己的桶、绝不回落主控区」,把落点解析也 mock 掉就等于把判据本身挖空。
@@ -39,7 +38,7 @@ import {
   cardBodyKey, cardHeadKey, cardBodyLocation, putCardBody, getCardBody, getCardHead, deleteCardBody, assertTitle,
 } from "../cards-body-store";
 import type { CardBody } from "../cards-body-store";
-// 序 31 第二刀 ②:账本走真实现(请求存储用最小替身)
+// 账本走真实现(请求存储用最小替身)
 import { __setRequestStoreProvider, decisionsOfCurrentRequest } from "@/lib/place/context";
 
 const SUB = "11111111-2222-3333-4444-5555aaaabbbb";
@@ -131,7 +130,7 @@ describe("54 会话卡片 · 区域正文(落该 target 自己的区)", () => {
     expect(got?.title).toBe("华东区客户分布");
   });
 
-  // 序 41 验收页面化(2026-10-23):硬门段 gbc GC-1 原来用 API 直存两轮刁钻内容做逐字段深比;改成页面真存后,
+  // 验收页面化(2026-10-23):硬门段 gbc GC-1 原来用 API 直存两轮刁钻内容做逐字段深比;改成页面真存后,
   //   页面造不出指定内容的对话 ⇒ 「刁钻值往返保真」这一半收进单测:null(不是空串)/ 负小数 / 前导 0 字符串(不许变数字)/
   //   中文 + emoji + 半角引号 / 嵌套图表规格 / 集合型字段 / 多轮。深比用 toEqual(键序无关;rows 是序列、按序比)。
   it("🔴 刁钻值往返保真:null / 负小数 / 前导 0 字符串 / 中文 emoji 半角引号 / 嵌套图表规格 / 集合型字段 / 两轮,逐字段全等", async () => {
@@ -246,7 +245,7 @@ describe("54 会话卡片 · 区域正文(落该 target 自己的区)", () => {
     expect(store.has(`${r.bucket}/${cardHeadKey(SUB, CARD)}`), "head 没删掉 ⇒ 标题还留在那个区域").toBe(false);
   });
 
-  it("🔴 结构性:本文件不许出现主控区默认值 / 模块级 S3 客户端(WP-17 元缺陷的同款防护)", async () => {
+  it("🔴 结构性:本文件不许出现主控区默认值 / 模块级 S3 客户端(元缺陷的同款防护)", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync(new URL("../cards-body-store.ts", import.meta.url), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1"); // 先剥注释
@@ -256,7 +255,7 @@ describe("54 会话卡片 · 区域正文(落该 target 自己的区)", () => {
     expect(src).toMatch(/resolveTargetGlue\(/);            // 落点解析走单一作者
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 序 31 第二刀 ②:正文落点的唯一作者记落点决策。第四十轮 observe:卡片正文的
+  // 正文落点的唯一作者记落点决策。第四十轮 observe:卡片正文的
   //   S3 Get / Put 落在该区桶上(没越区),却因读侧只经 getTargetRaw(看得见即可,不记决策)⇒ 未归因。
   describe("🔴 cardBodyLocation 记落点决策(读 / 写 / 删正文、head、快照都经它 ⇒ 一处记齐)", () => {
     const decided = () => decisionsOfCurrentRequest().decisions.filter((d) => d.via === CARD_BODY_PLACE_VIA).map((d) => d.targetId);

@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 // 页面「修改密码」的前端预校验。🔴 必须与用户池策略同口径(infra/lib/auth-stack.ts 的 passwordPolicy;
 //   判据 password-policy-parity 读那个文件逐项比)。最终以 Cognito 服务端校验为准。
 export const PASSWORD_MIN_LENGTH = 12;

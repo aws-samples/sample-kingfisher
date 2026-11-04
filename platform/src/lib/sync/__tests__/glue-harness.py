@@ -1,4 +1,4 @@
-# @kf-batch 37-sync-capability —— 同步 Glue 脚本的**行为**判据夹具:把平台生成的脚本原样 exec,
+# 同步 Glue 脚本的**行为**判据夹具:把平台生成的脚本原样 exec,
 # 底下换成假的 awsglue / pyspark / boto3(内存里的 S3 Tables 表、Redshift 表、源库表),
 # 跑完把「表里最后剩什么、发过哪些语句、抛了什么」吐成 JSON。判据断的是**结果**(目标表有没有被清空、
 # 失败时是否原样),不是脚本里有没有某段文字。
@@ -436,7 +436,7 @@ def rs_apply(sql, st):
         return None
     m = re.match(r"^DELETE FROM (\S+) USING (\S+) WHERE (.+)$", s)
     if m:
-        # 序 37 B-61:DELETE … USING stage WHERE t.k = stage.k AND … —— 删掉目标里键命中暂存表的行。
+        # DELETE … USING stage WHERE t.k = stage.k AND … —— 删掉目标里键命中暂存表的行。
         # 键值按 str 比(本夹具的 Redshift 路径把所有值当字符串装进暂存表,而预置的目标行可能是数字;真 Redshift 按类型比)
         t, stg = m.group(1).lower(), m.group(2).lower()
         pairs = _parse_on(m.group(3), left=m.group(1), right=m.group(2))

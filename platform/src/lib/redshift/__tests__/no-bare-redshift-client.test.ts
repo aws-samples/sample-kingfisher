@@ -1,4 +1,3 @@
-// @kf-batch 50-W3f-T0-T3
 // 🔴 门票 T0:**裸 `new RedshiftDataClient(...)` 门禁**(50 ROADMAP §2octies.17 ⑧)。
 //
 // 【为什么现在就要有它】W3-f 的主体是把 21 处「按 home 的 AWS_REGION 建 Redshift 客户端」的站点
@@ -21,7 +20,7 @@ const INFRA = resolve(SRC, "../../infra");
 
 /**
  * 唯一允许构造 Redshift Data 客户端的地方(工厂本身)。
- * @kf-batch 50-WP31-place-first-class —— WP-31 L3:构造收到数据面客户端的唯一工厂 `lib/aws/clients.ts`;
+ * L3:构造收到数据面客户端的唯一工厂 `lib/aws/clients.ts`;
  * `target-clients.ts` 的 `redshiftDataClientFor` 变成薄委托(下面另有一条钉它不许再自己 new)。
  */
 const FACTORY = "lib/aws/clients.ts";
@@ -29,14 +28,14 @@ const FACTORY = "lib/aws/clients.ts";
 /**
  * 🔴 **冻结名单:文件 → 现存裸构造数**。
  *
- * ✅ **2026-09-10 WP-2 收编完成:清零。** 全仓唯一的构造点是工厂 `lib/exec-env/target-clients.ts`。
+ * ✅ **2026-09-收编完成:清零。** 全仓唯一的构造点是工厂 `lib/exec-env/target-clients.ts`。
  * 名单留在这里(而不是把整段删掉)是**有意的**:它是那条「新增即红」判据的载体 ——
  * 任何文件重新长出裸构造,census 与名单对不上,当场红。往里加一行需要写理由。
  */
 const BARE_ALLOWLIST: Record<string, number> = {};
 
 /**
- * 🔴 **合同规定只能在主控区跑的清单**(WP-2 施工序 2:「home-only 清单必须恰好命中」)。
+ * 🔴 **合同规定只能在主控区跑的清单**(「home-only 清单必须恰好命中」)。
  *
  * 为什么要逐条冻结:`redshiftClientForHomeOnly(reason)` 与「忘了按 target 取 region」在**行为上
  * 完全一样**(都打到主控区)—— 区别只在于前者是合同。若不把清单钉住,这个函数就会变成
@@ -46,10 +45,10 @@ const BARE_ALLOWLIST: Record<string, number> = {};
  * ⇒ 文件 → 该文件里出现的理由(重复次数按出现次数计)。加一处必须同时改这张表 = 一次合同评审。
  */
 const HOME_ONLY_CENSUS: Record<string, string[]> = {
-  // @kf-batch 50-WP7-sync-pushdown(施工序 5)—— sync/execute-ddl 与 sync/generate-ddl 两行已删:
+  // sync/execute-ddl 与 sync/generate-ddl 两行已删
   // 理由值 `sync-no-target-dim` 退役(两路由改走 resolveRedshiftBinding 按 targetId 落点)。棘轮只减。
   "lib/backfill/execute.ts": ["workflow-no-target-dim"],
-  // @kf-batch 50-WP11b-shared-writer —— lib/modeling/redshift.ts 一行已删(理由值退役:非 home 建模落地交付)。
+  // lib/modeling/redshift.ts 一行已删(理由值退役:非 home 建模落地交付)。
   "lib/projects/project-resources.ts": ["project-inventory"],
   "lib/realtime/redshift-target.ts": ["dms-bootstrap-home"],
   "lib/realtime/zeroetl-service.ts": [
@@ -145,13 +144,12 @@ describe("🔴 T0:裸 `new RedshiftDataClient` 门禁(允许列表冻结,新增�
     const total = Object.values(got).reduce((a, b) => a + b, 0);
     const allowedTotal = Object.values(BARE_ALLOWLIST).reduce((a, b) => a + b, 0);
     expect(total).toBe(allowedTotal + 1);
-    // 🔴 T0 的终点(WP-2 ①「名单清零,只剩工厂 1 处」)—— 写成断言而不是注释,
+    // 🔴 T0 的终点(①「名单清零,只剩工厂 1 处」)—— 写成断言而不是注释,
     //    否则将来有人往名单里加一行、总量对账仍然过,清零这件事就悄悄作废了。
     expect(allowedTotal, "BARE_ALLOWLIST 必须保持清零:唯一构造点是工厂").toBe(0);
     expect(total, "全仓裸构造总数 = 1(工厂自己)").toBe(1);
   });
 
-  // @kf-batch 50-WP2-directquery
   it("🔴 home-only 清单**恰好命中**(这个函数不许变成绕过 per-target 的后门)", () => {
     const HOME_ONLY = /redshiftClientForHomeOnly\(\s*"([a-z0-9-]+)"\s*\)/g;
     const got: Record<string, string[]> = {};

@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 序 3 收尾 —— 多区扇出统一走 `forEachTargetPlace`(L10)的**行为** + **接线**判据。
+// 收尾 —— 多区扇出统一走 `forEachTargetPlace`(L10)的**行为** + **接线**判据。
 //
 // 行为(装配层:fanout ↔ resolve ↔ context 一律不 mock,只换注册表 = DDB 边界):
 //   ① 解析得开的分支各自一个嵌套上下文,并发不串、退出恢复;② 解析不开的分支**照样跑**、不在任何上下文里;
@@ -92,7 +91,7 @@ describe("🔴 接线:多区扇出点都走 forEachTargetPlace(只查调用位�
     ["app/api/flink/jobs/route.ts", 0, /reconcileFlinkStatus\(/],
     ["lib/redshift/multi-region-query.ts", 1, /Promise\.all\(list\.map\(\(targetId\) => submitOne/],
     ["app/api/etl-jobs/[id]/run/route.ts", 1, /for \(const targetId of runTargets\)/],
-    ["lib/engines/long-ops.ts", 1, /for \(const targetId of runTargets\)/], // B-136:引擎运行的扇出点搬进长操作执行体
+    ["lib/engines/long-ops.ts", 1, /for \(const targetId of runTargets\)/], // 引擎运行的扇出点搬进长操作执行体
     ["lib/etl/dag-fanout.ts", 3, /for \(const targetId of (?:bindingTargets\(job\)|targets|list)\)/],
     ["lib/engines/emr/schedule-fanout.ts", 2, /for \(const targetId of (?:targets|list\.length \? list : \[HOME_TARGET_ID\])\)/],
   ];

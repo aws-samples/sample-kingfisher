@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 store 单测(51 SPEC §1 / §2 / §6.1①③④;ACCEPTANCE M1 反例 / M15 / M18)。
+// store 单测(51 SPEC §1 / §2 / §6.1①③④;ACCEPTANCE M1 反例 / M15 / M18)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mem = vi.hoisted(() => ({ db: null as unknown as import("./mem-ddb").MemDdb }));
@@ -185,7 +184,7 @@ describe("探测缓存按 targetId × modelId 定形(P0-8 / M18)", () => {
   });
 });
 
-describe("transport 项(P51.2)", () => {
+describe("transport 项", () => {
   it("putTransport 三项一事务并 bump;getTransport 读回", async () => {
     await putTransport({ gptReady: true, branch: "A", decidedAt: 5, decidedBy: "admin", probeModelId: "openai.gpt-5.6-sol", probedAt: 5 }, actor);
     expect((await getTransport())?.gptReady).toBe(true);

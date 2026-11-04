@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 /**
  * 同步写 Redshift 时「**不许静默清空客户已有的表**」的唯一作者。
  *
@@ -19,19 +18,19 @@
  *   ③ 建任务 / 改任务时提前探一次,把「将被清空的非平台表」列给用户确认(409 + 清单)—— 这是体验,
  *      不是防线;探不到(数仓暂不可达)不拦创建,防线在 ②。
  *
- * 【序 37 B-60:S3 Tables 路与 Redshift 规则逐字对齐】原来这套只守 Redshift;覆盖写进客户已有的 S3 Tables 表直接替换。
+ * 【S3 Tables 路与 Redshift 规则逐字对齐】原来这套只守 Redshift;覆盖写进客户已有的 S3 Tables 表直接替换。
  *   · 标记:平台建的 Iceberg 表在 TBLPROPERTIES 里带 `bgp.created-by = <PLATFORM_TABLE_MARKER>`(S3_TABLE_MARKER_PROPERTY);
  *   · 守卫:脚本在任何写 / 删之前 SHOW TBLPROPERTIES,无标记且不在确认清单 ⇒ SYNC_REFUSED_CLEAR_FOREIGN_TABLE;
  *   · 确认项形态 = Spark 三段名 `s3tablescatalog.<namespace>.<table>`(与脚本里 s3t_table 逐字相等,不会与 schema.table 混淆);
  *   · 提前告知:GetTable 拿 metadataLocation → 读 Iceberg 元数据 JSON 的 properties 看标记;任何一步失败 ⇒ unknown(防线在脚本)。
- *   · merge(B-61)不整表清空 ⇒ 两条路都不需要确认。
+ *   · merge不整表清空 ⇒ 两条路都不需要确认。
  */
 import { ExecuteStatementCommand, DescribeStatementCommand, GetStatementResultCommand } from "@aws-sdk/client-redshift-data";
 import { GetTableCommand, ListTableBucketsCommand } from "@aws-sdk/client-s3tables";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { redshiftDataClientFor, s3ClientFor, s3tablesClientFor } from "@/lib/exec-env/target-clients";
 import { bindingTargets, resolveGlueBinding, resolveRedshiftBinding } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 56-B127-exec-env-own-table-bucket —— 「任务写哪个表桶」的唯一作者(与 start-run / 生成器同一函数)
+// 「任务写哪个表桶」的唯一作者(与 start-run / 生成器同一函数)
 import { effectiveTableBucket } from "./table-bucket";
 import { buildTargetNameMap } from "./target-naming";
 import { sanitizeS3TablesIdentifier } from "./s3tables-identifier";
@@ -78,7 +77,7 @@ export interface GuardTaskShape {
 export function clearsWholeTable(task: GuardTaskShape): boolean {
   // 脚本:INCREMENTAL = (syncMode == incremental);inc_where 只在「有增量列 且 有水位」时非空;
   //   INCREMENTAL 且 inc_where 为空 ⇒ 整表 DELETE;非增量 ⇒ 按 writeMode(overwrite = 整表 DELETE)。
-  //   序 37 B-61:merge 按键合并,不走预删也不清表(增量 + merge 同样走 merge 分支)⇒ 恒不清空。
+  //   merge 按键合并,不走预删也不清表(增量 + merge 同样走 merge 分支)⇒ 恒不清空。
   if (task.writeMode === "merge") return false;
   if (task.syncMode === "incremental") {
     const v = task.incrementalValue;
@@ -170,7 +169,7 @@ export async function probeTables(
 }
 
 /**
- * 序 37 B-60:一组 S3 Tables 表「在不在 / 是不是平台建的」。**尽力而为**:
+ * 一组 S3 Tables 表「在不在 / 是不是平台建的」。**尽力而为**:
  *   ListTableBuckets 找到表桶 ARN → GetTable(不存在 = NotFoundException)→ 读 `metadataLocation` 指向的 Iceberg
  *   元数据 JSON,看 `properties[S3_TABLE_MARKER_PROPERTY]`。除「表不存在」外任何失败都抛(调用方按 unknown 处理,
  *   不拦创建;防线在脚本里 SHOW TBLPROPERTIES 那道守卫)。
@@ -269,7 +268,7 @@ export async function overwritePreflight(
       const fqs = s3TargetTables(task, opts?.ds);
       if (fqs.length > 0) {
         const landing = await resolveGlueBinding({ targetId: tid });
-        // B-127 附带:探任务**实际写**的桶(自带桶优先),不是一律探执行环境的平台表桶 —— 否则自有桶任务里「客户已有的表」永远探不到(主控区同样)
+        // 附带:探任务**实际写**的桶(自带桶优先),不是一律探执行环境的平台表桶 —— 否则自有桶任务里「客户已有的表」永远探不到(主控区同样)
         tables.push(...unconfirmedForeignTables(await probeS3Tables({ region: landing.region, tableBucket: effectiveTableBucket(task, landing) }, fqs), confirmed));
       }
     } catch (e) {

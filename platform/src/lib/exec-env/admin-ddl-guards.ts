@@ -1,5 +1,4 @@
-// @kf-batch 50-G2R
-// G2R(模块 50)—— admin-DDL 的 **defense-in-depth lint**(50 SPEC §3.9a v3.3)。
+// G2R—— admin-DDL 的 **defense-in-depth lint**(50 SPEC §3.9a v3.3)。
 //
 // ══════════════════════════════════════════════════════════════════════════════
 // 🔴🔴 **本文件不是安全边界,也不是授权判定。**
@@ -102,7 +101,7 @@ export function assertNotUserDataRead(sql: string): void {
   }
 }
 
-/** 禁跨项目搬运 + destructive/可执行任意代码的形态(T-7 及其扩展)。 */
+/** 禁跨项目搬运 + destructive/可执行任意代码的形态(及其扩展)。 */
 export function assertNoCrossProjectMove(sql: string): void {
   const s = sqlSkeleton(sql);
   const banned: Array<[RegExp, string]> = [
@@ -133,8 +132,7 @@ export function assertNoCrossProjectMove(sql: string): void {
  */
 export function assertOwnedByProject(sql: string, projectId: string): void {
   const s = sqlSkeleton(sql);
-  // @kf-batch 52-P52.5a-supply
-  // 🔴🔴 **补一个盲区(P52.5a 施工时逮到)**:原正则是 `\bproj_[a-z0-9_]+`,而项目的 **role 名**
+  // 🔴🔴 **补一个盲区(施工时逮到)**:原正则是 `\bproj_[a-z0-9_]+`,而项目的 **role 名**
   // (`role_proj_<id>`)与 **登录用户名**(`user_proj_<id>`)里,`proj_` 前面紧挨着 `_`
   // —— `_` 和 `p` 都是 word 字符,**中间没有词边界** ⇒ `\bproj_` 根本匹配不到它们。
   // 后果:`CREATE ROLE role_proj_b` / `GRANT ROLE role_proj_b TO user_proj_a` 这类**跨项目**语句

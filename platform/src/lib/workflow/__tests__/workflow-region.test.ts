@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-3 / WP-14)
 /**
  * 钉住「编排按分区隔离」。用户 2026-09-10 **第三次**强调:
  * 「**这个是误区,我一开始要求的就是按照分区隔离,每一个分区都有 MWAA serverless 的调度能力,
@@ -20,7 +19,7 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:
 /** 编排链路上的每一个文件:发布 / 触发 / 节点状态 / 任务日志 / 控制台入口 / DAG 下发 */
 const WORKFLOW_PATH_FILES = [
   "lib/workflow/publish-dag.ts",
-  // 序 50 第二批:发布 / 下线 / 触发 / 删除的主体在执行体里(路由只留鉴权 + submitLongOp)
+  // 发布 / 下线 / 触发 / 删除的主体在执行体里(路由只留鉴权 + submitLongOp)
   "lib/workflow/long-ops.ts",
   "app/api/workflow/[id]/publish/route.ts",
   "app/api/workflow/[id]/trigger/route.ts",
@@ -29,7 +28,7 @@ const WORKFLOW_PATH_FILES = [
   "app/api/workflow/airflow/route.ts",
 ];
 
-describe("编排按分区隔离(SC-3)", () => {
+describe("编排按分区隔离", () => {
   it("🔴 编排链路上不许再出现 homeMwaaEndpoint()(= 把别区工作流塞回主控区调度)", () => {
     const bad: string[] = [];
     for (const f of WORKFLOW_PATH_FILES) {
@@ -47,12 +46,12 @@ describe("编排按分区隔离(SC-3)", () => {
   });
 
   it("每一处都必须从**工作流行上的章**解析端点(自己解析,或经一个会解析的单一作者)", () => {
-    // @kf-batch 50-WP17-serverless-workflow —— 🔴 判据放宽的**方向要对**:
+    // 🔴 判据放宽的**方向要对**:
     //   发布路由现在把「解挂」交给 `ensureDagUnpaused`(它自己按落点解析)⇒ 路由里不再直接出现
     //   `schedulerEndpointFor(`。那是**更强**的形态(端点解析只有一处),不是退步。
     //   所以判据改成:要么自己解析,要么经登记过的单一作者;而「用主控区端点」那条负向判据一个字不改
     //   (上面那个 it 仍在钉 homeMwaaEndpoint)。
-    // 序 50 第二批:路由经 submitLongOp 把主体交给执行体(lib/workflow/long-ops.ts 自己在清单里被钉),也算经单一作者
+    // 路由经 submitLongOp 把主体交给执行体(lib/workflow/long-ops.ts 自己在清单里被钉),也算经单一作者
     const DELEGATES = ["ensureDagUnpaused(", "publishWorkflowDag(", "unpublishWorkflowDag(", "submitLongOp("];
     for (const f of WORKFLOW_PATH_FILES) {
       const src = strip(read(f));
@@ -70,7 +69,7 @@ describe("编排按分区隔离(SC-3)", () => {
     const pub = strip(read("lib/workflow/publish-dag.ts"));
     expect(pub).toContain("const bucket = ep.dagBucket;");
     expect(pub).toContain("await s3ClientFor(ep.region)");
-    // @kf-batch 50-WP17-serverless-workflow —— 🔴 本条原来钉的是「遇 serverless 必须抛」。
+    // 🔴 本条原来钉的是「遇 serverless 必须抛」。
     //   那个抛的前提(dag-factory 表达不了多节点)已被 2026-09-11 的真跑证伪 ⇒ 现在必须**真发过去**。
     //   判据换成:serverless 分支存在、产物落**该 target 的** workflowBucket、且全程没有 home 字面量。
     expect(pub).toContain("isServerlessEndpoint(ep)");
@@ -81,12 +80,12 @@ describe("编排按分区隔离(SC-3)", () => {
 
   it("新建工作流要盖章,并在建之前就核**每一个**非 home 区都有调度组件(不许先建后发现发不了)", () => {
     const src = strip(read("app/api/workflow/route.ts"));
-    // @kf-batch 50-WP18-workflow-fanout —— 创建改成**可绑多区**(用户 2026-09-15 点名的
+    // 创建改成**可绑多区**(用户 2026-09-15 点名的
     //   「在美东1 发布、多个区域执行」;原来恒写单值 `targets: [wantTarget]` ⇒ 那套扇出通道永远没有输入)。
     //   判据跟着钉**事实**:落多值 + 逐个校验合法性 + 非 home 逐个核调度组件 + 不从 ...body 裸抄。
     expect(src).toContain("targets: wantTargets");
     expect(src, "非 home 的每个区都要核调度组件").toContain("requireMwaaForTargets(nonHome)");
-    // @kf-batch 50-WP31-place-first-class —— 合法性 / 非空 / 去重 由唯一作者 requestedTargets 判(行为判据见 requested-target.test.ts)
+    // 合法性 / 非空 / 去重 由唯一作者 requestedTargets 判(行为判据见 requested-target.test.ts)
     expect(src, "落点不许从 ...body 裸抄,且缺落点不许默认主控区").toMatch(/requestedTargets\(body, "新建工作流"\)/);
     // 🔴 反例:不许再回到「只取一个」的写法
     expect(src).not.toContain("targets: [wantTarget]");

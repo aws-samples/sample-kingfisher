@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.5a-supply
 // per-target 客户端与「禁 IAM fallback」的**可执行**门禁(50 SPEC §3.9a 第 8 步)。
 //
 // 🔴 本文件刻意打到**真的 SDK 入参**上,而不是断言源码里有 `SecretArn`:
@@ -224,7 +223,7 @@ describe("secret 写:幂等 + 一定拿到真 ARN", () => {
   });
 });
 
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色键规则 ①(SPEC v3.21 §3.1a / §6.1 段二)
+// 执行角色键规则 ①(SPEC v3.21 §3.1a / §6.1 段二)
 describe("🔴 Spark / EMR 落点:非 home 的执行角色必须是**本 target 自己的**(共享角色只剩 home)", () => {
   const ACCT = "123456789012";
   const base = {
@@ -243,7 +242,7 @@ describe("🔴 Spark / EMR 落点:非 home 的执行角色必须是**本 target 
     expect(g.roleArn).toBe(`arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-glue-role`);
     expect(g.home).toBe(false);
   });
-  it("🔴 E-149:glueRoleArn 是 home 的 bgp-glue-role(P50.2 存量)⇒ 抛,拒因指路「重新部署」,**不回落**", () => {
+  it("🔴 glueRoleArn 是 home 的 bgp-glue-role(存量)⇒ 抛,拒因指路「重新部署」,**不回落**", () => {
     const t = withRes({ glueRoleArn: `arn:aws:iam::${ACCT}:role/bgp-glue-role` });
     expect(() => resolveTargetGlue(t)).toThrow(/不是本 target 的 per-target 角色/);
     expect(() => resolveTargetGlue(t)).toThrow(/重新部署/);

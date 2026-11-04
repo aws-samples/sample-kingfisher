@@ -7,7 +7,7 @@ import { getActiveProjectId } from "@/lib/projects/guard";
 import { getPlanTask, forceTimeoutIfExpired } from "@/lib/copilot/plan/plan-task-service";
 import { runPlanTask } from "@/lib/copilot/plan/plan-task-runner";
 import { getPlan, listSteps } from "@/lib/copilot/plan/plan-service";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51 `_meta` 回显(异步终态:任务项 usedModelId;SPEC §3.3a ⑧)。
+// `_meta` 回显(异步终态:任务项 usedModelId;SPEC §3.3a ⑧)。
 import { buildAiMeta } from "@/lib/ai/meta";
 import type { SourceLayer } from "@/lib/ai/capabilities";
 

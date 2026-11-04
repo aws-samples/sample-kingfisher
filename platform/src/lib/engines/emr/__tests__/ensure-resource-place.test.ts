@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// 🔴🔴 B-30(2026-10-01,WP-31 落点观测器在第九轮全量硬门里实测抓到):
+// 🔴🔴 (2026-10-01,落点观测器在第九轮全量硬门里实测抓到):
 //   EMR 作业创建路由 `provider.ensureResource(item)` → `ensureApplication(job)` **不带落点** ⇒ 给 us-west-2 建的作业
 //   在**主控区**先建出一个 EMR application(观测记录:`emr-serverless POST /applications @ us-east-1` + `ec2 @ us-east-1`,
 //   本次请求的显式决策是 tgt_usw2_a)⇒ 主控区多一个孤儿 application、作业的 applicationId 记在主控区名下。
@@ -50,7 +49,7 @@ import { applicationFields, applicationIdOf, allApplicationRefs } from "../appli
 const job = (targets: string[]) => ({ jobId: "01JOBJOBJOBJOBJOBJOBJOBJOB", engine: "emr-serverless", targets, spec: {} }) as any;
 const creates = () => h.calls.filter((c) => c.cmd === "CreateApplicationCommand");
 
-describe("🔴🔴 B-30:建 EMR 作业时,application 建在**作业绑定的区**(不是主控区)", () => {
+describe("🔴🔴 建 EMR 作业时,application 建在**作业绑定的区**(不是主控区)", () => {
   beforeEach(() => { h.calls.length = 0; process.env.AWS_REGION = "us-east-1"; });
 
   it("只绑 us-west-2 ⇒ 只在 us-west-2 建一个、用该区描述符的子网 / SG;主控区一次都不碰", async () => {

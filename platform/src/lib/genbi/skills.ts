@@ -1,11 +1,11 @@
-// 模块 26 — 数据驱动「工具型 skill」注册表服务。
+// 数据驱动「工具型 skill」注册表服务。
 // 一个注册技能 = 经审核的只读查询模板（SQL 模板，或 HTTP 外部 API 调用）+ 参数声明。模型经 Gateway 工具
 // run_registered_skill(skill, params) 按名调用,Lambda 渲染参数(安全)→守卫→执行。
 // 新技能 = 加一行(纯数据,零部署、后续会话自动可用)。pk=projectId("global"通用), sk=skillId。
 import { PutCommand, QueryCommand, DeleteCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// @kf-batch 50-project-delete-orphans —— owned-only 读法与口径那边同一个作者
+// owned-only 读法与口径那边同一个作者
 import { queryAllPagesOwned } from "@/lib/genbi/context";
 
 export const GLOBAL_SCOPE = "global";
@@ -89,13 +89,12 @@ export async function listSkills(projectId: string): Promise<RegisteredSkill[]> 
 }
 
 /**
- * @kf-batch 50-WP23-project-delete-own-only
  * 🔴 只数本项目自己的技能(不合并 `global`)—— 与 `listContextOwnedByProject` 同一条理由:
  * 删项目的守卫问的是「这个项目**拥有**什么」,而 `listSkills` 为了问数可用性合并了全局技能。
  * 合并版拿去当归属判据 ⇒ 空项目永远删不掉,且让用户去删**全局共享**的东西。
  */
 export async function listSkillsOwnedByProject(projectId: string): Promise<RegisteredSkill[]> {
-  // @kf-batch 50-project-delete-orphans —— 🔴 原来复用 `listSkills`:那里每个分区 `catch { return []; }` 且只读第一页
+  // 🔴 原来复用 `listSkills`:那里每个分区 `catch { return []; }` 且只读第一页
   //   ⇒ 删项目守卫读失败时数成 0 ⇒ 放行删除(fail-open)。唯一调用方是删除守卫 ⇒ 改走 owned-only 读法:读不到就抛、翻页到底。
   return (await queryAllPagesOwned(TABLES.GENBI_SKILLS, projectId)) as unknown as RegisteredSkill[];
 }

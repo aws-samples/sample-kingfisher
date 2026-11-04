@@ -1,4 +1,4 @@
-// 模块 40 — L3 归因扫描器(拉模式,隔离架构核心)。
+// L3 归因扫描器(拉模式,隔离架构核心)。
 // 【零 hook】:不改任何现有状态机——按水位增量【只读】扫共享台账 bgp-task-runs,
 // 对每个已终态、可归因的 run 调引擎 API 取计量 → 价目折算 → 条件写 bgp-cost-runs(幂等)。
 // 现有表只 Scan/Get,绝不写回;重复扫描/并发触发都安全(attribute_not_exists 去重)。
@@ -11,7 +11,6 @@ import { WATERMARK_SK, SWEEP_PAGE_LIMIT } from "./constants";
 import { costOfUsage, roundUsd, PRICE_VERSION } from "./pricing";
 import { getWatermark, setWatermark, putCostRunIfNew } from "./store";
 import type { CostEngine, EngineUsage } from "./types";
-// @kf-batch 50-W3f-T0-T3
 // 🔴 **模块级 home 客户端已删**(硬门 W3f-8 真环境抓到):原来 `new GlueClient({ region: AWS_REGION })` 拿 home 的客户端
 // 去 GetJobRun 一条跑在 us-west-2 的 Glue run ⇒ EntityNotFound ⇒ 被下面的 catch 吞成 null ⇒ 「skipped」。
 // 症状:**别的区的成本永远归不上、而扫描器报得一切正常**(W3-g 删掉 job-service / 日志 / EMR 的模块级客户端时漏了这一处)。
@@ -33,7 +32,7 @@ interface TaskRunItem {
   glueJobRunId?: string;
   applicationId?: string; // emr-serverless
   nativeRunId?: string;
-  // @kf-batch 50-W3f-T0-T3 —— run 行的归属章(W2-a 起唯一写通道保证每条新 run 都有)
+  // run 行的归属章(W2-a 起唯一写通道保证每条新 run 都有)
   projectId?: string;
   targetId?: string;
 }
@@ -134,7 +133,6 @@ export async function sweepTaskCosts(opts?: { backfill?: boolean }): Promise<Swe
       skipped++;
       continue;
     }
-    // @kf-batch 50-W3f-T0-T3
     // 🔴 成本行继承 run 的归属章(T1)。run 无章 ⇒ **不归因、不回落 home**,单独计数暴露出来:
     //    W2-a 之后写通道保证每条新 run 都有章(现网 310 条无一漏)。这里若还见到无章 run,
     //    说明有写入点绕过了通道 —— 那是要修的 bug,不是要兜的底;猜 home 会把它藏起来。

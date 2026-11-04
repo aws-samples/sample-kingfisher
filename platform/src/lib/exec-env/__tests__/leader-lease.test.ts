@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2a-reconciler
 // leader-lease:reconciler 单例选主的 DDB 条件写租约(acquire / renew / steal-on-expiry / release)。
 // 🔴 涉网依赖顶层 vi.mock(铁律:动态 import × vi.mock 拦不住)。条件写在 mock 里不被求值 ⇒ 靠 mock 返回/抛错模拟"抢到/被拒"。
 import { describe, it, expect, vi, beforeEach } from "vitest";

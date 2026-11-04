@@ -1,7 +1,6 @@
 "use client";
-// @kf-batch 50-B27-codegen-place
 // AI 代码生成「这份代码按哪个区的数据目录生成」的**唯一呈现作者**(作业开发 / EMR 两处共用)。
-// 🔴 B-27:原来生成恒按主控区的仓/湖目录 + 主控区工作组实名做 grounding,而页面一个字不说 ⇒ 给 us-west-2 的作业
+// 🔴 原来生成恒按主控区的仓/湖目录 + 主控区工作组实名做 grounding,而页面一个字不说 ⇒ 给 us-west-2 的作业
 //   生成出一份引用主控区表与工作组的代码,用户只能在运行失败时才发现。服务端回 `groundedOn`,这里如实呈现。
 import { Typography } from "antd";
 import { useT } from "@/lib/i18n/useT";

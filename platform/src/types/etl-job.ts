@@ -32,13 +32,11 @@ export interface EtlJob {
   userId: string;
   jobId: string;
   name: string;
-  // @kf-batch 52-P52.2-W2a-run-stamp
   // 🔴 **DDB 行早就带 `projectId`,只有 TS 类型一直没写**(读侧 `api/etl-jobs` 就在按它
   // `projectFilter`)。这个缺口很坑:run 盖章要以作业行的 projectId 为权威,而类型层说"没有这个字段"
   // ⇒ 带类型的单测 fixture 永远不会设它 ⇒ 盖章恒为默认项目也测不出来
   // (同 memory `unwired-code-is-unverified` 的退化 fixture)。可选是因为存量行确实没有。
   projectId?: string;
-  // @kf-batch 50-P50.3-dataplane
   /**
    * ⚠️ **W3-a 落的单值绑定,已被 `targets` 取代**(50 SPEC §1.3a-S1 的合同是 `targets?: string[]`)。
    *
@@ -48,7 +46,7 @@ export interface EtlJob {
    * 写入路径只写 `targets`。
    */
   targetId?: string;
-  // @kf-batch 50-P50.3-multibind —— 50 SPEC §1.3a-**S1**(被点名为"整个模块
+  // 50 SPEC §1.3a-**S1**(被点名为"整个模块
   // 「哪个任务打哪个 target」的核心数据模型";纯追加属性、零迁移)。
   /**
    * 🔴 **执行目标绑定**(缺省 `["tgt_home"]`)。一个定义可绑多个区域;
@@ -61,7 +59,7 @@ export interface EtlJob {
    * `version` = 下发时该定义的版本号(`snapshotVersion` 的递增号);
    * 与当前版本不一致 ⇒ 矩阵判"版本不齐";`status:"failed"` ⇒ 红格;缺条目 ⇒ "漏发"。
    */
-  // @kf-batch 50-WP15-airflow-serverless:值形态 = lib/exec-env/deployments-shared 的 DeploymentRecord(单一作者;+scheduler / workflowArn),不再第二份手抄
+  // 值形态 = lib/exec-env/deployments-shared 的 DeploymentRecord(单一作者;+scheduler / workflowArn),不再第二份手抄
   deployments?: Record<string, DeploymentRecord>;
   /** 该 (定义 × target) 已特化(脱离共享定义)。特化格**不参与**矩阵的红黄判定。 */
   specializedFrom?: Record<string, { sourceId: string; at: number }>;

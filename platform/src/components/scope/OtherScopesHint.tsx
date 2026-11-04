@@ -1,13 +1,12 @@
 "use client";
-// @kf-batch 50-WP4-o1-scope
-// 护栏 1「永远不让用户丢东西」的两个呈现件(交互 INTERACTION §9.3-1;判据 E-151)。
+// 护栏 1「永远不让用户丢东西」的两个呈现件(交互 INTERACTION §9.3-1;判据)。
 //
 // AWS 式切区最大的痛点是:切错区之后「东西不见了」而界面**一个字都不说**。
 // 所以 target 视角下:
 //   · 列表页顶部**常驻**一条淡提示「其他执行范围还有 N 条 → 查看全部」;
 //   · 空态直接说「这个区没有,其他区有 N 条」并给一键切「全部」。
 //
-// 🔴 N 必须与 DDB 对得上(E-151 是逐行核对的)⇒ 数字来自 `GET /api/scope/counts`,**不加缓存**;
+// 🔴 N 必须与 DDB 对得上(是逐行核对的)⇒ 数字来自 `GET /api/scope/counts`,**不加缓存**;
 // 🔴 拉不到就**不显示**提示条(而不是显示 0):显示 0 等于告诉用户「别处没有东西」,那是撒谎。
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -62,7 +61,7 @@ export function useScopeCounts(resources: CountableKind[]): Counts {
  * 2026-09-09 真环境实测:仍有 6 条作业绑在**已删除**的 `tgt_usw2_b` / `tgt_usw2_c` 上
  * (那两个区按用户拍板删掉了,绑定却留在作业行里)。若把它们算进 N,提示条就会说
  * 「其他执行范围还有 9 条」而用户在下拉里**根本找不到**那 6 条 —— 那是另一种「说了谎」:
- * 给出一个到不了的数字比不给更让人怀疑界面。那 6 条属于**解绑清理**的事(WP-11a),不是范围的事。
+ * 给出一个到不了的数字比不给更让人怀疑界面。那 6 条属于**解绑清理**的事,不是范围的事。
  */
 function otherThan(
   byTarget: Record<string, number>,
@@ -114,8 +113,8 @@ export default function OtherScopesHint({ resources }: { resources: CountableKin
 /**
  * 空态文案:「这个区没有,主控区有 N 条」+ 一键切「全部」。
  *
- * @param note @kf-batch 50-WP4ter-coverage —— 可选的**一句实话**:某些资源在这个区不是「恰好没有」,
- * 而是**还建不了**(如同步任务:执行下推 WP-7 未上线)。空态只说「没有」会让用户反复去建、反复失败;
+ * @param note —— 可选的**一句实话**:某些资源在这个区不是「恰好没有」,
+ * 而是**还建不了**(如同步任务:执行下推未上线)。空态只说「没有」会让用户反复去建、反复失败;
  * 说清「为什么还不能」才是护栏 1 的本意(不让用户丢东西,也不让用户白试)。
  */
 export function ScopeEmptyHint({
@@ -163,11 +162,10 @@ export function ScopeEmptyHint({
 }
 
 /**
- * @kf-batch 50-WP4-o1-scope
  * 护栏 1 的**外部计数**版本:计数由调用方给(不自己去 `/api/scope/counts` 拉)。
  *
  * 🔴 为什么要这个变体:run 列表是**带时间窗 + 带筛选**的,而 counts 端点是不带窗口的全表计数 ——
- * 两者口径必然对不上,提示条的数字会与列表打架(判据 E-151 会因此假红)。所以 monitor 这类页
+ * 两者口径必然对不上,提示条的数字会与列表打架(判据会因此假红)。所以 monitor 这类页
  * 让**列表响应自己**顺手回一个 `countsByTarget`(同一查询、同一窗口),这里只负责呈现。
  * 合同:SPEC v3.35 §2.6.6。
  */

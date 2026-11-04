@@ -1,9 +1,8 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片**正文**的唯一读写方(54 DESIGN v1.1 §3.1 / §4.2)。
 //
 // 【为什么正文必须落「数据来源那个 target」的本区桶】一张卡片里有**真实业务数据行**
 //   (每轮 ≤200 行 × N 轮)。会话卡片是平台**第一个持久化查询结果行**的功能 ——
-//   把正文写进主控区就等于把别法域的数据搬进 us,那正是模块 50 整个 W5 在防的事。
+//   把正文写进主控区就等于把别法域的数据搬进 us,那正是整个 W5 在防的事。
 //   中央表(`bgp-genbi-cards`)只存**不含数据值**的指针,见 cards-store.ts。
 //
 // 【标题也留区(用户 2026-09-12 拍板)】中央连 `title` 都不存 ⇒ 列表要显示标题就得读该区。
@@ -14,7 +13,7 @@
 //   🔴 读不到 head **绝不能让卡片从列表里消失** —— 那比看不到标题坏得多(卡片是用户资产)。
 //
 // 【落点不许有默认值】本模块的入口一律收 `ExecutionTarget` **对象**,不收 `targetId?: string` ——
-//   WP-17 的元缺陷教训(一天内「恒打主控区」犯六次,根因是「落点是个有静默合法默认值的参数」):
+//   元缺陷教训(一天内「恒打主控区」犯六次,根因是「落点是个有静默合法默认值的参数」):
 //   收对象 ⇒ 调用方必须先真的把 target 解析出来,漏传直接是**编译错误**,不会静默落回主控区。
 //   桶名与 region 都走 `resolveTargetGlue()`(它对非 home 缺资源/缺 region 一律抛,绝不回落)。
 //
@@ -25,13 +24,13 @@
 //   · 非 home 的 datalakeBucket 是 `RETAIN` 且不带 autoDeleteObjects(exec-env 纪律)⇒ 删环境不删正文;
 //   · 🔴 **home 的 datalakeBucket 是 `DESTROY + autoDeleteObjects: true`**(`platform-stack.ts:57`)⇒
 //     销毁平台栈会连 home 卡片正文一起删。这是既有的 home/非 home 不对称(core-stack 文件头写着「刻意相反」),
-//     本包**不改它**(那是 P50.1 记的「home 桶仍 DESTROY」那条线),但在设计里登记为已知风险。
+//     本包**不改它**(那是记的「home 桶仍 DESTROY」那条线),但在设计里登记为已知风险。
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { createHash } from "crypto";
 import { s3ClientFor } from "@/lib/exec-env/target-clients";
 import { resolveTargetGlue } from "@/lib/exec-env/target-clients";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
-// @kf-batch 50-WP31-place-first-class 序 31 第二刀 ②:正文落点的唯一作者记落点决策(第四十轮 observe:卡片正文的
+// 正文落点的唯一作者记落点决策(卡片正文的
 //   S3 Get / Put 落在该区桶上没越区,却因读侧只经 getTargetRaw(看得见即可,不记决策)⇒ 未归因)。
 import { notePlaceDecision } from "@/lib/place/context";
 
@@ -121,7 +120,7 @@ export function cardHeadKey(userSub: string, cardId: string): string {
   return `${CARD_BODY_PREFIX}/${assertSegment(userSub, "userSub")}/${assertSegment(cardId, "cardId")}/head.json`;
 }
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)—— 刷新快照(与正文同目录、同一个桶、同一个区)
+// (问数)—— 刷新快照(与正文同目录、同一个桶、同一个区)
 /** 一次刷新的快照 key。快照 id 是平台生成的 ulid(DAG 的 runId 带 `#`,不能直接当 key 段)。 */
 export function cardRunSnapshotKey(userSub: string, cardId: string, snapshotId: string): string {
   return `${CARD_BODY_PREFIX}/${assertSegment(userSub, "userSub")}/${assertSegment(cardId, "cardId")}/runs/${assertSegment(snapshotId, "snapshotId")}.json`;
@@ -291,7 +290,7 @@ export async function deleteCardBody(
   target: ExecutionTarget,
   userSub: string,
   cardId: string,
-  // @kf-batch 50-WP28-platform-action-node —— 🔴 **必填**(不给静默默认值):刷新快照也在这个目录里,
+  // 🔴 **必填**(不给静默默认值):刷新快照也在这个目录里,
   //   漏传 = 删卡后该区留下一串带业务数据行的孤儿快照。新卡(从没刷新过)显式传 `[]`。
   snapshotIds: readonly string[]
 ): Promise<boolean> {

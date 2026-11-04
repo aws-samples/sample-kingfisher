@@ -1,13 +1,13 @@
 "use strict";
-// 模块 44 — Glue PySpark 工程配方 + 方言/配置约束。
-// 平台用 Glue 做批同步 / 离线计算;Glue 版本缺省取清单最高、用户可降版(序 53,用户 2026-10-26 拍板)。
+// Glue PySpark 工程配方 + 方言/配置约束。
+// 平台用 Glue 做批同步 / 离线计算;Glue 版本缺省取清单最高、用户可降版(用户 2026-10-26 拍板)。
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GLUE_RECIPES = exports.GLUE_DIALECT_RULES = exports.COOKBOOK_GLUE_DEFAULT_RUNTIME = exports.COOKBOOK_GLUE_VERSION_DEFAULT = exports.COOKBOOK_GLUE_VERSIONS = void 0;
 const shared_rules_1 = require("./shared-rules");
 const warehouse_facts_1 = require("./warehouse-facts");
-// @kf-batch 37-recipes-atomic-overwrite —— S3 Tables 结果表「先 drop 再建」= 非原子覆盖(唯一作者 seed/s3tables-overwrite-facts.ts)
+// S3 Tables 结果表「先 drop 再建」= 非原子覆盖(唯一作者 seed/s3tables-overwrite-facts.ts)
 const s3tables_overwrite_facts_1 = require("./s3tables-overwrite-facts");
-// 序 53 —— Glue 版本事实的 cookbook 内联副本。cookbook 是「零 @/ alias」的 core 包(随 genbi 容器 core-dist 分发),
+// Glue 版本事实的 cookbook 内联副本。cookbook 是「零 @/ alias」的 core 包(随 genbi 容器 core-dist 分发),
 //   不能 import @/lib/sync/glue-version;真源 = platform/src/lib/sync/glue-version.ts,
 //   单测 lib/cookbook/__tests__/glue-version-drift.test.ts 钉两处逐字一致(真源加版本这里没跟即红)。
 exports.COOKBOOK_GLUE_VERSIONS = ["4.0", "5.0", "5.1", "6.0"];
@@ -15,11 +15,11 @@ exports.COOKBOOK_GLUE_VERSION_DEFAULT = "6.0";
 exports.COOKBOOK_GLUE_DEFAULT_RUNTIME = { spark: "4.1.1", python: "3.13", iceberg: "1.11.0" };
 const GLUE_DEFAULT_LINE = `Glue ${exports.COOKBOOK_GLUE_VERSION_DEFAULT}(Spark ${exports.COOKBOOK_GLUE_DEFAULT_RUNTIME.spark} / Python ${exports.COOKBOOK_GLUE_DEFAULT_RUNTIME.python} / Iceberg ${exports.COOKBOOK_GLUE_DEFAULT_RUNTIME.iceberg})`;
 exports.GLUE_DIALECT_RULES = [
-    // 🔴 L1(52 P52.1):禁止授权给 PUBLIC(唯一作者 = seed/shared-rules.ts,三引擎共用一份)。
+    // 🔴 L1:禁止授权给 PUBLIC(唯一作者 = seed/shared-rules.ts,三引擎共用一份)。
     (0, shared_rules_1.noGrantToPublicRule)("glue"),
-    // @kf-batch 50-B27-codegen-place —— 数仓工作组写成字面量 ⇒ warn(唯一作者 seed/warehouse-facts.ts)
+    // 数仓工作组写成字面量 ⇒ warn(唯一作者 seed/warehouse-facts.ts)
     (0, warehouse_facts_1.hardcodedWarehouseRule)("glue"),
-    // @kf-batch 37-recipes-atomic-overwrite —— Glue PySpark 写 S3 Tables 结果表先 drop 再建 / 写 ⇒ warn。
+    // Glue PySpark 写 S3 Tables 结果表先 drop 再建 / 写 ⇒ warn。
     //   🔴 刻意不咬本文件 glue.redshift-warehouse-access 配方里经 redshift-data 发给**数仓**的 `DROP TABLE IF EXISTS public.x; CREATE TABLE public.x AS`
     //   (Redshift 没有 CREATE OR REPLACE TABLE,DROP+CTAS 包进 BEGIN/COMMIT 就是它的正解)—— 判据按表名前缀 / Spark 独有写法区分,见 facts 文件。
     (0, s3tables_overwrite_facts_1.noDropBeforeS3TablesWriteRule)("glue"),
@@ -184,7 +184,7 @@ exports.GLUE_RECIPES = [
         ],
         tags: ["glue", "pyspark", "etl", "batch", "聚合", "skeleton"],
     },
-    // ── 以下 3 条为模块45 P45.2 高频配方,提炼自平台【生产同步作业真跑验证过】的黄金脚本
+    // ── 以下 3 条为高频配方,提炼自平台【生产同步作业真跑验证过】的黄金脚本
     //    (lib/sync/glue-script-generator.ts,含真实踩坑根治),非凭大模型记忆。──
     {
         id: "glue.jdbc-read-source",
@@ -339,11 +339,11 @@ exports.GLUE_RECIPES = [
             "#   ✓ 正解:取平台注入的 args['bgp_redshift_workgroup'] / args['bgp_redshift_database'](见本配方顶部)。",
             "# ============ 【错误反例②b】把工作组写成字面量 —— 多区执行时打到别的区 ============",
             "# rs.execute_statement(WorkgroupName='some-workgroup', ...)",
-            "#   ✗ 字面量只对一个区成立;作业绑到别的区跑,要么该区没有这个工作组,要么查的是错的库(B-27)。",
+            "#   ✗ 字面量只对一个区成立;作业绑到别的区跑,要么该区没有这个工作组,要么查的是错的库。",
             "",
             "# ============ 【错误反例③】建完表再把它授权给 PUBLIC —— 会被平台硬拦 ============",
             "#   ✗ 建表后追加一条把该表授权给 PUBLIC 的语句(老配方曾这么教,已撤):",
-            "#     那会让库内所有身份都能读写这张表 → 击穿项目空间隔离(模块 52),",
+            "#     那会让库内所有身份都能读写这张表 → 击穿项目空间隔离,",
             "#     且规则 glue.no-grant-to-public 命中即 blocked,作业**跑不起来**。",
             "#   ✓ 正解:什么都不加。平台建表/写入/查询页/GenBI 用同一个数仓身份,建完表本来就看得到。",
         ].join("\n"),

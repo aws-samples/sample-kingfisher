@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— Glue 离线作业「立即运行 / 补数 / 重跑」(同一个 runGlueScriptJob)把**全套 15 个**业务日期参数
+// Glue 离线作业「立即运行 / 补数 / 重跑」(同一个 runGlueScriptJob)把**全套 15 个**业务日期参数
 // 以 StartJobRun Arguments 传入(原来手抄 4 个:yesterday_ds_nodash / tomorrow_ds_nodash 从没传过),脚本对象逐字节 = 作业脚本(不烙日期)。
 // 装配层:job-service ↔ run-params ↔ glue-job-name ↔ run-lock ↔ run-records 之间不 mock;只替换真外部:
 //   Glue / S3 客户端工厂(记录命令)、DDB 写通道、数仓凭证(Secrets Manager)。home 落点走 env(与现网同一条路)。

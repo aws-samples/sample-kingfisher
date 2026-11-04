@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // dag-factory YAML 定义生成器(SPEC v3.27 §3.15)。一个作业 × 一个 target = 一份 YAML = 一个 workflow(Name = dag_id)。
 // 🔴 服务约束(spike 七跑 + 官方参数支持页):schedule 须合法 cron;start_date **必须在未来**(EventBridge Scheduler 照 cron 触发,不受它影响);
 //    retries 0..3;execution_timeout ≤ 3600;不用 callback / trigger_rule / 分支 / ExternalTaskSensor;定义 < 50KB。
@@ -16,16 +15,16 @@ export interface ServerlessJobSpec {
   jobsTable: string;
   ctrlRegion: string;
   /**
-   * @kf-batch 50-WP31-place-first-class —— 序 4(L6):**执行落点**(PlaceWire v1)。原来的 `execRegion` + 数仓三样
+   * **执行落点**(PlaceWire v1)。原来的 `execRegion` + 数仓三样
    * (`workgroup` / `database` / `secretArn`)四个平面字段合并于此;运行时用 `bgp_read_place` 读,缺 / 不合法即拒,
    * 且 `place.targetId` 必须等于 `stamp.targetId`。redshift 作业必须带数仓腿。
    */
   place: PlaceWire;
   lockAttr: string;
   stamp: { projectId: string; targetId: string };
-  // @kf-batch 50-WP5-rungroup —— O2:定时触发的确定性分组(50 SPEC v3.44 §3.17.2)。
+  // O2:定时触发的确定性分组(50 SPEC v3.44 §3.17.2)。
   // 🔴 **只有发布时扇出到 >1 个 target 才注入**:Python 侧只知道自己那个区,「这次是不是联动」
-  //    只有发布期的 TS 知道 ⇒ 不注入就等于「单区定时不成组」(与 E-166 同一条口径)。
+  //    只有发布期的 TS 知道 ⇒ 不注入就等于「单区定时不成组」(与同一条口径)。
   // 🔴 `cron` 是**分组时间轴的唯一来源** —— 刻意不用 Airflow 的 run_id / logical_date
   //    (MWAA Serverless 下它退化成常量,拿它分组会把所有历次定时归成同一个组)。
   scheduledGroup?: {
@@ -35,7 +34,7 @@ export interface ServerlessJobSpec {
     table: string;
     projectId: string;
     requestedTargets: string[];
-    /** 本份产物的定义版本(E-168:跨区版本差要看得见;**刻意不进分组键**)。 */
+    /** 本份产物的定义版本(跨区版本差要看得见;**刻意不进分组键**)。 */
     definitionVersion?: number;
   };
   // redshift(数仓落点在 place.redshift)

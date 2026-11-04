@@ -1,5 +1,4 @@
-// @kf-batch 50-P50.3b-2a-reconciler
-// P50.3b-2a:周期 reconciler 的【进程内驱动】(SPEC §3.5a / DESIGN §20.24)。
+// 2a:周期 reconciler 的【进程内驱动】(SPEC §3.5a / DESIGN §20.24)。
 //
 // 运行体 = 现有常驻平台服务(ApplicationLoadBalancedFargateService,desiredCount 2~6),由 src/instrumentation.ts
 //   的 register() 在 nodejs runtime 启动一次。每 tick:选主(leader-lease)→ 若当选,遍历 listTargetsRaw() →
@@ -13,16 +12,16 @@
 import { listTargetsRaw, type ExecutionTarget } from "@/lib/exec-env/registry";
 import { reconcileOneTarget } from "@/lib/exec-env/reconcile";
 import { acquireOrRenewLeaderLease, RECONCILER_LEASE_MS, type LeaderLease } from "@/lib/exec-env/leader-lease";
-// @kf-batch 50-WP9a-durable-jobs —— 数据面长作业的推进泵(独立计时器;泵侧零执行器 import,见 pump.ts 文件头)
+// 数据面长作业的推进泵(独立计时器;泵侧零执行器 import,见 pump.ts 文件头)
 import { startDataplaneJobPump } from "@/lib/dataplane-jobs/pump";
-// @kf-batch 50-B51-backfill-pump —— 补数计划的后台推进泵(独立计时器;泵侧零执行器 import,见 backfill/pump.ts 文件头)
+// 补数计划的后台推进泵(独立计时器;泵侧零执行器 import,见 backfill/pump.ts 文件头)
 import { startBackfillPump } from "@/lib/backfill/pump";
-// @kf-batch 50-WP31-place-first-class 序 31 第二刀 ②:请求外的循环**自己建显式落点上下文**(context.ts 文件头 ① 的原话)。
-//   第四十三轮 observe 实测,未归因榜 13 类里 11 类是「(请求外)」—— 全是本文件两个 tick 按 target 发出的探活 / 镜像调用:
+// 请求外的循环**自己建显式落点上下文**(context.ts 文件头 ① 的原话)。
+//   第四十三轮 observe 实测,未归因榜 13 类里 11 类是「(请求外)」—— 全是本文件两个 tick 按 target 发出的探活 / 镜像调用
 //   客户端建在 target 自己的区(没越区),只是没人告诉观测器「这一串调用是替谁做的」。
 //   🔴 两个叶子都已在 instrumentation 可达面上(observer → context;descriptor 只 import 类型 + target-id),不碰 node 内置。
 //   🔴 enforce 安全:控制面客户端(注册表 DynamoDB / CodeBuild / IAM / 目标区 CloudFormation)走 sdkClient("control-plane"),
-//      不挂落点守卫;数据面客户端都按 target.region 建 = 上下文的 region ⇒ 序 6 切 enforce 时本包装不会把探活自己拦死。
+//      不挂落点守卫;数据面客户端都按 target.region 建 = 上下文的 region ⇒ 切 enforce 时本包装不会把探活自己拦死。
 import { runInPlace } from "@/lib/place/context";
 import { placeOfDescriptorOrNull } from "@/lib/place/descriptor";
 
@@ -50,7 +49,7 @@ export interface TickSummary {
 // 进程内状态:持有的 leader 租约(跨 tick 续租)+ 是否已启动(register 幂等)。
 let currentLease: LeaderLease | null = null;
 let started = false;
-// @kf-batch 50-WP9a-durable-jobs —— 本副本「确定还持有」leader 租约到何时(泵只在这之前取作业)。
+// 本副本「确定还持有」leader 租约到何时(泵只在这之前取作业)。
 //   取「续租时刻 + 租约 − 1 分钟」:租约 8 分钟、续租周期 4 分钟 ⇒ 正常运转时始终为真;
 //   续租失败 / 被别的副本抢走 ⇒ 下一次 tick 就置 0,泵最迟 1 分钟余量内停手。
 let leaderHeldUntil = 0;
@@ -68,7 +67,7 @@ export function holdsLeaderLease(now: number = Date.now()): boolean {
  */
 export async function runReconcileTick(now: number = Date.now()): Promise<TickSummary> {
   currentLease = await acquireOrRenewLeaderLease(currentLease, now);
-  leaderHeldUntil = currentLease ? now + RECONCILER_LEASE_MS - LEADER_SAFETY_MS : 0; // @kf-batch 50-WP9a-durable-jobs
+  leaderHeldUntil = currentLease ? now + RECONCILER_LEASE_MS - LEADER_SAFETY_MS : 0;
   if (!currentLease) return { leader: false, total: 0, reconciled: 0, errors: 0 };
 
   let targets: ExecutionTarget[];
@@ -83,7 +82,7 @@ export async function runReconcileTick(now: number = Date.now()): Promise<TickSu
   let errors = 0;
   for (const t of targets) {
     try {
-      // @kf-batch 50-WP30-decommission —— 退役中的环境不探活:
+      // 退役中的环境不探活
       //   · `gone`(已删除 / 已弃置)⇒ 跳过(没有资源可探;以前每 tick 对墓碑跑一次探活、记一次错);
       //   · `decommissioning`(销毁中 / 卡住)⇒ 跳过:探活一个正在拆的环境只会写一堆红项、还会跟收口抢写。
       //     销毁的观测收口走 destroy-observe(详情页销毁中每 15s 轮询)。
@@ -91,7 +90,7 @@ export async function runReconcileTick(now: number = Date.now()): Promise<TickSu
       //     而本文件在 instrumentation 可达面上 —— `await import()` 也不构成编译边界(instrumentation-bundle-guard 钉住)。
       const phase = (t.observed as { phase?: string } | undefined)?.phase;
       if (phase === "gone" || phase === "decommissioning" || (t.status === "deleted" && !t.observed)) continue;
-      // 序 31 第二刀 ②:整段探活 / 完成 / 回写都在该 target 的显式落点上下文里 ⇒ 观测器把它发出的每一次调用归到这个 target
+      // 整段探活 / 完成 / 回写都在该 target 的显式落点上下文里 ⇒ 观测器把它发出的每一次调用归到这个 target
       await runForTarget(t, () => reconcileOneTarget(t.targetId));
       reconciled++;
     } catch (e) {
@@ -102,7 +101,6 @@ export async function runReconcileTick(now: number = Date.now()): Promise<TickSu
   return { leader: true, total: targets.length, reconciled, errors };
 }
 
-// @kf-batch 50-P50.3-mirror
 // ── 跨地域元数据镜像的**定时刷新**(50 SPEC §3.13「定时 + 手动触发」的定时那一半)──────
 //
 // 🔴 **为什么挂在这个循环上、而不是新建一个定时器/Lambda**:选主已经在这里了(leader-lease),
@@ -143,7 +141,7 @@ export async function runMirrorTick(now: number = Date.now()): Promise<MirrorTic
     console.error("[mirror] 算到期清单失败:", String((e as Error)?.message ?? e));
     return { due: 0, mirrored: 0, errors: 1, deferred: 0 };
   }
-  // 序 31 第二刀 ②:到期清单只有 targetId,显式上下文要描述符 ⇒ 列一次全表按 id 取(列不到 ⇒ 该 target 无上下文照常刷)
+  // 到期清单只有 targetId,显式上下文要描述符 ⇒ 列一次全表按 id 取(列不到 ⇒ 该 target 无上下文照常刷)
   let descriptors = new Map<string, ExecutionTarget>();
   try {
     descriptors = new Map((await listTargetsRaw()).map((t) => [t.targetId, t] as const));
@@ -194,7 +192,6 @@ export function startReconcilerLoop(): void {
     try {
       const s = await runReconcileTick();
       if (s.leader && (s.errors > 0 || s.total > 0)) console.log("[reconciler] tick:", JSON.stringify(s));
-      // @kf-batch 50-P50.3-mirror
       // 🔴 **镜像刷新排在探活之后、且完全隔离**:探活是准入判定的输入(15min stale 阈值),
       //    镜像只是一个看板 ⇒ 镜像抛异常绝不能影响 reconcile 的结果与计数。
       //    非 leader 不刷(两卡同时刷会双份调用 + 互相覆盖分面)。
@@ -216,10 +213,10 @@ export function startReconcilerLoop(): void {
   console.log("[reconciler] 周期循环已启动(tick=%dms,lease=%dms)", TICK_INTERVAL_MS, RECONCILER_LEASE_MS);
   schedule(INITIAL_DELAY_MS);
 
-  // @kf-batch 50-WP9a-durable-jobs —— 🔴 独立计时块(不进 runOnce):泵 15s 一轮,与 4 分钟的探活 tick 互不阻塞;
+  // 🔴 独立计时块(不进 runOnce):泵 15s 一轮,与 4 分钟的探活 tick 互不阻塞;
   //   泵出任何错都只在它自己的循环里(pump.ts 逐轮 try/catch),碰不到探活与镜像。
   //   选主口径复用本循环的 leader 租约(不另起锁行);停泵开关 BGP_DATAPLANE_JOBS_PAUSED=1 在泵内部判。
   startDataplaneJobPump({ isLeader: () => holdsLeaderLease() });
-  // @kf-batch 50-B51-backfill-pump —— 补数计划不再只靠页面开着推进(B-51c);选主口径与数据面作业泵相同。
+  // 补数计划不再只靠页面开着推进;选主口径与数据面作业泵相同。
   startBackfillPump({ isLeader: () => holdsLeaderLease() });
 }

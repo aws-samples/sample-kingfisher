@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片四个动作(保存 / 打开 / 续聊 / 删除)的**编排层**:路由只做取参与出参,业务顺序全在这里。
 // 合同 = 54 DESIGN v1.3 §5(接口)/ §7(执行流程)。
 //
@@ -180,7 +179,6 @@ export async function openCard(userSub: string, cardId: string, identity: Identi
   } catch (e) {
     if (e instanceof CardBodyUnreadable) throw e;
     // 🔴 AccessDenied / 网络错**不当成「没有」**(cards-body-store 已经原样上抛),这里只加一句人话。
-    // @kf-batch 50-WP26b-region-derive
     // 🔴🔴 region 一律从**活的 target** 派生,存下来的那份只作回落。
     //   2026-09-20 截图铁证:`读取 tgt_euw1_a(us-west-2)的卡片正文失败…` —— 而 `tgt_euw1_a` 在
     //   **eu-west-1**。原因是这里拼的是 `pointer.region`(保存那一刻写进指针的**快照**,见上面第 127 行)。
@@ -264,7 +262,7 @@ export async function resumeCard(
 
 /**
  * 删卡(两段式,§7.3):置 `deleting` + **额度立刻释放** → 删该区正文 → 删指针。
- * 清理失败 ⇒ 指针留成 `deleting`,列表里出现「清理未完成 · 重试」(残留可见,WP-11a 口径)。
+ * 清理失败 ⇒ 指针留成 `deleting`,列表里出现「清理未完成 · 重试」(残留可见,口径)。
  */
 /** 删卡结果。`bodyOrphaned` 非空 = 该区正文**再也清不掉了**(见 deleteCard 的终态分支)。 */
 export interface DeleteCardResult {
@@ -312,7 +310,7 @@ export async function deleteCard(userSub: string, cardId: string): Promise<Delet
       limit: CARD_LIMIT,
     };
   }
-  // @kf-batch 50-WP28-platform-action-node —— 刷新快照一并清(清单在指针上)
+  // 刷新快照一并清(清单在指针上)
   const bodyCleaned = await deleteCardBody(target, userSub, cardId, pointer.refreshSnapshots ?? []);
   if (bodyCleaned) await deleteCardPointer(userSub, cardId);
   return { deleted: true, bodyCleaned, used: await readQuota(userSub), limit: CARD_LIMIT };

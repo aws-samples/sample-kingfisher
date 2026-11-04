@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 会话卡片四条路由共用的**异常 → HTTP 映射**(单一作者)。
 //
 // 🔴 为什么不放在 `route.ts` 里:① Next App Router 的 route 文件只许导出固定名(GET/POST/…),
@@ -10,7 +9,7 @@ import { CardStoreContended } from "@/lib/genbi/cards-store";
 import { CardBodyUnreadable } from "@/lib/genbi/cards-body-store";
 import { targetNotReadyResponse } from "@/lib/exec-env/target-http";
 import { AuditUnavailable, ResidencyAckRequired } from "@/lib/exec-env/residency";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)—— 刷新 / 定时刷新的两类失败
+// (问数)—— 刷新 / 定时刷新的两类失败
 import { CardNotRefreshable, CardRefreshFailed } from "@/lib/genbi/cards-refresh";
 import { ActionScheduleInvalid, ActionScheduleOfflineIncomplete } from "@/lib/scheduler/action-schedules";
 import { actionScheduleError } from "@/lib/scheduler/action-schedules-http";

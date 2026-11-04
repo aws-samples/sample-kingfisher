@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47a-promote-ux —— 「某类资源的页面在哪」的唯一作者(发布到环境后的「切到 X 环境查看」、审批后的跳转都用它)。
+// 「某类资源的页面在哪」的唯一作者(发布到环境后的「切到 X 环境查看」、审批后的跳转都用它)。
 //   🔴 这张表与 lib/versions/version-service.ts 的 ResourceType 闭合清单一一对应;新增资源类型时两处同改,缺一 tsc 就红。
 import type { ResourceType } from "@/lib/versions/version-service";
 

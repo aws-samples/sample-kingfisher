@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— 同步向导 / 同步列表的 UX 兜底接线判据(用户 2026-10-15 反馈 ② ③ ④ ⑤)。
+// 同步向导 / 同步列表的 UX 兜底接线判据(用户 2026-10-15 反馈 ② ③ ④ ⑤)。
 // 「写了」≠「接上了」:草稿模块、筛选器、错误兜底、自动刷新都必须在**调用点**出现,且旧形态不许回来。
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -73,8 +73,8 @@ describe("② 多页签右键菜单:三项都接到 closeMany,规则在纯模块
   });
 });
 
-// @kf-batch 44-sync-switch-datasource —— 编辑任务换数据源(用户 2026-10-15 反馈 ②;…7698 探针坐实:旧源已选表残留、先发后到的旧源表清单盖掉新源)
-describe("序 44 ② 换数据源:请求序号防竞态 + 用户换源后清掉不在新源里的已选表", () => {
+// 编辑任务换数据源(用户 2026-10-15 反馈 ②;…7698 探针坐实:旧源已选表残留、先发后到的旧源表清单盖掉新源)
+describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源里的已选表", () => {
   const src = strip(read("SyncTaskModal.tsx"));
   it("dsReqSeq 序号:每次选源自增;拉表 / 映射 / workgroup 三处结果落地前都比对序号;过期结果直接 return", () => {
     expect(src).toMatch(/const dsReqSeq = useRef\(0\);/);
@@ -89,7 +89,7 @@ describe("序 44 ② 换数据源:请求序号防竞态 + 用户换源后清掉�
   });
 });
 
-// 序 49 ⑥ UX ②(用户 2026-10-20 拍板:第一步「给缺省 + 只留 Next」)
+// UX ②(用户 2026-10-20 拍板:第一步「给缺省 + 只留 Next」)
 describe("⑥ 新建向导第一步:三个选择题有缺省(唯一作者 SYNC_WIZARD_DEFAULTS),「完成」第 2 步起才出现", () => {
   const src = strip(read("SyncTaskModal.tsx"));
   it("缺省值模块:三个值都落在向导下拉 / 单选的闭合选项里(不是编出来的值)", async () => {
@@ -101,7 +101,7 @@ describe("⑥ 新建向导第一步:三个选择题有缺省(唯一作者 SYNC_W
   });
   it("打开向导:新建用缺省(编辑用任务自己的值),targetType 状态同源;缺省只从唯一作者 import", () => {
     expect(src).toContain('import { SYNC_WIZARD_DEFAULTS } from "@/lib/sync/wizard-defaults"');
-    // 序 53:编辑存量任务时先补回「记录没存就按 5.1」的 Glue 版本(withRecordGlueVersion),新建仍是唯一作者的缺省
+    // 编辑存量任务时先补回「记录没存就按 5.1」的 Glue 版本(withRecordGlueVersion),新建仍是唯一作者的缺省
     expect(src).toContain("form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS)");
     expect(src).toContain("setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType)");
     expect(src).not.toContain("form.setFieldsValue(editing || {})");

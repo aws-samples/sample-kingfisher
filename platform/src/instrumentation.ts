@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-2a-reconciler
 // Next.js instrumentation:进程启动一次性钩子(需 next.config.js 开 experimental.instrumentationHook,Next 14.x)。
 // register() 每个 server 实例(ECS task)启动时调一次 —— 正是"进程内 lease 单例"reconciler 的挂载点。
 //
@@ -9,7 +8,7 @@ export async function register() {
   // 动态 import:避免把 reconciler 及其 AWS SDK 依赖拉进 edge/中间件 bundle。
   const { startReconcilerLoop } = await import("@/lib/exec-env/reconciler-loop");
   startReconcilerLoop();
-  // @kf-batch 50-WP31-place-first-class —— 落点观测器(WP-31 L9 观测模式):量真实越区调用,只记录不拦截。
+  // 落点观测器(L9 观测模式):量真实越区调用,只记录不拦截。
   // 装失败不许挡启动(观测器坏了不能把平台带坏)。
   try {
     const { installPlaceObserver } = await import("@/lib/place/observer");

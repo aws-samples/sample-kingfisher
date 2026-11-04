@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2a-exec-env-stackgroup
 // 执行环境栈组的**入参解析与校验**(50 DESIGN §4.1a-4:app.ts 加 `-c exec-env-*` 时只实例化该 target 的栈组)。
 //
 // 【为什么单独一个文件】栈组的正确性第一关是"入参对不对":region 写错 ⇒ 资源建到错的地方;
@@ -8,7 +7,7 @@
 // 🔴 fail-closed:任何一项不合法就 **throw**,让 `cdk synth` 当场失败。
 //    绝不"猜一个默认值继续" —— 部署期猜错的代价是建出一批名字/位置都错的真实资源。
 import { HOME_TARGET_ID, RESOURCE_KINDS } from "../shared/naming";
-// @kf-batch 50-WP23-xregion-peering —— CIDR 的唯一作者(为什么必须显式给见那个文件的头注释)
+// CIDR 的唯一作者(为什么必须显式给见那个文件的头注释)
 import { EXEC_ENV_VPC_CIDR_POOL, HOME_EXEC_ENV_VPC_CIDR, cidrsOverlap, parseExecEnvVpcCidr } from "./vpc-cidr";
 
 /** 50 SPEC §1.1 的组件枚举(与 platform 侧 `registry.ts` 的 `TARGET_COMPONENTS` 同集合)。 */
@@ -21,13 +20,13 @@ export const EXEC_ENV_COMPONENTS = [
   "flink",
   "agentcore",
   "residency-api",
-  // @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §3.15)
+  // (SPEC v3.27 §3.15)
   "airflow-serverless",
 ] as const;
 export type ExecEnvComponent = (typeof EXEC_ENV_COMPONENTS)[number];
 
 /**
- * @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 每个执行环境都必须装齐的组件(用户 2026-10-10 拍板,不提供精简形态)。
+ * ② —— 🔴🔴 每个执行环境都必须装齐的组件(用户 2026-10-10 拍板,不提供精简形态)。
  * 平台侧唯一作者 = `platform/src/lib/exec-env/implemented-components.ts` 的 `BASE_REQUIRED_COMPONENTS` /
  * `requiredComponentsFor`;这里是 infra 那道构建边界的副本,由平台侧 parity 单测逐字节钉住。
  * 法域 ≠ home 另装 residency-api;agentcore 只属主控区且不由栈组部署(external),broker 不判它。
@@ -53,8 +52,8 @@ export interface ExecEnvContext {
   account: string;
   /** 已去重、已按枚举顺序排序、必含 `core`。 */
   components: ExecEnvComponent[];
-  // 🔴 @kf-batch 50-WP16-zero-egress:`natGateways` **已删除**(不是改默认值,是从类型里消失)。
-  //    执行环境自 WP-16 起零出网,NAT 数恒为 0;把入参留着 = 留一个「可以再开 NAT」的口子,
+  // 🔴 `natGateways` **已删除**(不是改默认值,是从类型里消失)。
+  //    执行环境零出网,NAT 数恒为 0;把入参留着 = 留一个「可以再开 NAT」的口子,
   //    而那正是 change-safety A4「让非法状态无法表达」要消灭的东西。传 `-c exec-env-nat-gateways`
   //    会在 `readExecEnvContext` 直接抛(不是忽略 —— 静默忽略会让运维以为自己调了档)。
   /**
@@ -66,7 +65,6 @@ export interface ExecEnvContext {
   /** 是否是 home target(home 走存量实名豁免)。 */
   isHome: boolean;
   /**
-   * @kf-batch 50-WP13-mwaa-region
    * 🔴 **控制面(home)所在 region** —— 只有 `mwaa` 组件需要:该区 MWAA 的 DAG 回写 run 台账到 home 的 `bgp-*` 表
    * (SPEC v3.26 §3.14「控制面回写 = 唯一跨区例外」),角色策略里的 DDB ARN / KMS via-service 都要它。
    * 来自 `-c exec-env-home-region`(buildspec 传 CodeBuild 自身 `$AWS_REGION` = 控制面 region);
@@ -74,7 +72,6 @@ export interface ExecEnvContext {
    */
   homeRegion?: string;
   /**
-   * @kf-batch 50-WP23-xregion-peering
    * 🔴 本执行环境 VPC 的 CIDR —— **必填**(类型上不可缺)。
    * 非 home 由 `-c exec-env-vpc-cidr` 给(值来自描述符 `vpcCidr`,注册时从地址池分配);
    * home 走存量值(见 `HOME_EXEC_ENV_VPC_CIDR`)。
@@ -83,7 +80,6 @@ export interface ExecEnvContext {
    */
   vpcCidr: string;
   /**
-   * @kf-batch 50-WP23-xregion-peering
    * 🔴 主控区那一侧的三件事实,**要么三个都有、要么整个不存在**(非 home 必有;home 没有)。
    *
    * 为什么捆成一个对象而不是三个可选字段:三个字段各自可选 ⇒ 「只有两个」这种状态在类型上是**可表达**的,
@@ -146,7 +142,7 @@ export function readExecEnvContext(
 
   const components = parseComponents(str(get("exec-env-components")));
 
-  // 🔴 @kf-batch 50-WP16-zero-egress:这个入参已退役,**传了就抛**。
+  // 🔴 这个入参已退役,**传了就抛**。
   if (str(get("exec-env-nat-gateways")) !== undefined) {
     throw new Error(
       "-c exec-env-nat-gateways 已退役(50 SPEC §3.16:执行环境零出网,NAT 恒为 0)—— " +
@@ -156,25 +152,25 @@ export function readExecEnvContext(
 
   const azs = parseAzs(str(get("exec-env-azs")), region);
 
-  // @kf-batch 50-WP13-mwaa-region —— mwaa 组件必须知道控制面在哪个 region(回写 run 台账);其余组件不需要
+  // mwaa 组件必须知道控制面在哪个 region(回写 run 台账);其余组件不需要
   const homeRegion = str(get("exec-env-home-region"));
   if (homeRegion !== undefined && !REGION_RE.test(homeRegion)) {
     throw new Error(`-c exec-env-home-region 非法:${homeRegion}(须 region 全名,形如 us-east-1)`);
   }
-  // 🔴 @kf-batch 50-WP16-zero-egress:`homeRegion` 从「只有 mwaa 需要」升级为「**非 home target 一律必需**」。
+  // 🔴 `homeRegion` 从「只有 mwaa 需要」升级为「**非 home target 一律必需**」。
   //    理由:零出网之后,回写 home 台账的那条路要靠**跨区 DynamoDB 接口端点 + 私有托管域**
   //    (SPEC §3.16-C),而任何跑任务的 target 都要回写台账 —— 不知道控制面在哪个 region 就建不出这条路,
-  //    症状会是「任务跑成功、看板上这次运行不存在」(WP-15 T-12 已经踩过一次同族的坑)。
+  //    症状会是「任务跑成功、看板上这次运行不存在」(已经踩过一次同族的坑)。
   const isHomeTarget = targetId === HOME_TARGET_ID;
   if (!isHomeTarget && !homeRegion) {
     throw new Error(
-      "-c exec-env-home-region 缺失 —— 非 home 执行环境自 WP-16 起**一律**需要它:" +
+      "-c exec-env-home-region 缺失 —— 非 home 执行环境**一律**需要它:" +
         "① 该区调度器回写 home 运行台账的角色策略(SPEC §3.14);" +
         "② 零出网下回写要走的跨区 DynamoDB 接口端点 + 私有托管域(SPEC §3.16-C)。**不猜默认值**"
     );
   }
 
-  // @kf-batch 50-WP23-xregion-peering —— VPC CIDR
+  // VPC CIDR
   // 🔴 非 home **必须显式给**:跨区 peering 要求与主控区 CIDR 不重叠,而 CDK 的默认值恰好一模一样。
   //    home 是唯一例外 —— 它压根不与自己 peering,沿用存量值 ⇒ 对 home 的行为逐字节不变。
   const rawVpcCidr = str(get("exec-env-vpc-cidr"));
@@ -182,7 +178,7 @@ export function readExecEnvContext(
     ? HOME_EXEC_ENV_VPC_CIDR
     : parseExecEnvVpcCidr(rawVpcCidr, "-c exec-env-vpc-cidr");
 
-  // @kf-batch 50-WP23-xregion-peering —— 主控区那一侧的三件事实(非 home 三个都必需)
+  // 主控区那一侧的三件事实(非 home 三个都必需)
   const homeVpcId = str(get("exec-env-home-vpc-id"));
   const homeVpcCidr = str(get("exec-env-home-vpc-cidr"));
   const homeDdbEndpointId = str(get("exec-env-home-ddb-endpoint-id"));
@@ -234,7 +230,7 @@ export function readExecEnvContext(
 
 /** `core,redshift` → 去重排序后的枚举数组;不传 / 空串 / 未知组件即抛。 */
 export function parseComponents(raw: string | undefined): ExecEnvComponent[] {
-  // @kf-batch 50-PROD-B-seq33 ② —— 🔴 不再静默缺省成 core(那正是「精简形态」的入口):不传即抛。
+  // ② —— 🔴 不再静默缺省成 core(那正是「精简形态」的入口):不传即抛。
   if (raw === undefined) {
     throw new Error("-c exec-env-components 必须显式给(组件集由控制面按完整组件集下发;不再缺省成 core)");
   }
@@ -270,7 +266,7 @@ export function parseComponents(raw: string | undefined): ExecEnvComponent[] {
  * ⚠️ 代价与配套(必须一起做,否则是把风险从 synth 推到 CFN):AZ 名 `<region>a/b` 在绝大多数 region
  *    都存在,但**AZ 可用性是账号级的**(个别账号在某 region 缺某个 AZ,或需 opt-in)。
  *    ⇒ **部署前必须 preflight** `aws ec2 describe-availability-zones` 校验这两个 AZ 可用,
- *    不可用就报清楚的错并提示用 `-c exec-env-azs=` 换 —— 该 preflight 归 P50.2 切片 b 的 buildspec。
+ *    不可用就报清楚的错并提示用 `-c exec-env-azs=` 换 —— 该 preflight 切片 b 的 buildspec。
  */
 export function parseAzs(raw: string | undefined, region: string): string[] {
   const azs = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [`${region}a`, `${region}b`];

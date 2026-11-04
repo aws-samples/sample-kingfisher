@@ -1,9 +1,9 @@
-// 模块 34 — 告警引擎核心。一次 evaluate:
+// 告警引擎核心。一次 evaluate:
 //   1. 读所有 enabled && !silenced 规则(限当前项目);
 //   2. 扫共享运行台账 bgp-task-runs;
 //   3. 按规则条件(失败/超时/成功率/断流)匹配 → 生成候选告警(带幂等去重键);
 //   4. putEventIfNew 幂等写事件(同一 run/窗口只告一次)→ 分发到通道 → 回写投递结果;
-//   5. 失败类且开了 enrichWithDiagnosis → 挂 AI 诊断(复用模块25 startDiagnosis)。
+//   5. 失败类且开了 enrichWithDiagnosis → 挂 AI 诊断(复用startDiagnosis)。
 //
 // 首期由前端轮询/手动触发调用(无常驻 worker,零常驻成本);无人值守(定时)留二期。
 // 水位 lastEvaluatedAt:失败/超时类只看水位之后完成的终态 run,避免历史 run 反复触发。
@@ -16,7 +16,7 @@ import { putEventIfNew, updateEventDelivery } from "./events";
 import { dispatch, Notification } from "./notify";
 import { startDiagnosis } from "@/lib/diagnostics/service";
 import type { AlertRule, AlertScope, Severity } from "./types";
-// @kf-batch 50-WP4ter-coverage —— 工单 SC-10:run 行的区章(`SCOPE_SCALAR_ATTR.run`)唯一判定
+// run 行的区章(`SCOPE_SCALAR_ATTR.run`)唯一判定
 import { scalarTargetOf } from "@/lib/exec-env/scope";
 
 // bgp-task-runs 行(只取引擎用得到的字段)。
@@ -30,7 +30,7 @@ interface TaskRun {
   duration?: number; // 秒
   error?: string;
   taskName?: string;
-  /** @kf-batch 50-WP4ter-coverage —— run 章(52 SPEC §1;缺省经 `scalarTargetOf` 归主控区) */
+  /** run 章(52 SPEC §1;缺省经 `scalarTargetOf` 归主控区) */
   targetId?: string;
 }
 
@@ -51,7 +51,7 @@ async function scanRuns(limit = 500): Promise<TaskRun[]> {
 // run 是否落在规则作用域内(任务类型 + 可选具体任务 + 可选执行环境)。
 function inScope(run: TaskRun, scope: AlertScope): boolean {
   if (scope.taskId && run.taskId !== scope.taskId) return false;
-  // @kf-batch 50-WP4ter-coverage —— 规则可以只盯某几个区(留空 = 全部)
+  // 规则可以只盯某几个区(留空 = 全部)
   if (scope.targets && scope.targets.length > 0 && !scope.targets.includes(targetOf(run))) return false;
   if (scope.taskType === "all") return true;
   // etl 作用域同时覆盖 etl-glue/etl-redshift 等以 "etl" 开头的类型(与监控页路由口径一致)。
@@ -59,7 +59,7 @@ function inScope(run: TaskRun, scope: AlertScope): boolean {
   return run.taskType === scope.taskType;
 }
 
-// @kf-batch 50-WP4ter-coverage —— 「这条 run 属于哪个区」的**唯一**判定(与全平台过滤同一函数;
+// 「这条 run 属于哪个区」的**唯一**判定(与全平台过滤同一函数;
 // 无章的存量 run 归主控区 —— 那是历史事实:落章之前只有一条执行路径)。
 const targetOf = (r: TaskRun) => scalarTargetOf(r as unknown as Record<string, unknown>, "run");
 
@@ -67,7 +67,7 @@ const isFailed = (r: TaskRun) => r.status === "failed";
 const isSucceeded = (r: TaskRun) => r.status === "succeeded";
 const runTime = (r: TaskRun) => r.finishedAt || r.startedAt || "";
 
-// @kf-batch 50-WP4ter-coverage —— 按区分组(顺序稳定:按 targetId 字典序,便于判据逐条比)
+// 按区分组(顺序稳定:按 targetId 字典序,便于判据逐条比)
 function groupByTarget(rows: TaskRun[]): Array<[string, TaskRun[]]> {
   const m = new Map<string, TaskRun[]>();
   for (const r of rows) {
@@ -109,7 +109,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
           message: `任务「${name}」运行失败${err}`,
           msgKey: r.error ? "任务「{name}」运行失败：{err}" : "任务「{name}」运行失败",
           msgParams: { name, ...(r.error ? { err: String(r.error).slice(0, 200) } : {}) },
-          // @kf-batch 50-WP4ter-coverage —— 单条 run 的告警天然属于一个区,但**得说出来**:
+          // 单条 run 的告警天然属于一个区,但**得说出来**:
           // 值班的人第一件事就是问「哪个区挂了」(dedupeKey 用 runId 已唯一,不用带区)
           trigger: { taskId: r.taskId, taskName: r.taskName, runId: r.runId, taskType: r.taskType, targetId: targetOf(r) },
           diagRef: r.runId ? { taskId: r.taskId, runId: r.runId } : undefined,
@@ -137,7 +137,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
 
   if (c.type === "success-rate") {
     // 滚动窗口内(按完成时间)统计终态 run 成功率;低于阈值告一次(窗口桶去重)。
-    // @kf-batch 50-WP4ter-coverage —— 🔴🔴 **按区分别评估**(缺省;合同 INTERACTION §4sexies)。
+    // 🔴🔴 **按区分别评估**(缺省;合同 INTERACTION §4sexies)。
     // 改动前:全部区揉成一个 rate + 一个 `win#<bucket>` 桶 ⇒ A 区全挂、B 区健康时总体不越阈值
     // ⇒ **不告警**(静默漏告)。现在每个区各算一遍、各自去重,桶键带上 targetId。
     const winMs = (c.windowMinutes || 1440) * 60000;
@@ -172,7 +172,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
 
   if (c.type === "no-run") {
     // 断流:窗口内无成功 run。规则式先顶(预测留二期)。
-    // @kf-batch 50-WP4ter-coverage —— 🔴🔴 **按区分别评估**(缺省)。改动前:只要**任意一个区**
+    // 🔴🔴 **按区分别评估**(缺省)。改动前:只要**任意一个区**
     // 窗口内有一次成功,就整体不报 ⇒ 一个区完全断流可以永远不被发现(静默漏告里最坏的一种)。
     // 🔴 候选区取「**这条规则作用域里出现过的所有区**」而不是「窗口内有 run 的区」:
     // 断流的定义恰恰是「这个区现在没有成功 run」,拿窗口内的行去枚举区,断流的那个区会直接消失。
@@ -209,7 +209,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
   return [];
 }
 
-// @kf-batch 50-WP4ter-coverage —— 给门禁用的测试缝:`matchRule` 是纯函数(规则 × run 集合 → 候选),
+// 给门禁用的测试缝:`matchRule` 是纯函数(规则 × run 集合 → 候选),
 // 而「按区分别评估」这件事**只能在它这一层验**(再往上就要连 DDB 与通道一起 mock,判据会变脆)。
 // 🔴 只导出这一个纯函数,不导出任何会写库的东西。
 export { matchRule as __matchRuleForTest };

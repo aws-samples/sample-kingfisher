@@ -1,4 +1,4 @@
-// 序 38 B-72 —— 调度配置页「这个区还没有 Airflow 环境」只许在**真没装**时出现(接线判据,钉源码接缝)。
+// 调度配置页「这个区还没有 Airflow 环境」只许在**真没装**时出现(接线判据,钉源码接缝)。
 //
 // 【缺陷原形(2026-10-13 客户生产环境)】条件原来是 `!mwaaLoginUrl`:装的是 airflow-serverless 的区本来就没有 Web 控制台
 //   (/api/workflow/airflow 回 409 WORKFLOW_SCHEDULER_UNSUPPORTED),于是被误报成「没有 Airflow」,而执行环境页明明列着它已安装。
@@ -11,7 +11,7 @@ import { join } from "node:path";
 const src = readFileSync(join(__dirname, "..", "SchedulePanel.tsx"), "utf8");
 const code = src.split("\n").filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("{/*")).join("\n");
 
-describe("B-72 SchedulePanel 调度器三态", () => {
+describe("SchedulePanel 调度器三态", () => {
   it("应答按 error.code 分态:serverless / missing / mwaa(有 loginUrl)", () => {
     expect(code).toContain('code === "WORKFLOW_SCHEDULER_UNSUPPORTED"');
     expect(code).toMatch(/setSchedulerKind\("serverless"\)/);

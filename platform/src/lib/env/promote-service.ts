@@ -1,4 +1,4 @@
-// 模块 15 — 多环境晋升服务 (v1.6.0)
+// 多环境晋升服务 (v1.6.0)
 //
 // Promote a config resource from one environment to another within the same project.
 // Each environment holds an independent physical resource; the same logical resource is
@@ -41,7 +41,7 @@ const PROMOTE_EXCLUDE = [
   "downstreamFired",
   "scheduleEnabled",
   "promotedFrom",
-  // @kf-batch 50-SEQ47a-promote-ux —— 发布痕迹是**目标那份**自己的事实,再往下游发布时不许被带走
+  // 发布痕迹是**目标那份**自己的事实,再往下游发布时不许被带走
   "promotedAt",
   "promotedBy",
   "sourceId",
@@ -80,7 +80,7 @@ export interface PromoteResult {
   fromEnv: string;
   toEnv: string;
   lineageId: string;
-  // @kf-batch 50-SEQ47a-promote-ux —— 页面要告诉用户「发了哪一版、什么时候」
+  // 页面要告诉用户「发了哪一版、什么时候」
   promotedAt: string;
   sourceId: string;
   sourceVersion: number;
@@ -117,7 +117,7 @@ export async function executePromote(
 
   const config = portableConfig(type, source);
   const now = new Date().toISOString();
-  // @kf-batch 50-SEQ47a-promote-ux —— 发的是源资源的第几版(快照表是版本的唯一真值源;没快照过 = 0)
+  // 发的是源资源的第几版(快照表是版本的唯一真值源;没快照过 = 0)
   const sourceVersion = await currentDefinitionVersion(type, sourceId).catch(() => 0);
   const trace = { promotedFrom: fromEnv, promotedAt: now, promotedBy: actor, sourceId, sourceVersion };
   const existing = await findTargetByLineage(type, projectId, lineageId, toEnv);
@@ -166,7 +166,7 @@ export async function executePromote(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// @kf-batch 50-SEQ47a-promote-ux —— 一份资源在三个环境里的发布状态(页面「各环境」一行的唯一数据源)。
+// 一份资源在三个环境里的发布状态(页面「各环境」一行的唯一数据源)。
 //   以 lineageId 为枢纽逐环境找同源资源;再把本项目里 **待批准的 deploy 审批** 按 resourceId ∈ 本链所有 id 挂到目标环境上。
 //   只读、不改任何行。
 export interface LineageEnvRow {

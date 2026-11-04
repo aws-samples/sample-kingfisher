@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg2-WP10a
 // POST /api/residency/ack —— 用户对某个**跨法域**执行目标同意当前版本的免责告知(50 SPEC v3.23 §2.1 / §3.2;S13 同意留存)。
 //
 // 【谁能调】任何已登录用户(middleware 已验 JWT;同意是**个人**行为,不看项目角色 —— 一个 viewer 直查跨法域 target 也要先同意)。
@@ -8,7 +7,7 @@ export const dynamic = "force-dynamic";
 // 【幂等】同一 (用户, target, 版本) 再调 ⇒ 200 `created:false`,原记录不动(表只追加)。
 // 【审计】同意本身也进中央 bgp-audit(`residency.ack`);写不成 ⇒ 503(同意行已留存,重试即 created:false + 审计补上)。
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+// 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { apiOk, apiError } from "@/lib/api-response";

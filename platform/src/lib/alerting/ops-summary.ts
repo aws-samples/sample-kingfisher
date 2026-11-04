@@ -1,11 +1,11 @@
-// 模块 34 — 运维大屏聚合。一次性算出 /ops 大屏所有卡片数据:任务态分布、近 N 日趋势、
+// 运维大屏聚合。一次性算出 /ops 大屏所有卡片数据:任务态分布、近 N 日趋势、
 // Top 慢任务、成功率/准点率、甘特时间线数据、最近告警。复用共享运行台账 bgp-task-runs +
 // 各资源表的名称 join(同 api/monitor/runs 口径)。演示量级 Scan 够用(实时级 GSI 留二期)。
 
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { listRecentEvents } from "./events";
-// @kf-batch 50-WP4ter-coverage —— 工单 SC-19:按区(run 与告警事件都过同一套标量过滤)
+// 按区(run 与告警事件都过同一套标量过滤)
 import { filterRowsByScalar, type TargetScope } from "@/lib/exec-env/scope";
 
 interface Run {
@@ -44,7 +44,6 @@ async function scanTable(table: string, proj: string): Promise<any[]> {
 }
 
 /**
- * @kf-batch 50-WP4ter-coverage(工单 SC-19)
  * @param opts.scope 传了就只统计**该执行范围**的 run 与告警事件。
  *
  * 🔴 运维大屏原来是全平台一锅端 —— 而它恰恰是最需要按区看的一页:一个区的成功率塌了,
@@ -68,7 +67,7 @@ export async function buildOpsSummary(opts: { scope?: TargetScope } = {}): Promi
   for (const j of etlJobs) nameMap[j.jobId] = j.name;
   for (const j of engineJobs) nameMap[j.jobId] = j.name;
 
-  // @kf-batch 50-WP4ter-coverage —— 先按区过滤 run,再算所有派生指标(分布 / 今日 / 甘特 / 趋势)
+  // 先按区过滤 run,再算所有派生指标(分布 / 今日 / 甘特 / 趋势)
   const runsScoped = opts.scope
     ? (filterRowsByScalar(runsRaw as unknown as Array<Record<string, unknown>>, opts.scope, "run") as unknown as Run[])
     : (runsRaw as Run[]);
@@ -142,7 +141,7 @@ export async function buildOpsSummary(opts: { scope?: TargetScope } = {}): Promi
     trend,
     topSlow,
     gantt,
-    // @kf-batch 50-WP4ter-coverage —— 最近告警也按区(池化评估的事件没有章 ⇒ 归主控区)
+    // 最近告警也按区(池化评估的事件没有章 ⇒ 归主控区)
     recentAlerts: (opts.scope
       ? (filterRowsByScalar(recentEvents as unknown as Array<Record<string, unknown>>, opts.scope, "alert") as unknown as typeof recentEvents)
       : recentEvents

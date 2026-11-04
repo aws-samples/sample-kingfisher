@@ -1,5 +1,4 @@
-// @kf-batch 50-B40-candidate-blocked
-// B-40:候选区按「组织 SCP 是否拦住部署必需动作」分出 blocked。钉住用户可见的结果:
+// 候选区按「组织 SCP 是否拦住部署必需动作」分出 blocked。钉住用户可见的结果
 //   · 组织层显式拒(AllowedByOrganizations=false)的区 ⇒ 不在 available,列进 blocked 且点名被拦的动作与拒因层;
 //   · 正控制:没被拦的区照样可选(换到没有这条 SCP 的账号,同一段代码自动放回)—— **不写死任何区名**;
 //   · 字段缺失 / null ≠ 被拦(只认显式 false);
@@ -17,10 +16,10 @@ const h = vi.hoisted(() => ({
   cbFails: false,
   /** region → 被组织拦的动作;"throw" = 该区每次都限流;"denied" = 无权限(非限流);"missing" = 字段缺失 */
   orgDeny: {} as Record<string, string[] | "throw" | "denied" | "missing">,
-  /** region → 前 N 次限流,之后照 orgDeny 回(B-46) */
+  /** region → 前 N 次限流,之后照 orgDeny 回 */
   throttleFirst: {} as Record<string, number>,
   sims: [] as any[],
-  /** 构造时给的配置:B-47 判「有没有被塞数据面角色凭证」 */
+  /** 构造时给的配置:判「有没有被塞数据面角色凭证」 */
   ctors: [] as Array<{ svc: string; hasCreds: boolean }>,
   regions: ["ap-northeast-1", "eu-west-1", "us-east-1", "us-west-2"],
   targets: [] as any[],
@@ -92,7 +91,7 @@ beforeEach(() => {
   h.targets = [{ pk: "env", sk: "tgt_home", targetId: "tgt_home", region: "us-east-1", status: "active" }];
 });
 
-describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", () => {
+describe("组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", () => {
   it("显式 false ⇒ blocked 并点名动作;其它区放行(正控制);模拟的是部署身份", async () => {
     h.orgDeny = { "ap-northeast-1": ["s3tables:ListTableBuckets", "cloudformation:CreateStack"] };
     const v = await classifyRegionsByOrgPolicy(["ap-northeast-1", "us-west-2", "eu-west-1"]);
@@ -122,13 +121,13 @@ describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", 
     const sleeps: number[] = [];
     const v2 = await classifyRegionsByOrgPolicy(["eu-west-1", "us-west-2"], { sleep: async (ms) => { sleeps.push(ms); } });
     expect(v2.unverified.map((u) => u.region)).toEqual(["eu-west-1"]);
-    // 有界:一直限流 ⇒ 第一遍 6 次 + 冷却 1 次 + 串行补查 6 次就停(B-50),不无限重试
+    // 有界:一直限流 ⇒ 第一遍 6 次 + 冷却 1 次 + 串行补查 6 次就停,不无限重试
     expect(h.sims.filter((x) => x.ContextEntries[0].ContextKeyValues[0] === "eu-west-1")).toHaveLength(12);
     expect(sleeps).toHaveLength(11);
     expect(sleeps.every((ms) => ms >= 0 && ms <= 4000)).toBe(true);
   });
 
-  it("🔴 B-50 第一遍预算用完仍限流的区 ⇒ 冷却后串行补查一遍:被拦的照实 blocked、放行的可选,都不落进 unverified", async () => {
+  it("🔴 第一遍预算用完仍限流的区 ⇒ 冷却后串行补查一遍:被拦的照实 blocked、放行的可选,都不落进 unverified", async () => {
     h.orgDeny = { "sa-east-1": ["s3tables:ListTableBuckets"] };
     h.throttleFirst = { "sa-east-1": 8, "eu-west-2": 7 };
     const v = await classifyRegionsByOrgPolicy(["sa-east-1", "eu-west-2", "us-west-2"], { sleep: async () => {} });
@@ -141,7 +140,7 @@ describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", 
     expect(second.filter((r, i) => i > 0 && r !== second[i - 1])).toHaveLength(1);
   });
 
-  it("🔴 B-46 限流几次后放行 ⇒ 照实分类(被拦的区仍是 blocked、放行的区可选),不落进 unverified", async () => {
+  it("🔴 限流几次后放行 ⇒ 照实分类(被拦的区仍是 blocked、放行的区可选),不落进 unverified", async () => {
     h.orgDeny = { "ap-northeast-1": ["cloudformation:CreateStack"] };
     h.throttleFirst = { "ap-northeast-1": 3, "us-west-2": 2 };
     const v = await classifyRegionsByOrgPolicy(["ap-northeast-1", "us-west-2"], { sleep: async () => {} });
@@ -149,7 +148,7 @@ describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", 
     expect(v.blocked.map((b) => b.region)).toEqual(["ap-northeast-1"]);
   });
 
-  it("B-46 只重试限流:无权限这类失败重试不会变 ⇒ 立刻 unverified、只模拟一次", async () => {
+  it("只重试限流:无权限这类失败重试不会变 ⇒ 立刻 unverified、只模拟一次", async () => {
     h.orgDeny = { "eu-west-1": "denied" };
     const sleeps: number[] = [];
     const v = await classifyRegionsByOrgPolicy(["eu-west-1"], { sleep: async (ms) => { sleeps.push(ms); } });
@@ -158,7 +157,7 @@ describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", 
     expect(sleeps).toEqual([]);
   });
 
-  it("B-46 退避是 full jitter(同一批并发不齐步重撞):同一档位的等待时长不全相同", async () => {
+  it("退避是 full jitter(同一批并发不齐步重撞):同一档位的等待时长不全相同", async () => {
     h.orgDeny = { "eu-west-1": "throw", "eu-west-2": "throw", "eu-west-3": "throw" };
     const sleeps: number[] = [];
     await classifyRegionsByOrgPolicy(["eu-west-1", "eu-west-2", "eu-west-3"], { sleep: async (ms) => { sleeps.push(ms); } });
@@ -169,7 +168,7 @@ describe("B-40 组织策略分类(SimulatePrincipalPolicy 的组织层裁决)", 
     expect(new Set(tier0).size).toBeGreaterThan(1);
   });
 
-  it.each(["observe", "enforce"])("🔴 B-47 %s 下探测仍用任务角色(控制面):CodeBuild / IAM 客户端不带数据面角色凭证,每区只模拟一次", async (mode) => {
+  it.each(["observe", "enforce"])("🔴 %s 下探测仍用任务角色(控制面):CodeBuild / IAM 客户端不带数据面角色凭证,每区只模拟一次", async (mode) => {
     process.env.BGP_DATAPLANE_CREDS = mode;
     try {
       const v = await classifyRegionsByOrgPolicy(["eu-west-1", "us-west-2"], { sleep: async () => {} });

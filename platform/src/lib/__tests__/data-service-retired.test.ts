@@ -1,7 +1,6 @@
-// @kf-batch 50-W5-seg2-WP1
-// 🔴 「数据服务」下线门禁(50 SPEC §3.9c 已下线能力登记 / WORK-PACKAGES WP-1 v1.6 / ACCEPTANCE §8tervicies 单测门 (a)–(e))。
+// 🔴 「数据服务」下线门禁(50 SPEC §3.9c 已下线能力登记 v1.6 / ACCEPTANCE §8tervicies 单测门 (a)–(e))。
 //
-// 为什么必须是门禁而不是一次性删除:模块 30 的 lib / 管理 API / 页面 / TABLES 常量 2026-09-05 已删,但
+// 为什么必须是门禁而不是一次性删除: lib / 管理 API / 页面 / TABLES 常量 2026-09-05 已删,但
 //   · 一次 `git revert` / 一次「顺手恢复」就能把 `@/lib/data-service` 的 import 带回来;
 //   · 有人会想「表都没人用了,顺手删掉」—— 三张表按 RETAIN 纪律必须留在 infra(删表另过破坏性变更门);
 //   · BI 的 dataapi 分支若有人改回「去取数」,410 同一句就没了。
@@ -53,7 +52,7 @@ const FORBIDDEN: ReadonlyArray<readonly [RegExp, string]> = [
 // lib/bi/types.ts / reports.ts 保留的是 `dataapi` 类型字面 —— 它本就不在禁用 token 里,不必豁免整文件(豁免整文件会让那里的回流漏网)。
 const WHITELIST_PREFIX = [ROUTE_410, "lib/i18n/messages/"];
 
-describe("🔴 WP-1 (a) platform/src 活代码里数据服务零引用(剥注释;pattern 带边界)", () => {
+describe("🔴 platform/src 活代码里数据服务零引用(剥注释;pattern 带边界)", () => {
   const files = walk(SRC);
   it("扫描面合理(扫空 = 假绿)", () => {
     expect(files.length).toBeGreaterThan(200);
@@ -75,7 +74,7 @@ describe("🔴 WP-1 (a) platform/src 活代码里数据服务零引用(剥注释
   });
 });
 
-describe("🔴 WP-1 (b) 对外端点 /api/public/data/[...slug]:五个方法都在、都 410 + 三字段、不 import 任何 @/lib", () => {
+describe("🔴 对外端点 /api/public/data/[...slug]:五个方法都在、都 410 + 三字段、不 import 任何 @/lib", () => {
   const text = src(ROUTE_410);
   const code = strip(text);
   it("源码:GET / POST / PUT / DELETE / PATCH 五个 handler 都导出", () => {
@@ -90,7 +89,7 @@ describe("🔴 WP-1 (b) 对外端点 /api/public/data/[...slug]:五个方法都�
     expect(code).not.toContain('from "@/lib');
     expect(code).not.toMatch(/docClient|TableName|x-api-key|requireProject|recordAudit/);
   });
-  it("真调:五个 handler 各返回 410 + { code:GONE, message, since } 恰好三字段(ACCEPTANCE E-134)", async () => {
+  it("真调:五个 handler 各返回 410 + { code:GONE, message, since } 恰好三字段(ACCEPTANCE)", async () => {
     const mod = (await import(resolve(SRC, ROUTE_410))) as Record<string, () => Promise<Response>>;
     for (const m of ["GET", "POST", "PUT", "DELETE", "PATCH"]) {
       const res = await mod[m]();
@@ -100,7 +99,7 @@ describe("🔴 WP-1 (b) 对外端点 /api/public/data/[...slug]:五个方法都�
   });
 });
 
-describe("🔴 WP-1 (c) 三张表 infra 仍在(RETAIN 纪律;防有人顺手删表)且在 naming.json 登记为已下线 RETAIN", () => {
+describe("🔴 三张表 infra 仍在(RETAIN 纪律;防有人顺手删表)且在 naming.json 登记为已下线 RETAIN", () => {
   const infra = strip(readFileSync(resolve(REPO, "infra/lib/database-stack.ts"), "utf8"));
   it.each(RETAINED_TABLES)("infra/lib/database-stack.ts 仍定义 tableName %s", (name) => {
     const hits = infra.match(new RegExp(`tableName:\\s*"${name}"`, "g")) || [];
@@ -113,7 +112,7 @@ describe("🔴 WP-1 (c) 三张表 infra 仍在(RETAIN 纪律;防有人顺手删�
   });
 });
 
-describe("🔴 WP-1 (d) 菜单 routes.tsx 无「数据服务」leaf,「数据开发」组其余项原样(ACCEPTANCE E-132)", () => {
+describe("🔴 菜单 routes.tsx 无「数据服务」leaf,「数据开发」组其余项原样(ACCEPTANCE)", () => {
   const routes = strip(src("components/layout/routes.tsx"));
   it("无 /data-service 与「数据服务」", () => {
     expect(routes).not.toContain("/data-service");
@@ -126,7 +125,7 @@ describe("🔴 WP-1 (d) 菜单 routes.tsx 无「数据服务」leaf,「数据开
   });
 });
 
-describe("🔴 WP-1 (e) 共享件搬家:lib/sql/param-render 存在,BI 只从它 import renderSql / coerceParams", () => {
+describe("🔴 共享件搬家:lib/sql/param-render 存在,BI 只从它 import renderSql / coerceParams", () => {
   it("lib/sql/param-render.ts 导出 renderSql / coerceParams(可执行)", () => {
     expect(existsSync(resolve(SRC, "lib/sql/param-render.ts"))).toBe(true);
     expect(typeof paramRender.renderSql).toBe("function");

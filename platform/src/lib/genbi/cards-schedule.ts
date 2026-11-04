@@ -1,4 +1,4 @@
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // 问数卡片「定时刷新」的配置面 —— 一张卡片至多一个调度对象(`gcard_<cardId>`,kind=genbi-card)。
 //
 // 🔴 载体与治理定时任务**同一套**(`lib/scheduler/action-schedules.ts`):单节点 platform-action 工作流发到

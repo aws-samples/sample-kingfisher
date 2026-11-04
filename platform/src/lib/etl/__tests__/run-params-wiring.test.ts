@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— 接线判据:业务日期参数的**每个消费者**都在调用点用单一作者,而不是各手抄一份。
+// 接线判据:业务日期参数的**每个消费者**都在调用点用单一作者,而不是各手抄一份。
 //
 // 【为什么要钉调用点】「token 出现过」会被 import 行放行(memory wiring-criteria-must-check-call-site):
 //   先剥注释与 import 行,再查「在调用位置用了」;并反向钉「不许再手写 "--yesterday_ds" 这类字面清单」——
@@ -47,7 +47,7 @@ describe("🔴 业务日期参数:单一作者接到每条路的调用点", () =
   });
 
   it("MWAA Serverless 运行时:_run_glue 用 bgp_run_param_args(ds);_run_emr 收 ds 并追加 bgp_run_param_argv(ds);片段来自 RUN_PARAMS_PY", () => {
-    // 序 73 模块 57:三引擎执行体(_run_glue / _run_emr …)搬进作业族共享块 job-exec-py.ts(serverless 代码包与经典 runtime-lib 拼同一份字节);
+    // 三引擎执行体(_run_glue / _run_emr …)搬进作业族共享块 job-exec-py.ts(serverless 代码包与经典 runtime-lib 拼同一份字节);
     //   调用点 run_job 仍在 runtime-py.ts。判据跟着钉:执行体在共享块,两个宿主都拼 RUN_PARAMS_PY 与 JOB_EXEC_PY、都 import re, sys。
     const fam = strip(read("lib/workflow/job-exec-py.ts"));
     expect(fam).toMatch(/args = bgp_run_param_args\(ds\)/);

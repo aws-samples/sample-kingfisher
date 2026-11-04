@@ -1,4 +1,4 @@
-// 模块 35 P1 — D3 维度/事实建模服务层。
+// D3 维度/事实建模服务层。
 //
 // 维度表/事实表登记的 CRUD + 一键生成并应用 Redshift DDL + 血缘挂靠(归属分层/域)+ OM 推送。
 // 沿用 P0「单逻辑分区 + ULID 排序键」。DDL 安全(类型白名单 + 标识符白名单 + 注释转义)在 ./redshift。
@@ -10,7 +10,7 @@ import { PutCommand, QueryCommand, GetCommand, DeleteCommand } from "@aws-sdk/li
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { buildCreateTableStatements, normalizeColumnType, safeIdent } from "./redshift";
-// @kf-batch 50-WP11b-shared-writer —— 门②:建模产物必须落平台全局 schema(SPEC §3.9d.8)
+// 门②:建模产物必须落平台全局 schema(SPEC §3.9d.8)
 import { assertPlatformGlobalSchema } from "./landing-fqn";
 import { setAssetBinding } from "./service";
 import { perTargetTruth } from "./landing-shared";
@@ -65,7 +65,7 @@ function validateModelTable(input: any): ModelTableCore {
   const schema = str(input.schema);
   if (!schema) throw new Error("缺少目标 schema");
   safeIdent(schema);
-  // @kf-batch 50-WP11b-shared-writer —— 🔴 这是建模里**唯一用户可填落点**的地方:不许填项目私有 schema。
+  // 🔴 这是建模里**唯一用户可填落点**的地方:不许填项目私有 schema。
   //   建模落地不受项目白名单约束(它没有项目维),换上的真门就是这里 + 落地路径上的同一个守卫;
   //   在定义时就拒,用户当场看到原因,而不是落地到某个区才失败。
   assertPlatformGlobalSchema(schema);
@@ -84,7 +84,7 @@ function validateModelTable(input: any): ModelTableCore {
     ...(str(input.layerId) ? { layerId: str(input.layerId) } : {}),
     ...(str(input.domainId) ? { domainId: str(input.domainId) } : {}),
     ...(str(input.description) ? { description: str(input.description) } : {}),
-    // @kf-batch 50-SEQ47c-catalog-ddl —— 来源只认闭合清单;不传 = 建模页(读侧当 modeling)
+    // 来源只认闭合清单;不传 = 建模页(读侧当 modeling)
     ...(input.origin === "catalog" || input.origin === "catalog-adopted" ? { origin: input.origin } : {}),
   };
   if (tableType === "dimension") {
@@ -106,7 +106,7 @@ export async function listModelTables(): Promise<ModelTable[]> {
   return Items as ModelTable[];
 }
 
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「修改表结构」按 (schema, 物理表名) 找台账行(小写比较;Redshift 标识符不区分大小写)。
+// 数据目录「修改表结构」按 (schema, 物理表名) 找台账行(小写比较;Redshift 标识符不区分大小写)。
 export async function findModelTableByPhysical(schema: string, physicalTable: string): Promise<ModelTable | null> {
   const want = `${String(schema).toLowerCase()}.${String(physicalTable).toLowerCase()}`;
   const all = await listModelTables();
@@ -165,7 +165,6 @@ export async function updateModelTable(modelTableId: string, patch: any, actor?:
   return updated;
 }
 
-// @kf-batch 50-W5-seg1-WP11a
 // 🔴 删定义**受控**(与码表同一条,见 `service.ts deleteCodeTable` 的说明):仍有落地产物 ⇒ 409 由用户决定;
 //    确认串 = 物理表名(维度 / 事实表没有 code,表名就是它的身份)。
 export async function deleteModelTable(
@@ -183,7 +182,7 @@ export async function deleteModelTable(
 /** 解绑某个 target(可选连清理);编排见 `./unbind.ts`,这里只管维度 / 事实表的落点与 home 投影。 */
 export async function unbindModelTable(
   modelTableId: string,
-  // @kf-batch 50-WP11b-shared-writer —— `actor` 必填:非主控区的 DROP 走 admin 受控通道,要具名操作者
+  // `actor` 必填:非主控区的 DROP 走 admin 受控通道,要具名操作者
   opts: { targetId: string; cleanup: boolean; confirm?: string | null; actor: import("@/lib/exec-env/admin-ddl-executor").AuthenticatedActor | null }
 ): Promise<{ modelTable: ModelTable; dropped: boolean; table: string }> {
   const t = await getModelTable(modelTableId);
@@ -249,7 +248,6 @@ export async function previewUnbindModelTable(
   };
 }
 
-// @kf-batch 50-P50.3-modeling
 /** 当前定义哈希 + 物理落点(读侧判「版本不齐」用;算出来不落库,避免第二个真值源)。 */
 export async function modelTableDefHash(t: Pick<ModelTable, "schema" | "physicalTable" | "columns">): Promise<string> {
   const { defHashOf, columnSignature, normalizeTypeName } = await import("./landing");
@@ -279,14 +277,13 @@ export async function previewModelTableDDL(modelTableId: string): Promise<{ ddl:
 }
 
 // 应用:在 Redshift 建表 → 回写 applied 状态 → 重新挂血缘归属 → best-effort 推 OM(真实列)。
-// @kf-batch 50-P50.3-modeling
 // 🔴 **逐 target 物化 + 观测态回写**(轴A;与码表同一个作者 `lib/modeling/landing.ts`)。
 // `applied`/`appliedTable`/`appliedAt` 降为 **home 那一格的投影**,只为读兼容。
 export async function applyModelTableById(
   modelTableId: string,
   actor: string | undefined, // 血缘归属的 boundBy(与下面 opts.actor 那个 admin 主体是两件事)
-  // @kf-batch 50-W5-seg2-WP10a —— `residencyActor`:落地前逐 target 写区域审计的行为主体(路由传用户;缺省平台服务主体)
-  // @kf-batch 50-WP11b-shared-writer —— `actor`(**必填**,无默认):非主控区建表走 admin 受控通道(`land-model-table`)
+  // `residencyActor`:落地前逐 target 写区域审计的行为主体(路由传用户;缺省平台服务主体)
+  // `actor`(**必填**,无默认):非主控区建表走 admin 受控通道(`land-model-table`)
   opts: {
     targets?: string[];
     force?: boolean;
@@ -317,7 +314,7 @@ export async function applyModelTableById(
   const targets = Array.from(new Set([...bound, ...landing]));
 
   const statements = buildCreateTableStatements({ schema: t.schema, physicalTable: t.physicalTable, columns: t.columns });
-  // @kf-batch 50-W5-seg2-WP10a —— 同码表:落地之前逐 target 写区域审计(entry=modeling-land);probeOnly 不审。
+  // 同码表:落地之前逐 target 写区域审计(entry=modeling-land);probeOnly 不审。
   if (!opts.probeOnly) {
     const { residencyAudit, auditActorOrService } = await import("@/lib/exec-env/residency-audit");
     for (const tid of landing) {
@@ -366,7 +363,7 @@ export async function applyModelTableById(
 }
 
 // best-effort 把 Redshift 真实 schema(含新建维度/事实表)推进 OpenMetadata 治理目录。
-// 复用模块24 的 introspect+createOrUpdate(幂等,FQN 一致,不产生重复实体)。动态 import 避免循环依赖。
+// 复用 introspect+createOrUpdate(幂等,FQN 一致,不产生重复实体)。动态 import 避免循环依赖。
 async function pushModelTableToOM(): Promise<void> {
   try {
     const { pushRedshiftSchemaToOpenMetadata } = await import("@/lib/openmetadata/om-push");

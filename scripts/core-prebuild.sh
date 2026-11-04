@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# core-prebuild — 平台级 Agent 框架层 ①core-build 件(模块47 L2 泛化)。
+# core-prebuild — 平台级 Agent 框架层 ①core-build 件(泛化)。
 # 把某个 AI 能力的 core(platform/src/lib/<cap>/core, TS 单一来源)编译成 CJS 产物,
 # copy 进该能力的【消费方包目录】(容器 agent / 技能 Lambda)。
 #
-# 【为什么泛化】原 genbi-core-prebuild.sh 硬编码 genbi;模块47 要给每个 AI 能力(genbi/paramadvisor/
+# 【为什么泛化】原 genbi-core-prebuild.sh 硬编码 genbi;要给每个 AI 能力(genbi/paramadvisor/
 # netadvisor/…)同一套 core-dist 机制。此脚本 capability 驱动:关联数组声明各能力的 tsconfig +
 # core 源 + core-dist 目标,加一个能力只加数组一行(呼应 FRAMEWORK-LAYER.md ①core-build 件)。
 #
@@ -38,9 +38,9 @@ declare -A CAP_CORE_SRC=(
   [genbi]="$PLATFORM/src/lib/genbi/core"
   [paramadvisor]="$PLATFORM/src/lib/param-advisor/core"
   [netadvisor]="$PLATFORM/src/lib/network-advisor/core"
-  # cookbook(P45.5b):源目录是 lib/cookbook 本身(非 /core 子目录),tsconfig 只 include 纯子集
+  # cookbook:源目录是 lib/cookbook 本身(非 /core 子目录),tsconfig 只 include 纯子集
   [cookbook]="$PLATFORM/src/lib/cookbook"
-  # ai(模块 51 v2.0 多厂商模型通道):厂商档案 vendors.ts + 请求整形 converse-shape.ts,零 @/ 零 SDK
+  # ai(多厂商模型通道):厂商档案 vendors.ts + 请求整形 converse-shape.ts,零 @/ 零 SDK
   [ai]="$PLATFORM/src/lib/ai/core"
 )
 declare -A CAP_DESTS=(
@@ -50,10 +50,10 @@ declare -A CAP_DESTS=(
   [paramadvisor]="$ROOT/infra/agent/paramadvisor/core-dist"
   # netadvisor(L3):仅容器 agent(其技能 Lambda 是 esbuild 单源,无需 core-dist)
   [netadvisor]="$ROOT/infra/agent/netadvisor/core-dist"
-  # cookbook(P45.5b):方言 guard 纯子集 → GenBI 容器 core-dist 的 cookbook 子目录(容器 agent.js
+  # cookbook:方言 guard 纯子集 → GenBI 容器 core-dist 的 cookbook 子目录(容器 agent.js
   # import ./core-dist/cookbook/core-guard.js);与 genbi/core-dist 并列不混。
   [cookbook]="$ROOT/infra/agent/genbi/core-dist/cookbook"
-  # ai(模块 51 v2.0,51 SPEC §7.6):三个容器 core-dist 的 ai 子目录(genbi agent.js 与 _runtime/agent-runner.js
+  # ai:三个容器 core-dist 的 ai 子目录(genbi agent.js 与 _runtime/agent-runner.js
   # import ./core-dist/ai/converse-shape.js);容器与平台读**同一份**厂商档案(用户 2026-10-14「全部走同一个模型通道」)。
   [ai]="$ROOT/infra/agent/genbi/core-dist/ai $ROOT/infra/agent/netadvisor/core-dist/ai $ROOT/infra/agent/paramadvisor/core-dist/ai"
 )
@@ -65,7 +65,7 @@ declare -A CAP_AFTER=(
   [paramadvisor]="ai"
   [netadvisor]="ai"
 )
-# ②runtime 件分发(模块47 L2):走 agent-runner 的能力容器,需把平台级共享源 infra/agent/_runtime
+# ②runtime 件分发:走 agent-runner 的能力容器,需把平台级共享源 infra/agent/_runtime
 # 分发进容器目录内的 _runtime/(同 core-dist 机制——Docker 构建上下文=容器目录,COPY 不能出上下文)。
 # genbi 不在此列(它有自己的 agent.js + retrieval,不走 agent-runner);paramadvisor/netadvisor(L3)走。
 RUNTIME_SRC="$ROOT/infra/agent/_runtime"
@@ -86,9 +86,9 @@ build_one() {
   echo "[core-prebuild:$CAP] 编译 core → CJS (tsconfig=$TSCONFIG) ..."
   rm -rf "$TMP_OUT"
   ( cd "$PLATFORM" && npx tsc -p "$TSCONFIG" )
-  # B-120 守卫(2026-10-25):记下这次编译**真正吃进去**的源(tsc --listFilesOnly 的 platform/src 子集,被 import 带进来的也算)
+  # 守卫(2026-10-25):记下这次编译**真正吃进去**的源(tsc --listFilesOnly 的 platform/src 子集,被 import 带进来的也算)
   #   及其 sha256,写成每个 core-dist 的 .source-manifest.json;单测 platform/src/lib/__tests__/core-dist-source-manifest.test.ts
-  #   重算比对 ⇒ 改了源不重跑本脚本就红。缺陷原形:序 46 给 vendors.ts 加的 probeTimeoutMs 从没回写进入库产物,
+  #   重算比对 ⇒ 改了源不重跑本脚本就红。缺陷原形:给 vendors.ts 加的 probeTimeoutMs 从没回写进入库产物,
   #   用入库副本部署的智能体按旧档案探测模型,而 tsc / vitest / 红线全绿 —— 产物只是构建快照,此前没有「与源同步」的守卫。
   local SOURCES
   SOURCES="$( cd "$PLATFORM" && npx tsc -p "$TSCONFIG" --listFilesOnly | grep -F "/platform/src/" || true )"
@@ -101,7 +101,7 @@ build_one() {
     rm -rf "$DEST"
     mkdir -p "$DEST"
     # 递归 copy 全部产物(含子目录,如 cookbook 的 seed/*.js)。genbi/param/net 是扁平无子目录,
-    # cp -r 行为与原 `cp *.js` 一致(仅多带 .d.ts,本就在带);cookbook(P45.5b)有 seed/ 子目录须递归。
+    # cp -r 行为与原 `cp *.js` 一致(仅多带 .d.ts,本就在带);cookbook有 seed/ 子目录须递归。
     cp -r "$TMP_OUT"/. "$DEST"/
     # 标记 core-dist 为 CommonJS:产物是 CJS(tsconfig module:commonjs)。容器 agent 的 package.json
     # 是 type:module,不加此标记则该目录 .js 被当 ESM 解析致 import 失败。Lambda 侧加了也无害。
@@ -144,7 +144,7 @@ followed by a rebuild fails that test; rerunning the script is the only supporte
 \`package.json\` in this directory only marks it as CommonJS so that the ESM agent packages
 resolve these files correctly.
 EOF
-    # B-120:源清单(路径相对仓库根 → sha256,按键排序,逐字节可重现;容器 / Lambda 打包带上它无害)
+    # 源清单(路径相对仓库根 → sha256,按键排序,逐字节可重现;容器 / Lambda 打包带上它无害)
     MANIFEST_CAP="$CAP" MANIFEST_TSCONFIG="platform/$TSCONFIG" MANIFEST_ROOT="$ROOT" MANIFEST_DEST="$DEST" MANIFEST_SOURCES="$SOURCES" node - <<'NODE'
 const fs = require("fs"), path = require("path"), crypto = require("crypto");
 const root = fs.realpathSync(process.env.MANIFEST_ROOT);

@@ -1,4 +1,4 @@
-// 模块 44 — EMR Serverless 作业【纯草稿】创建(供 emr StepHandler 用)。
+// EMR Serverless 作业【纯草稿】创建(供 emr StepHandler 用)。
 // 与 create-service 的其它 createXxxDraft 同款纪律:只写 status=draft,【绝不碰云资源】。
 //
 // 关键区别于 engines route 的 POST:那个 POST 会调 provider.ensureResource 真建 EMR application(碰云);

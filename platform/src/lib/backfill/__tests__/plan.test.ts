@@ -144,7 +144,6 @@ describe("aggregateProgress / derivePlanStatus", () => {
   });
 });
 
-// @kf-batch 50-P50.3-mrquery
 describe("🔴🔴 补数实例的 target 维(日期 × 节点 × target)—— 纯追加,home 逐字节不变", () => {
   const dateRange = { start: "2026-07-01", end: "2026-07-02", granularity: "day" as const };
 

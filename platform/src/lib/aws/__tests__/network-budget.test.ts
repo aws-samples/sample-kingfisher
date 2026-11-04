@@ -1,6 +1,6 @@
-// 序 57 / B-129 ③ —— SDK 客户端的网络预算(lib/aws/clients.ts withNetworkBudget,唯一作者)。
+// ③ —— SDK 客户端的网络预算(lib/aws/clients.ts withNetworkBudget,唯一作者)。
 //
-// 【缺陷原形】第四十七轮:平台进程里一次 IAM GetRole 在上一跳之后空档 64 秒才到达(CloudTrail),CPU 14% / 无限流 / 无 5xx —— AWS SDK v3 缺省
+// 【缺陷原形】平台进程里一次 IAM GetRole 在上一跳之后空档 64 秒才到达(CloudTrail),CPU 14% / 无限流 / 无 5xx —— AWS SDK v3 缺省
 //   connectionTimeout = requestTimeout = 0,一跳停顿只能干等,外层 CloudFront 60 秒就 504。
 // 【判据钉的事实】
 //   ① 两个工厂入口(sdkClient / regionalClient)与 Redshift Data / DynamoDB 都带预算:connectionTimeout 5 s、socketTimeout 60 s、maxAttempts 3;

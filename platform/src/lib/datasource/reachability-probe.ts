@@ -1,6 +1,6 @@
-// 序 49 ② B-73 —— 「这个数据源现在连得上吗」的**唯一作者**:状态格的「已连接」只许来自真正连上的结论。
+// 「这个数据源现在连得上吗」的**唯一作者**:状态格的「已连接」只许来自真正连上的结论。
 //
-// 【缺陷原形(B-73,s38 负向源 10.255.255.1)】建源收口与「测试连接(按 id)」都拿 `testConnection(glueConnectionName)`
+// 【缺陷原形(s38 负向源 10.255.255.1)】建源收口与「测试连接(按 id)」都拿 `testConnection(glueConnectionName)`
 //   的结论写 `status`:那只核「Glue 连接存在 + 带 JDBC URL + 带子网」,不登录源库 ⇒ host 根本不可达的源建完就显示
 //   「已连接 (115ms)」(115ms 是查 Glue 连接配置的耗时),直到有人点「检测」才露馅。工程纪律 9:不许把「配置建好了」说成「已连接」。
 // 【规则】
@@ -14,7 +14,7 @@ import { pingDataSource } from "@/lib/datasource/heartbeat";
 import { dsCanUseGlueReach, dsProbeVia, startGlueProbe, glueReachNote, type GlueProbeStart } from "@/lib/datasource/glue-reach";
 import { patchDataSourceRow } from "@/lib/datasource/ds-patch";
 import { DatasourceNetworkBrokenError } from "@/lib/datasource/network-reconcile";
-// 序 31 二刀 ⑤:心跳直连读凭证(secret ARN 自带区)/ 起探测作业都替这条源所在区做事 ⇒ 入口先记落点决策
+// 心跳直连读凭证(secret ARN 自带区)/ 起探测作业都替这条源所在区做事 ⇒ 入口先记落点决策
 import { noteDatasourceRowPlace } from "@/lib/datasource/ds-place";
 import type { TestResult } from "@/lib/aws/datasource-service";
 import type { DataSource } from "@/types/datasource";
@@ -38,7 +38,7 @@ async function writeHeartbeat(datasourceId: string, status: string, hb: Hb) {
 
 /**
  * 「检测」—— 连通性检测本体(heartbeat POST 与建源收口共用)。写库并返回结论。
- * 🔴 行为与 B-70 第 2 版 heartbeat POST 逐字相同(搬家不改语义;glue-reach-routes 判据守着)。
+ * 🔴 行为与第 2 版 heartbeat POST 逐字相同(搬家不改语义;glue-reach-routes 判据守着)。
  */
 export async function probeDataSourceReachability(row: DataSource, now: string = new Date().toISOString()): Promise<
   Extract<ReachabilityOutcome, { kind: "settled" | "glue-testing" }>
@@ -65,7 +65,7 @@ export async function probeDataSourceReachability(row: DataSource, now: string =
   try {
     probe = await startGlueProbe(row as never, (patch) => patchDataSourceRow(row.datasourceId, patch));
   } catch (e) {
-    // 序 61 B-133:源的用户自带安全组 / 子网或密钥缺失(平台不代建)⇒ 发现作业根本起不来 ⇒ 心跳如实「不可达 + 原因」、状态 error;
+    // 源的用户自带安全组 / 子网或密钥缺失(平台不代建)⇒ 发现作业根本起不来 ⇒ 心跳如实「不可达 + 原因」、状态 error;
     //   不冒成 500(「检测」按钮)也不留在「测试中」;源行的 networkState / networkIssue 已由核对作者写好,列表显示「网络对象缺失」。
     if (e instanceof DatasourceNetworkBrokenError) {
       const hb: Hb = {

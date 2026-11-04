@@ -1,4 +1,3 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **平台动作命令的消费端(状态机的唯一作者)**:读命令 → 校验 → 抢单(pending → running)→ 执行 → 写终态。
 //
 // 【谁调它】主控区的分发 Lambda(DDB Streams 触发)→ 平台内部端点 `POST /api/internal/actions/run` → 本模块。

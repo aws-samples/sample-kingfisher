@@ -4,11 +4,11 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { updateRule, deleteRule } from "@/lib/quality/service";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP4quater-reads(工单 SC-8)—— 改 / 删也必须用同一个按区键,
+// 改 / 删也必须用同一个按区键,
 // 否则会去主控区的分区上找一条本区的规则(找不到 ⇒ 404,而规则明明在)。
 import { scopedFqn, governanceTargetFrom } from "@/lib/governance/scoped-fqn";
 
-// 模块 19: 改 / 删质量规则（仅平台管理员）。fqn 走查询参数，ruleId 走路径。
+// 改 / 删质量规则（仅平台管理员）。fqn 走查询参数，ruleId 走路径。
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);

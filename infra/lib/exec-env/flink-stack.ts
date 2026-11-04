@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3a-component-stacks
 // 执行环境 **flink 组件**栈(50 SPEC §1.1 的 `flink` 资源袋:`flinkRoleArn`)。
 //
 // 【和 home 的 `infra/lib/flink-stack.ts` 什么关系】

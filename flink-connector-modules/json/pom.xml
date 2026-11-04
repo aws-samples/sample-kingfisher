@@ -5,7 +5,7 @@
   <parent><groupId>com.bgp.flink</groupId><artifactId>flink-connector-modules-parent</artifactId><version>1.0</version></parent>
   <artifactId>flink-module-json</artifactId>
   <packaging>jar</packaging>
-  <!-- 模块 32-CR — JSON format 模块。connector id = "json"。 -->
+  <!-- JSON format 模块。connector id = "json"。 -->
   <dependencies>
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-streaming-java</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>
     <dependency><groupId>org.apache.flink</groupId><artifactId>flink-table-runtime</artifactId><version>${flink.version}</version><scope>provided</scope></dependency>

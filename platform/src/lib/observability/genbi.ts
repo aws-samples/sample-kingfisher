@@ -1,6 +1,6 @@
-// 模块 26 — Observability 看板后端聚合：AgentCore Runtime/Gateway 状态 + 工具、GenBI 用量分析、
+// Observability 看板后端聚合：AgentCore Runtime/Gateway 状态 + 工具、GenBI 用量分析、
 // 技能 Lambda CloudWatch 指标、每工具/每注册技能调用计数(EMF)。全部 best-effort（单点失败不影响整体）。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { homeRegion } from "@/lib/place/home-region";
 import { sdkClient } from "@/lib/aws/clients";
 import {
@@ -8,7 +8,7 @@ import {
 } from "@aws-sdk/client-bedrock-agentcore-control";
 import { CloudWatchClient, GetMetricStatisticsCommand, ListMetricsCommand } from "@aws-sdk/client-cloudwatch";
 import { scanGenBiHistory } from "@/lib/genbi/history";
-// @kf-batch 50-WP4ter-coverage —— 按执行范围过滤(工单 SC-6)
+// 按执行范围过滤
 import { filterRowsByScalar, type TargetScope } from "@/lib/exec-env/scope";
 
 const REGION = homeRegion();
@@ -169,7 +169,6 @@ async function toolCallMetrics(items: any[]) {
 }
 
 /**
- * @kf-batch 50-WP4ter-coverage
  * @param opts.scope 传了就按区过滤**会话与工具调用**这两块。
  *
  * 🔴 如实登记:`agentcore` 与 `lambda` 两块是**运行时单实例**的指标

@@ -1,4 +1,4 @@
-// 序 41 B-117 —— `deleteJson` 的行为判据(只 mock 真外部 fetch)。缺陷原形见 delete-json.ts 头注。
+// `deleteJson` 的行为判据(只 mock 真外部 fetch)。缺陷原形见 delete-json.ts 头注。
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { deleteJson, DeleteRejected } from "@/lib/http/delete-json";
 
@@ -29,7 +29,7 @@ describe("deleteJson —— 成功才算成功", () => {
     vi.stubGlobal("fetch", fakeFetch(204, null));
     expect(await deleteJson("/api/x/1")).toEqual({});
   });
-  it("🔴 B-117 原形:409 TEARDOWN_IN_PROGRESS 信封 ⇒ 抛 DeleteRejected,message 是服务端原话、code / status 带上(页面不许再说「已删除」)", async () => {
+  it("🔴 原形:409 TEARDOWN_IN_PROGRESS 信封 ⇒ 抛 DeleteRejected,message 是服务端原话、code / status 带上(页面不许再说「已删除」)", async () => {
     vi.stubGlobal("fetch", fakeFetch(409, { success: false, error: { message: "同步通道没能真正停下来(dms):复制任务 — 还在 creating。请稍后再试", code: "TEARDOWN_IN_PROGRESS" } }));
     const e = await deleteJson("/api/sync/t1").catch((x) => x);
     expect(e).toBeInstanceOf(DeleteRejected);

@@ -1,4 +1,4 @@
-// 序 57 / B-129 ② —— `ensureGlueRole` 出请求路径:进程内只核一次并缓存;只有 NoSuchEntity 才补建;失败不缓存。
+// ② —— `ensureGlueRole` 出请求路径:进程内只核一次并缓存;只有 NoSuchEntity 才补建;失败不缓存。
 // 【缺陷原形】原来每次建源都在请求路径上 GetRole 一次(第四十七轮实测这一跳停顿 64 秒 ⇒ 整条建源 504),且 `catch {}` 把网络超时 / 限流
 //   也当「角色不存在」去 CreateRole ⇒ EntityAlreadyExists ⇒ 500,错误指向 IAM 而真因是一次网络抖动。
 // 只 mock 真外部:IAM SDK 模块本身(客户端 + 四条命令);datasource-service ↔ clients 工厂真装配。

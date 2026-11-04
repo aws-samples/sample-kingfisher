@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg2-WP8
 // `_meta` 回显契约单测(51 SPEC §3.3a)+ apiOk 兼容第三参。
 import { describe, it, expect } from "vitest";
 import { buildAiMeta } from "../meta";

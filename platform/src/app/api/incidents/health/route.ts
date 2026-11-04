@@ -5,7 +5,7 @@ import { requireProject } from "@/lib/projects/guard";
 import { listMasters } from "@/lib/incidents/store";
 import { computeHealth } from "@/lib/incidents/health";
 import { reconcileIncidents } from "@/lib/incidents/reconcile";
-// @kf-batch 50-WP4quater-reads(工单 SC-20)—— 🔴 健康度**必须与列表用同一个过滤**:
+// 🔴 健康度**必须与列表用同一个过滤**:
 // 顶部卡片(类别数 / 已验证修复覆盖率 / 复发 Top)若还是全平台合计,而下面的表只列本区,
 // 用户看到的是「覆盖率 60%」配一张两行的表 —— 两个数字互相矛盾比都不过滤更难判断。
 import { readScope, filterRowsByScope } from "@/lib/exec-env/scope";

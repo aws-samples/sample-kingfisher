@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg1-WP11a
 // GET /api/modeling/codetables/[id]/unbind-preview?targetId= —— 解绑弹窗的影响预览(50 SPEC v3.20 §3.8)。
 // 行数是 `svv_table_info` 估值(界面标「约」);credential-gap / 无记录 ⇒ 不连库,rowCountEstimate=null。
-// 模块 55 / 序 50:主体在 lib/modeling/long-ops.ts(modeling-unbind-preview);目标区数仓冷时 45s 未终态 ⇒ 202 + 客户端传输层轮询。
+// 主体在 lib/modeling/long-ops.ts(modeling-unbind-preview);目标区数仓冷时 45s 未终态 ⇒ 202 + 客户端传输层轮询。
 import { NextRequest } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+// 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { apiError } from "@/lib/api-response";

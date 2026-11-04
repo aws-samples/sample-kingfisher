@@ -1,4 +1,4 @@
-// 模块 34 — 钉钉群机器人通道。webhook + 可选加签(安全设置选「加签」时必须)。
+// 钉钉群机器人通道。webhook + 可选加签(安全设置选「加签」时必须)。
 // 加签口径:sign = urlEncode(base64(HmacSHA256(secret, `${timestamp}\n${secret}`))),拼到 &timestamp=&sign=。
 // 钉钉即使业务失败也回 HTTP 200(errcode 在 body),故解析 errcode 做业务级判定。
 

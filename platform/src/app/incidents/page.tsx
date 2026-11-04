@@ -1,8 +1,8 @@
 "use client";
 
-// 模块 43-A — 运维知识库(Incident Memory)。诊断沉淀的结构化故障,按 signature 归并成"故障类别":
+// 运维知识库(Incident Memory)。诊断沉淀的结构化故障,按 signature 归并成"故障类别":
 // 顶部健康度卡(类别数/已验证修复覆盖率/累计发生/复发Top),主表按复发排序 + 筛选,展开抽屉看
-// 发生时间线 + 维护"已验证修复手册"(乐观锁)。读时后端 reconcile 把 done 诊断补记(零侵入模块25)。
+// 发生时间线 + 维护"已验证修复手册"(乐观锁)。读时后端 reconcile 把 done 诊断补记(零侵入)。
 
 import React, { useEffect, useState } from "react";
 import {
@@ -13,7 +13,7 @@ import { BulbOutlined, ReloadOutlined, CheckCircleOutlined, StopOutlined, Export
 import { useT } from "@/lib/i18n/useT";
 import FeatureGuide from "@/components/common/FeatureGuide";
 import { MetricCard } from "@/components/dashboard/charts";
-// @kf-batch 50-WP4quater-reads(工单 SC-20)—— 运维知识库按执行范围过滤。
+// 运维知识库按执行范围过滤。
 // 🔴 故障是**跑在某个区**的作业出的:同一个签名在 us-west-2 反复出、在主控区一次没有,这件事
 // 原来完全看不出来(顶部覆盖率与复发 Top 都是全平台合计)。列表 + 健康度**用同一个 scope**,
 // 否则会出现「覆盖率 60%」配一张两行的表这种自相矛盾。
@@ -146,7 +146,7 @@ export default function IncidentsPage() {
     },
     { title: t("影响任务"), dataIndex: "affectedTasks", key: "tasks", width: 100, render: (v: string[]) => (v || []).length },
     {
-      // @kf-batch 50-WP4quater-reads —— 这类故障在哪些区出现过(护栏 2:落点必须一眼可见)。
+      // 这类故障在哪些区出现过(护栏 2:落点必须一眼可见)。
       // 🔴 无章的存量主档如实显示「主控区」而不是留空:留空会让人以为「不属于任何区」,
       // 而读侧的回落规则明确把它算进主控区 —— 显示与过滤必须是同一句话。
       title: t("出现区域"), dataIndex: "targets", key: "targets", width: 170,
@@ -255,7 +255,7 @@ export default function IncidentsPage() {
           dataSource={rows}
           pagination={{ pageSize: 10 }}
           locale={{
-            // @kf-batch 50-WP4quater-reads(工单 SC-20)—— 护栏 1「永远不让用户丢东西」:
+            // 护栏 1「永远不让用户丢东西」:
             // 单区视角下知识库常常本来就是空的(那个区还没出过故障),而「空」与「这一页没按范围过滤」
             // 在界面上长得一模一样 ⇒ 空态必须说出「别的范围里还有多少条」并给切过去的入口。
             emptyText: (

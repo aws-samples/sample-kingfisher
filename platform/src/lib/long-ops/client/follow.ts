@@ -1,8 +1,8 @@
-// 模块 55 长操作统一框架 —— 客户端传输层:把一次 202(协议记号 long-op/1)跟到终态,再整形成**与同步响应完全一样的 Response**。
+// 长操作统一框架 —— 客户端传输层:把一次 202(协议记号 long-op/1)跟到终态,再整形成**与同步响应完全一样的 Response**。
 //
 // 🔴 零服务端 import(浏览器拦截器与判据共用)。调用方只有一个:lib/auth/AuthProvider.tsx 的全局 fetch 拦截器
-//   (所有 same-origin `/api/` 下请求的必经之路)⇒ ~300 个页面调用点一行不改就拿到终态;`aiFetchJson`(B-107)退成薄壳。
-// 只认 `data.protocol === "long-op/1"` 的 202:GenBI `{taskId,status:"pending",async:true}` 与 B-95 `{status:"warming"}` 原样放行。
+//   (所有 same-origin `/api/` 下请求的必经之路)⇒ ~300 个页面调用点一行不改就拿到终态;`aiFetchJson`退成薄壳。
+// 只认 `data.protocol === "long-op/1"` 的 202:GenBI `{taskId,status:"pending",async:true}` 与 `{status:"warming"}` 原样放行。
 //
 // 终态整形(55 DESIGN D5):
 //   succeeded ⇒ `resultStatus ?? 200` + `{ success:true, data: result, _meta? }`

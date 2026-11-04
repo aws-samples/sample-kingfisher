@@ -5,7 +5,7 @@ import { GetLogEventsCommand, DescribeLogStreamsCommand } from "@aws-sdk/client-
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP7-sync-pushdown —— CloudWatch 日志组是 region 内的:非 home 的 Glue 作业日志在
+// CloudWatch 日志组是 region 内的:非 home 的 Glue 作业日志在
 // **那个区**的日志组里,home 客户端取到的空与「作业没输出」长得一模一样(问 A 答 B)。
 import { bindingTargets, regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import { logsClientFor } from "@/lib/exec-env/target-clients";

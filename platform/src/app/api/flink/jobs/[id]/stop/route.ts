@@ -6,7 +6,7 @@ import { apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { flinkJobTarget } from "@/lib/realtime/flink-service";
 import { getCorrelationId } from "@/lib/observability/logger";
-// 模块 55 / 序 50 第二批:停止主体(pauseFlinkJob 等 MSAF 离开运行态最多 2 分钟 → 写 stopping → 审计)在 lib/realtime/long-ops.ts(flink-stop)。
+// 停止主体(pauseFlinkJob 等 MSAF 离开运行态最多 2 分钟 → 写 stopping → 审计)在 lib/realtime/long-ops.ts(flink-stop)。
 //   超 45 秒由统一框架转 202,页面右下「正在后台执行:停止实时作业」;对象租约 `flink:<jobId>`。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 

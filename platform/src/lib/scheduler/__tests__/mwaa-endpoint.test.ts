@@ -1,5 +1,4 @@
-// @kf-batch 50-WP13-mwaa-region
-// MWAA 端点解析器(单一作者)的可执行门禁 —— ACCEPTANCE E-216 前半。
+// MWAA 端点解析器(单一作者)的可执行门禁 —— ACCEPTANCE 前半。
 // 🔴 home 逐字节 = env(存量路径不变);非 home 缺组件 / 缺资源 ⇒ MwaaNotInstalled 且 missing 全列;绝不回落 home。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -27,7 +26,7 @@ import {
   unpauseWhenLoaded,
   SCHEDULER_ENDPOINT_VIA,
 } from "@/lib/scheduler/mwaa-endpoint";
-// 序 31 第二刀 ②:账本走真实现(请求存储用最小替身)
+// 账本走真实现(请求存储用最小替身)
 import { __setRequestStoreProvider, decisionsOfCurrentRequest } from "@/lib/place/context";
 
 const USW2 = "tgt_usw2_a";
@@ -62,7 +61,7 @@ describe("非 home:fail-closed,绝不回落 home", () => {
     await expect(p).rejects.toBeInstanceOf(MwaaNotInstalled);
     const e = (await p.catch((x) => x)) as MwaaNotInstalled;
     expect(e.code).toBe(MWAA_NOT_INSTALLED_CODE);
-    // @kf-batch 50-WP15-airflow-serverless:拒因泛化为「缺任一调度组件」⇒ 两种缺因一起列(serverless 在前)
+    // 拒因泛化为「缺任一调度组件」⇒ 两种缺因一起列(serverless 在前)
     expect(e.code).toBe("SCHEDULER_NOT_INSTALLED");
     expect(e.missing).toEqual([{ targetId: USW2B, region: "us-west-2", displayName: "eu-sim", reason: expect.stringContaining("未安装 mwaa 组件") }]);
     expect(e.message).toMatch(/未安装调度组件/);
@@ -94,13 +93,13 @@ describe("requireMwaaForTargets:一次核全部、缺的一起列(宪法 B6)", (
     expect(ok.get(USW2B)!.dagBucket).toBe("b");
   });
   it("补装深链形态(列表页读 target + highlight)", () => {
-    // @kf-batch 50-WP15-airflow-serverless:深链缺省高亮 serverless(推荐,分钟级);显式传 mwaa 仍可高亮经典行
+    // 深链缺省高亮 serverless(推荐,分钟级);显式传 mwaa 仍可高亮经典行
     expect(mwaaFixHref(USW2B)).toBe("/exec-envs?target=tgt_usw2_b&highlight=airflow-serverless");
     expect(mwaaFixHref(USW2B, "mwaa")).toBe("/exec-envs?target=tgt_usw2_b&highlight=mwaa");
   });
 });
 
-// @kf-batch 50-WP15-airflow-serverless —— 联合解析:两者都缺 ⇒ 两种缺因一起列;只装 serverless ⇒ serverless 端点;两者都装 ⇒ 缺省 serverless、偏好 mwaa 可切
+// 联合解析:两者都缺 ⇒ 两种缺因一起列;只装 serverless ⇒ serverless 端点;两者都装 ⇒ 缺省 serverless、偏好 mwaa 可切
 describe("schedulerEndpointFor(SPEC v3.27 §3.15)", () => {
   const SLS_RES = { workflowBucket: "bgp-airflow-sls-123456789012-tgt-usw2-a", airflowServerlessRoleArn: "arn:aws:iam::123456789012:role/BgpExecEnv-tgt-usw2-a-airflow-sls-role", airflowServerlessSgId: "sg-1", emrSubnetIds: ["subnet-a", "subnet-b"] };
   it("两者都缺 ⇒ SchedulerNotInstalled 一次列两种缺因(serverless 在前)", async () => {
@@ -141,8 +140,8 @@ describe("schedulerEndpointFor(SPEC v3.27 §3.15)", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class —— 序 31 第二刀 ②:端点解析 = 「这个工作流的产物在哪个区」的落点决策,在唯一作者记账。
-//   第四十三轮 observe:DELETE /api/workflow/<id> 撤 DAG 的 s3.DeleteObject(该区 workflow 桶,没越区)因撤回链只经
+// 端点解析 = 「这个工作流的产物在哪个区」的落点决策,在唯一作者记账。
+//   DELETE /api/workflow/<id> 撤 DAG 的 s3.DeleteObject(该区 workflow 桶,没越区)因撤回链只经
 //   bindingTargets()(纯解析)而未归因;发布 / 触发 / 取日志同链。
 describe("🔴 三个端点解析入口都记落点决策(observer 据此归因)", () => {
   const SLS_RES = { workflowBucket: "bgp-airflow-sls-123456789012-tgt-usw2-a", airflowServerlessRoleArn: "arn:aws:iam::123456789012:role/BgpExecEnv-tgt-usw2-a-airflow-sls-role", airflowServerlessSgId: "sg-1", emrSubnetIds: ["subnet-a", "subnet-b"] };

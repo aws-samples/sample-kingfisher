@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 40 — FinOps 成本治理页(4 Tab:大盘/任务成本/异常/预算与建议)。
+// FinOps 成本治理页(4 Tab:大盘/任务成本/异常/预算与建议)。
 // 隔离红线:只 import 共享稳定组件(charts.tsx/FeatureGuide),所有业务组件在 components/finops/。
 
 import React, { useEffect, useState } from "react";

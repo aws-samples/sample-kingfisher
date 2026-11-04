@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — 可选模型目录(51 SPEC §2 GET /catalog;DESIGN D3′ 四系列(v2.0)/ D4「仅 Bedrock」)。
+// 可选模型目录(51 SPEC §2 GET /catalog;DESIGN D3′ 四系列(v2.0)/ D4「仅 Bedrock」)。
 //
 //   · 列表**只**来自 `ListFoundationModels`(outputModalities ⊇ TEXT)+ `ListInferenceProfiles`(取短 id,不取 ARN)
 //   · 再按厂商档案过滤(`lib/ai/core/vendors.ts` 唯一作者):Claude **Opus** 全版本 + `openai.gpt-5.6-*` + `zai.glm-5*` + `moonshotai.kimi-k3*`
@@ -7,18 +6,18 @@
 //   · `available` / `lastProbe` **只读探测缓存**(`ai-model#probe#<targetId>#<id>`,24h 内才算已知),🔴 绝不 probe-all(P0-4 / M11)
 //   · 本目录也是 PUT 的**唯一权威白名单**(防直连 API 塞 haiku;P1-3)
 //   · 排序(SPEC §7.5):`available` 为真的在前,再按档案系列顺序,再按 id
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { BedrockClient, ListFoundationModelsCommand, ListInferenceProfilesCommand } from "@aws-sdk/client-bedrock";
 import type { Place } from "@/lib/place/types";
 import { familyOf, stripGeoPrefix, type Family, type ProbeResult } from "@/lib/ai/capabilities";
-// @kf-batch 51-v2-multi-vendor —— 系列判定改由厂商档案驱动(原来这里手写两条正则 = 第二作者)
+// 系列判定改由厂商档案驱动(原来这里手写两条正则 = 第二作者)
 import { FAMILIES, isSelectableSeries } from "@/lib/ai/core/vendors";
 import { isProbeFresh, listProbes, probeResultOf } from "./model-store";
 
 export { isSelectableSeries };
 
-// @kf-batch 50-PROD-A-launch-hardening(h)—— 🔴 原来写死 `"us." | "global."`:主控区 / 执行区不在美国时,
+// 🔴 原来写死 `"us." | "global."`:主控区 / 执行区不在美国时,
 //   该区的 `eu.` / `apac.` / `jp.` … 推理配置在目录里**整个消失**。前缀改由账号真值推:
 //   推理配置 id − 它指向的基础模型 id(ListInferenceProfiles 自带 modelArn),不再枚举地理段。
 export type ProfilePrefix = `${string}.`;
@@ -101,7 +100,7 @@ function baseIdFromArn(arn: string | undefined): string | undefined {
  * 拉目录并合并探测缓存。会抛(控制面调用失败),路由层转 503 CatalogUnavailable。
  * 🔴 全程零 InvokeModel:探测态只读 `ai-model#probe#<targetId>#*`。
  */
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半(2026-10-11 真环境坐实):🔴 原来 `region = opts.region || process.env.AWS_REGION`、
+// 后一半(2026-10-11 真环境坐实):🔴 原来 `region = opts.region || process.env.AWS_REGION`、
 //   `targetId = opts.targetId || HOME_TARGET_ID`,而路由只传 targetId ⇒ **任何 targetId(含合法的 tgt_usw2_a)查的都是主控区的
 //   Bedrock 目录**,不存在的 targetId 也照样 200。模型开通是「账号 × region」级(51 SPEC §1 探测缓存按 targetId 定形的理由),
 //   目录必须取**该执行环境所在区**的 ListFoundationModels / ListInferenceProfiles。⇒ 落点**必填**、region 只从落点(描述符)来。

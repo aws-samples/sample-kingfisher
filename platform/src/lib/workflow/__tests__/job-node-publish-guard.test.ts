@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN §3.5 / §4)—— 发布 400 三例 + 「不许先发一半」的结构:
+// 发布 400 三例 + 「不许先发一半」的结构
 //   ① sync 节点任务绑别的区 ⇒ buildCarrierArtifact 抛 JobNodeUnbound(nodeType sync);② job 节点作业不绑该区 ⇒ JobNodeUnbound;
 //   ③ legacy 引擎 + job 节点 ⇒ 能力门 engine-capability;三者经单一作者 schedulerRejectResponse 都是 **400**;
 //   ④ 正向:serverless + 绑了该区的 Glue 作业 ⇒ YAML 里 job task 带 jobSpec(glueJobName / lockAttr / stamp);

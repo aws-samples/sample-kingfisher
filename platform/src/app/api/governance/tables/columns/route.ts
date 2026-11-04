@@ -1,8 +1,8 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「修改表结构」抽屉的真实列:GET ?targetId=&schema=&table=
+// 数据目录「修改表结构」抽屉的真实列:GET ?targetId=&schema=&table=
 //   读该执行区 svv_columns(含注释),并回答「这张表能不能图形化改」:建模台账里有没有 / schema 是否平台全局 / 类型是否全在白名单。
 //   🔴 落点来自 URL 的 targetId(缺 ⇒ 400),不读 scope,不回落主控区。
-// 模块 55 / 序 50:主体在 lib/governance/long-ops.ts(catalog-read-columns);目标区数仓冷时 45s 未终态 ⇒ 202 + 客户端传输层轮询。
+// 主体在 lib/governance/long-ops.ts(catalog-read-columns);目标区数仓冷时 45s 未终态 ⇒ 202 + 客户端传输层轮询。
 import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";

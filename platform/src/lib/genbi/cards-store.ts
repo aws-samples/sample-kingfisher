@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 问数「会话卡片」的**中央指针 + 每人配额**的唯一写入方(54 DESIGN v1.1 §4.1 / §5.1 / §3.2)。
 //
 // 【为什么必须是单一作者】上限「每人最多 100 张」只有在**指针与计数器同一次事务**里才是真的:
@@ -57,7 +56,7 @@ export interface CardPointer {
   createdAt: string;
   updatedAt: string;
   state: CardState;
-  // @kf-batch 50-WP28-platform-action-node(WP-29 问数)—— 卡片「刷新」的**非数据**戳(结果与快照仍在该区 S3)。
+  // (问数)—— 卡片「刷新」的**非数据**戳(结果与快照仍在该区 S3)。
   //   🔴 字段名刻意避开 `assertNoDataValues` 拦的那些(rows / result / …):这里只有时间、状态、快照 id。
   /** 最近一次刷新完成的时刻(成功才盖)。 */
   lastRefreshedAt?: string;
@@ -117,7 +116,6 @@ export class CardStoreContended extends Error {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-GC3a-contention-budget
 // 🔴🔴 **争抢重试预算必须是「推导出来的」,不是拍一个数**(2026-09-21 第五轮全量硬门 GC-3a 实测)。
 //
 // 【实测形态】判据并发(8 路)造满 100 张:配额精确到 100/100、第 101 次 409 —— **正确性是对的**;
@@ -270,7 +268,7 @@ export async function getCardPointer(userSub: string, cardId: string): Promise<C
   return (Item as CardPointer | undefined) ?? null;
 }
 
-/** 我的卡片(含 `deleting` 的 —— 清理未完成必须**可见**,WP-11a「残留可见」口径)。 */
+/** 我的卡片(含 `deleting` 的 —— 清理未完成必须**可见**,「残留可见」口径)。 */
 export async function listCardPointers(userSub: string): Promise<CardPointer[]> {
   const { Items = [] } = await docClient.send(
     new QueryCommand({
@@ -436,7 +434,7 @@ export async function reconcileQuota(userSub: string): Promise<number> {
   return n;
 }
 
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数)
+// (问数)
 /**
  * 刷新成功后的指针回写(**唯一作者**:`cards-refresh.ts` 调它)。
  * 正文已原地改写(字节数 / 摘要随之变化)+ 新快照入清单;🔴 条件写:卡片必须仍是 ready

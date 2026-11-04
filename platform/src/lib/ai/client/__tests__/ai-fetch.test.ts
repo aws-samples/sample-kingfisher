@@ -1,4 +1,4 @@
-// 序 46 B-107 → 模块 55 —— aiFetchJson 薄壳判据:非 JSON 响应包成可读错误(B-110 同一口径)、JSON 原样;不再轮询(202 由全局拦截器在它之前跟到终态)。
+// → —— aiFetchJson 薄壳判据:非 JSON 响应包成可读错误(同一口径)、JSON 原样;不再轮询(202 由全局拦截器在它之前跟到终态)。
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { aiFetchJson, readJsonEnvelope } from "../ai-fetch";
 

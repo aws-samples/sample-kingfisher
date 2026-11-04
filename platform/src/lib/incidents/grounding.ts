@@ -1,4 +1,4 @@
-// 模块 43-A.2 — 诊断证据 grounding:把"运维知识库历史已验证修复"+"业务口径"渲染成一段中文
+// 诊断证据 grounding:把"运维知识库历史已验证修复"+"业务口径"渲染成一段中文
 // prompt 区块,拼进喂给 AWS DevOps Agent 的证据里(见 lib/diagnostics/evidence.ts)。
 //
 // 这是护城河复利闭环的"注入"环:DevOps Agent 的强项是自主关联 AWS 遥测(CloudWatch/X-Ray)找

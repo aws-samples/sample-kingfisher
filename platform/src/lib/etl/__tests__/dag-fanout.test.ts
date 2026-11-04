@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-fanout
 // 逐 target 扇出下发的门禁 —— 🔴 **全部可执行**(真调 `publishFanout`/`offlineFanout`,
 // 打桩只打到 S3 / DDB / 绑定解析这三层边界),不用文本断言。
 //
@@ -52,14 +51,14 @@ vi.mock("@/lib/aws/dynamodb", () => ({
 }));
 
 vi.mock("@/lib/scheduler/mwaa-offline", () => ({
-  // @kf-batch 50-WP13-mwaa-region:下线带 targetId(去该 target 自己的 MWAA)
+  // 下线带 targetId(去该 target 自己的 MWAA)
   offlineDag: vi.fn(async (dagId: string, targetId: string) => {
     h.offlined.push(`${dagId}@${targetId}`);
     return { dagId, targetId, paused: true, dagFileDeleted: true };
   }),
 }));
 
-// @kf-batch 50-WP13-mwaa-region —— MWAA 端点按 h.bindings 造(有绑定 = 装了 mwaa);h.noMwaa 里的 target 视为未装
+// MWAA 端点按 h.bindings 造(有绑定 = 装了 mwaa);h.noMwaa 里的 target 视为未装
 vi.mock("@/lib/scheduler/mwaa-endpoint", async (importOriginal) => {
   const real = (await importOriginal()) as Record<string, any>;
   const epOf = (tid: string) => {
@@ -83,7 +82,7 @@ vi.mock("@/lib/scheduler/mwaa-endpoint", async (importOriginal) => {
       if (missing.length) throw new real.MwaaNotInstalled(missing);
       return new Map(targets.map((t) => [t, epOf(t)]));
     }),
-    // @kf-batch 50-WP15-airflow-serverless(施工序 6):预览改走联合解析器;本文件夹具全是经典 MWAA 端点(无 kind)⇒ 同一张 epOf
+    // 预览改走联合解析器;本文件夹具全是经典 MWAA 端点(无 kind)⇒ 同一张 epOf
     schedulerEndpointFor: vi.fn(async (tid: string) => {
       const ep = epOf(tid);
       // 生产口径 = `${slsReason};${mwaaReason}`(两种缺因一起列);夹具照此拼,预览断言仍能看到 mwaa 缺因
@@ -119,7 +118,7 @@ vi.mock("@/lib/exec-env/data-plane-target", async (importOriginal) => {
       const tid = args.targetId || "tgt_home";
       const b = h.bindings[tid];
       if (!b) throw new (real.TargetBindingRejected as any)("missing-component", `目标 ${tid} 没装 redshift 组件`);
-      // 🔴 与真实语义一致:home 目前就是共享 admin(per-project 化属 P52.5b),
+      // 🔴 与真实语义一致:home 目前就是共享 admin(per-project 化),
       // 非 home 在 legacy-seeded / provisioning 下也回落该 target 自己的 admin。
       return { targetId: tid, ...b, degradedToLegacyAdmin: b.degraded ?? true, home: tid === "tgt_home" };
     }),
@@ -267,7 +266,6 @@ describe("🔴 fail-fast:失败要写台账,被跳过的**不许**写", () => {
     expect(h.s3Puts.map((p) => p.Key)).toEqual(["dags/bgp_etl_J1.py"]);
   });
 
-  // @kf-batch 50-P50.3-matrix
   it("🔴 子集重发(矩阵的「重发到此 region」):只发点名的那个区,**不动**其它区的台账", async () => {
     const r = await publishFanout(job({ targets: [HOME, USW2] }), { cron: "0 5 * * *", onlyTargets: [USW2] });
     expect(r.rows.map((x) => x.targetId)).toEqual([USW2]);
@@ -315,7 +313,7 @@ describe("🔴🔴 解绑 ≠ 下线", () => {
       },
     });
     const removed = await offlineUnboundTargets(j, [HOME]);
-    // @kf-batch 50-WP18d-unpublish-seam —— 返回值从「名字数组」改成 `{offlined, failures}`:
+    // 返回值从「名字数组」改成 `{offlined, failures}`:
     // 逐区失败必须能带出来(`offlineFanout` 从不抛 ⇒ 调用点的 try/catch 拦不到)
     expect(removed).toEqual({ offlined: [USW2], failures: [] });
     expect(h.offlined).toEqual(["bgp_etl_J1__tgt_usw2_a@tgt_usw2_a"]);
@@ -342,7 +340,7 @@ describe("🔴 预览:绝不抛,逐行给原因", () => {
 
   it("🔴 预览只给凭证**形态**,不给 ARN(它会显示到界面上)", async () => {
     const rows = await planFanout(job({ targets: [HOME, USW2] }));
-    expect(rows[0].credential).toBe("shared-admin"); // home 目前是共享 admin(per-project 化属 P52.5b)
+    expect(rows[0].credential).toBe("shared-admin"); // home 目前是共享 admin(per-project 化)
     expect(rows[1].credential).toBe("shared-admin");
     // 供给完成(isolated)之后同一行应变成 per-project —— 形态是**算出来的**,不是写死的文案
     h.bindings[USW2].degraded = false;
@@ -355,18 +353,16 @@ describe("🔴 预览:绝不抛,逐行给原因", () => {
     expect(rows[0].ok).toBe(true);
     expect(rows[1]).toMatchObject({ ok: true, region: "us-west-2", bucket: "bgp-mwaa-dags-tgt-usw2-a", envName: "bgp-mwaa-tgt-usw2-a" });
   });
-  // @kf-batch 50-WP13-mwaa-region
   it("🔴 缺 MWAA 的区:预览整行 ✗ + code=MWAA_NOT_INSTALLED(前端据此渲染「去执行环境补装 MWAA」)", async () => {
     h.noMwaa.push(USW2);
     const rows = await planFanout(job({ targets: [HOME, USW2] }));
     expect(rows[0].ok).toBe(true);
-    // @kf-batch 50-WP15-airflow-serverless:码改 SCHEDULER_NOT_INSTALLED(SPEC v3.27 §2.1;旧码在 detail.legacyCode)
+    // 码改 SCHEDULER_NOT_INSTALLED(SPEC v3.27 §2.1;旧码在 detail.legacyCode)
     expect(rows[1]).toMatchObject({ ok: false, code: "SCHEDULER_NOT_INSTALLED", bucket: "—", envName: "—", region: "us-west-2" });
     expect(rows[1].reason).toContain("未安装 mwaa 组件");
   });
 });
 
-// @kf-batch 50-WP13-mwaa-region
 describe("🔴🔴 区域内调度:每份 DAG 落该 target 自己的 MWAA 桶;缺 MWAA 在任何写之前整体拒", () => {
   it("home 的 DAG 在 home 桶、usw2 的 DAG 在 usw2 桶(不再全塞 home 桶 = 用户点名的跨区域调度)", async () => {
     const r = await publishFanout(job({ targets: [HOME, USW2] }), { cron: "0 * * * *" });
@@ -377,7 +373,7 @@ describe("🔴🔴 区域内调度:每份 DAG 落该 target 自己的 MWAA 桶;�
     expect(h.s3Puts.map((p) => p.Bucket)).toEqual(["bgp-mwaa-dags", "bgp-mwaa-dags-tgt-usw2-a"]);
     expect(Object.keys(r.endpoints).sort()).toEqual([HOME, USW2]);
   });
-  it("🔴 一个区缺 MWAA ⇒ 整次抛 MwaaNotInstalled,**零** S3 写、零台账(E-208);missing 只列缺的那个", async () => {
+  it("🔴 一个区缺 MWAA ⇒ 整次抛 MwaaNotInstalled,**零** S3 写、零台账;missing 只列缺的那个", async () => {
     h.noMwaa.push(USW2);
     const { MwaaNotInstalled } = await import("@/lib/scheduler/mwaa-endpoint");
     const p = publishFanout(job({ targets: [HOME, USW2] }), { cron: "0 * * * *" });

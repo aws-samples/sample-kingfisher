@@ -11,7 +11,7 @@
 // ⚠️ json 必须在 platform/ 内(而非 repo 根):platform Docker 构建上下文 = fromAsset("../platform"),
 // Dockerfile COPY . . 只拷 platform 目录;放 repo 根会 Next build 报 Module not found(已踩)。
 import modelConfig from "../../../ai-model.json";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:运行时解析链(bgp-settings → env → SSOT)。
+// 运行时解析链(bgp-settings → env → SSOT)。
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { getModelSetting, getVersion } from "@/lib/settings/model-store";
 import type { Capability, SourceLayer } from "./capabilities";
@@ -23,7 +23,7 @@ export const DEFAULT_MODEL_ID: string = modelConfig.defaultModelId;
 export const resolveModelId = (): string => process.env.BEDROCK_MODEL_ID || DEFAULT_MODEL_ID;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-W5-seg2-WP8 — 模块 51 运行时解析链(51 SPEC §3.1 / §3.1a / §6.1② / §6.2①②③)
+// 运行时解析链(51 SPEC §3.1 / §3.1a / §6.1② / §6.2①②③)
 //
 // 三层:① bgp-settings 运行时配置(页面可改,秒级生效)→ ② env BEDROCK_MODEL_ID → ③ SSOT。
 // ① 为空时与上面同步 `resolveModelId()` **逐字节等价**(D2 零迁移 / 可回滚)。
@@ -72,8 +72,8 @@ export function _cacheKeysForTests(): string[] {
 }
 
 /**
- * 逻辑 scope(决定读哪条 sk)。🔴 一期恒 "global"(DESIGN D3:9 能力全走全局默认;D8:per-target 二期 P51.3)。
- * 两个形参**都真接**:P51.3 / P51.4 只改这一处(`<targetId>#global` / `<capability>`)。
+ * 逻辑 scope(决定读哪条 sk)。🔴 一期恒 "global"(DESIGN D3:9 能力全走全局默认;D8:per-target 二期)。
+ * 两个形参**都真接**:只改这一处(`<targetId>#global` / `<capability>`)。
  */
 export function deriveScope(capability?: Capability, targetId?: string): string {
   void capability;
@@ -168,19 +168,19 @@ export async function resolveLayered(capability?: Capability, targetId?: string)
 // ── 格式校验(51 SPEC §2 正则 + §6.2③ region 钩子)───────────────────────────────
 
 /** 廉价预筛正则(短 id / inference profile id;**拒 ARN**,P1-3 有意为之)。 */
-// @kf-batch 50-PROD-A-launch-hardening(h):地理前缀按形态收(us-gov. / jp. / au. … 都是 Bedrock 真实存在的),
+// 地理前缀按形态收(us-gov. / jp. / au. … 都是 Bedrock 真实存在的),
 //   不再只认四个 —— 只认四个 ⇒ 主控区放在日本 / GovCloud 时,该区唯一可用的推理配置被当成「格式非法」拒掉。
 export const MODEL_ID_REGEX = /^([a-z]+(?:-[a-z]+)*\.)?[a-z]+\.[a-z0-9.:-]+$/;
 
 /**
- * modelId 格式是否合法。`region` 钩子一期缺省不判;P51.3 在此填实
+ * modelId 格式是否合法。`region` 钩子一期缺省不判;在此填实
  * 「`us.` 推理配置在非 US region 必炸」的判据(50 R10 P0)。
  */
 export function isModelIdFormatValid(modelId: string, opts: { region?: string } = {}): boolean {
   if (typeof modelId !== "string" || modelId.length < 5 || modelId.length > 200) return false;
   if (!MODEL_ID_REGEX.test(modelId)) return false;
   if (opts.region) {
-    // P51.3 填实:例如 us.* profile 只能在 us-* region 调用。一期不启用,只留钩子(避免误伤现网 us.* 配置)。
+    // 填实:例如 us.* profile 只能在 us-* region 调用。一期不启用,只留钩子(避免误伤现网 us.* 配置)。
     void opts.region;
   }
   return true;

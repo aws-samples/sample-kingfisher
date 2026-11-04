@@ -1,4 +1,4 @@
-// 模块 13 — RBAC 守卫 (v1.4.0)
+// RBAC 守卫 (v1.4.0)
 //
 // Helpers used by API routes to enforce project-scoped, role-based access. The platform
 // middleware already verifies every /api/* token; these helpers resolve identity + the
@@ -58,7 +58,6 @@ export async function requireProject(
   return { identity, projectId: pid, role };
 }
 
-// @kf-batch 52-P52.1-D4
 // 🔴 **项目配置管理专用守卫**(改名 / 删项目 / 成员增删改 / 审批决策)。
 //
 // 判据 = 平台 admin ∨(manager ∧ 本项目 owner),见 `config-permissions.canManageProjectConfig`

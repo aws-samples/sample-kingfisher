@@ -1,4 +1,3 @@
-// @kf-batch 50-WP18c-capacity-visibility
 /**
  * 「云侧还没给算力」的判定 —— **行为**判据。
  * 变异对照:去掉 `stillRunning` 这一半 ⇒ ③ 红;把 starvation 文本改错一个字 ⇒ ① 红;

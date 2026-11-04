@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mrquery
 // **数仓直查:多 region 并行提交**(50 INTERACTION §4septies,用户 2026-09-04 定的交互)。
 //
 // ── 这一刀解决什么 ──────────────────────────────────────────────────────────
@@ -24,12 +23,12 @@
 // `submitError`,**不进入轮询**。让它假装"正在执行"是最坏的形态:用户会一直等一个永远不会回来的结果。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 多区扇出的唯一写法(L10)
+// 多区扇出的唯一写法(L10)
 import { forEachTargetPlace } from "@/lib/place/fanout";
 import { ExecuteStatementCommand } from "@aws-sdk/client-redshift-data";
 import { resolveRedshiftBinding, TargetBindingRejected, bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { redshiftDataClientFor } from "@/lib/exec-env/target-clients";
-// @kf-batch 50-W5-seg2-WP10a —— 可审计闭包(跨法域 target 提交前写区域审计;写不成即拒)
+// 可审计闭包(跨法域 target 提交前写区域审计;写不成即拒)
 import { residencyAudit, userActor, isResidencyError } from "@/lib/exec-env/residency-audit";
 import { AuditUnavailable } from "@/lib/exec-env/residency";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
@@ -54,7 +53,7 @@ export type QueryErrorKind =
   | "credential-missing"
   | "timeout"
   | "syntax"
-  // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 的两类拒因(审计完整性 / 同意前置),不是引擎错
+  // 跨法域 target 的两类拒因(审计完整性 / 同意前置),不是引擎错
   | "audit-unavailable"
   | "ack-required"
   | "other";
@@ -67,7 +66,6 @@ export interface ClassifiedError {
 
 const HINTS: Record<QueryErrorKind, string> = {
   "table-missing": "该区域还没有这张表 —— 去「数据同步」给它建一条到该执行目标的同步任务,或改查该区确实存在的表。",
-  // @kf-batch 50-W5-seg2-WP10a
   "audit-unavailable": "该执行目标的区域审计表当前写不进去,查询未提交(审计完整性:写不成即拒)—— 稍后重试;持续出现请检查该目标的 residency-api 组件探活。",
   "ack-required": "对该跨法域执行目标的操作需要先同意免责告知 —— 页面会弹出告知,同意后重试即可。",
   "permission-denied": "该区域的执行身份没有这张表的权限 —— 去「执行环境管理 › 凭证状态」给本项目补供给,或让表属主授权。",
@@ -115,7 +113,7 @@ export function classifySubmitError(e: unknown): ClassifiedError {
           ? "warehouse-conflict"
           : e.reason === "no-credential"
             ? "credential-missing"
-            : "target-not-ready"; // @kf-batch 50-W5-seg1-WP10a:原「跨法域 ⇒ 专用错误类」分支已删(不设法务门;project-not-allowed 走 target-not-ready 的可修口径)
+            : "target-not-ready"; // 原「跨法域 ⇒ 专用错误类」分支已删(不设法务门;project-not-allowed 走 target-not-ready 的可修口径)
     return { kind, hint: HINTS[kind] };
   }
   return classifyEngineError((e as Error)?.message ?? String(e));
@@ -130,9 +128,9 @@ export interface QuerySubmission {
   home: boolean;
   /** 执行身份**形态**(不是标识):`per-project` / `shared-admin` / `worker-iam` */
   credential: "per-project" | "shared-admin" | "worker-iam";
-  /** 该目标的法域(只作 🌍 标签 + 审计维度;@kf-batch 50-W5-seg1-WP10a:不再驱动「合并」是否可用)。 */
+  /** 该目标的法域(只作 🌍 标签 + 审计维度;:不再驱动「合并」是否可用)。 */
   jurisdiction: string;
-  /** @kf-batch 50-W5-seg2-WP10a 跨法域 target 的区域审计 ID(提交前写;home / 同法域无)。sheet 头显示「审计 #…」 */
+  /** 跨法域 target 的区域审计 ID(提交前写;home / 同法域无)。sheet 头显示「审计 #…」 */
   auditId?: string;
   statementId?: string;
   handleId?: string;
@@ -165,7 +163,7 @@ export async function submitToTargets(args: {
         `每个区都是一次独立扫描与计费,超过上限请分批`
     );
   }
-  // @kf-batch 50-WP31-place-first-class —— 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):每个区一个分支、各自一个嵌套落点上下文。
+  // 一次请求碰多个区 ⇒ 唯一写法 `forEachTargetPlace`(L10):每个区一个分支、各自一个嵌套落点上下文。
   //   仍是并发、顺序与入参一致;解析不开的区照样交给 submitOne,由它原来的那套报错写进该 sheet 的 submitError(不改报错形状)。
   return forEachTargetPlace(list, (targetId) => submitOne(targetId, args), { via: "submitToTargets" });
 }
@@ -193,7 +191,6 @@ async function submitOne(
     // 而 per-project 身份在那个 namespace 里根本不存在。它只在 home 出现。
     const SecretArn =
       home && binding.workgroup === ZEROETL_WORKGROUP ? await getZeroEtlSecretArn() : binding.secretArn;
-    // @kf-batch 50-W5-seg2-WP10a
     // 🔴 **提交之前**写区域审计(entry=execute;SPEC v3.23 §3.2):home / 同法域 ⇒ null,一字不变;
     //    跨法域 ⇒ 区域全量(SQL 原文 / operator)+ 中央摘要(sqlHash),写不成 ⇒ 这一 target **不提交**、sheet 显示
     //    `audit-unavailable`,其它 target 照跑(路由已在扇出前对全部 target 做过同意前置,这里的 ack-required 只剩并发竞态)。
@@ -233,7 +230,7 @@ async function submitOne(
         WorkgroupName: binding.workgroup,
         Database: binding.database,
         ...(SecretArn ? { SecretArn } : {}),
-        // @kf-batch 50-W5-seg2-WP10a —— 🔴 statement ↔ 区域审计的**关联**(E-186):execute 审计是提交**之前**写的(写不成即拒的前提),
+        // 🔴 statement ↔ 区域审计的**关联**:execute 审计是提交**之前**写的(写不成即拒的前提),
         //    行内不可能有 statementId;把 auditId 设成 Redshift 语句的 StatementName ⇒ 从 Redshift 侧一查即得「这条语句对应哪条审计」。
         //    home / 同法域没有 auditId ⇒ 不设(存量请求逐字节不变)。
         ...(auditId ? { StatementName: auditId } : {}),
@@ -292,7 +289,7 @@ export function normalizeQueryTargets(targets: unknown): string[] {
   return dedup.slice().sort((a, b) => (isHome(a) ? -1 : isHome(b) ? 1 : 0));
 }
 
-// @kf-batch 50-W5-seg1-WP10a —— 原 `crossJurisdiction()`(跨法域时禁用「合并为一张表」)**已删**:
+// 原 `crossJurisdiction()`(跨法域时禁用「合并为一张表」)**已删**:
 //    DESIGN §18 决策 6quinquies(平台不设法务门):合并对跨法域 target **可用**,查询已审计(INTERACTION v2.17 §4bis.3 / §4septies.6)。
 
 export { HOME_TARGET_ID };

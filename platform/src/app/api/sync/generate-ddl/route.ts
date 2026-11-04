@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-guards
 // 🔴 **改动前**:零守卫 + 注入面(52 SPEC §2 缺口B 第 8 面;台账 52 DESIGN §11.2 第 6 项)。
 //
 // 【两条注入路径,一次修法关掉两条】
@@ -26,16 +25,16 @@ import { buildTargetDdl } from "@/lib/sync/target-ddl";
 import { apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { safeIdent } from "@/lib/modeling/redshift";
-// @kf-batch 50-WP7-sync-pushdown(施工序 5)—— home-only 合同退役:存在性探测按 body 的 targetId(前端从 ds.ownerTargetId 派生)
+// home-only 合同退役:存在性探测按 body 的 targetId(前端从 ds.ownerTargetId 派生)
 // 在执行体里走 resolveRedshiftBinding,并带 binding 的 secretArn 执行(非 home 的 TaskRole 在该区 workgroup 没有 DB 用户)。
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
-// @kf-batch 50-WP31-place-first-class —— B-35 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 后一半:点名必须是**已注册且装好**的执行环境(不存在 ⇒ 409,不再写孤儿记录 / 回降级结果)
 import { requestedRegisteredPlace } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { getCorrelationId } from "@/lib/observability/logger";
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 
-// 模块 55 / 序 50 第二批:探测主体在 lib/sync/long-ops.ts(sync-generate-ddl,只读、不占资源);数仓冷启动时探测可能排队几十秒,
+// 探测主体在 lib/sync/long-ops.ts(sync-generate-ddl,只读、不占资源);数仓冷启动时探测可能排队几十秒,
 //    超 45 秒由统一框架转 202,页面右下「正在后台执行:生成建表语句并探测目标表」,终态同形交回。
 export async function POST(req: NextRequest) {
   const ctx = await requireProject(req, "editor");

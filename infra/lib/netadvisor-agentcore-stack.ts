@@ -1,4 +1,4 @@
-// 模块 28 — 网络连通性顾问 on AgentCore 基建栈（平台标准首个样板）。
+// 网络连通性顾问 on AgentCore 基建栈（平台标准首个样板）。
 // 平台标准见 docs/design/28-agentcore-standard/DESIGN.md。照抄 agentcore-stack.ts(GenBI 先驱实现)，
 // 只改「业务层」：资源命名 bgp-netadvisor-* / 工具定义(2 个) / Lambda 打包方式 / Lambda 只读 IAM。
 // 协议层(Gateway AWS_IAM 入站 + GatewayTarget + Runtime 门控 + 托管 Memory + 三角色)100% 复用。
@@ -23,12 +23,12 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as path from "path";
 import { Construct } from "constructs";
 import { attachNetAdvisorReadOnlyPolicy } from "./netadvisor-iam";
-import { resolveModelId } from "./shared/model"; // 模块47 L0:模型 ID 收敛 SSOT(ai-model.json)
-import { buildAgentCoreResources } from "./shared/agentcore-base"; // 模块47 L1:协议层共享基类
+import { resolveModelId } from "./shared/model"; // 模型 ID 收敛 SSOT(ai-model.json)
+import { buildAgentCoreResources } from "./shared/agentcore-base"; // 协议层共享基类
 
 export interface NetAdvisorAgentCoreStackProps extends cdk.StackProps {
   modelId?: string;
-  dataKey?: kms.IKey; // 模块 27 (WS1) — 技能 Lambda 读 CMK 加密的 bgp-datasources 表需解密权限
+  dataKey?: kms.IKey; // 技能 Lambda 读 CMK 加密的 bgp-datasources 表需解密权限
 }
 
 export class NetAdvisorAgentCoreStack extends cdk.Stack {
@@ -36,7 +36,7 @@ export class NetAdvisorAgentCoreStack extends cdk.Stack {
     super(scope, id, props);
     const region = cdk.Stack.of(this).region;
     const account = cdk.Stack.of(this).account;
-    // 模块47 L0:默认模型走全平台 SSOT(ai-model.json,当前 sonnet-4-5)。props > env > SSOT。
+    // 默认模型走全平台 SSOT(ai-model.json,当前 sonnet-4-5)。props > env > SSOT。
     const modelId = resolveModelId(props.modelId);
 
     // platform 目录(Lambda 源码 + tsconfig + lock 所在)。infra/lib → ../../platform。
@@ -117,7 +117,7 @@ export class NetAdvisorAgentCoreStack extends cdk.Stack {
     repo: ecr.Repository; skillFn: NodejsFunction; gatewayRole: iam.Role; runtimeRole: iam.Role;
     modelId: string;
   }) {
-    // 模块47 L1:协议层走共享基类。id 原样传入 → 逻辑 ID 逐字节一致(synth diff 已验 0,零重建)。
+    // 协议层走共享基类。id 原样传入 → 逻辑 ID 逐字节一致(synth diff 已验 0,零重建)。
     buildAgentCoreResources({
       stack: this,
       ids: { gateway: "NetAdvisorGateway", target: "NetAdvisorTarget", runtime: "NetAdvisorRuntime", memory: "NetAdvisorMemory", memoryRole: "NetAdvisorMemoryRole" },

@@ -28,7 +28,7 @@ export async function recordGenBiHistory(
   userId: string,
   question: string,
   result: GenBiResult,
-  // @kf-batch 50-WP4ter-coverage —— `targetId` = 这次问数的 SQL 真打到的区(工单 SC-6)。
+  // `targetId` = 这次问数的 SQL 真打到的区。
   // 🔴 可选而不是必填:本函数是 best-effort 旁路,签名收紧会让调用方为了编译通过而**瞎填一个区**。
   // 缺省不补 home:历史行没有章就交给读侧的三级/标量回落统一处理(一处定义)。
   meta?: { engine?: string; backend?: string; targetId?: string }

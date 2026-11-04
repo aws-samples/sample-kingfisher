@@ -1,9 +1,8 @@
-// @kf-batch 50-P50.3-dataplane
 // 数据面 target 绑定的门禁(50 SPEC §3.1 / §3.4 / §3.8 / §6.7)。
 //
 // 🔴 本文件的承重只有一条:**region / workgroup / database / 凭证 四样必须同时是那个 target 的**。
 // 只对上一两样是本模块最危险的失败形态 —— 它**不报错**,只是"看起来正常地连到了别的区域"
-// (`warehouse-location.ts` 文件头记的就是这个;P50.1 收编 workgroup 兜底时的病根也是它)。
+// (`warehouse-location.ts` 文件头记的就是这个;收编 workgroup 兜底时的病根也是它)。
 // 所以下面每条正向断言都配一条**负向**:别的三样不许还是 home 的。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -82,7 +81,7 @@ describe("🔴 home:逐字节等价,而且**根本不碰**新链路", () => {
     expect(getPrivilegedCred, "home 走了 §3.9 工厂 ⇒ provisioning 窗口过期会把存量作业打挂").not.toHaveBeenCalled();
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 原判据是「显式传 tgt_home 与不传等价」;WP-31 序 3 起落点必填,
+  // 原判据是「显式传 tgt_home 与不传等价」;落点必填,
   //   漏传 / 空串不再静默落主控区(类型挡住漏传,运行期挡住 any / 空串)
   it("🔴 不传 / 空串 ⇒ 拒,不再静默落主控区", async () => {
     await expect(resolveRedshiftBinding({ projectId: PROJ } as never)).rejects.toThrow(/非法 targetId/);
@@ -99,7 +98,6 @@ describe("🔴 home:逐字节等价,而且**根本不碰**新链路", () => {
   });
 });
 
-// @kf-batch 50-WP31-place-first-class
 describe("run 章 ⇒ targetId(唯一作者 targetOfStamp)", () => {
   it("有章用章;无章 = 存量主控区;章非法 ⇒ 可修的绑定拒绝(不许变成主控区)", () => {
     expect(stampedTargetOf({ targetId: "tgt_usw2_a" })).toBe("tgt_usw2_a");
@@ -186,7 +184,7 @@ describe("🔴🔴 非 home:四样必须**同时**是那个 target 的", () => {
   });
 });
 
-// @kf-batch 50-WP11b-shared-writer —— BindingOpts 是必填判别式(无默认值);per-project 的简写
+// BindingOpts 是必填判别式(无默认值);per-project 的简写
 const PP = (projectId: string | null) => ({ scope: "per-project" as const, projectId });
 
 describe("🔴 写入路径的校验(`{...body}` 展开是 fail-open)", () => {
@@ -212,7 +210,7 @@ describe("🔴 写入路径的校验(`{...body}` 展开是 fail-open)", () => {
     await expect(assertBindableTarget("tgt_usw2_a", "redshift", PP(null))).rejects.toThrow(/没有安装 redshift 组件/);
   });
 
-  // @kf-batch 50-W5-seg1-WP10a —— 🔴 反转:原「跨法域 ⇒ 本期拒」已作废(DESIGN §18 决策 6quinquies:不设法务门)。
+  // 🔴 反转:原「跨法域 ⇒ 本期拒」已作废(DESIGN §18 决策 6quinquies:不设法务门)。
   //    跨法域 target 与同法域走**同一条路**;它唯一的技术前置在准入内核(residencyPrerequisite,registry 侧单测),这里不再判法域。
   it("🔴🔴 跨法域 target ⇒ 与同法域同一条路(不因 jurisdiction 拒绑;不设法务门)", async () => {
     targets.tgt_usw2_a = { ...USW2, jurisdiction: "eu-sim" };
@@ -281,7 +279,7 @@ describe("assertTargetComponent(纯函数)", () => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP11b-shared-writer —— E-233 / E-235(单测侧):scope 判别式(SPEC §3.9d.8,台账 B-17)
+// (单测侧):scope 判别式(SPEC §3.9d.8,台账)
 // ══════════════════════════════════════════════════════════════════════════════
 describe("🔴🔴 scope 必填判别式:platform-global **只**跳过项目白名单(成对判据)", () => {
   it("allowlist: [](最严那一态)⇒ platform-global 放行;🔴 同一状态下 per-project 仍拒 project-not-allowed", async () => {
@@ -318,8 +316,7 @@ describe("🔴🔴 scope 必填判别式:platform-global **只**跳过项目白�
   });
 });
 
-// @kf-batch 50-B109-exec-target-dims
-describe("🔴 B-109 listComponentCapableTargets:维度 → 组件谓词是唯一作者,且与写路径同口径", () => {
+describe("🔴 listComponentCapableTargets:维度 → 组件谓词是唯一作者,且与写路径同口径", () => {
   const opts = { scope: "per-project" as const, projectId: PROJ };
   it("airflow 列装了 airflow-serverless 或 mwaa 的,只有数仓的不列;redshift 反之;core 全列;旧名 listRedshiftCapableTargets 等价", async () => {
     targets = {

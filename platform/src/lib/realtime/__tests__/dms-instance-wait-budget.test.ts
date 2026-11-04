@@ -1,5 +1,4 @@
-// @kf-batch 69-B137-dms-instance-wait
-// 🔴 B-137(2026-11-01 …4916 第五十轮硬门 wp24 真撞):后台编排等 DMS 复制实例的预算 8 分钟 < AWS 真建实例 13.3 分钟
+// 🔴 (2026-11-01 …4916 第五十轮硬门 wp24 真撞):后台编排等 DMS 复制实例的预算 8 分钟 < AWS 真建实例 13.3 分钟
 //    ⇒ 编排放弃、复制任务从未创建、用户得再点一次。本判据钉三件事实:
 //    ① 预算 ≥ 25 分钟(覆盖实测 13.3 分钟并留余量)且 ≤ 60 分钟(不许无限等);
 //    ② 轮询循环真的用这份常量(不许再长出 `i < 48` 这种字面量);
@@ -11,7 +10,7 @@ import { REPLICATION_INSTANCE_WAIT } from "../dms-service";
 
 const read = (rel: string) => readFileSync(resolve(__dirname, "../../../", rel), "utf8");
 
-describe("B-137 DMS 复制实例等待预算", () => {
+describe("DMS 复制实例等待预算", () => {
   it("① 预算覆盖实测的实例创建时长(13.3 分钟)并留余量,且有上限", () => {
     const totalMin = (REPLICATION_INSTANCE_WAIT.intervalMs * REPLICATION_INSTANCE_WAIT.maxAttempts) / 60_000;
     expect(totalMin, "预算必须 ≥ 25 分钟:…4916 实测 CreateReplicationInstance → available 用了 13.3 分钟,8 分钟预算让编排在实例就位前放弃").toBeGreaterThanOrEqual(25);

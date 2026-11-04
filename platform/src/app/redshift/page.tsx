@@ -1,9 +1,9 @@
 "use client";
-// 序 41 B-117 —— 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
+// 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
 import { deleteJson } from "@/lib/http/delete-json";
 
 import { fetchExecTargets } from "@/lib/exec-env/exec-targets-client";
-// @kf-batch 50-WP2-directquery —— 顶栏「执行范围」= 本页执行目标的**默认值**(INTERACTION §9.4「默认范围跟随视角」)。
+// 顶栏「执行范围」= 本页执行目标的**默认值**(INTERACTION §9.4「默认范围跟随视角」)。
 // 🔴 为什么必须跟随:页面在能力矩阵里声明了 `scopeWired: true`(= 已按执行范围过滤),
 //    若顶栏切了区而编辑器仍打在原来的区,那句声明就是假的 —— 门禁 `scope-wired-guard` 正是为此存在。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -13,13 +13,12 @@ import { Button, Space, Table, Alert, Spin, Select, Tabs, message, Input, Popcon
 import { PlayCircleOutlined, ClearOutlined, SaveOutlined, DeleteOutlined, DatabaseOutlined, ReloadOutlined } from "@ant-design/icons";
 import dynamic from "next/dynamic";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-P50.1-workgroup-ssot
 // 前端默认值也收编到命名 SSOT(与改动前**同值**,零行为变化)。
-// 🔴 P50.3 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
+// 🔴 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
 //    客户端拿不到)—— 届时改这一个 import 的用法即可,不必再回来找字面量。
-// @kf-batch 50-P50.3-mrquery —— 多 region 结果:一个 region 一个 sheet(INTERACTION §4septies)。
+// 多 region 结果:一个 region 一个 sheet(INTERACTION §4septies)。
 import MultiRegionResults, { type Submission } from "@/components/redshift/MultiRegionResults";
-// @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)+ 留区 SQL 原文按需读回
+// 免责告知弹窗(409 驱动,同意后重试)+ 留区 SQL 原文按需读回
 import { useResidencyAck } from "@/components/residency/useResidencyAck";
 import { fetchWithResidencyAck } from "@/lib/residency/client";
 
@@ -30,7 +29,7 @@ const MAX_FANOUT = 8;
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-// 序 43 nit:原第一项是占位选项「选择模板...」(value 空,选了无动作)—— Select 自带 placeholder,去掉
+// 原第一项是占位选项「选择模板...」(value 空,选了无动作)—— Select 自带 placeholder,去掉
 const SQL_TEMPLATES = [
   { label: "CREATE TABLE AS", value: "CREATE TABLE new_table AS\nSELECT * FROM source_table\nWHERE 1=1;" },
   { label: "MERGE (Upsert)", value: "MERGE INTO target USING source ON target.id = source.id\nWHEN MATCHED THEN UPDATE SET target.col = source.col\nWHEN NOT MATCHED THEN INSERT VALUES (source.id, source.col);" },
@@ -41,7 +40,7 @@ const SQL_TEMPLATES = [
 export default function RedshiftPage() {
   const t = useT();
   const { scope } = useScope();
-  // @kf-batch 50-W5-seg2-WP10a —— 免责告知弹窗(409 驱动,同意后重试)+ 留区 SQL 原文查看
+  // 免责告知弹窗(409 驱动,同意后重试)+ 留区 SQL 原文查看
   const { residencyModal, resolveAckRequired } = useResidencyAck();
   const [regionSql, setRegionSql] = useState<{ historyId: string; jurisdiction?: string; sql: string; auditId?: string } | null>(null);
   const [sql, setSql] = useState("SELECT 1;");
@@ -55,8 +54,8 @@ export default function RedshiftPage() {
 
   // Connection state
   const [workgroups, setWorkgroups] = useState<any[]>([]);
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴 不再以 home 的 workgroup 常量打底(在别的区视角下那是主控区的名字,
-  // 清单到达前会当选中项显示;与向导 E-218 同族)。空 = 清单到达后选第一个;空着提交由服务端按执行目标解析。
+  // 🔴 不再以 home 的 workgroup 常量打底(在别的区视角下那是主控区的名字,
+  // 清单到达前会当选中项显示;与向导同族)。空 = 清单到达后选第一个;空着提交由服务端按执行目标解析。
   const [selectedWg, setSelectedWg] = useState("");
   const [selectedDb, setSelectedDb] = useState("dev");
   const [schemas, setSchemas] = useState<any>(null);
@@ -64,11 +63,11 @@ export default function RedshiftPage() {
 
   const [databases, setDatabases] = useState<string[]>(["dev"]);
 
-  // @kf-batch 50-P50.3-mrquery —— 执行区域多选 + 逐区提交结果。
+  // 执行区域多选 + 逐区提交结果。
   const [execTargets, setExecTargets] = useState<Array<{ targetId: string; region: string; isHome: boolean }>>([]);
   const [targets, setTargets] = useState<string[]>([HOME_TARGET]);
   const [targetsErr, setTargetsErr] = useState("");
-  // @kf-batch 50-WP2-directquery —— 该区未部署数仓时的说明(空串 = 正常)
+  // 该区未部署数仓时的说明(空串 = 正常)
   const [schemaUnavailable, setSchemaUnavailable] = useState("");
   const [submissions, setSubmissions] = useState<Submission[] | null>(null);
   /** 只要绑了任何非 home 的区,落点就不能再手填(只能来自各目标的描述符)。 */
@@ -79,11 +78,11 @@ export default function RedshiftPage() {
   const [currentHandleId, setCurrentHandleId] = useState<string>("");
   const [sqlHistory, setSqlHistory] = useState<any[]>([]);
 
-  // @kf-batch 50-WP4quater-reads(工单 SC-35)—— 保存的查询与执行历史都按执行范围过滤。
+  // 保存的查询与执行历史都按执行范围过滤。
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
   const fetchTasks = () => fetch(`/api/redshift/tasks${scopeQs}`).then((r) => r.json()).then(setSavedTasks);
-  // @kf-batch 50-WP4ter-coverage —— 工作组下拉跟随编辑器自己的执行目标(与左侧库表树同一个 `treeTarget`)
+  // 工作组下拉跟随编辑器自己的执行目标(与左侧库表树同一个 `treeTarget`)
   const fetchWorkgroups = () => {
     // 🔴🔴 **先清空再取**(2026-09-18 真环境截图坐实的缺陷):切到 us-west-2 之后,这条请求要跨区
     // ListWorkgroups,平台忙时能飞好几十秒;在那段时间里页面**继续显示上一个区的值** ——
@@ -109,7 +108,7 @@ export default function RedshiftPage() {
         setSelectedWg((cur) => (cur && names.includes(cur) ? cur : names[0] || ""));
       });
   };
-  // @kf-batch 50-WP2-directquery —— 库清单/库表树跟**执行目标**走(多选时取第一个:左侧树只能显示一个区的结构;
+  // 库清单/库表树跟**执行目标**走(多选时取第一个:左侧树只能显示一个区的结构;
   // 多区并行的差异由 §4septies 的多 sheet 结果对比呈现,不该硬塞进一棵树里)。
   // 🔴 用 `?targetId=` 而不是 `?scope=`:这里回答的是「我在编辑器里选了哪个数仓」,不是页面视角。
   const treeTarget = targets[0] || HOME_TARGET;
@@ -117,7 +116,7 @@ export default function RedshiftPage() {
   //    (绑定解析对「显式给的 workgroup ≠ 该 target 描述符」是直接拒 —— 那条检查本身是对的)。
   const treeWgQs = (wg: string) => (treeTarget === HOME_TARGET ? `workgroup=${encodeURIComponent(wg)}&` : "");
   const fetchDatabases = (wg: string) => fetch(`/api/redshift/databases?${treeWgQs(wg)}targetId=${encodeURIComponent(treeTarget)}`).then((r) => r.json()).then((d: any[]) => { if (Array.isArray(d) && d.length) setDatabases(d.map((x) => x.name)); });
-  // @kf-batch 50-WP4quater-reads(工单 SC-35)—— 执行历史按范围过滤(行上已有 targetId 章)
+  // 执行历史按范围过滤(行上已有 targetId 章)
   const fetchHistory = () => fetch(`/api/redshift/history${scopeQs}`).then((r) => r.json()).then((d) => setSqlHistory(d.success ? d.data : d));
 
   const fetchSchemas = async () => {
@@ -131,13 +130,12 @@ export default function RedshiftPage() {
     } finally { setLoadingSchema(false); }
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 同上:执行目标换了,工作组下拉跟着换
-  // @kf-batch 50-WP4quater-reads —— 🔴 deps 必须同时含 `scopeQs`:`treeTarget` 是**编辑器选的执行目标**,
+  // 同上:执行目标换了,工作组下拉跟着换
+  // 🔴 deps 必须同时含 `scopeQs`:`treeTarget` 是**编辑器选的执行目标**,
   // 它与顶栏视角是两回事(多区分组视角下 treeTarget 不变)⇒ 只写 treeTarget,切分组时保存的查询与
   // 历史列表都停在上一个分组(护栏 4 的漏洞)。
   useEffect(() => { fetchTasks(); fetchWorkgroups(); fetchDatabases(selectedWg); fetchHistory(); /* eslint-disable-next-line */ }, [treeTarget, scopeQs]);
 
-  // @kf-batch 50-WP2-directquery
   // 顶栏切区 ⇒ 执行目标默认跟着换(用户刚刚明确表达了"我关心这个区");之后仍可手动多选做扇出。
   // 🔴 「全部」视角回到 `[HOME_TARGET]` = 改动前的缺省,逐字节等价。
   useEffect(() => {
@@ -145,7 +143,6 @@ export default function RedshiftPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scope.kind === "target" ? scope.targetId : "global"]);
 
-  // @kf-batch 50-P50.3-mrquery
   // 🔴 清单**必须来自服务端**(`/api/exec-targets`):"哪些目标可下推"是准入 + 组件 + 法域
   // 三条判据的合成,前端拼等于第二个判据源。读失败要**显式说出来** —— 静默留空 = 界面上只剩
   // home 可选,用户会以为第二区域没建好。
@@ -153,7 +150,7 @@ export default function RedshiftPage() {
     fetchExecTargets("redshift").then(setExecTargets).catch((e) => setTargetsErr(String(e?.message || e)));
   }, []);
 
-  // @kf-batch 50-W5-seg2-WP10a —— 留区 SQL 原文:中央历史行只有指针,点「查看 / 加载」按需读区域表(先同意前置再区域审计)
+  // 留区 SQL 原文:中央历史行只有指针,点「查看 / 加载」按需读区域表(先同意前置再区域审计)
   const fetchRegionSql = async (r: any): Promise<{ sql: string; auditId?: string } | null> => {
     const { res, body, cancelled } = await fetchWithResidencyAck(`/api/redshift/history/${r.historyId}/sql`, undefined, resolveAckRequired);
     if (cancelled) return null;
@@ -170,12 +167,12 @@ export default function RedshiftPage() {
   const handleExecute = async () => {
     setRunning(true); setError(""); setSubmissions(null);
     try {
-      // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 首次直查 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
+      // 跨法域 target 首次直查 ⇒ 服务端 409 ⇒ 弹免责告知 ⇒ 同意留存 ⇒ 自动重试同一请求
       const { body: data, cancelled } = await fetchWithResidencyAck("/api/redshift/execute", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sql,
-          // @kf-batch 50-P50.3-mrquery —— 多区:落点由各目标描述符决定,**多区时不传** workgroup/database
+          // 多区:落点由各目标描述符决定,**多区时不传** workgroup/database
           // (传了非 home 会被 `assertNoWarehouseConflict` 当场拒,用户会看到一堆"落点冲突"而不知为何)。
           ...(multiRegion ? {} : { workgroupName: selectedWg, database: selectedDb }),
           targets,
@@ -210,7 +207,7 @@ export default function RedshiftPage() {
     try {
       await deleteJson(`/api/redshift/tasks/${id}`); message.success(t("已删除")); fetchTasks();
     } catch (e) {
-      // 序 41 B-117:服务端拒绝 ⇒ 原话呈现(此前无条件提示「已删除」)
+      // 服务端拒绝 ⇒ 原话呈现(此前无条件提示「已删除」)
       message.error((e as Error).message || t("删除失败"));
     }
   };
@@ -230,7 +227,7 @@ export default function RedshiftPage() {
   return (
     <div>
       {residencyModal}
-      {/* @kf-batch 50-W5-seg2-WP10a —— 留区 SQL 原文(按需读回,来自该区的区域结果表;中央仍无) */}
+      {/* 留区 SQL 原文(按需读回,来自该区的区域结果表;中央仍无) */}
       <Modal
         open={Boolean(regionSql)}
         onCancel={() => setRegionSql(null)}
@@ -248,7 +245,7 @@ export default function RedshiftPage() {
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space wrap>
           <span style={{ fontWeight: 500 }}>{t("连接配置:")}</span>
-          {/* @kf-batch 50-P50.3-mrquery —— 🔴 **执行区域多选**:一条 SQL 可同时打多个 region,
+          {/* 🔴 **执行区域多选**:一条 SQL 可同时打多个 region,
               结果按区分 sheet(INTERACTION §4septies)。标签必须可见 —— 多选 Select 只勾一个值时
               长得跟单选一模一样,用户第一反应会是"只能选一个区域"(离线计算页刚被这条咬过)。 */}
           <span style={{ color: "#8fa6b2", fontSize: 12 }}>{t("执行区域(可多选)")}</span>
@@ -277,7 +274,7 @@ export default function RedshiftPage() {
           <Select value={selectedDb} disabled={multiRegion} onChange={setSelectedDb} style={{ width: 140 }}
             options={databases.map((d) => ({ label: d, value: d }))} />
           {multiRegion ? <Tag color="blue">{t("落点由各执行目标的描述符决定")}</Tag> : null}
-          {/* 🔴 无头判据(E-140c)靠**结构属性**定位,不靠文案:这两处都走 `t()`,有英文词条 ⇒
+          {/* 🔴 无头判据靠**结构属性**定位,不靠文案:这两处都走 `t()`,有英文词条 ⇒
               界面被判成 en 时中文 locator 必崩(本仓 locale 坑已犯 4 次)。 */}
           <Button icon={<ReloadOutlined />} onClick={fetchSchemas} loading={loadingSchema}
                   data-testid="rs-load-schema">{t("加载 Schema")}</Button>
@@ -291,7 +288,7 @@ export default function RedshiftPage() {
         {/* Left: Schema Browser */}
         <div style={{ width: 260, flexShrink: 0 }}>
           <Card size="small" title={t("数据库对象")} style={{ height: "calc(100vh - 280px)", overflow: "auto" }}>
-            {/* @kf-batch 50-WP2-directquery —— 该区未部署数仓 ⇒ 说清原因,别给一棵空树 */}
+            {/* 该区未部署数仓 ⇒ 说清原因,别给一棵空树 */}
             {schemaUnavailable ? (
               <Alert type="warning" showIcon data-testid="schema-no-warehouse" message={schemaUnavailable} />
             ) : schemas ? (
@@ -335,7 +332,7 @@ export default function RedshiftPage() {
               </div>
               {error && <Alert type="error" message={error} showIcon style={{ marginBottom: 12 }} />}
               {running && <Spin tip={t("提交中...")} style={{ display: "block", margin: "20px auto" }} />}
-              {/* @kf-batch 50-P50.3-mrquery
+              {/*
                   🔴 结果区整体交给多 sheet 组件:**每个 sheet 独立生命周期**(各自轮询、谁先回来
                   谁先能看、错误就地展示在它自己的 sheet 里)。单区时组件不出「对比」tab,
                   视觉与改动前一致 ⇒ 存量用法零感知。 */}
@@ -360,7 +357,7 @@ export default function RedshiftPage() {
             )},
             { key: "history", label: t("执行历史 ({count})", { count: sqlHistory.length }), children: (
               <Table size="small" columns={[
-                // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 的 SQL 原文**留在区域**(E-189):中央行无 sql,这里只显示指针 + 「查看」按需读回
+                // 跨法域 target 的 SQL 原文**留在区域**:中央行无 sql,这里只显示指针 + 「查看」按需读回
                 { title: "SQL", dataIndex: "sql", ellipsis: true, render: (v: string, r: any) => r.residency === "region"
                   ? <Space size={4} data-testid="history-region-row">
                       <span style={{ fontSize: 11 }}>{t("留在 {j} 区域", { j: r.jurisdiction || r.targetId })}</span>
@@ -368,7 +365,7 @@ export default function RedshiftPage() {
                     </Space>
                   : <code style={{ fontSize: 11 }}>{v?.slice(0, 80)}</code> },
                 { title: t("状态"), dataIndex: "status", width: 80, render: (v: string) => <Tag color={v === "success" ? "green" : "red"}>{v}</Tag> },
-                // @kf-batch 50-P50.3-mrquery —— 一条 SQL 打了多个区就会有多条历史,不标区域看不出哪个区没成。
+                // 一条 SQL 打了多个区就会有多条历史,不标区域看不出哪个区没成。
                 { title: t("执行区域"), dataIndex: "targetId", width: 140,
                   render: (v: string, r: any) => (!v || v === HOME_TARGET
                     ? <Tag>{t("本地")}</Tag>

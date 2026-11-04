@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— /sync 自动刷新的事实:非终态清单闭合、间隔 8s、判定按字符串状态。
+// /sync 自动刷新的事实:非终态清单闭合、间隔 8s、判定按字符串状态。
 import { describe, it, expect } from "vitest";
 import { SYNC_AUTO_REFRESH_MS, SYNC_IN_FLIGHT_STATUSES, anySyncInFlight } from "../auto-refresh";
 

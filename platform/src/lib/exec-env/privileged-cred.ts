@@ -1,8 +1,7 @@
-// @kf-batch 50-G2R
-// G2R(模块 50)—— per-target 特权凭证工厂 `getPrivilegedCred()`(50 SPEC §3.9 + §3.9b v3.3)。
+// G2R—— per-target 特权凭证工厂 `getPrivilegedCred()`(50 SPEC §3.9 + §3.9b v3.3)。
 //
 // 🔴 **仍是"空转"**:本模块**没有任何生产调用方**(既有 16 处 `getRedshiftSecretArn()` 调用、
-// 分布在 14 个文件里,一处未动)。SPEC §S10 明确把「禁裸调」这条 lint 推迟到 P52.5a。
+// 分布在 14 个文件里,一处未动)。SPEC §S10 明确把「禁裸调」这条 lint 推迟到。
 // ⇒ 上线对现网行为影响为 0。**P0-3 / P0-5 均"仍未关闭"**(拍板 C 口径)。
 //
 // ── 三类 purpose 的枚举名以 52 §3.4 为准(v3.0 统一)────────────────────────────
@@ -32,7 +31,6 @@
 import { requireReadyTarget, type ExecutionTarget } from "@/lib/exec-env/registry";
 import { credCacheKey, ProcessCache } from "@/lib/exec-env/cred-cache";
 import { assertProjectId } from "@/lib/exec-env/project-schema";
-// @kf-batch 52-P52.5a-supply
 import { lookupProjectSecretArn } from "@/lib/exec-env/project-secret";
 import { reportCredentialFallback, reportProvisioningExpired } from "@/lib/exec-env/cred-observability";
 
@@ -63,7 +61,7 @@ export interface CredentialIsolation {
  * ⚠️ **如实登记(外部审核 v2 P1-3,仍未修)**:这仍然只是个**声明式 marker**,不是受控只读执行能力
  * —— 52 §3.4 要求的四道收口里,本类型只体现了 (a) 只读身份;**(b) 返回形态约束、(c) 强 RBAC、
  * (d) 全程审计**尚未落地,而且任何内部代码都能构造同形对象。
- * 改成不透明的受控 executor 属 P52.5a;在那之前**不要**把它当成隔离保证。
+ * 改成不透明的受控 executor ;在那之前**不要**把它当成隔离保证。
  */
 export interface GovernanceReadIdentity {
   kind: "governance-read";
@@ -100,7 +98,6 @@ const degradation = new Map<string, number>();
 /**
  * 过渡回落计数(按 `targetId#project#state#epoch`)。
  *
- * @kf-batch 52-P52.5a-supply
  * ✅ **§3.9b 的可观测闭环已在本批补齐**(此前这里只有计数 + `console.warn`,而 §3.9b 明写
  * 「仅 `console.warn` + 进程内 Map 不算可观测闭环」)。四件都落在
  * `cred-observability.ts`:审计事件 / 按 target·project 的指标 / provisioning 超时告警 /
@@ -189,7 +186,6 @@ export function provisioningExpired(iso: CredentialIsolation, now = Date.now()):
   return now > ms;
 }
 
-// @kf-batch 52-P52.5a-supply
 // 🔴 **原来这里是一个 `return undefined` 的 stub**(G 阶段正确:per-project secret 还不存在)。
 // 现在换成真查找 —— 它住在 `project-secret.ts`,因为供给层也要用同一份(避免第二个作者),
 // 而且**读失败必抛**(不许把读失败等价成"没有凭证" ⇒ 那会静默回落 admin)。
@@ -306,7 +302,7 @@ export async function getPrivilegedCred(
         "admin-ddl 不由 getPrivilegedCred 发凭证 —— 走 50 SPEC §3.9a 的闭合执行器:" +
           "调用方只传结构化 AdminDdlRequest(lib/exec-env/admin-ddl-request.ts)," +
           "SQL 由私有模板生成(admin-ddl-templates.ts),凭证在执行器内部取用不外泄;" +
-          "执行器本体随 P52.5a 交付"
+          "执行器本体随后交付"
       );
 
     default: {

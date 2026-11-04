@@ -1,4 +1,3 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 多节点编排 → MWAA Serverless `tasks` YAML 的门禁(判据 ACCEPTANCE v1.43 段 `slsw` SW-0 / SW-2 / SW-10a / SW-10b)。
 //
 // 🔴 这些判据的存在理由:合同(SPEC v3.43 §3.15)整体压在**服务侧实测的八条**上,而其中两条是**命门**:
@@ -361,7 +360,7 @@ describe("🔴🔴 真环境首跑抓到的两个生成器缺陷(段 slsw SW-7 /
 });
 
 describe("🔴 台账 runId 带 `#`,前端拼进 URL 必须 encodeURIComponent", () => {
-  // 调度器写的 run 行 id 恒为 `<raw>#<targetId>`(T-12 复合键)。`#` 在 URL 里是 fragment 起点 ⇒
+  // 调度器写的 run 行 id 恒为 `<raw>#<targetId>`(复合键)。`#` 在 URL 里是 fragment 起点 ⇒
   // 不编码就只有前半段到服务端 ⇒ 404。症状全是**静默的**:状态永远回填不了(行停在「运行中」)、
   // 节点弹窗空、任务日志空 —— 而手动 run 用 `ulid()`(不带 `#`)一切正常,所以一直没人撞到。
   const files = ["app/workflow/[id]/page.tsx", "app/sync/[id]/page.tsx"];

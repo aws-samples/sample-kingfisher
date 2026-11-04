@@ -1,34 +1,34 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { createSecret, deleteSecret, parseUserDsNetwork } from "@/lib/aws/datasource-service";
 import { apiOk, apiError } from "@/lib/api-response";
-// 序 38 B-70:探测方式闭合清单(表单 / 路由同一份)
+// 探测方式闭合清单(表单 / 路由同一份)
 import { DS_PROBE_VIA, type DsProbeVia, type DataSource } from "@/types/datasource";
 import { settleGlueProbeRows } from "@/lib/datasource/glue-probe-settle";
-// 序 60 B-132:状态回写走唯一作者(条件写;源已删即丢弃,不再造幽灵行)
+// 状态回写走唯一作者(条件写;源已删即丢弃,不再造幽灵行)
 import { patchDataSourceRow } from "@/lib/datasource/ds-patch";
 import { recordAudit } from "@/lib/audit";
-// 序 57 / B-129:JDBC 建源的 provision 段(核 Glue 角色 → 探网段 / 建组 → 建 Glue 连接 → 落库 → 收口)改经模块 55 长操作框架 ——
+// JDBC 建源的 provision 段(核 Glue 角色 → 探网段 / 建组 → 建 Glue 连接 → 落库 → 收口)改长操作框架
 //   原来同步串在请求路径上、没有超时预算,一跳停顿(第四十七轮实测 IAM GetRole 前空档 64 秒)就撞 CloudFront 60 秒墙 504,
 //   而服务端照样建出 ⇒ 「报错了但又建出来了」、再点重复建。现在 45 秒内 201 逐字不变,否则 202 + 页面轮询「正在后台执行:新建数据源」;
 //   对象租约 `datasource:create:<项目>:<名字>` 让后台还在建时再点同名「完成」⇒ 409。主体在 lib/datasource/long-ops.ts(datasource-create)。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 import { getCorrelationId } from "@/lib/observability/logger";
 import { requireProject, projectFilter } from "@/lib/projects/guard";
-// @kf-batch 50-WP4bis-p1-scope —— 执行范围(50 SPEC §2.6;WP-4bis 阶段 1)
+// 执行范围(50 SPEC §2.6;当前阶段 1)
 import { requireScope, scopeFilter } from "@/lib/exec-env/scope";
 import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 import { parseJdbcParams } from "@/lib/datasource-spi/jdbc/jdbc-params";
 import { toSourceRef } from "@/lib/datasource-spi/normalize";
-// @kf-batch 50-W3f-T0-T3 —— 新建数据源盖落点(ownerTargetId),两条建源路径同源
+// 新建数据源盖落点(ownerTargetId),两条建源路径同源
 import { placementForNewDataSource } from "@/lib/datasource/placement";
-// @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 建源落点。用户 2026-09-10:「所有的任务都要创建在
+// 🔴 建源落点。用户 2026-09-10:「所有的任务都要创建在
 // 当前区域,不能只是创建在主控区,没意义…不然也是白干了。」建源是这条链的第一环:同步任务的落点
 // 由它引用的数据源的 `ownerTargetId` 派生,所以「源只能建在主控区」= 同步任务只能落主控区。
 import { resolveDsPlace, type DsPlaceResolved } from "@/lib/datasource/ds-place";
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   try {
     const ctx = await requireProject(req, "viewer");
     if (ctx instanceof NextResponse) return ctx;
-    // @kf-batch 50-WP4bis-p1-scope —— 执行范围。🔴 只认 URL 的 `?scope=`;非法/不存在/无权一律 4xx,
+    // 执行范围。🔴 只认 URL 的 `?scope=`;非法/不存在/无权一律 4xx,
     // **绝不回落 home 或 global**(回落会让用户以为在看一个区、其实在看全部)。
     const scope = await requireScope(req, ctx.projectId);
     if (scope instanceof NextResponse) return scope;
@@ -67,9 +67,9 @@ export async function GET(req: NextRequest) {
     if (hasSecret === "true") { filterParts.push("attribute_exists(secretArn)"); }
     else if (hasSecret === "false") { filterParts.push("attribute_not_exists(secretArn)"); }
 
-    // @kf-batch 50-WP4bis-p1-scope —— A 类(标量章 `ownerTargetId`)⇒ 直接下推 DDB。
+    // A 类(标量章 `ownerTargetId`)⇒ 直接下推 DDB。
     // 🔴 `global` 时 `scopeFilter` 回 `null` ⇒ 表达式与改动前**逐字节相同**(回滚点)。
-    // ⚠️ 订正(2026-09-15,WP-23 W23-4):这条注释原来写「一期建源只发生在主控区(恒盖 home)」——
+    // ⚠️ 订正(2026-09-15,W23-4):这条注释原来写「一期建源只发生在主控区(恒盖 home)」——
     //    **已过时**。`placementForNewDataSource(targetId)` 现在由 `resolveDsPlace()` 从「顶栏视角 / 显式
     //    `body.targetId`」得到落点(用户 2026-09-10 拍板「任务必须能建在当前区」),非 home 视角建的源
     //    盖的是那个区的章、Glue 连接也建在那个区 ⇒ 非 home 视角下这张表**不再必然为空**。
@@ -87,7 +87,7 @@ export async function GET(req: NextRequest) {
       ...(Object.keys(attrNames).length > 0 ? { ExpressionAttributeNames: attrNames } : {}),
       ExpressionAttributeValues: attrValues,
     }));
-    // 序 38 B-70:「经 Glue 连接验证中」的行读到就推进到结论(页面不再轮询时也能看到结果);非 testing 行零外部调用
+    // 「经 Glue 连接验证中」的行读到就推进到结论(页面不再轮询时也能看到结果);非 testing 行零外部调用
     return apiOk(await settleGlueProbeRows(Items as DataSource[]));
   } catch (e: any) {
     return apiError(e.message, 500);
@@ -102,17 +102,17 @@ export async function POST(req: NextRequest) {
   const { name, type, host, port, database, username, password, env, tags, rdsSecretArn } = body;
 
   if (!name || !type) return apiError("缺少必填字段: name, type");
-  // @kf-batch 44-jdbc-params —— 附加 JDBC 连接参数:形态不合法 ⇒ 400 什么都不建;落库与进 Glue 连接的都是归一化后的 `k=v&k=v`
+  // 附加 JDBC 连接参数:形态不合法 ⇒ 400 什么都不建;落库与进 Glue 连接的都是归一化后的 `k=v&k=v`
   const jp = parseJdbcParams(body.jdbcParams);
   if (!jp.ok) return apiError(jp.error, 400, { code: "VALIDATION_FAILED" });
   const jdbcParams = jp.normalized;
-  // 序 38 B-70:探测方式(闭合清单;不传 = auto)
+  // 探测方式(闭合清单;不传 = auto)
   const probeVia: DsProbeVia | undefined = body.probeVia === undefined || body.probeVia === null || body.probeVia === "" ? undefined : body.probeVia;
   if (probeVia !== undefined && !(DS_PROBE_VIA as readonly string[]).includes(String(probeVia))) {
     return apiError(`探测方式不合法:${JSON.stringify(body.probeVia)}(可选:${DS_PROBE_VIA.join(" / ")})`, 400, { code: "VALIDATION_FAILED" });
   }
 
-  // 模块42 §10.5:按范式分流。stream(Kinesis/后续 MSK)/object-store 等非 JDBC 源不走
+  // §10.5:按范式分流。stream(Kinesis/后续 MSK)/object-store 等非 JDBC 源不走
   //  host/port/database + Glue Connection + 存密钥,而是各自连接袋 + provider.validateConfig。
   //  JDBC 路径逐字保持不变(向后兼容,零回归)。paradigm 由已注册 provider 的 capabilities 驱动。
   const provider = isDataSourceType(type) ? getProvider(type) : null;
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     const v = provider!.validateConfig(conn);
     if (!v.ok) return apiError(`连接配置无效: ${v.errors.join("；")}`);
     // 🔴 非 JDBC 源也要先解析落点(解析失败 400 什么都不建)
-    // @kf-batch 50-WP27-9cap-matrix —— 🔴🔴 **顺序从「先 provision 后解析落点」改成「先解析后 provision」**,
+    // 🔴🔴 **顺序从「先 provision 后解析落点」改成「先解析后 provision」**,
     //   两个缺陷一起修:
     //   ① 上面那句注释「解析失败 400 什么都不建」**对 provision 型源本来是假的**:流已经在 AWS 里建好了,
     //      请求才 400 ⇒ 账号里留一条没人管的、在**计费**的 Kinesis 流,而平台侧没有任何记录;
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     //     并【不写进 connection 袋落库】(密钥不入库红线)——见其内部实现。
   }
 
-  // @kf-batch 37-B54-ds-user-sg —— 用户网络在**建任何 AWS 资源之前**解析;畸形 ⇒ 400 什么都不建。
+  // 用户网络在**建任何 AWS 资源之前**解析;畸形 ⇒ 400 什么都不建。
   const userNet = parseUserDsNetwork(body?.network);
   if (userNet.kind === "invalid") return apiError(userNet.reason, 400, { code: "VALIDATION_FAILED" });
 
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
   let secretArn: string;
   try {
     if (rdsSecretArn) {
-      // 序 31 三刀 IAM 侧(2026-10-21):RDS 实例的托管主密钥是**账号自有**密钥(`rds!db-…` / 演示库 `BgpRdsStack…`),不在数据面角色的
+      // IAM 侧(2026-10-21):RDS 实例的托管主密钥是**账号自有**密钥(`rds!db-…` / 演示库 `BgpRdsStack…`),不在数据面角色的
       //   实名读清单里;把账密复制进平台的 bgp/datasource/<id> 是建源时的一次性控制面动作 ⇒ 走控制面轴读(理由见 getAccountSecretViaControlPlane)。
       const { getAccountSecretViaControlPlane } = await import("@/lib/datasource-spi/secrets");
       const rdsSecret = await getAccountSecretViaControlPlane(rdsSecretArn);
@@ -234,13 +234,13 @@ export async function POST(req: NextRequest) {
           database,
           username: resolvedUsername,
           secretArn,
-          // @kf-batch 44-jdbc-params —— 不填 ⇒ 不写键(行形态与改动前相同)
+          // 不填 ⇒ 不写键(行形态与改动前相同)
           ...(jdbcParams ? { jdbcParams } : {}),
-          // 序 38 B-70:源在自有网络时用户可声明只经 Glue 连接探测 / 发现表(不传 ⇒ 不写键)
+          // 源在自有网络时用户可声明只经 Glue 连接探测 / 发现表(不传 ⇒ 不写键)
           ...(probeVia ? { probeVia } : {}),
           ...(env ? { env } : {}),
           ...(Array.isArray(tags) ? { tags } : {}),
-          // @kf-batch 37-B54-ds-user-sg —— 用户指定了子网 + 组 ⇒ 平台不建组、用户的组全部进 Glue 连接;没指定 ⇒ 不写键 = 老路径自动探测
+          // 用户指定了子网 + 组 ⇒ 平台不建组、用户的组全部进 Glue 连接;没指定 ⇒ 不写键 = 老路径自动探测
           ...(userNet.kind === "user"
             ? { network: { subnetId: userNet.net.subnetId, securityGroupIds: userNet.net.securityGroupIds, ...(userNet.net.availabilityZone ? { availabilityZone: userNet.net.availabilityZone } : {}) } }
             : {}),
@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// 模块42 §10.5 — 非 JDBC 源(stream/object-store,凭证=iam-role)建源:
+// §10.5 — 非 JDBC 源(stream/object-store,凭证=iam-role)建源
 //  不存密钥、不建 Glue Connection、不 detectNetwork;连接信息进 connection 袋;
 //  用 provider.testConnection 定初始 status(可达=active)。与 JDBC 路径解耦,零回归。
 async function createNonJdbcSource(
@@ -269,8 +269,8 @@ async function createNonJdbcSource(
   meta: { name: string; type: string; env?: string; tags?: string[] },
   connection: Record<string, any>,
   provisionNote?: string,
-  // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 非 JDBC 源同样按落点建(凭证与章)
-  // L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+  // 非 JDBC 源同样按落点建(凭证与章)
+  // L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
   dsPlace: DsPlaceResolved = { targetId: "tgt_home", region: homeRegion(), home: true },
 ) {
   const datasourceId = ulid();
@@ -322,7 +322,7 @@ async function createNonJdbcSource(
       detail: { name: meta.name, type: meta.type },
     }).catch(() => {});
 
-    // 异步真连测试(不阻塞响应):可达→active,否则 error。序 60 B-132:经 patchDataSourceRow 条件写 —— 源在收口前被删 ⇒ 结论丢弃,不造幽灵行。
+    // 异步真连测试(不阻塞响应):可达→active,否则 error。:经 patchDataSourceRow 条件写 —— 源在收口前被删 ⇒ 结论丢弃,不造幽灵行。
     provider.testConnection(toSourceRef(item)).then(async (result) => {
       await patchDataSourceRow(datasourceId, {
         status: result.success ? "active" : "error",

@@ -1,12 +1,11 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — `bgp-settings` 表的模型配置存取层(51 SPEC §1 表 / §2 接口 / §6.1 五模式)。
+// `bgp-settings` 表的模型配置存取层(51 SPEC §1 表 / §2 接口 / §6.1 五模式)。
 //
 // 本文件是 `ai-model#*` 前缀的**唯一拼接处**(P0-2:store 独占 sk 拼接,调用方只传逻辑 scope)。
 //
 // 键形态(51 DESIGN D8 / SPEC §6.2①,一期值 vs 形态分开看):
 //   ai-model#global                          一期全局默认(值恒此;形态可扩为 ai-model#<targetId>#global)
 //   ai-model#__version                       缓存失活计数器(冷表 0;ADD 自建)
-//   ai-model#__transport                     GPT 传输门控项(P51.2)
+//   ai-model#__transport                     GPT 传输门控项
 //   ai-model#probe#<targetId>#<modelId>      per-target × per-model 探测缓存(24h 应用层过期)
 //   ratelimit#probe#<adminSub>#m#<bucket>    probe 限频计数(见 probe-ratelimit.ts,带 ttl)
 //
@@ -418,7 +417,7 @@ export function probeResultOf(p: ProbeCacheItem): ProbeResult {
   };
 }
 
-// ── GPT 传输门控项(P51.2)──────────────────────────────────────────────────────
+// ── GPT 传输门控项──────────────────────────────────────────────────────
 
 export async function getTransport(): Promise<TransportItem | null> {
   const { Item } = await docClient.send(

@@ -1,4 +1,4 @@
-// 模块 37 v4 — 分析看板 CRUD(bgp-bi-analyses)。QuickSight 式:一个画布内嵌 N 个视觉对象 + 绑字段·作用域筛选器。
+// 分析看板 CRUD(bgp-bi-analyses)。QuickSight 式:一个画布内嵌 N 个视觉对象 + 绑字段·作用域筛选器。
 // 键式隔离:pk=projectId, sk=analysisId(ULID);更新走 version 乐观锁(照抄 dashboards.ts,并发一成功一 409)。
 // 纯新增:旧 reports/dashboards 的表/lib/API 完全不动。视觉对象的 source/viz 复用 reports 的归一(不重造)。
 

@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg1-WP10a
-// Glue 作业名 per-target 单一作者(E-142 真环境洞的根治门禁):
+// Glue 作业名 per-target 单一作者(真环境洞的根治门禁):
 //   ① home 名逐字节不变 ② 非 home 带 target slug、同 region 两个 target **不同名** ③ 非法 targetId 拒
 //   ④ 接线守卫:job-service / dag-generator / schedule 路由都调 `glueJobNameFor`,仓内不再有第二处拼 `bgp-etl-${`
 //   ⑤ EMR application 名同款 per-target
@@ -24,7 +23,7 @@ describe("glueJobNameFor:per-target 作业名", () => {
     expect(glueJobNameFor(JOB, "tgt_home")).toBe(glueJobBaseName(JOB));
   });
 
-  it("🔴 非 home 带 target slug;同 region 的两个 target 名字**不同**(E-142:同名会互相覆盖 Role)", () => {
+  it("🔴 非 home 带 target slug;同 region 的两个 target 名字**不同**(同名会互相覆盖 Role)", () => {
     const a = glueJobNameFor(JOB, "tgt_usw2_a");
     const b = glueJobNameFor(JOB, "tgt_usw2_b");
     expect(a).toBe(`${glueJobBaseName(JOB)}-tgt-usw2-a`);

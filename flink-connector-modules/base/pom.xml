@@ -11,7 +11,7 @@
   <artifactId>flink-module-base</artifactId>
   <packaging>jar</packaging>
 
-  <!-- 模块 32-CR — 薄基础 runner(§2.1/§2.5)。
+  <!-- 薄基础 runner(§2.1/§2.5)。
        只含 FlinkSqlRunner 主类 + MSAF runtime helper;【不打任何连接器】(几 MB)。
        连接器由运行期 mergeJars 按 resolveModules 结果拼入。
        主类含 iceberg catalog 拦截,但 iceberg/hadoop 类【反射延迟加载】(§2.5)——

@@ -1,4 +1,4 @@
-// 序 72 B-139(模块 56)—— 信任策略解析(纯函数,候选分组与预检共用)。
+// 信任策略解析(纯函数,候选分组与预检共用)。
 
 /** 信任策略(IAM 回的是 URL 编码 JSON)是否允许 `service` 承担:Effect Allow · Action 含 sts:AssumeRole(或 sts:*)· Principal.Service 含它。 */
 export function trustsService(assumeRolePolicyDocument: string | undefined, service: string): boolean {

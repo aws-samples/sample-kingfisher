@@ -1,6 +1,6 @@
 // Reads a data source's schema (tables + columns) for registration into OpenMetadata.
 //
-// 模块 42:改为委托数据源 SPI(getProvider(type).introspect)。MySQL 走到的仍是同一段
+// 改为委托数据源 SPI(getProvider(type).introspect)。MySQL 走到的仍是同一段
 // INFORMATION_SCHEMA 查询(现收编在 lib/datasource-spi/jdbc/mysql.ts,逐字不变);PostgreSQL/
 // Oracle/SQLServer 现在也能探查(各自 provider 实现)。不支持 introspect 的 provider 返回 [],
 // 调用方仍注册 service/database 但无表(与原「非 mysql 返 []」语义一致)。

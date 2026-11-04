@@ -1,11 +1,11 @@
-// 模块 32 — 实时计算 Flink 编排服务(Amazon Managed Service for Apache Flink / MSAF)。
+// 实时计算 Flink 编排服务(Amazon Managed Service for Apache Flink / MSAF)。
 //
 // 每个 Flink SQL 流作业 = 一个 MSAF 应用(从 S3 上的通用 flink-sql-runner.jar 运行,用户 SQL 经
 // 运行时属性 bgp.sql 注入)。生命周期:ensure(Create)→ Start → Describe(status)→ Stop+Delete(止血)。
 //
 // 红线:不硬编码账号/区域/ARN —— 全部由运行时 env(platform-stack 确定性派生)+ jobId 组装;
 // 存库的 SQL 用占位符(${SOURCE_STREAM_ARN}/${OUTPUT_PATH}/${REGION}),启动时才解析为具体值。
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   CreateApplicationCommand,
@@ -29,19 +29,19 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
 import { KafkaClient, GetBootstrapBrokersCommand } from "@aws-sdk/client-kafka";
 import { FLINK, runnerFor, tableBucketArn, type FlinkRunner } from "./flink-config";
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— 落点与按区客户端的唯一出口
+// 落点与按区客户端的唯一出口
 import { resolveFlinkPlace, flinkClients, ensureRunnerJar, type FlinkPlace } from "./flink-place";
-// @kf-batch 50-WP31-place-first-class —— 多区扇出的唯一写法(L10)
+// 多区扇出的唯一写法(L10)
 import { forEachTargetPlace } from "@/lib/place/fanout";
 import { rdsClientFor } from "@/lib/exec-env/target-clients";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-// 序 72 B-139(模块 56):执行角色解析 / 预检的唯一作者
+// 执行角色解析 / 预检的唯一作者
 import { resolveExecutionRoleArn } from "@/lib/execution-role/resolve";
 import { preflightExecutionRole, assertPreflightPassed } from "@/lib/execution-role/preflight";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
-// 🔴 凭证读取走 ARN 派生 region 的唯一出口(工单 SC-31):secret ARN 自带 region
+// 🔴 凭证读取走 ARN 派生 region 的唯一出口:secret ARN 自带 region
 import { getSecretJson } from "@/lib/datasource-spi/secrets";
-// @kf-batch 44-jdbc-params —— sink 的 MySQL JDBC URL 走数据源 SPI 同一个作者(不经 lib/aws/datasource-service,避免把 Glue / EC2 SDK 拉进实时模块图)
+// sink 的 MySQL JDBC URL 走数据源 SPI 同一个作者(不经 lib/aws/datasource-service,避免把 Glue / EC2 SDK 拉进实时模块图)
 import { getProvider } from "@/lib/datasource-spi/registry";
 import { toSourceRef } from "@/lib/datasource-spi/normalize";
 import { runSelectAthena } from "@/lib/genbi/athena";
@@ -50,11 +50,10 @@ import { getConnector, assembleUberJar, assembleModularUberJar } from "./flink-c
 import { guard } from "@/lib/cookbook";
 import { recordComputeLineage } from "@/lib/governance/lineage-service";
 import { pushComputeLineageToOM } from "@/lib/openmetadata/om-push";
-// 模块 55 第二批:等 MSAF 过渡态的唯一原语 + 后台销毁的等待者上下文(flink-start / stop / delete 三条路由已是长操作)
+// 等 MSAF 过渡态的唯一原语 + 后台销毁的等待者上下文(flink-start / stop / delete 三条路由已是长操作)
 import { awaitTerminal, LongOpWaitBudgetExceeded } from "@/lib/long-ops/await-terminal";
 import { runAsBackgroundWaiter } from "@/lib/long-ops/context";
 
-// @kf-batch 50-WP4quater-reads(工单 SC-5)
 // 🔴🔴 这里原来是 **6 个模块级主控区客户端 + 7 个部署时快照常量**。用户 2026-09-10 的原话是
 // 「一定要加这个维度,不然白干了,所有任务都在自己的区域跑,不然没有意义。」
 // 那种写法的三种失败形态(都不是「报个错」那么轻):
@@ -62,7 +61,7 @@ import { runAsBackgroundWaiter } from "@/lib/long-ops/context";
 //      (而它在那个区好好跑着);
 //   ② 用主控区角色去 CreateApplication ⇒ AccessDenied,界面上只有「启动失败」;
 //   ③ 最坏:**应用跑在那个区、产物写回主控区** ⇒ 数据驻留承诺当场破,而一切看起来正常。
-// ⇒ 一切区域性的东西都从 `FlinkPlace` 来(@kf-batch 50-WP31-place-first-class:主控区也读描述符,不再走 FLINK 常量)。
+// ⇒ 一切区域性的东西都从 `FlinkPlace` 来(主控区也读描述符,不再走 FLINK 常量)。
 const ACCOUNT = FLINK.account; // 单账号 × 多 region(生产形态):账号不随区变
 const SOURCE_STREAM = FLINK.sourceStream;
 const USER_ID = "default-user";
@@ -97,7 +96,7 @@ async function ensureLogGroup(ctx: FlinkCtx, jobId: string): Promise<string> {
   return `arn:aws:logs:${ctx.region}:${ctx.account}:log-group:${lg}:log-stream:flink`;
 }
 
-// @kf-batch 50-WP31-place-first-class —— 序 3 收尾:落点**必填**(原来不给 ⇒ 读 FLINK 常量 = 主控区那套)。
+// 收尾:落点**必填**(原来不给 ⇒ 读 FLINK 常量 = 主控区那套)。
 export function flinkReady(place: FlinkPlace): { ok: boolean; reason?: string } {
   if (!place.roleArn || !place.codeBucket || !place.account) {
     return { ok: false, reason: "实时计算基建未就绪:请先部署 BgpFlinkStack(-c enable-flink=1)并上传 runner JAR" };
@@ -105,12 +104,12 @@ export function flinkReady(place: FlinkPlace): { ok: boolean; reason?: string } 
   return { ok: true };
 }
 
-// @kf-batch 50-WP31-place-first-class —— 区必填(原来缺省 = FLINK.region,即主控区)
+// 区必填(原来缺省 = FLINK.region,即主控区)
 export function sourceStreamArn(region: string): string {
   return `arn:aws:kinesis:${region}:${ACCOUNT}:stream/${SOURCE_STREAM}`;
 }
 /** 产物路径。🔴 桶必须是**作业所在区**那个:写回主控区就是数据出境。
- *  @kf-batch 50-WP31-place-first-class —— 桶必填(原来缺省 = FLINK.outputBucket,即主控区的桶)。 */
+ *  桶必填(原来缺省 = FLINK.outputBucket,即主控区的桶)。*/
 export function outputPath(jobId: string, outputBucket: string): string {
   return `s3://${outputBucket}/flink-out/${jobId}/`;
 }
@@ -266,7 +265,7 @@ FROM TABLE(TUMBLE(TABLE orders_src, DESCRIPTOR(ts), INTERVAL '1' MINUTE))
 GROUP BY window_start, window_end, region;`;
 }
 
-/** 模块42 P42.6b — MSK/Kafka 源默认模板(Kafka 源 → 1 分钟滚动窗口聚合 → S3 sink)。
+/** MSK/Kafka 源默认模板(Kafka 源 → 1 分钟滚动窗口聚合 → S3 sink)。
  *  §11.4 定稿:连接+认证全部占位注入,用户只写业务 schema/format/startup。
  *   · ${KAFKA_TOPIC}     —— 页面主 topic(混合模式:注入默认,SQL 可改);由 resolveMskSource 注入。
  *   · ${KAFKA_AUTH_PROPS} —— 裸占位符(不在引号内),展开为 bootstrap+认证块(IAM/SCRAM),密钥不入库。
@@ -306,17 +305,17 @@ GROUP BY window_start, window_end, region;`;
 
 /** 把占位符解析为具体运行时值(账号/区域/输出路径不入库,启动时才注入)。
  *  注:${SOURCE_STREAM_ARN}/${SOURCE_STREAM} 不在此解析——它们由 resolveKinesisSource 按【所选 Kinesis
- *  数据源】注入(P42.7c 多源);无所选源时回退全局默认流(向后兼容旧作业)。见 resolveKinesisSource。 */
+ *  数据源】注入(多源);无所选源时回退全局默认流(向后兼容旧作业)。见 resolveKinesisSource。*/
 export function resolveSql(sql: string, jobId: string, place: FlinkPlace): string {
   // 🔴 `${REGION}` 与 `${OUTPUT_PATH}` 都是**落点事实**:解析成主控区的值再拿去别的区跑,
   //    作业会去主控区读写(连接器里的 aws.region 就是这么来的)。
-  //    @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = 主控区常量)。
+  //    落点必填(原来缺省 = 主控区常量)。
   return (sql || "")
     .replace(/\$\{OUTPUT_PATH\}/g, outputPath(jobId, place.outputBucket))
     .replace(/\$\{REGION\}/g, place.region);
 }
 
-/** 【单一事实源】按所选数据源解析 Kinesis 流名(P42.7c 两层模型第二层)。
+/** 【单一事实源】按所选数据源解析 Kinesis 流名(两层模型第二层)。
  *  · 选了 kinesis 数据源 → 用其 connection.streamName(回退 connection.name);
  *  · 未选(或数据源非 kinesis) → 回退全局默认流 SOURCE_STREAM(向后兼容旧 Kinesis 作业)。
  *  🔴 启动侧(resolveKinesisSource)与造数侧(/produce 端点)都必须过它 —— 否则 produce 会像
@@ -328,10 +327,10 @@ export async function resolveKinesisStreamName(sourceDatasourceId?: string): Pro
   return ds && ds.type === "kinesis" && sn ? String(sn) : SOURCE_STREAM;
 }
 
-/** Kinesis 源:把 ${SOURCE_STREAM_ARN}/${SOURCE_STREAM} 解析为【所选 Kinesis 数据源】的流(P42.7c 多源)。
+/** Kinesis 源:把 ${SOURCE_STREAM_ARN}/${SOURCE_STREAM} 解析为【所选 Kinesis 数据源】的流(多源)。
  *  流名解析收敛到 resolveKinesisStreamName(SSOT,与 /produce 端点共用)。
  *  与 resolveMysqlCdcSource 同构:源具体连接由 sourceDatasourceId 决定,不写死、不入库。 */
-// @kf-batch 50-WP31-place-first-class —— 区与账号都取落点(原来区缺省 = 主控区、账号取 env 常量)
+// 区与账号都取落点(原来区缺省 = 主控区、账号取 env 常量)
 async function resolveKinesisSource(sql: string, sourceDatasourceId: string | undefined, place: Pick<FlinkPlace, "region" | "account">): Promise<string> {
   if (!/\$\{SOURCE_STREAM(_ARN)?\}/.test(sql)) return sql; // 无占位符(如 CDC 作业):不碰
   const streamName = await resolveKinesisStreamName(sourceDatasourceId);
@@ -375,7 +374,7 @@ export function buildKafkaAuthProps(auth: string, bootstrap: string, user?: stri
     `  'properties.sasl.client.callback.handler.class' = 'software.amazon.msk.auth.iam.IAMClientCallbackHandler'`;
 }
 
-/** 模块42 P42.6b — MSK/Kafka 源:把 ${KAFKA_TOPIC} + ${KAFKA_AUTH_PROPS} 解析为【所选 MSK 数据源】的
+/** MSK/Kafka 源:把 ${KAFKA_TOPIC} + ${KAFKA_AUTH_PROPS} 解析为【所选 MSK 数据源】的
  *  连接+认证(§11.4 定稿)。与 resolveKinesisSource/resolveMysqlCdcSource 同构:源连接由 sourceDatasourceId 决定,
  *  绝不入库/不进受跟踪代码(密钥红线,同 resolveMysqlSink)。
  *
@@ -443,7 +442,7 @@ async function resolveMysqlSink(sql: string, sinkDatasourceId?: string): Promise
       user = sec.username || sec.user || ""; password = sec.password || "";
     } catch (e: any) { throw new Error("读取 sink 数据源密钥失败: " + String(e?.message || e)); }
   }
-  // @kf-batch 44-jdbc-params —— JDBC URL 不再手写第二份:与数据源 Glue 连接 / 同步脚本同一个作者(含用户附加参数与 MySQL 默认参数);
+  // JDBC URL 不再手写第二份:与数据源 Glue 连接 / 同步脚本同一个作者(含用户附加参数与 MySQL 默认参数);
   //   同时兼容扁平行与 connection 袋(toSourceRef 归一)。sink 恒为 MySQL(模板 ${MYSQL_URL})。
   const url = getProvider("mysql").buildConnection(toSourceRef({ ...(ds as Record<string, any>), type: "mysql" })).jdbcUrl || "";
   return sql
@@ -465,7 +464,7 @@ function deriveServerIdRange(jobId: string): string {
   return `${base}-${base + 4}`;
 }
 
-/** MySQL CDC 源(模块32 多 source):mysql-cdc 源表的 hostname/port/username/password/database 占位符
+/** MySQL CDC 源(多 source):mysql-cdc 源表的 hostname/port/username/password/database 占位符
  *  ${SRC_*},启动时从所选「源数据源」(+ Secrets Manager)注入,绝不入库/不进受跟踪代码(红线)。
  *  并把 server-id 改写为【按 jobId 派生的全局唯一值】,避免 Error 1236 server-id 冲突导致重启循环。 */
 async function resolveMysqlCdcSource(sql: string, sourceDatasourceId: string | undefined, jobId: string): Promise<string> {
@@ -499,7 +498,7 @@ function isMysqlCdcSource(sql: string): boolean {
 }
 
 /** S3 Tables sink:把仓库 ARN / 命名空间占位符解析为具体值(账号/区域派生,不入库)。 */
-// 🔴 B-26:落点必填(原来恒用主控区表桶,见 `tableBucketArn` 注释)。
+// 🔴 落点必填(原来恒用主控区表桶,见 `tableBucketArn` 注释)。
 export function resolveS3TableSink(sql: string, place: FlinkPlace): string {
   if (!/\$\{TABLE_BUCKET_ARN\}|\$\{S3TABLE_DB\}/.test(sql)) return sql;
   return sql
@@ -770,10 +769,9 @@ export interface StartOptions {
    *  🔴 缺省 false —— 平台绝不代替用户做这个决策(会重算历史/可能重复写入)。 */
   discardStateConfirmed?: boolean;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-5)
    * 这次启动的**执行落点**。🔴 由路由从**作业行上的章**取(`flinkJobTarget(job)`),
    * 不接受前端裸传 —— 让前端决定「在哪个区起这个作业」等于让它绕过绑定,
-   * 而绑定是数据驻留承诺的那一环。@kf-batch 50-WP31-place-first-class:**必填**(原来缺省 = 主控区)。
+   * 而绑定是数据驻留承诺的那一环。:**必填**(原来缺省 = 主控区)。
    */
   targetId: string;
 }
@@ -829,7 +827,7 @@ export function resolveRestoreType(snapshotsOn: boolean, probe: SnapshotProbe, d
 }
 
 /** 查源 MySQL 现存**最老** binlog 的时间(排障级只读查询;查不到返回 undefined)。
- *  复用模块 42 已在依赖里的 mysql2(与 datasource-spi/jdbc/mysql.ts 同一客户端),不新增依赖。
+ *  复用已在依赖里的 mysql2(与 datasource-spi/jdbc/mysql.ts 同一客户端),不新增依赖。
  *  `SHOW BINARY LOGS` 只返文件名/大小,故用 INFORMATION_SCHEMA 拿不到时间 —— 改用两段式:
  *  文件名序号单调递增,取最老文件名,再用 `SHOW BINLOG EVENTS` 读其首事件时间戳。 */
 async function oldestBinlogTime(sourceDatasourceId?: string): Promise<Date | undefined> {
@@ -987,7 +985,7 @@ async function ensureApplication(ctx: FlinkCtx, jobId: string, finalSql: string,
   const res = normalizeResources(resources);
   const logStreamArn = await ensureLogGroup(ctx, jobId);
   // 执行角色:作业自定义 executionRoleArn 优先,留空回退该落点的平台 Flink 运行角色。
-  // 序 72 B-139:单一作者 resolveExecutionRoleArn;自定义角色在 CreateApplication **之前**按本落点预检(信任
+  // 单一作者 resolveExecutionRoleArn;自定义角色在 CreateApplication **之前**按本落点预检(信任
   //   kinesisanalytics.amazonaws.com + 引擎基线),缺 ⇒ 抛 ExecRolePreflightError,不建应用。
   const resolvedRole = resolveExecutionRoleArn({
     custom: executionRoleArn,
@@ -1080,7 +1078,7 @@ export function parseFlinkSqlLineage(finalSql: string, jobId: string): { inputs:
 /** 启动作业:按 sinkType 选 runner(运行时版本+代码 JAR)→ ensure 应用(注入解析后的 SQL)→ StartApplication(不从快照恢复)。 */
 export async function startFlinkJob(jobId: string, sql: string, sinkType: string | undefined, sinkDatasourceId: string | undefined, connectorIds: string[] | undefined, customVpc: CustomVpc | undefined, resources: FlinkResources | undefined, sourceDatasourceId: string | undefined, executionRoleArn: string | undefined, opts: StartOptions): Promise<{ appName: string }> {
   const name = appName(jobId);
-  // 模块45(运行时安全网):启动前过 Flink 方言校验(对存库占位符原文,与 ai-sql 生成后 guard 同源规则)。
+  // (运行时安全网):启动前过 Flink 方言校验(对存库占位符原文,与 ai-sql 生成后 guard 同源规则)。
   //  · 可纠正的方言违规自动纠正后再跑;error 级无法自动修(如缺/多 INSERT INTO、窗口缺 GROUP BY window_start,window_end)
   //    → 拒绝启动并明确报错(经 start 路由 catch 写 status=error),不硬提交注定启动失败的作业。guard 纯 CPU 幂等。
   const gd = guard("flink", sql);
@@ -1088,7 +1086,7 @@ export async function startFlinkJob(jobId: string, sql: string, sinkType: string
     const detail = gd.violations.filter((v) => v.severity === "error").map((v) => v.title).join("；");
     throw new Error(`Flink SQL 方言校验未通过,已拦截启动(避免提交注定失败的作业):${detail}。请修正后重试。`);
   }
-  // @kf-batch 50-WP4quater-reads(工单 SC-5)—— 🔴 落点在这里定下,之后每一步都用它:
+  // 🔴 落点在这里定下,之后每一步都用它
   //   区域 / 角色 / 代码桶 / 产物桶 / 私有子网 全部来自 ctx,不再有主控区默认值。
   //   `opts.targetId` 由路由从**作业行上的章**取(`flinkJobTarget`),不接受前端裸传。
   const ctx = await ctxFor(opts.targetId);
@@ -1098,11 +1096,11 @@ export async function startFlinkJob(jobId: string, sql: string, sinkType: string
   let codeKey = runner.codeKey;
   let finalSql = resolveSql(gd.code, jobId, ctx);
   finalSql = await resolveMysqlSink(finalSql, sinkDatasourceId);
-  // 模块32 多 source:MySQL CDC 源凭证(${SRC_*})从所选源数据源注入(不入库)+ server-id 唯一化(端口以数据源为准)。
+  // 多 source:MySQL CDC 源凭证(${SRC_*})从所选源数据源注入(不入库)+ server-id 唯一化(端口以数据源为准)。
   finalSql = await resolveMysqlCdcSource(finalSql, sourceDatasourceId, jobId);
-  // 模块42 P42.7c 多源:Kinesis 源 ${SOURCE_STREAM_ARN} 按所选 kinesis 数据源的流注入(未选回退全局默认流)。
+  // 多源:Kinesis 源 ${SOURCE_STREAM_ARN} 按所选 kinesis 数据源的流注入(未选回退全局默认流)。
   finalSql = await resolveKinesisSource(finalSql, sourceDatasourceId, ctx);
-  // 模块42 P42.6b:MSK/Kafka 源 ${KAFKA_TOPIC}/${KAFKA_AUTH_PROPS} 按所选 MSK 数据源的连接+认证注入(密钥不入库)。
+  // MSK/Kafka 源 ${KAFKA_TOPIC}/${KAFKA_AUTH_PROPS} 按所选 MSK 数据源的连接+认证注入(密钥不入库)。
   finalSql = await resolveMskSource(finalSql, sourceDatasourceId, ctx.region);
   finalSql = resolveS3TableSink(finalSql, ctx);
   const cdcSource = isMysqlCdcSource(finalSql);
@@ -1137,19 +1135,19 @@ export async function startFlinkJob(jobId: string, sql: string, sinkType: string
     }
     if (customConnectorKeys.length === 0) throw new Error("自定义 sink 作业未选择已上传的连接器(请先在「连接器管理」上传 JAR)");
   }
-  // 🔴 模块 32-CR CR.4:代码 JAR 装配 —— 绞杀者式双路径,由 env 开关控制,默认走【胖包】(零行为变化)。
+  // 🔴 CR.4:代码 JAR 装配 —— 绞杀者式双路径,由 env 开关控制,默认走【胖包】(零行为变化)。
   //  · 开关关(默认 FLINK_MODULAR_ASSEMBLY!=="1"):现有胖包路径逐字不变 ——
   //      runnerFor(sinkType) 选基础/s3t 包;custom 走 assembleUberJar 合并用户连接器。所有现有作业零影响。
   //  · 开关开:走模块化按需拼装(assembleModularUberJar,CR.3)——按 finalSql 解析所需连接器模块拼 uber-jar
   //      (含 custom 的用户连接器),内容哈希缓存。仅显式开启才走,供 CR.4 parity 真跑验证。
-  //  🔴 P42.6b:MSK/Kafka 源【强制走模块化】(不论全局开关)——因两个胖包(base/s3t)均【未打 kafka connector】
+  //  🔴 MSK/Kafka 源【强制走模块化】(不论全局开关)——因两个胖包(base/s3t)均【未打 kafka connector】
   //     (§11.8 核实),kafka 作业只能靠模块库的 kafka(+msk-iam-auth)模块按需拼装。这是"仅对 kafka 作业"的
   //     定向启用:非 kafka 作业仍严格遵循全局开关(默认胖包,零回归)。全局切默认仍是 CR.5。
   //  runtimeEnvironment 两路径一致(始终 FLINK.runtimeEnvironment),故 ensureApplication 用 runner.runtimeEnvironment 不变。
   if (kafkaSource || process.env.FLINK_MODULAR_ASSEMBLY === "1") {
     // §2.0 分治:含 iceberg 的组合 asm.prebuilt=true(返回预构建 s3t 包,不运行期合并);轻量走按需合并。
     //   Kafka→S3 裸文件 = 轻量[kafka,msk-iam-auth,files,json]运行期合并;Kafka→S3Tables = 预构建 s3t 组合包(路径2)。
-    // @kf-batch 50-WP4quater-reads(工单 SC-5)—— 合并结果必须落**这个作业所在区**的代码桶
+    // 合并结果必须落**这个作业所在区**的代码桶
     const asm = await assembleModularUberJar(finalSql, customConnectorKeys, { region: ctx.region, codeBucket: ctx.codeBucket });
     codeKey = asm.key;
     console.log("[flink] 模块化拼装", { app: name, kafkaSource, modules: asm.modules, cached: asm.cached, prebuilt: !!asm.prebuilt, codeKey });
@@ -1160,7 +1158,7 @@ export async function startFlinkJob(jobId: string, sql: string, sinkType: string
   // VPC 接入:
   //  · MySQL CDC 源(读私有 RDS binlog):必须接 VPC,用【用户自选】的子网 + SG(下拉框,网络可达性用户自理)。
   //    优先于 sink 判断——因为源在 VPC 内、sink 是 S3Table(托管网络),网络瓶颈在源端。
-  //  · 🔴 MSK/Kafka 源(P42.6b):broker 在私有 VPC(9098/9096),同 CDC 必须接 VPC(用户自选子网+SG,§11.5
+  //  · 🔴 MSK/Kafka 源:broker 在私有 VPC(9098/9096),同 CDC 必须接 VPC(用户自选子网+SG,§11.5
   //    网络在作业级)。与 CDC 同优先级(源在 VPC 内,不论 sink 是 S3 裸文件还是 S3Tables)。
   //  · custom sink:用户自管 VPC(显式选私有子网 + SG)。
   //  · mysql sink:后端按目标 RDS 自动解析。
@@ -1261,7 +1259,7 @@ export async function pauseFlinkJob(jobId: string, targetId: string): Promise<{ 
   }
   // 抓最近的错误根因(若有),供持久化——这样停止后即使日志在,诊断也能直接拿到。
   let lastError: string | undefined;
-  // @kf-batch 50-WP31-place-first-class —— 🔴 WP-31 观测器在第九轮硬门里抓到:这里原来**没传落点** ⇒ 非主控区作业停止时
+  // 🔴 观测器在第九轮硬门里抓到:这里原来**没传落点** ⇒ 非主控区作业停止时
   //   去**主控区**的日志组抓根因(FilterLogEvents @ us-east-1,恒空)。闭合门 realtime-region-place 只列举了 4 个函数名、
   //   没列它 ⇒ 漏。根治 = 本文件的落点参数全部改**必填**(漏传编译不过),不再往名单里加第 5 个名字。
   try { lastError = await captureRootError(jobId, targetId); } catch { /* best-effort */ }
@@ -1270,9 +1268,8 @@ export async function pauseFlinkJob(jobId: string, targetId: string): Promise<{ 
 
 /** 删除作业的 MSAF 应用(真正销毁 + 删日志组)。供 UI「删除」用。幂等(不存在视为已删)。 */
 /**
- * @kf-batch 50-B28-flink-delete-settling
  * MSAF 应用的**过渡态**:在这些状态下 `DeleteApplication` 必抛 `ResourceInUseException`。
- * 🔴🔴 B-28(2026-10-01 新账号硬门 `scq` A3-撤 真撞):原来只等 `RUNNING_LIKE`(不含 STOPPING)⇒ 用户点「停止」后紧接着点「删除」,
+ * 🔴🔴 (2026-10-01 新账号硬门 `scq` A3-撤 真撞):原来只等 `RUNNING_LIKE`(不含 STOPPING)⇒ 用户点「停止」后紧接着点「删除」,
  *   应用正在 STOPPING ⇒ 跳过等待直接删 ⇒ ResourceInUse ⇒ 页面 502「请重试」,作业留着。
  */
 export const FLINK_SETTLING_STATUSES = ["STOPPING", "FORCE_STOPPING", "STARTING", "UPDATING", "AUTOSCALING", "ROLLING_BACK", "MAINTENANCE", "DELETING"] as const;
@@ -1303,7 +1300,7 @@ export async function deleteFlinkApp(jobId: string, targetId: string, opts: { po
     const busy = (x: typeof cur) => !!x && (RUNNING_LIKE.includes(String(x.ApplicationStatus || "")) ||
       (FLINK_SETTLING_STATUSES as readonly string[]).includes(String(x.ApplicationStatus || "")));
     if (busy(cur)) {
-      // 原「while busy && 没到 deadline」改经 awaitTerminal:预算 budgetMs / pollMs 轮(模块 55 第二批);预算 ≤ 0 ⇒ 一轮都不等
+      // 原「while busy && 没到 deadline」改经 awaitTerminal:预算 budgetMs / pollMs 轮;预算 ≤ 0 ⇒ 一轮都不等
       if (budgetMs <= 0) throw new FlinkAppSettling(String(cur!.ApplicationStatus || ""));
       try {
         cur = await awaitTerminal<typeof cur>({
@@ -1328,8 +1325,7 @@ export async function deleteFlinkApp(jobId: string, targetId: string, opts: { po
   try { await ctx.cwl.send(new DeleteLogGroupCommand({ logGroupName: logGroupName(jobId) })); } catch { /* best-effort */ }
 }
 
-// @kf-batch 50-B28b-flink-delete-async
-// 🔴🔴 B-28 第二次(2026-10-01 第九轮硬门 `scq` A3-撤 再红,用户:「别总是在同一个地方踩坑」):
+// 🔴🔴 第二次(2026-10-01 第九轮硬门 `scq` A3-撤 再红,用户:「别总是在同一个地方踩坑」):
 //   第一次修法把「停止中删除」从 502 改成 409「稍后再点」—— 用户点一次删除**仍然删不掉**,
 //   只是错误码好看了。真环境实测 MSAF 从 STOPPING 到 READY 用了 44s,而一次请求最多等 40s(回源墙 60s)
 //   ⇒ 「在请求里等」这条路结构上就不可靠。⇒ 改成**异步受理**:等不到就把行标成 `deleting`、回 202,
@@ -1399,7 +1395,7 @@ export function ensureFlinkDeletion(
 ): boolean {
   if (deletionsInFlight.has(jobId)) return false;
   deletionsInFlight.add(jobId);
-  // 模块 55 第二批:后台销毁是「请求外的循环入口」(读时对账也会起它)⇒ 包进登记过的后台等待者上下文,里面的 awaitTerminal 才合法
+  // 后台销毁是「请求外的循环入口」(读时对账也会起它)⇒ 包进登记过的后台等待者上下文,里面的 awaitTerminal 才合法
   const p = runAsBackgroundWaiter("flink-deletion", () => finishFlinkDeletion(jobId, targetId, opts))
     .catch(() => "failed")
     .finally(() => {
@@ -1417,7 +1413,7 @@ export async function __flinkDeletionsSettled(): Promise<void> {
 
 /**
  * 删除的唯一入口(路由调它)。停得下来 ⇒ 当场删完(`deleted`);还在停 ⇒ 标 `deleting` 并后台做完(`accepted`)。
- * 其它失败原样抛(路由回 502,**不动记录** —— T-14 不变量)。
+ * 其它失败原样抛(路由回 502,**不动记录** —— 不变量)。
  */
 export async function requestFlinkDeletion(
   jobId: string,
@@ -1439,7 +1435,7 @@ export async function requestFlinkDeletion(
 /** 从 CloudWatch 抽取作业的"真实根因错误"一行(提交失败/重启循环的 throwable 摘要)。
  *  供停止时持久化到 lastError、以及诊断兜底。无错误返回 undefined。 */
 export async function captureRootError(jobId: string, targetId: string): Promise<string | undefined> {
-  // @kf-batch 50-WP27-9cap-matrix —— 🔴 同族第六处:这里也把落点算出来就扔了
+  // 🔴 同族第六处:这里也把落点算出来就扔了
   //   (`ctxFor(targetId)` 之后调 `readFlinkLogs(jobId, 200)` 不带 target)⇒ 非 home 的流作业
   //   停止时抓「真实根因」抓的是**主控区**的日志组(空的)⇒ `lastError` 恒空、页面上「为什么失败」
   //   永远说不出来。落点参数在签名里、调用点没接上 —— 由闭合门
@@ -1483,12 +1479,11 @@ export async function describeFlinkJob(jobId: string, targetId: string): Promise
 
 // 平台作业状态全集(单一事实来源)。draft=从未启动;running/starting=运行态;stopped=已停;
 // error=启动失败;deleted=曾启动但 MSAF 应用在 AWS 侧已不存在(被外部删除/账号回收)——与用户主动 stopped 区分。
-// @kf-batch 50-B28b-flink-delete-async —— + stopping(引擎还在停;原来直接写 stopped ⇒ 平台先于引擎说「已停止」,
+// + stopping(引擎还在停;原来直接写 stopped ⇒ 平台先于引擎说「已停止」,
 //   下游据此去删就撞上过渡态)+ deleting(删除已受理、后台做完)。两者都**不**短路对账:要一直问到引擎稳下来。
 export type FlinkDbStatus = "draft" | "starting" | "running" | "stopping" | "stopped" | "error" | "deleting" | "deleted";
 const FLINK_TERMINAL: FlinkDbStatus[] = ["draft", "stopped", "error", "deleted"];
 /**
- * @kf-batch 50-WP27-9cap-matrix
  * 读时对账**可以短路**的状态 —— 刻意**不含 `deleted`**。
  *
  * 🔴 区别在于「谁把它放成这个状态」:
@@ -1518,10 +1513,10 @@ export function mapAppStatusToDb(appStatus: string | null, hadAppName: boolean, 
 /** 读时对账:对非终态作业查 MSAF 真实态,纠正并(机会性)回写 DB,返回真实的 DB 状态 + 原始 appStatus。
  *  终态(draft/stopped/error/deleted)直接返回原状态,不查后端(省调用、且避免把正常停的误判)。 */
 export async function reconcileFlinkStatus(job: any): Promise<{ dbStatus: FlinkDbStatus; appStatus: string }> {
-  // @kf-batch 50-WP4quater-reads(工单 SC-5)—— 🔴 对账必须打**作业自己那个区**:
+  // 🔴 对账必须打**作业自己那个区**:
   // 用主控区客户端去 Describe 别区的应用,回 ResourceNotFound ⇒ 这里会把作业写成「已删除」,
   // 而它在那个区好好跑着(这与离线侧「Glue 对账用 home 客户端把成功写成 failed」是同一个坑)。
-  // @kf-batch 50-WP27-9cap-matrix —— 🔴🔴 **这里原来把落点算出来就扔了**:
+  // 🔴🔴 **这里原来把落点算出来就扔了**:
   //   `const ctx = await ctxFor(flinkJobTarget(job))` 之后紧接着调的是 `describeFlinkJob(job.jobId)`
   //   ——**没把 target 传下去**,于是非 home 的作业永远拿主控区客户端去 Describe 别区的应用,
   //   ResourceNotFound 被 `.catch(() => null)` 吞掉 ⇒ 映射成 `deleted`(「AWS 侧已不存在」),
@@ -1534,7 +1529,7 @@ export async function reconcileFlinkStatus(job: any): Promise<{ dbStatus: FlinkD
   //   一旦推错(比如上面那个 bug),短路会让它**永远**不再复核 ⇒ 页面永久说谎。
   //   draft / stopped / error 才是「有人有意把它放在这个状态」,短路是对的。
   //   (记忆 `stale-blockers-must-be-reprobed`:推导出来的「做不到/不存在」必须能被重新勘定。)
-  // @kf-batch 50-B28b-flink-delete-async —— 删除已受理:任何一次读取都把它接着做完(进程重启后的兜底;同进程去重)
+  // 删除已受理:任何一次读取都把它接着做完(进程重启后的兜底;同进程去重)
   if (prev === "deleting") {
     ensureFlinkDeletion(String(job.jobId), target);
     return { dbStatus: "deleting", appStatus: "DELETING" };
@@ -1542,9 +1537,9 @@ export async function reconcileFlinkStatus(job: any): Promise<{ dbStatus: FlinkD
   if (!job.appName || RECONCILE_SHORT_CIRCUIT.includes(prev as FlinkDbStatus)) {
     return { dbStatus: (prev as FlinkDbStatus) || "draft", appStatus: job.appName ? "UNKNOWN" : "NOT_DEPLOYED" };
   }
-  // @kf-batch 50-WP31-place-first-class —— 🔴🔴 **看不了 ≠ 不存在**:原来 `.catch(() => null)` 把**任何**失败(落点解析不开 /
+  // 🔴🔴 **看不了 ≠ 不存在**:原来 `.catch(() => null)` 把**任何**失败(落点解析不开 /
   //   AccessDenied / 限流 / 网络)都当成「Describe 回 null」⇒ 运行中的作业被推导成 `deleted` **并写回 DDB**。
-  //   序 3 收尾让主控区也读描述符之后,主控区描述符一时解析不开就会把主控区所有运行中的作业写成「AWS已删除」。
+  //   收尾让主控区也读描述符之后,主控区描述符一时解析不开就会把主控区所有运行中的作业写成「AWS已删除」。
   //   「应用不存在」只有一个来源:`describe()` 把 ResourceNotFoundException 映成 null(上面那个函数)。其余失败 ⇒ 保留原状态、不写库。
   let d: { status: string; versionId?: number } | null;
   try {
@@ -1566,7 +1561,7 @@ export async function reconcileFlinkStatus(job: any): Promise<{ dbStatus: FlinkD
 }
 
 /**
- * @kf-batch 50-WP31-place-first-class —— 序 3 收尾:列表的读时对账 = **一次请求碰多个区** ⇒ 唯一写法 `forEachTargetPlace`(L10)。
+ * 收尾:列表的读时对账 = **一次请求碰多个区** ⇒ 唯一写法 `forEachTargetPlace`(L10)。
  * 按作业的章分组,每个区一个分支、各自一个嵌套落点上下文(拦截模式下该区的 Describe 按它自己的区核验);
  * 原来是 `rows.map(reconcileFlinkStatus)` 平铺,一个请求里混着两个区的调用、没有任何上下文。
  * 某个区的落点解析不开 ⇒ 那个区的行照样交给 `reconcileFlinkStatus`(它对「看不了」保留原状态,不推导成已删除)。
@@ -1771,7 +1766,7 @@ export async function readMysqlResults(sinkDatasourceId?: string, sql?: string, 
  *  【模式无关】:不写死列名,SELECT * 取该 sink 表的真实结构 —— 兼容窗口聚合(window_start/region/…)、
  *  CDC 聚合(region/order_cnt/total_amount)、以及用户自定义任意结构。返回真实表名 + 列 + 行,前端动态渲染。
  *  (历史 bug:曾写死 SELECT window_start,... 对无 window_start 的 CDC 表报 COLUMN_NOT_FOUND → 0 行。) */
-// 🔴 B-26:`targetId` 必填(取自作业行上的章 `flinkJobTarget`);原来三处都是主控区:表桶 / 目录引用 / Athena 落点。
+// 🔴 `targetId` 必填(取自作业行上的章 `flinkJobTarget`);原来三处都是主控区:表桶 / 目录引用 / Athena 落点。
 export async function readS3TableResults(sql: string | undefined, limit: number, targetId: string): Promise<S3TableResults> {
   const place = await resolveFlinkPlace(targetId);
   const resolved = resolveS3TableSink(sql || "", place);

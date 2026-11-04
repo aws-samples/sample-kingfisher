@@ -1,7 +1,6 @@
-// @kf-batch 50-B09-carrier-drift
-// 🔴🔴 **B-09:改了产物生成器,存量载体不会自动重发** ——
+// 🔴🔴 **改了产物生成器,存量载体不会自动重发**
 // 以后**每一次**契约改动都会让已发布的载体静默带着旧定义继续跑。
-// 它不是「一个 bug」,是**一台产 bug 的机器**(本轮最重的那条 B-01 就是从它的现场挖出来的)。
+// 它不是「一个 bug」,是**一台产 bug 的机器**(本轮最重的那条就是从它的现场挖出来的)。
 //
 // 解法是**可派生**的:拿当前生成器重新生成一遍,与服务上已发布的定义**逐字节**比。
 // 刻意不存 `generatorVersion` —— 版本号自己会漂(忘记 bump 就白搭),而且又多一份要同步的真值。
@@ -32,7 +31,7 @@ function fnBody(src: string, name: string): string {
   return rest.slice(0, nx > 0 ? nx : rest.length);
 }
 
-describe("B-09 ① 产物生成只有一个作者", () => {
+describe("① 产物生成只有一个作者", () => {
   const pub = strip(read("lib/workflow/publish-dag.ts"));
 
   it("🔴 三个生成器的**调用点**只允许出现在 `buildCarrierArtifact` 里", () => {
@@ -57,7 +56,7 @@ describe("B-09 ① 产物生成只有一个作者", () => {
   });
 });
 
-describe("B-09 ② 比对零副作用", () => {
+describe("② 比对零副作用", () => {
   const pub = strip(read("lib/workflow/publish-dag.ts"));
 
   it("🔴 `carrierDefinitionDrift` 与 `buildCarrierArtifact` 里都不许有写操作", () => {
@@ -86,7 +85,7 @@ describe("B-09 ② 比对零副作用", () => {
   });
 });
 
-describe("B-09 ③ 归一清单闭合 + 归一函数有判别力", () => {
+describe("③ 归一清单闭合 + 归一函数有判别力", () => {
   it("🔴 清单只许 `start_date` 一项,且每项必须写明**为什么它会变**", () => {
     expect(
       CARRIER_VOLATILE_FIELDS.length,
@@ -126,7 +125,7 @@ describe("B-09 ③ 归一清单闭合 + 归一函数有判别力", () => {
     const added = base + '\n          "ledger_task_type": "sync"';
     expect(
       normalizeCarrierDefinition(base),
-      "新增了一个 env 字段却判成一致 ⇒ 正是 B-01 那种「字段在、值是缺省的」漏不掉的地方"
+      "新增了一个 env 字段却判成一致 ⇒ 正是「字段在、值是缺省的」那种漏不掉的地方"
     ).not.toBe(normalizeCarrierDefinition(added));
   });
 
@@ -139,11 +138,11 @@ describe("B-09 ③ 归一清单闭合 + 归一函数有判别力", () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// B-09 ④ **接线** —— 🔴 本仓那个元 bug:「机制早就建好了,只是那条路径没接」。
+// ④ **接线** —— 🔴 本仓那个元 bug:「机制早就建好了,只是那条路径没接」。
 //   机制在库里而没有任何用户能看见的出口 = 写了等于没写,而且**两层测试都会全绿**。
 // 🔴 接线判据要**剥 import 之后查调用位置**(本仓栽过三次:token 出现过会被 import 行放行)。
 // ════════════════════════════════════════════════════════════════════════════
-describe("B-09 ④ 接线:两个清单接口都真的出 drift 态", () => {
+describe("④ 接线:两个清单接口都真的出 drift 态", () => {
   const wf = strip(read("app/api/workflow/route.ts"));
   const sync = strip(read("app/api/sync/route.ts"));
   const carrier = strip(read("lib/sync/schedule-carrier.ts"));

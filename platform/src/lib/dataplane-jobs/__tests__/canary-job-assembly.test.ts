@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 🔴🔴 permission canary 的**装配层判据**(WP-9 ④-3;判据 CN-1..CN-5 的本机版)。
+// 🔴🔴 permission canary 的**装配层判据**(④-3;判据 CN-1..CN-5 的本机版)。
 // 只 mock 真外部(DDB 假表 / FakeAws / 注册表 / 项目台账);canary handler ↔ runner ↔ store ↔ 真执行器(建探针)↔
 // statement 原语 ↔ project-secret 查找 **一律真跑**。
 //

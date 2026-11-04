@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
-# @kf-batch 50-WP15-airflow-serverless(T-8)
 # IAM 模拟门:平台 ECS TaskRole × 「平台真实调用清单」(infra/iam/platform-taskrole-calls.json)⇒ IAM SimulatePrincipalPolicy 离线模拟。
 #
-# 为什么存在:WP-15 一刀之内同一类缺陷三次 —— 代码用了的动作角色没给(T-2 iam:GetRole / T-7 codebuild:ListBuildsForProject),
-#   以及 T-8「动作给了但资源模式错」(CreateWorkflow 在创建时按 workflow/* 评估,名字限定 bgp* 永不匹配)。
+# 为什么存在:一刀之内同一类缺陷三次 —— 代码用了的动作角色没给(iam:GetRole codebuild:ListBuildsForProject),
+#   以及「动作给了但资源模式错」(CreateWorkflow 在创建时按 workflow/* 评估,名字限定 bgp* 永不匹配)。
 #   单测里的动作名守卫只能抓前一类;后一类只有拿**真实 ARN 形态**去问 IAM 才抓得到。模拟是离线的(不真调服务、零副作用、秒级),
-#   所以放在每次平台栈部署之后(scripts/redeploy-platform.sh 第 4 步)与 sls 段 S-0:任何一条不是 allowed 就红,不许带着它收工。
+#   所以放在每次平台栈部署之后(scripts/redeploy-platform.sh 第 4 步)与 sls 段:任何一条不是 allowed 就红,不许带着它收工。
 #
 # 用法:
 #   python3 scripts/iam-simulate-gate.py --profile temp-account --home-region us-east-1 --regions us-east-1,us-west-2 [--probe-region <区>|none] [--role-arn …] [--json]
 #   退出码 0 = 全 allowed;1 = 有真红(平台缺权 / 我方策略自己拒 / 模拟失败);2 = 用法或环境错误;
 #          4 = 无真红,但有若干行**在本账号里验不了**(被账号所在组织的 SCP 拦住 ⛔;或 `--probe-region none` ⇒ any-region 轴没有探测区 ⚠️)。
-#   `--probe-region none`(B-114,2026-10-22):放行清单已覆盖本账号能挑出的每一个区时由 redeploy-platform.sh 传入 ——
+#   `--probe-region none`:放行清单已覆盖本账号能挑出的每一个区时由 redeploy-platform.sh 传入
 #          any-region 轴的调用只在 home 模拟(权限本身仍验),「放行集之外也 allowed」这一半记成未验、单独计数(`anyRegionUnverified`)并退 4;
 #          **不是过关**,换到还有未放行区的账号复验。
 #
@@ -102,7 +101,7 @@ def classify(decision, matched, org_blocked, err):
     return "red"
 
 
-PROBE_NONE = "none"  # `--probe-region none`:any-region 轴本次没有探测区可用(B-114)
+PROBE_NONE = "none"  # `--probe-region none`:any-region 轴本次没有探测区可用
 
 
 def sim_regions_for(axis, probe_region, home_region, regions):
@@ -138,7 +137,7 @@ def main():
     ap.add_argument("--regions", default="us-east-1", help="执行 region 列表(含 home),逗号分隔")
     ap.add_argument("--probe-region", default="eu-central-1",
                     help="axis=any-region 用的探测 region:**故意不在 --regions 里**,用来证明那条权限没被区域条件挡住(K-7);"
-                         "`none` = 本账号挑不出放行集之外的区(B-114)⇒ any-region 轴只在 home 验、单独记未验并退 4")
+                         "`none` = 本账号挑不出放行集之外的区 ⇒ any-region 轴只在 home 验、单独记未验并退 4")
     ap.add_argument("--manifest", default=DEFAULT_MANIFEST)
     ap.add_argument("--role-arn", default=None)
     ap.add_argument("--json", action="store_true", help="末行输出 JSON 摘要(供验收脚本解析)")
@@ -154,12 +153,12 @@ def main():
         print(f"[iam-gate] ✗ --probe-region {a.probe_region} 落在 --regions 里 ⇒ any-region 轴等于没验;换一个不上线的 region", file=sys.stderr)
         return 1
     if a.probe_region == PROBE_NONE:
-        print("[iam-gate] ⚠️ --probe-region none:any-region 轴本次没有放行集之外的探测区,这几条只在 home 验、「放行集之外也 allowed」记为未验(B-114)", file=sys.stderr)
+        print("[iam-gate] ⚠️ --probe-region none:any-region 轴本次没有放行集之外的探测区,这几条只在 home 验、「放行集之外也 allowed」记为未验", file=sys.stderr)
     role_arn, td = (a.role_arn, "(given)") if a.role_arn else discover_task_role(a.profile, a.home_region, (manifest.get("principal") or {}).get("cluster", "bgp-cluster"))
     print(f"[iam-gate] TaskRole = …/{role_arn.rsplit('/', 1)[-1]}  任务定义 = {td.rsplit('/', 1)[-1]}  regions = {','.join(regions)}", file=sys.stderr)
 
     rows = []
-    any_region_unverified = []  # B-114:探测区 = none 时 any-region 轴「放行集之外也 allowed」这一半没验的调用
+    any_region_unverified = []  # 探测区 = none 时 any-region 轴「放行集之外也 allowed」这一半没验的调用
     for c in manifest["calls"]:
         axis = c.get("axis", "execution")
         # 🆕 axis=any-region(K-7,2026-09-08):必须在**放行集之外**也 allowed ⇒ 用探测 region 打,
@@ -167,7 +166,7 @@ def main():
         sim_regions, unverified = sim_regions_for(axis, a.probe_region, a.home_region, regions)
         if unverified:
             any_region_unverified.append(c["action"])
-            print(f"  ⚠️ {c['action']:<45} {'(any-region)':<10} 未验            放行集之外的探测区本账号挑不出(B-114)", file=sys.stderr)
+            print(f"  ⚠️ {c['action']:<45} {'(any-region)':<10} 未验            放行集之外的探测区本账号挑不出", file=sys.stderr)
         for region in sim_regions:
             resource = c["resource"].replace("{acct}", acct).replace("{region}", region).replace("{home}", a.home_region)
             ctx = {"aws:RequestedRegion": region}
@@ -199,7 +198,7 @@ def main():
           f"{len(bad)} 条真红;{len(blocked)} 条本账号验不了(组织 SCP);{len(any_region_unverified)} 条 any-region 轴未验(无探测区)", file=sys.stderr)
     if any_region_unverified:
         print(f"[iam-gate] ⚠️ any-region 轴 {len(any_region_unverified)} 条调用只在 home 验过、「放行集之外也 allowed」这一半本账号没验成:{any_region_unverified}"
-              f" —— 🔴 不等于过关;放行清单已覆盖本账号能挑出的每一个区(B-114),换到还有未放行区的账号重跑本门复验", file=sys.stderr)
+              f" —— 🔴 不等于过关;放行清单已覆盖本账号能挑出的每一个区,换到还有未放行区的账号重跑本门复验", file=sys.stderr)
     if blocked:
         regs = sorted({r["region"] for r in blocked})
         # ══════════════════════════════════════════════════════════════════════

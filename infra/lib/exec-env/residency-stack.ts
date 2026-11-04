@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP10a
 // 执行环境 **residency-api 组件**栈 · 片 1 = 区域审计 / 结果存储(50 SPEC v3.22 §1.3 D / §1.3a S4;DESIGN §18 决策 6quinquies ③)。
 //
 // 【这个组件是什么、不是什么】
@@ -7,12 +6,12 @@
 //     · `bgp-region-audit-<slug>`   区域审计全量(operator / SQL 原文 / statementId / entry / triggeredBy / authKind)—— 中央只留摘要;
 //     · `bgp-region-results-<slug>` 区域结果存储(SQL 历史 / 问数 turns / 导出索引)—— 中央只留指针;
 //     · 区域结果桶(结果对象 / 导出 / 记忆摘要)。
-//   片 2(区域 API Gateway 浏览器直连就近执行)归 WP-10b,本栈**不建**任何 API / Lambda。
+//   片 2(区域 API Gateway 浏览器直连就近执行),本栈**不建**任何 API / Lambda。
 //
 // 【三条硬要求,synth-gate §7b 逐条打】
 //   ① **RETAIN + 底座 CMK**:审计与结果是客户数据,删环境不许删(core-stack 文件头同一条纪律);
 //   ② **桶策略 deny 复制**(`s3:ReplicateObject` / `s3:PutReplicationConfiguration`)—— 这是「结果留区」的产品能力(数据放哪),不是干预;
-//      ACCEPTANCE E2 / E-182 断 `get-bucket-replication` 无配置且策略含 deny;
+//      ACCEPTANCE E2 断 `get-bucket-replication` 无配置且策略含 deny;
 //   ③ **OutputKey = 描述符字段名**(`residencyAuditTable` / `residencyResultsTable` / `residencyBucket`),平台 finalize 按键取值进袋、probe 三项真探。
 //
 // 🔴 防篡改不在本栈:审计表的 Deny UpdateItem / DeleteItem / BatchWriteItem 挂在**平台 TaskRole**(platform-stack `ExecEnvResidency`),

@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 创建工具(P44.2)。声明式,kind:"create",每个带 actionCode(供闸2 action-guard 校验)。
+// Copilot 创建工具。声明式,kind:"create",每个带 actionCode(供闸2 action-guard 校验)。
 // 只做纯草稿(status=draft,不运行/调度/碰云资源)。数据源刻意不在此(会建云资源)——Copilot 对数据源只给建议。
 // 每个 handler:先过 action-guard(闸2 冗余校验,即便被误注册也拦)→ 调 create-service 建草稿 → 回结果。
 // RBAC(闸3)在 ask 路由入口统一做:创建工具仅在调用者具 editor 角色时才装入工具集(见 registry.buildTools)。

@@ -6,7 +6,7 @@
 // 关键：每个 Describe 独立 try/catch。失败 → degraded=true + missing[] 记原因，相关事实留空，
 // 让 L2 把依赖该事实的规则降级为 UNKNOWN，而不是整体崩溃（场景 D1/D6）。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { regionalClient } from "@/lib/aws/clients";
 import {
   type EC2Client,
@@ -25,7 +25,7 @@ import {
 } from "@aws-sdk/client-ec2";
 import { cacheKey, getCached, setCached } from "./cache";
 import { resolveTargets, targetSignature, type ResolveCtx } from "./target-resolver";
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤:L1 探测的落点决策如实记账(见 probeEnvironment 开头)
+// L1 探测的落点决策如实记账(见 probeEnvironment 开头)
 import { notePlaceDecision } from "@/lib/place/context";
 
 /** 决策记账里的作者名(观测清单按它归类)。 */
@@ -42,7 +42,7 @@ import type {
 } from "./types";
 
 // 累积探测过程中的降级信息 + 本次探测的落点(region)与按它建出来的 EC2 客户端。
-// @kf-batch 41-B115-netadvisor-place —— 不再有模块级客户端:客户端随请求落点走。
+// 不再有模块级客户端:客户端随请求落点走。
 interface ProbeCtx extends ResolveCtx {
   ec2: EC2Client;
 }
@@ -248,7 +248,7 @@ async function probeVpcDetails(vpcId: string, ctx: ProbeCtx): Promise<Partial<Vp
 }
 
 // 探测入口。scopeVpcId 给定则只探该 VPC（省调用）；否则探全部 VPC。
-// @kf-batch 41-B115-netadvisor-place —— 探测在**请求落点的 region**做:EC2 客户端按 req.region 经唯一工厂建(序 31 二刀 ⑤ 曾把
+// 探测在**请求落点的 region**做:EC2 客户端按 req.region 经唯一工厂建(曾把
 //   模块级主控区客户端如实记成主控区决策,那是「如实记」,不是「修好」;本刀把能力缺口补上)。决策记成该落点本身(观测清单按 via 归类;
 //   技能 Lambda 里没有请求上下文时本记账是 no-op)。
 export async function probeEnvironment(req: PlacedConnectivityRequest): Promise<EnvironmentFacts> {

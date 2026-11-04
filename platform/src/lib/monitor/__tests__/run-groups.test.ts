@@ -1,4 +1,3 @@
-// @kf-batch 50-WP5-rungroup
 // O2 写通道 + 派生口径的**装配层**单测(50 SPEC v3.44 §1.3a S7 / §3.17;判据 ACCEPTANCE 段 `o2`)。
 //
 // 🔴🔴 **只 mock 唯一的真外部(DynamoDB 客户端)**;兄弟模块 `run-records` / `run-group` /
@@ -187,7 +186,7 @@ describe("🔴 openRunGroup:结构上不可能违反的三条", () => {
     expect(row.failurePolicy).toBe("continue");
   });
 
-  it("🔴 单区不建组(E-166 在结构上不可能违反,而不是靠调用方记得判)", async () => {
+  it("🔴 单区不建组(在结构上不可能违反,而不是靠调用方记得判)", async () => {
     await expect(openRunGroup({ runGroupId: RG, ...BASE, requestedTargets: ["tgt_home"] }))
       .rejects.toThrow(RunGroupInputInvalid);
     await expect(openRunGroup({ runGroupId: RG, ...BASE, requestedTargets: ["tgt_home", "tgt_home"] }))
@@ -211,7 +210,7 @@ describe("🔴 openRunGroup:结构上不可能违反的三条", () => {
     expect((await getRunGroupRow(RGS))!.accepted).toEqual({ tgt_home: { runId: "r1" } });
   });
 
-  it("🔴 组行写失败 ⇒ 抛 RunGroupWriteFailed(E-167:运行路由必须据此拒绝,不许 fail-open)", async () => {
+  it("🔴 组行写失败 ⇒ 抛 RunGroupWriteFailed(运行路由必须据此拒绝,不许 fail-open)", async () => {
     failNextWriteWith = new Error("AccessDeniedException: not authorized");
     await expect(openRunGroup({ runGroupId: RG, ...BASE })).rejects.toThrow(RunGroupWriteFailed);
     failNextWriteWith = new Error("boom");
@@ -346,7 +345,7 @@ describe("🔴 单一作者门禁", () => {
   });
 });
 
-// @kf-batch 50-WP5-rungroup —— E-168 的接线:definitionVersion 必须**真有人写**
+// 接线:definitionVersion 必须**真有人写**
 describe("🔴 definitionVersion 端到端:唯一作者 = 组行的 accepted;子行合并出来", () => {
   const stamp = (targetId: string) => ({ projectId: "proj-default", targetId });
 
@@ -362,7 +361,7 @@ describe("🔴 definitionVersion 端到端:唯一作者 = 组行的 accepted;子
     expect("definitionVersion" in byT.tgt_use1_a, "没写过就不许有这个字段(编一个 0 会显示成「v0」骗人)").toBe(false);
   });
 
-  it("🔴 跨区版本差**看得见**(E-168):两区不同版本 ⇒ 两个子行两个值,而**组仍是一个**", async () => {
+  it("🔴 跨区版本差**看得见**:两区不同版本 ⇒ 两个子行两个值,而**组仍是一个**", async () => {
     await openRunGroup({ runGroupId: RG, ...BASE });
     await putRunRecord({ taskId: "job1", runId: "r1", taskType: "etl-glue", stamp: stamp("tgt_home"), runGroupId: RG, status: "succeeded" });
     await putRunRecord({ taskId: "job1", runId: "r2", taskType: "etl-glue", stamp: stamp("tgt_use1_a"), runGroupId: RG, status: "succeeded" });

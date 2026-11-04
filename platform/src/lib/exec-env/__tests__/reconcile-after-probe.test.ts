@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix
 // reconcileAfterProbe(§21.4)—— bug#11 真正闭合的**核心完成命令**的正/反面单测(§11.2)。
 //
 // 正面:modern 初装(provisioning→verifying)/ ready 升级完成(ready→ready,清 operation ⇒ 回 active)/

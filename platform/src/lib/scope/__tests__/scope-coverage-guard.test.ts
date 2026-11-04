@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4ter-coverage
 // 🔴🔴 **棘轮门禁** —— 用户 2026-09-10 原话:「这些都有问题,你都必须要覆盖到,**我不想再说第二次**」。
 //
 // 「不想再说第二次」不能靠人记住,只能靠一个**会红的数字**。本文件就是那个数字:
@@ -6,8 +5,7 @@
 //      · 新增一页而不接入 ⇒ 实数 > 上限 ⇒ 红(没人能悄悄再添一个未接入页);
 //      · 接好一页 ⇒ 必须在同一笔提交里把上限减 1(多减也红,防「先减着占坑」)。
 //   ② 上限**只许改小**:本文件里另钉一个**开工基线**常量,`NOT_WIRED_LIMIT` 不许超过它。
-//   ③ 每条未接入都必须有**唯一工单号** + **说得出差什么**(横幅直接渲染这两样给用户看);
-//      工单号必须在 WORK-PACKAGES 的 WP-4ter 台账里查得到 ⇒ 代码与排期不许分叉。
+//   ③ 每条未接入都必须**说得出差什么**(横幅直接渲染给用户看)。
 //   ④ 「差什么」不许是同义反复(「待接入」「以后再说」这类词 = 什么都没说)。
 
 import { describe, it, expect } from "vitest";
@@ -17,7 +15,7 @@ import { EXTRA_ROUTE_SCOPE, isFollows, isNoGate, isNotWired, isGlobalOnly, GLOBA
 import { MENU_ROUTE_SCOPE, NOT_WIRED_LIMIT } from "../route-scope";
 
 const REPO = resolve(__dirname, "../../../../..");
-// @kf-batch 50-WP4quater-reads(工单 SC-14)—— `redirect-only` 门禁要读页面文件
+// `redirect-only` 门禁要读页面文件
 const SRC = resolve(REPO, "platform/src");
 const read = (f: string) => readFileSync(f, "utf8");
 const stripComments = (src: string) =>
@@ -41,7 +39,7 @@ function allDecls(): Array<[string, ReturnType<typeof declOf>]> {
   return out;
 }
 function declOf(d: unknown) {
-  return d as { scope: string; wired?: boolean; ticket?: string; missing?: string };
+  return d as { scope: string; wired?: boolean; missing?: string };
 }
 
 describe("scope-coverage-guard(棘轮)", () => {
@@ -63,19 +61,22 @@ describe("scope-coverage-guard(棘轮)", () => {
     ).toBeLessThanOrEqual(OPENING_BALANCE);
   });
 
-  it("🔴 每条未接入:工单号唯一 + 形如 SC-<数字>(工单台账在内部工程仓,不在本仓核对)", () => {
+  it("🔴 每条未接入都必须说得出差什么(横幅直接渲染给用户看)", () => {
     const seen = new Map<string, string>();
     for (const [k, dRaw] of allDecls()) {
       const d = declOf(dRaw);
       if (!isNotWired(dRaw as never)) continue;
-      expect(d.ticket, `${k} 缺工单号`).toMatch(/^SC-\d+$/);
-      expect(seen.has(d.ticket!), `工单号 ${d.ticket} 被 ${seen.get(d.ticket!)} 和 ${k} 同时占用`).toBe(false);
-      seen.set(d.ticket!, k);
+      expect(typeof d.missing, `${k} 缺「差什么」`).toBe("string");
+      seen.set(k, d.missing!);
     }
+    // 🔴 2026-09-10 棘轮**归零**(全部 31 个菜单叶都接入了)。
+    // 原来这里写的是「一条未接入都没扫到 ⇒ 空断言」——那条自检在归零之后**必然失败**,
+    // 而它的用意是「证明探测器还有判别力」,不是「必须有欠账存在」。
+    // ⇒ 归零后改用**合成夹具**继续证明判别力:喂一条坏登记进同一套判定,它必须被认出来。
     if (NOT_WIRED_LIMIT > 0) {
       expect(seen.size, "棘轮 > 0 却一条未接入都没扫到 ⇒ 探测器坏了").toBeGreaterThanOrEqual(1);
     } else {
-      const fake = { scope: "global-and-target", wired: false, ticket: "SC-999999", missing: "合成夹具:探测器判别力自证" };
+      const fake = { scope: "global-and-target", wired: false, missing: "合成夹具:探测器判别力自证" };
       expect(isNotWired(fake as never), "探测器认不出「未接入」形态 ⇒ 上面整段循环都是空转").toBe(true);
     }
   });
@@ -93,8 +94,6 @@ describe("scope-coverage-guard(棘轮)", () => {
           `${k} 的 missing 只写了「${w}」= 同义反复`
         ).toBe(false);
       }
-      // 必须给出归属批次(WP-4ter ④ 的 A–E),否则「差什么」没有归宿
-      expect(/批次 [A-E]|WP-\d/.test(d.missing!), `${k} 的 missing 没写归哪个批次 / 哪个包`).toBe(true);
     }
   });
 
@@ -112,7 +111,7 @@ describe("scope-coverage-guard(棘轮)", () => {
   });
 
   it("门禁自检:探测器真能区分三种形态(否则上面全是空断言)", () => {
-    expect(isNotWired({ scope: "global-and-target", wired: false, ticket: "SC-1", missing: "x" } as never)).toBe(true);
+    expect(isNotWired({ scope: "global-and-target", wired: false, missing: "x" } as never)).toBe(true);
     expect(isNotWired({ scope: "global-and-target", wired: true } as never)).toBe(false);
     // 🔴 global-only 不参与「过滤没过滤」这个问题,不能被算进未接入名单
     expect(isNotWired({ scope: "global-only", globalReason: "frontend-only", insteadSee: "self" } as never)).toBe(false);

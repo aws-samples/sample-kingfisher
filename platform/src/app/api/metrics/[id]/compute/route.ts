@@ -2,17 +2,16 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
-// @kf-batch 50-WP2-directquery —— 执行目标从 **body** 来,不从 `?scope=`(50 SPEC §2.6.3;写路由不读 scope)。
+// 执行目标从 **body** 来,不从 `?scope=`(50 SPEC §2.6.3;写路由不读 scope)。
 import { getActiveProjectId } from "@/lib/projects/guard";
-// @kf-batch 50-WP31-place-first-class
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { getCorrelationId } from "@/lib/observability/logger";
-// 模块 55 / 序 50 第二批:计算主体(computeMetric 数仓直查 → 审计)在 lib/metrics/long-ops.ts(metric-compute);
+// 计算主体(computeMetric 数仓直查 → 审计)在 lib/metrics/long-ops.ts(metric-compute);
 //   指标 SQL 真环境十几秒、叠上数仓冷启动就撞 60s 墙 ⇒ 超 45 秒由统一框架转 202,页面右下「正在后台执行:计算指标」。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 
-// 模块 20: 计算单个指标(当前值 + 维度分布 + 时间趋势 + 写快照)。仅平台管理员(执行 Redshift)。
+// 计算单个指标(当前值 + 维度分布 + 时间趋势 + 写快照)。仅平台管理员(执行 Redshift)。
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const identity = await resolveIdentity(req);

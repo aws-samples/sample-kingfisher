@@ -1,4 +1,3 @@
-// @kf-batch 50-B08-sync-task-write-guard
 // 🔴🔴 **同步任务行的状态写回必须条件写** —— 否则已删的任务会被后台回写**凭空造回来**。
 //
 // 【真环境证据(2026-09-20 第三轮全量硬门 `wp24` 段)】
@@ -79,7 +78,7 @@ function rawSyncTaskUpdates(src: string): string[] {
   return hits;
 }
 
-describe("同步任务行的状态写回:唯一写通道 + 条件写(B-08)", () => {
+describe("同步任务行的状态写回:唯一写通道 + 条件写", () => {
   beforeEach(() => {
     sent.length = 0;
     nextError = null;
@@ -103,7 +102,7 @@ describe("同步任务行的状态写回:唯一写通道 + 条件写(B-08)", () 
     expect(input.Key).toEqual({ userId: "default-user", taskId: "t-1" });
     expect(
       input.ConditionExpression,
-      "少了条件写 ⇒ 行已删时会 upsert 出一条只有 Key 的残行(B-08 那个形态)"
+      "少了条件写 ⇒ 行已删时会 upsert 出一条只有 Key 的残行(残行形态)"
     ).toBe("attribute_exists(taskId)");
     // 调用方给的表达式必须原样带过去(不许被作者悄悄改写)
     expect(input.UpdateExpression).toBe("SET #s = :s");
@@ -130,7 +129,7 @@ describe("同步任务行的状态写回:唯一写通道 + 条件写(B-08)", () 
     ).rejects.toThrow(/ExpiredToken/);
   });
 
-  // @kf-batch 41-B121-dms-start-single-flight —— 状态机守卫(「只许一条启动编排在飞」)也必须经本通道
+  // 状态机守卫(「只许一条启动编排在飞」)也必须经本通道
   it("⑥ 带 `onlyIf` ⇒ 条件**叠**在 attribute_exists 之后(AND),且让 DDB 把旧行带回来以便分清「行没了 / 条件没过」", async () => {
     const { updateSyncTaskIfExists } = await import("@/lib/sync/task-write");
     const r = await updateSyncTaskIfExists({
@@ -142,7 +141,7 @@ describe("同步任务行的状态写回:唯一写通道 + 条件写(B-08)", () 
     });
     expect(r.ok).toBe(true);
     const input = sent[0] as Record<string, unknown>;
-    expect(input.ConditionExpression, "调用方的条件不许替掉 attribute_exists —— 那是 B-08 的命根").toBe("attribute_exists(taskId) AND (#s <> :s)");
+    expect(input.ConditionExpression, "调用方的条件不许替掉 attribute_exists —— 那是条件写守卫的命根").toBe("attribute_exists(taskId) AND (#s <> :s)");
     expect(input.ReturnValuesOnConditionCheckFailure).toBe("ALL_OLD");
     expect("onlyIf" in input, "onlyIf 是本通道的参数,不许漏给 SDK").toBe(false);
     // 不带 onlyIf 时不要这个开销(与 ① 的字面一致)
@@ -194,7 +193,7 @@ describe("同步任务行的状态写回:唯一写通道 + 条件写(B-08)", () 
       /updateSyncTaskIfExists\s*\(/.test(rec.replace(/^\s*import[\s\S]*?;\s*$/gm, "")),
       "读时对账没走唯一写通道 —— 它的 task 来自**列表**(没有重新 Get),窗口最大"
     ).toBe(true);
-    // @kf-batch 37-sync-backfill —— 启动 / 后台轮询已原样搬到 lib/sync/start-run.ts ⇒ 这条路 = 路由 + 启动核心
+    // 启动 / 后台轮询已原样搬到 lib/sync/start-run.ts ⇒ 这条路 = 路由 + 启动核心
     const start =
       readFileSync(join(SRC, "app/api/sync/[id]/start/route.ts"), "utf8") + "\n" + readFileSync(join(SRC, "lib/sync/start-run.ts"), "utf8");
     const noImports = start.replace(/^\s*import[\s\S]*?;\s*$/gm, "");

@@ -5,7 +5,7 @@
 // fire-and-forget,记忆失败不影响主流程。actorId = projectId,namespace /paramadvisor/{actorId}。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { createHash } from "crypto";

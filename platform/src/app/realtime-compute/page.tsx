@@ -12,10 +12,10 @@ import {
 import Editor from "@monaco-editor/react";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
-// 序 72 B-139:执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
+// 执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
 import { useAuth } from "@/lib/auth/AuthProvider";
-// @kf-batch 50-WP4quater-reads(工单 SC-5)—— 实时作业按执行范围。用户 2026-09-10:
+// 实时作业按执行范围。用户 2026-09-10:
 // 「一定要加这个维度,不然白干了,所有任务都在自己的区域跑,不然没有意义。」
 // 列表按 `?scope=` 过滤;**新建时的默认落点 = 顶栏当前视角**(单区视角 ⇒ 就建在那个区)。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -23,7 +23,7 @@ import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 import { groupsFromToken } from "@/lib/auth/roles";
 import { useT } from "@/lib/i18n/useT";
 import { adviseFailure } from "@/lib/realtime/failure-advisor";
-// 序 46 B-107 — 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
+// 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
 
 const statusBadge: Record<string, any> = {
@@ -171,7 +171,7 @@ SELECT DATE_FORMAT(window_start, 'yyyy-MM-dd HH:mm:ss') AS window_start, region,
 FROM TABLE(TUMBLE(TABLE orders_src, DESCRIPTOR(ts), INTERVAL '1' MINUTE))
 GROUP BY window_start, window_end, region;`;
 
-// 模块32 多 source —— MySQL CDC(直接消费 binlog)→ S3 Table(Iceberg,小批次写入)。
+// 多 source —— MySQL CDC(直接消费 binlog)→ S3 Table(Iceberg,小批次写入)。
 // 源表用 'connector'='mysql-cdc'(Flink CDC 内嵌 Debezium 读 binlog);${SRC_*} 占位符启动时
 // 从所选「源数据源」的 Secrets Manager 注入(不入库)。目标为 S3 Table,原样同步(不聚合)。
 // 🔴 模板读的表必须在【本部署实际存在】。原模板写死 'table-name'='products',但 products 只由
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS s3t.\`\${S3TABLE_DB}\`.\`payments_cdc\` (
 INSERT INTO s3t.\`\${S3TABLE_DB}\`.\`payments_cdc\`
 SELECT payment_id, player_id, amount_usd, product_id, pay_time FROM payments_cdc;`;
 
-// 模块42 P42.6b/c — MSK/Kafka 源 → S3 裸文件(1 分钟滚动窗口聚合)。§11.4 定稿:
+// c — MSK/Kafka 源 → S3 裸文件(1 分钟滚动窗口聚合)。§11.4 定稿
 // 连接+认证全部占位注入(${KAFKA_TOPIC}/${KAFKA_AUTH_PROPS}),用户只写业务 schema/format/startup;
 // 启动时 resolveMskSource 按所选 MSK 数据源展开(bootstrap+IAM/SCRAM 认证,密钥不入库)。
 // 🔴 ${KAFKA_AUTH_PROPS} 是裸占位符(不在引号内),接在 'format'='json' 行后;guard 已验放行(§11.4)。
@@ -302,14 +302,14 @@ export default function RealtimeComputePage() {
   const [busyId, setBusyId] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null); // 非空=编辑模式(PUT),空=新建(POST)
-  // @kf-batch 50-WP18-flink-multi-region —— 新建时可**多选**执行区:流式作业天生一区一个应用 ⇒
+  // 新建时可**多选**执行区:流式作业天生一区一个应用 ⇒
   //   「一次发布多区」= 一次提交、每个区各建一个作业(用户 2026-09-15 点名)。
   const [newJobTargets, setNewJobTargets] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [sql, setSql] = useState(DEFAULT_SQL);
   const [sinkType, setSinkType] = useState("s3");
   const [sinkDsId, setSinkDsId] = useState<string | undefined>(undefined);
-  // 模块32 多 source:数据源类型(kinesis 默认 / mysql-cdc 直读 binlog)。
+  // 多 source:数据源类型(kinesis 默认 / mysql-cdc 直读 binlog)。
   const [sourceType, setSourceType] = useState("kinesis");
   const [cdcDsId, setCdcDsId] = useState<string | undefined>(undefined); // MySQL CDC 源数据源(端口以数据源为准)
   // MySQL CDC 网络选择(下拉:真实 VPC/子网/SG,平台不自动猜可达性,用户选哪个透传 MSAF)。
@@ -319,7 +319,7 @@ export default function RealtimeComputePage() {
   const [cdcVpc, setCdcVpc] = useState<string | undefined>(undefined);
   const [cdcSubnets, setCdcSubnets] = useState<string[]>([]);
   const [cdcSgs, setCdcSgs] = useState<string[]>([]);
-  const [mskTopic, setMskTopic] = useState(""); // 模块42 P42.6c:MSK 源主 topic(作业级,§11.4;注入 SQL 的 ${KAFKA_TOPIC})
+  const [mskTopic, setMskTopic] = useState(""); // MSK 源主 topic(作业级,§11.4;注入 SQL 的 ${KAFKA_TOPIC})
   const [datasources, setDatasources] = useState<any[]>([]);
   const [meta, setMeta] = useState<any>(null);
   const [saving, setSaving] = useState(false);
@@ -378,15 +378,15 @@ export default function RealtimeComputePage() {
       setJobs(d.success ? d.data : Array.isArray(d) ? d : []);
     } finally { setLoading(false); }
   };
-  // @kf-batch 50-WP4quater-reads —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)
+  // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)
   useEffect(() => {
     fetchJobs();
     fetchConnectors();
     // 🔴 源 / sink 数据源选择器也必须按区:在 usw2 建作业却挑到主控区的源,作业跑起来连不上
     fetch(`/api/datasources${scopeQs}`).then((r) => r.json()).then((d) => setDatasources((d.success ? d.data : d) || [])).catch(() => {});
     fetch(`/api/flink/meta?targetId=${encodeURIComponent(landingOfScope(scope))}`).then((r) => r.json()).then((d) => setMeta(d.success ? d.data : d)).catch(() => {});
-    // 模块32 多 source:拉真实 VPC/子网/SG 供 MySQL CDC 作业下拉选网络。
-    // @kf-batch 50-WP31-place-first-class —— 落点显式(分组 / 全部 = 主控区写明,后端不再缺省)
+    // 多 source:拉真实 VPC/子网/SG 供 MySQL CDC 作业下拉选网络。
+    // 落点显式(分组 / 全部 = 主控区写明,后端不再缺省)
     fetch(`/api/flink/network?targetId=${encodeURIComponent(landingOfScope(scope))}`).then((r) => r.json()).then((d) => {
       const n = d.success ? d.data : d;
       setNetVpcs(n?.vpcs || []); setNetSubnets(n?.subnets || []); setNetSgs(n?.securityGroups || []);
@@ -394,7 +394,7 @@ export default function RealtimeComputePage() {
     return () => clearInterval(pollRef.current);
   }, [scopeQs]);
 
-  // @kf-batch 50-B28b-flink-delete-async —— 有作业在「停止中 / 删除中」就 10s 后再拉一次,直到都稳定
+  // 有作业在「停止中 / 删除中」就 10s 后再拉一次,直到都稳定
   //   (删除已受理的作业会自己从列表消失 —— 用户点一次就够,不用守着刷新)。换范围时清掉旧定时器。
   useEffect(() => {
     if (!jobs.some((j) => j?.status === "stopping" || j?.status === "deleting")) return;
@@ -456,7 +456,7 @@ export default function RealtimeComputePage() {
       const finalSql = (isMsk && mskTopic.trim()) ? sql.replace(/\$\{KAFKA_TOPIC\}/g, mskTopic.trim()) : sql;
       const payload = {
         name: name.trim(), sql: finalSql, sinkType, sinkDatasourceId: sinkDsId,
-        // 模块32/42 多 source:所选源数据源(CDC=MySQL 源;MSK=MSK 数据源;kinesis=Kinesis 数据源,可选留空回退默认流)。
+        // 多 source:所选源数据源(CDC=MySQL 源;MSK=MSK 数据源;kinesis=Kinesis 数据源,可选留空回退默认流)。
         sourceType,
         sourceDatasourceId: (isVpcSource || sourceType === "kinesis") ? cdcDsId : undefined,
         connectorIds: sinkType === "custom" ? connectorIds : undefined,
@@ -473,7 +473,7 @@ export default function RealtimeComputePage() {
           ? {}
           : newJobTargets.length
           ? { targets: newJobTargets }
-          : { targetId: landingOfScope(scope) }), // @kf-batch 50-WP31-place-first-class —— 显式落点(后端缺 ⇒ 400)
+          : { targetId: landingOfScope(scope) }), // 显式落点(后端缺 ⇒ 400)
         runtimeProperties: (() => {
           const byGroup: Record<string, Record<string, string>> = {};
           runtimeProps.forEach(({ g, k, v }) => {
@@ -551,7 +551,7 @@ export default function RealtimeComputePage() {
       if (d.success === false) { message.error(d.error?.message || t("AI 生成失败")); return; }
       setSql(d.data.sql);
       message.success(t("已用 AI 生成 Flink SQL,请检查后创建"));
-      // 模块45:cookbook 方言校验回显(规则标题是数据不翻译,框架文案走 t())。
+      // cookbook 方言校验回显(规则标题是数据不翻译,框架文案走 t())。
       const dia = d.data.dialect;
       if (dia?.fixed?.length) {
         message.info(t("已按平台方言规则自动修正 {n} 处", { n: dia.fixed.length }) + ": " + dia.fixed.map((f: any) => f.title).join("；"));
@@ -644,7 +644,7 @@ export default function RealtimeComputePage() {
       const r = await fetch(`/api/flink/jobs/${id}`, { method: "DELETE" });
       const d = await r.json();
       if (d.success === false) { message.error(d.error?.message || t("删除失败")); return; }
-      // @kf-batch 50-B28b-flink-delete-async —— 202 = 已受理、后台做完(列表显示「删除中」直到消失)
+      // 202 = 已受理、后台做完(列表显示「删除中」直到消失)
       if (d.data?.deleting) message.info(d.data?.message || t("删除已受理,停稳后会自动销毁并从列表移除"));
       else message.success(t("已删除(并清理 MSAF 应用)"));
       fetchJobs();
@@ -741,7 +741,7 @@ export default function RealtimeComputePage() {
     { title: t("作业名称"), dataIndex: "name", render: (v: string, r: any) => <a onClick={() => openDetail(r)}><b>{v}</b></a> },
     { title: t("状态"), dataIndex: "status", render: (v: string) => <Badge status={statusBadge[v] || "default"} text={statusLabel[v] ? t(statusLabel[v]) : v} /> },
     { title: t("引擎"), render: () => <Tag color="geekblue">MSAF Flink {meta?.versionLabel || ""}</Tag> },
-    // 🔴 @kf-batch 50-WP27-9cap-matrix:优先显示**读侧派生**的真实源流。落库的 `sourceStream` 是
+    // 🔴 优先显示**读侧派生**的真实源流。落库的 `sourceStream` 是
     //   建作业时的快照(默认名 `bgp-flink-source` 那条流**根本不存在** —— 平台刻意不建固定流),
     //   显示它就是在说一条不存在的流的名字。派生值由后端经 `resolveKinesisStreamName` 给出。
     { title: t("源流"), dataIndex: "sourceStream", render: (v: string, r: any) => <Tag>{r.sourceStreamResolved || v}</Tag> },
@@ -749,7 +749,7 @@ export default function RealtimeComputePage() {
     {
       title: t("操作"), key: "action", render: (_: any, r: any) => (
         r.status === "stopping" || r.status === "deleting" ? (
-          // @kf-batch 50-B28b-flink-delete-async —— 引擎还在过渡态:启动 / 编辑 / 删除都不给点(点了只会被拒);列表自动刷新到稳定
+          // 引擎还在过渡态:启动 / 编辑 / 删除都不给点(点了只会被拒);列表自动刷新到稳定
           <Space size="small">
             <Tooltip title={r.status === "deleting" ? t("删除已受理,停稳后会自动销毁并从列表移除") : t("引擎正在停止,停稳后可再操作")}>
               <span style={{ color: "#888", cursor: "not-allowed" }}>{r.status === "deleting" ? t("删除中") : t("停止中")}</span>
@@ -824,7 +824,7 @@ export default function RealtimeComputePage() {
         <div style={{ marginBottom: 12 }}>
           <Input placeholder={t("作业名称,例如:每分钟各区域成交额")} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        {/* @kf-batch 50-WP18-flink-multi-region —— 🔴 新建时可**多选**执行区(用户 2026-09-15:
+        {/* 🔴 新建时可**多选**执行区(用户 2026-09-15:
             「我不是让你在美东1 发布执行多个区域吗?」)。流式作业天生一区一个应用 ⇒ 这里的语义是
             **每个区各建一个作业**(名字自动带区后缀),而不是一个作业跑两区 —— 标签上把这句话说清楚,
             否则用户会以为「一个作业同时在两区跑」。🔴 只勾一个时多选长得像单选,必须有可见标签 + 计数标签。 */}
@@ -880,7 +880,7 @@ export default function RealtimeComputePage() {
                 options={datasources.filter((d: any) => (d.type || "").includes("mysql")).map((d: any) => ({ label: `${d.name}(${(d.host || "").split(".")[0]}/${d.database})`, value: d.datasourceId }))} />
             </>
           )}
-          {/* 模块42 P42.7c 多源:Kinesis 源第二层——下拉自动列出已注册的 Kinesis 数据源(选即可,免手敲)。
+          {/* 多源:Kinesis 源第二层——下拉自动列出已注册的 Kinesis 数据源(选即可,免手敲)。
               没有想要的?去「数据源」页新建 Kinesis 流(可新建/选已有)。选中的流启动时注入 SQL 的 ${SOURCE_STREAM_ARN}。 */}
           {sourceType === "kinesis" && (
             <>
@@ -891,7 +891,7 @@ export default function RealtimeComputePage() {
                 options={datasources.filter((d: any) => d.type === "kinesis").map((d: any) => ({ label: `${d.name}(${d.connection?.streamName || "-"})`, value: d.datasourceId }))} />
             </>
           )}
-          {/* 模块42 P42.6c:MSK/Kafka 源第二层——列出已注册的 MSK 数据源(连接+认证+topic 都在数据源里,选即可)。
+          {/* MSK/Kafka 源第二层——列出已注册的 MSK 数据源(连接+认证+topic 都在数据源里,选即可)。
               没有?去「数据源」页新建 MSK 源(选托管集群/自建 + IAM/SCRAM)。启动时注入 ${KAFKA_TOPIC}/${KAFKA_AUTH_PROPS}。 */}
           {sourceType === "msk" && (
             <>
@@ -1036,7 +1036,7 @@ export default function RealtimeComputePage() {
           }}
           title={t("Flink 资源参数智能顾问")}
         />
-        {/* 执行角色(序 72 B-139:账号内任何 kinesisanalytics.amazonaws.com 可承担的角色都能选;留空=该区平台 Flink 运行角色;落点 = 编辑中作业的章 / 新建时第一个绑定区 / 当前范围) */}
+        {/* 执行角色(账号内任何 kinesisanalytics.amazonaws.com 可承担的角色都能选;留空=该区平台 Flink 运行角色;落点 = 编辑中作业的章 / 新建时第一个绑定区 / 当前范围) */}
         <div style={{ marginTop: 12 }}>
           <span style={{ color: "#888", fontSize: 12 }}>{t("执行角色")}</span>
           <ExecutionRolePicker

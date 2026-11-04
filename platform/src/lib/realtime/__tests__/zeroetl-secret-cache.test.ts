@@ -1,5 +1,4 @@
-// @kf-batch 50-G7-P0P1P2
-// G6/G7(模块 50)—— zero-etl admin secret 缓存的**站点级**单测。
+// G6/G7—— zero-etl admin secret 缓存的**站点级**单测。
 //
 // 【为什么必须有这个文件】外部审核 v2 **P2-2**:"Zero-ETL 既有测试没有覆盖复合 key / 失活"。
 // 这是 R9 才发现的**第二个**凭证缓存 —— `redshift/execute` 与 zero-etl 是两条分叉,
@@ -47,7 +46,7 @@ describe("复合键:按 (targetId, project, purpose) 分槽", () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
-  it("不同 project 各成一槽(为 P52.5a 的 per-project 凭证预留)", async () => {
+  it("不同 project 各成一槽(为  per-project 凭证预留)", async () => {
     sendMock.mockResolvedValue({ ARN: "arn:zeroetl" });
     await getZeroEtlSecretArn({ project: "proj_a" });
     await getZeroEtlSecretArn({ project: "proj_b" });

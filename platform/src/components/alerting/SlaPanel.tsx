@@ -3,8 +3,8 @@
 // SLA 基线预警面板(原 /sla 页,2026-07-13 调度运维收敛并入告警中心作 Tab;
 // 功能零删减:SLA CRUD/基线学习与展示/破线预测标签/FeatureGuide)。
 
-// 模块 43-B — SLA 基线预警。两块:①SLA 定义(选任务/工作流 → 承诺完成时刻 → 预警提前量 → 通道)
-// CRUD;②基线只读展示 + 重新学习。破线预测在运行途中由 /api/sla/predict 滚动计算并经模块34通道推送。
+// SLA 基线预警。两块:①SLA 定义(选任务/工作流 → 承诺完成时刻 → 预警提前量 → 通道)
+// CRUD;②基线只读展示 + 重新学习。破线预测在运行途中由 /api/sla/predict 滚动计算并通道推送。
 
 import React, { useEffect, useState } from "react";
 import {
@@ -14,7 +14,7 @@ import {
 import { PlusOutlined, ReloadOutlined, AlertOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import FeatureGuide from "@/components/common/FeatureGuide";
-// @kf-batch 50-WP4quater-reads(工单 SC-36)—— 「给哪个任务定 SLA」的候选必须按执行范围过滤。
+// 「给哪个任务定 SLA」的候选必须按执行范围过滤。
 // 🔴 注意本文件里 `targetId` 是**表单字段名**(SLA 绑的任务/工作流 id),与执行目标不是一回事;
 // 执行范围一律用下面的 `execScopeQs`,别把两个概念混进同一个名字。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -38,7 +38,7 @@ export default function SlaPanel({ active }: { active: boolean }) {
   const load = () => {
     setLoading(true);
     Promise.all([
-      // @kf-batch 50-WP4quater-reads(工单 SC-15)—— 两条都按执行范围:
+      // 两条都按执行范围
       // SLA 行的区维派生自绑定对象;基线由服务端**摊平成「任务 × 区」**返回(一行一区)。
       fetch(`/api/sla${execScopeQs}`).then((r) => r.json()),
       fetch(`/api/baseline${execScopeQs}`).then((r) => r.json()),
@@ -149,7 +149,7 @@ export default function SlaPanel({ active }: { active: boolean }) {
     { title: t("任务"), dataIndex: "taskName", key: "taskName", render: (v: string, r: any) => v || r.taskId?.slice(-12) },
     { title: t("类型"), dataIndex: "taskType", key: "taskType", render: (v: string) => v ? <Tag>{v}</Tag> : "—" },
     {
-      // @kf-batch 50-WP4quater-reads(工单 SC-15)—— 一行一区。`legacy` = 落章之前学出来的基线,
+      // 一行一区。`legacy` = 落章之前学出来的基线,
       // 它没有区维,如实标出来而不是冒充成某个区自己的数字。
       title: t("执行区"), key: "targetId", width: 150,
       render: (_: any, r: any) => (

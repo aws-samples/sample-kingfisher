@@ -1,4 +1,3 @@
-// @kf-batch 50-W5-seg1-WP3
 // 执行环境 **per-target 执行角色**的唯一作者(50 SPEC v3.21 §6.1 段二落地口径 1–2)。
 //
 // 【为什么单独一个文件】四类角色(glue / emr / redshift-copy / dms-kinesis)分别建在 core / redshift / dms 三个栈里,
@@ -89,7 +88,7 @@ export function bucketArnPair(partition: string, bucketName: string): string[] {
 
 /**
  * 本 target 所在区**任意** S3 Tables 表桶的 ARN(`bucket/*` 同时匹配 `bucket/<名>` 与其下 `/table/<id>`)。
- * B-127(2026-10-27):执行区 Glue / EMR 角色对 S3 Tables 的授权从「只有本区平台表桶」放到「本区任意表桶」—— 客户自有表桶在
+ * 执行区 Glue / EMR 角色对 S3 Tables 的授权从「只有本区平台表桶」放到「本区任意表桶」—— 客户自有表桶在
  * 「系统设置 → 数据湖外部表桶」登记后要能被该区的同步作业写入(此前登记了也写不了:角色只认平台表桶)。仍由 ARN 的 region 段绑区
  * (不跨区),与主控区同类角色 `s3tables:* on *`(区条件)口径一致;「哪些桶可写」的准入在平台侧按登记表判(platform lib/sync/table-bucket.ts),
  * IAM 不再是第二道按桶名的门。

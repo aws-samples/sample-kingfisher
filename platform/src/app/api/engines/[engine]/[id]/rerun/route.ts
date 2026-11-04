@@ -10,7 +10,6 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { isEngineType, getProvider } from "@/lib/engines/registry";
-// @kf-batch 50-W5-seg2-WP10a
 import { residencyErrorResponse, userActor } from "@/lib/exec-env/residency-audit";
 
 const USER_ID = "default-user";
@@ -40,7 +39,7 @@ export async function POST(
   const runDate = prev?.runDate || undefined;
 
   try {
-    // @kf-batch 50-W5-seg2-WP10a —— 行为主体传给 provider 写区域审计(重跑不带 targetId ⇒ home,同意前置为空操作;残留错误仍映射)
+    // 行为主体传给 provider 写区域审计(重跑不带 targetId ⇒ home,同意前置为空操作;残留错误仍映射)
     const res = await getProvider(params.engine).submit(job, { runDate, triggeredBy: "rerun", actor: userActor(guard.identity) });
     recordAudit(req, `engine.${params.engine}.rerun`, {
       resourceType: "engine-job",

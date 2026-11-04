@@ -1,5 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP28-platform-action-node(WP-29 问数 · CAP-GENBI)
+// (问数 · CAP-GENBI)
 // POST /api/genbi/cards/[cardId]/refresh  { turnIndex? }  —— 「立即刷新」:重跑卡片里那条 SQL,刷新**同一张**卡并留一份快照。
 //
 // 🔴 与定时刷新**同一个作者** `refreshCardOnce`(白名单 genbi.card-refresh 的 author 就是它)。

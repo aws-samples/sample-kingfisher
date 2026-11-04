@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 37 v2 — 仪表盘拖拽网格(治"死板")。封装 react-grid-layout v2,对页面暴露极简 API。
+// 仪表盘拖拽网格(治"死板")。封装 react-grid-layout v2,对页面暴露极简 API。
 // 隔离红线:react-grid-layout 的 import 只在此文件(+ 页面用我导出的组件)。布局用 {i,x,y,w,h}=RGL 原生格式
 //(v1 设计时留的后路),存储/API/校验零改动。
 //

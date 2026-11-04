@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 🔴🔴 **装配层判据**(WORK-PACKAGES WP-9 施工序 1–2)—— 只 mock **真外部**:
+// 🔴🔴 **装配层判据**(2)—— 只 mock **真外部**:
 //   DynamoDB(内存假表,真求值条件表达式)/ Redshift Data · Secrets Manager · Redshift Serverless(FakeAws)/
 //   执行环境注册表 / 项目台账。
 //   runner ↔ store ↔ supply handler ↔ **真**闭合执行器(submit / settle / provisionProjectLogin)↔ statement 原语 ↔
@@ -155,11 +154,11 @@ describe("🔴🔴 JB-3:一次供给走到底(真执行器 · 真 statement 原�
     expect(settled[0].actor, "结果审计不是记在发起者名下").toBe(ACTOR.actor);
   });
 
-  // @kf-batch 50-WP31-place-first-class(序 31 第二刀 ① = B-98)
+  // (=)
   // 🔴 第二条数据面通道(admin-DDL 执行器)原来只做准入、不记落点决策 ⇒ observe 观测器把本就该落到 us-west-2 的
   //   redshift-data / secretsmanager 调用判成 cross-region(第三十九 / 四十轮 16 / 12 条全是它);enforce 一开会误拦。
   //   装配层钉**事实**:真执行器 + 真 statement 原语跑一遍,提交请求与收口请求(两个请求存储)各自的决策袋都含该 target。
-  it("🔴 B-98 submit / settle / 供给作业的每一步都把 tgt_usw2_a 记进各自请求的落点决策袋(via admin-ddl-executor)", async () => {
+  it("🔴 submit / settle / 供给作业的每一步都把 tgt_usw2_a 记进各自请求的落点决策袋(via admin-ddl-executor)", async () => {
     const place = await import("@/lib/place/context");
     const decided = () => place.decisionsOfCurrentRequest().decisions.filter((d) => d.via === "admin-ddl-executor").map((d) => d.targetId);
     try {

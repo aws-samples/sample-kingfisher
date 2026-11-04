@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47c-catalog-ddl —— 「写了 ≠ 接上了」:数据目录建表 / 改表的接缝判据(查调用位置,不查 token 出现过)。
+// 「写了 ≠ 接上了」:数据目录建表 / 改表的接缝判据(查调用位置,不查 token 出现过)。
 //   ① 四条路由存在;写路由落点来自请求体 / URL 的 targetId(requestedTargetId / validateCreateSpec),不读 scope;
 //   ② prod 门控:两条写路由都走 isProtectedEnv(getActiveEnv) ⇒ createApproval(type = DDL_APPROVAL_TYPE),审批路由批准分支调 executeApprovedDdl;
 //   ③ 改表编排:区域审计写在执行**之前**;非主控区先写台账 pendingAlter 再调执行器 alter-model-table;执行器模板已登记;
@@ -44,7 +44,7 @@ describe("② prod 门控与审批", () => {
     expect(create).toContain("if (isProtectedEnv(env))");
     expect(create).toContain("type: DDL_APPROVAL_TYPE");
     expect(create).toMatch(/apiOk\(\{ pending: true, approvalId: approval\.approvalId, env[^}]*\}, 202\)/);
-    // 改表(模块 55 / 序 50):三个分支都要先读目标区真实列 ⇒ 整段进执行体;路由只按环境选 mode,执行体里建审批单并以 202 同形回
+    // 改表:三个分支都要先读目标区真实列 ⇒ 整段进执行体;路由只按环境选 mode,执行体里建审批单并以 202 同形回
     const alter = code("app/api/governance/tables/alter/route.ts");
     expect(alter).toContain("const env = getActiveEnv(req)");
     expect(alter).toContain('const mode = isProtectedEnv(env) ? "request-approval" : "execute"');
@@ -57,7 +57,7 @@ describe("② prod 门控与审批", () => {
   it("审批路由:批准 ddl 单 ⇒ executeApprovedDdl(payload 形状先过 isDdlApprovalPayload)", () => {
     const c = code("app/api/approvals/[id]/route.ts");
     expect(c).toContain('if (decision === "approved" && approval.type === DDL_APPROVAL_TYPE)');
-    // 模块 55 / 序 50:执行搬进执行体(approval-execute-ddl),路由先验形状再提交;执行体由批准人身份派生 actor 调 executeApprovedDdl
+    // 执行搬进执行体(approval-execute-ddl),路由先验形状再提交;执行体由批准人身份派生 actor 调 executeApprovedDdl
     before(c, "isDdlApprovalPayload(approval.payload)", 'kind: "approval-execute-ddl"', "先验形状再提交");
     const ex = code("lib/governance/long-ops.ts");
     expect(ex).toMatch(/executeApprovedDdl\(payload, actorContextOf\(ctx\.identity\)\)/);

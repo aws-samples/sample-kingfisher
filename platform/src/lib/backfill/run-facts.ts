@@ -1,14 +1,14 @@
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(客户 2026-10-19 反馈 b,台账 B-101)
+// (客户 2026-10-19 反馈 b,台账)
 // 补数实例的「可观测事实」唯一作者:把实例行(bgp-backfill-instances)与它底层那条 run(bgp-task-runs)
 // 的终态 / 错误 / 行数指标 / 日志定位键**合成一份**给页面;以及「成功但 0 行」的判定与提示。
 //
 // 【为什么单独一个文件】补数页此前只画状态色块:成功 / 失败各一个字,「成功但目标表没数据」在页面上与
 // 「成功且写了 10 万行」长得一模一样,日志只能去任务监控页按运行找、两页之间没有跳转。写入行数 / 日志键
-// 本来就在 run 行上(同步任务 `metrics.rowsWritten`,序 37 B-62;Redshift 语句本批补 `metrics.rowsAffected`),
+// 本来就在 run 行上(同步任务 `metrics.rowsWritten`,;Redshift 语句本批补 `metrics.rowsAffected`),
 // 缺的是**把它们接到实例上**。这里是接缝的唯一作者:路由 / 页面只消费,不各自去读 run 表。
 //
 // 🔴 行数语义诚实化:
-//   · `rowsWritten`(number):有机器可读的写入侧指标 —— 同步任务取 `metrics.rowsWritten`(写入侧,序 37 B-62),
+//   · `rowsWritten`(number):有机器可读的写入侧指标 —— 同步任务取 `metrics.rowsWritten`(写入侧),
 //     Redshift SQL 作业 / 工作流 SQL 节点取 `metrics.rowsAffected`(Data API `ResultRows` 之和 = 受影响行数);
 //   · `null`:这类运行**不产出**行数指标(EMR 作业、Glue PySpark 脚本作业等)⇒ 页面写「未上报」,不写 0,
 //     「不知道」与「零」是两个事实(与 verify-script-quality-lesson 同一条铁律)。
@@ -39,7 +39,7 @@ export interface BackfillRunFacts {
   glueJobName: string | null;
   glueJobRunId: string | null;
   statementId: string | null;
-  /** run 行的章(实际执行区)。字段名刻意不叫 targetId:这不是落点入参,是 run 行上已盖的章的投影(WP-31 落点棘轮只盯入参签名) */
+  /** run 行的章(实际执行区)。字段名刻意不叫 targetId:这不是落点入参,是 run 行上已盖的章的投影(落点棘轮只盯入参签名) */
   stampedTargetId: string | null;
 }
 

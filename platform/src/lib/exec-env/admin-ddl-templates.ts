@@ -1,5 +1,4 @@
-// @kf-batch 50-G2R
-// G2R(模块 50)—— admin-DDL 的**私有模板注册表**(50 SPEC §3.9a v3.3,用户拍板 B)。
+// G2R—— admin-DDL 的**私有模板注册表**(50 SPEC §3.9a v3.3,用户拍板 B)。
 //
 // 这里是新的**真安全边界**:SQL 不再由调用方提供,而是由每个 operation 的私有 builder 生成。
 // 调用方只能传 `{operation, targetId, projectId, …}`;产物是 branded type,模块外构造不出。
@@ -12,7 +11,7 @@
 //      CREATE TABLE IF NOT EXISTS / DELETE FROM / DROP TABLE / INSERT INTO … VALUES
 //    而旧的 `assertNotUserDataRead` **blanket 禁 INSERT/DELETE** ⇒ 直接接线会把码表落地判死。
 //    定案:本 admin 模板**只管结构 + 权限**;**数据写入不走 admin**。所以 `land-code-table` 的模板里
-//    **没有 INSERT/DELETE** —— 数据写入由窄权 `shared_writer` 执行(@kf-batch 50-WP11b-shared-writer,
+//    **没有 INSERT/DELETE** —— 数据写入由窄权 `shared_writer` 执行(
 //    SPEC §3.9d:`modeling/landing.ts` 非 home 分支用它的 secret 直调 `execOnTarget`)。
 //
 // 🔴 **G2R 口径**:本文件生产调用 0 处、不改现网行为;**P0-4 仍未关闭**。
@@ -23,7 +22,7 @@ import {
   type VerifiedAdminDdlContext,
 } from "@/lib/exec-env/admin-ddl-request";
 import { SHARED_SCHEMA, projectDbUserName, projectRoleName, projectSchema } from "@/lib/exec-env/project-schema";
-// @kf-batch 50-WP11b-shared-writer —— 落点 / 窄权写者名的唯一作者 + 建模 DDL 的唯一作者(模板只 brand,不再拼一遍)
+// 落点 / 窄权写者名的唯一作者 + 建模 DDL 的唯一作者(模板只 brand,不再拼一遍)
 import {
   assertPlatformGlobalSchema,
   codeTableLandingFqn,
@@ -31,9 +30,9 @@ import {
   type LandingFqn,
 } from "@/lib/modeling/landing-fqn";
 import { buildCodeTableCreateStatement, buildCreateTableStatements } from "@/lib/modeling/redshift";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 图形化改表的语句作者(与 home 路径同一份)
+// 图形化改表的语句作者(与 home 路径同一份)
 import { buildAlterTableStatements, isEmptyAlterPlan } from "@/lib/modeling/alter";
-// @kf-batch 50-WP9a-durable-jobs —— canary 探针名的唯一作者(与判据侧 permission-canary.ts 同源)
+// canary 探针名的唯一作者(与判据侧 permission-canary.ts 同源)
 import { CANARY_DENY_SCHEMA, CANARY_TABLE } from "@/lib/exec-env/canary-names";
 
 /**
@@ -87,7 +86,6 @@ type TemplateBuilders = {
 };
 
 /**
- * @kf-batch 50-WP11b-shared-writer
  * 建模类 operation 的落点:**只**来自执行器第 2 步服务端读台账得到的 `context.modelingObject`,
  * 且必须与 request 里的 id 对得上(防「拿 A 的台账行去建 B」)、必须过门② 落点守卫。
  * 🔴 缺 / 对不上 ⇒ 抛 —— 宁可炸,不许回落任何默认名(那就是第三个作者)。
@@ -120,7 +118,6 @@ function schemaOf(ctx: VerifiedAdminDdlContext, projectId: string): string {
 const builders: TemplateBuilders = {
   "create-project-schema": (req, ctx) => {
     const schema = schemaOf(ctx, req.projectId);
-    // @kf-batch 52-P52.5a-supply
     // 🔴🔴 **真环境第一次执行就逮到的真 bug(原来这里写的是 `OWNER TO role_proj_…`)**:
     // Redshift 的 `ALTER SCHEMA … OWNER TO <name>` 里 `<name>` 必须是 **user**,**role 不能当属主**。
     // 真环境报错原文:`ERROR: user "role_proj_proj_01m1…" does not exist` ——
@@ -145,7 +142,7 @@ const builders: TemplateBuilders = {
   "create-shared-schema": () => [
     brandStatement(`CREATE SCHEMA IF NOT EXISTS ${ident(SHARED_SCHEMA)}`),
     // 🔴 shared 只给**只读**;写入由窄权 shared-writer 承担(§4.6)。
-    // 🔴 绝不 `GRANT ... TO PUBLIC`(那是 52 P52.1 要撤的 6 处存量授权的形状)。
+    // 🔴 绝不 `GRANT ... TO PUBLIC`(那是要撤的 6 处存量授权的形状)。
   ],
 
   "create-role": (req) => [brandStatement(`CREATE ROLE ${ident(projectRoleName(req.projectId))}`)],
@@ -162,7 +159,6 @@ const builders: TemplateBuilders = {
     ];
   },
 
-  // @kf-batch 52-P52.5a-supply
   // 把项目 role 授给该项目的**登录用户**。两个名字都来自 SSOT(`project-schema.ts`),
   // 语句里**没有任何字面量** ⇒ 产物进审计完全安全,这正是它能留在模板里、
   // 而 `CREATE USER … PASSWORD '…'` 不能的原因(见 `admin-ddl-request.ts` 同名分支的说明)。
@@ -184,12 +180,12 @@ const builders: TemplateBuilders = {
     // + `CREATE SCHEMA ... AUTHORIZATION dms_ingest`。
     // 🔴 口令**不进模板**:模板产物会进审计,口令绝不能落审计/日志。
     // 定案:用户创建与口令设置由执行器在函数内调 `CREATE USER ... PASSWORD` 的**参数化路径**完成
-    // (P52.5a 交付);本模板只负责**幂等的 schema + 授权**部分,故 DMS bootstrap 功能保留、
+    // (交付);本模板只负责**幂等的 schema + 授权**部分,故 DMS bootstrap 功能保留、
     // 但口令那一段不经模板。
     brandStatement(`CREATE SCHEMA IF NOT EXISTS ${ident(DMS_INGEST_SCHEMA)} AUTHORIZATION ${ident(DMS_INGEST_USER)}`),
   ],
 
-  // @kf-batch 50-WP11b-shared-writer —— 🔴 改造(原来落 `shared.code_<id>`、列 `code/label/sort_order`,零生产调用方):
+  // 🔴 改造(原来落 `shared.code_<id>`、列 `code/label/sort_order`,零生产调用方):
   //   落点走 `codeTableLandingFqn()`,建表语句**就是** home 落地用的那一条(`buildCodeTableCreateStatement`)
   //   ⇒ 列定义只有一个作者;home 建出来的表与非 home 建出来的表逐字节同构。
   //   🔴 见文件头:admin 通道只做**结构 + 权限**,不做数据写入(灌数由窄权 shared_writer 做)。
@@ -203,10 +199,10 @@ const builders: TemplateBuilders = {
     ];
   },
 
-  // @kf-batch 50-WP11b-shared-writer(SPEC §3.9d.2)—— **逐表**授权给窄权写者。
+  // (SPEC §3.9d.2)—— **逐表**授权给窄权写者。
   // 🔴 只有 USAGE(没有 CREATE)+ 这一张码表的四个 DML 权;**绝不** `ON ALL TABLES IN SCHEMA`
   //    (那会让它能写将来任何进这个 schema 的表 —— 枚举违规写法式的思路,漏的一定是第 N+1 张)。
-  //    ⇒ 「admin 模板显式授过的那几张表」就是它能写的全集;负向判据 E-230 因此可判。
+  //    ⇒ 「admin 模板显式授过的那几张表」就是它能写的全集;负向判据因此可判。
   "grant-shared-writer": (req, ctx) => {
     const f = modelingLanding(ctx, { kind: "code-table", id: req.codeTableId });
     const w = ident(sharedWriterUserName());
@@ -216,9 +212,9 @@ const builders: TemplateBuilders = {
     ];
   },
 
-  // @kf-batch 50-WP11b-shared-writer(SPEC §3.9d.6)—— 维度/事实表建表(纯 DDL)。
+  // (SPEC §3.9d.6)—— 维度/事实表建表(纯 DDL)。
   // 🔴 DDL **直接 brand `buildCreateTableStatements` 的产物**,绝不自己再拼(否则类型归一化 / 主键子句 /
-  //    COMMENT 转义各一份 ⇒「home 建出来的表和非 home 不一样」,而两边各自看都是对的;E-234 对照判据钉它)。
+  //    COMMENT 转义各一份 ⇒「home 建出来的表和非 home 不一样」,而两边各自看都是对的;对照判据钉它)。
   // 末尾两条 GRANT 是**只读**观测权:落地后要「再观测一次」(§3.8),而 information_schema 只列出当前用户
   //    有权的表 ⇒ 窄权写者对这张表**只有 SELECT**(没有任何写权;它不是这张表的写者)。
   "land-model-table": (req, ctx) => {
@@ -232,7 +228,7 @@ const builders: TemplateBuilders = {
     ];
   },
 
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 图形化改表(非主控区)。语句**只**从台账上的 `pendingAlter` 计划生成
+  // 图形化改表(非主控区)。语句**只**从台账上的 `pendingAlter` 计划生成
   //   (调用方 `lib/modeling/alter-service.ts` 先把计划写进台账再调执行器;home 路径用同一个 `buildAlterTableStatements`)。
   //   没有计划 / 空计划 ⇒ 抛(no-op 不许冒充 fail-closed)。DROP COLUMN 的不可逆确认在路由层(输入表名)。
   "alter-model-table": (req, ctx) => {
@@ -244,20 +240,20 @@ const builders: TemplateBuilders = {
     return buildAlterTableStatements({ schema: f.schema, physicalTable: f.table, plan: o.pendingAlter }).map(brandStatement);
   },
 
-  // @kf-batch 50-WP11b-shared-writer —— 建模落地表的 DROP(强制重建 / 解绑并清理)。
-  // 窄权写者刻意没有 DROP 权(E-230 ②),所以这一步只能是 admin 模板;要删的表只来自台账(不收调用方的表名)。
+  // 建模落地表的 DROP(强制重建 / 解绑并清理)。
+  // 窄权写者刻意没有 DROP 权,所以这一步只能是 admin 模板;要删的表只来自台账(不收调用方的表名)。
   "drop-landed-table": (req, ctx) => {
     const f = modelingLanding(ctx, { kind: req.kind, id: req.objectId });
     return [brandStatement(`DROP TABLE IF EXISTS ${ident(f.schema)}.${ident(f.table)}`)];
   },
 
-  // @kf-batch 50-WP9a-durable-jobs —— permission canary 的探针(WORK-PACKAGES WP-9 ④-3)。
+  // permission canary 的探针(④-3)。
   // 三张同名空表,各自的授权就是判据要测的东西:
   //   · `proj_<id>.bgp_canary` —— 授本项目 role **SELECT**(C-2 正控制:读自己的必须成功);
   //   · `shared.bgp_canary`    —— 授本项目 role **SELECT**(C-4 读 shared 成功;C-5 往里写必须被拒);
   //   · `bgp_canary_deny.bgp_canary` —— 🔴 **不授任何人**(C-3 读它必须 permission denied)。
   // 🔴 必须显式逐表 GRANT:`grant` 模板的 `ON ALL TABLES IN SCHEMA` 只覆盖**授权那一刻已存在**的表
-  //    (WP-9 ② 第 11 行),探针表是后建的 ⇒ 不补这两条,C-2 / C-4 会因为「没授权」而红,判据就测错了东西。
+  //    (② 第 11 行),探针表是后建的 ⇒ 不补这两条,C-2 / C-4 会因为「没授权」而红,判据就测错了东西。
   // 🔴 只建结构 + 只读授权:没有 INSERT / DELETE / DROP(表空着即可,`count(*)` 就是读)。
   "create-canary-probes": (req, ctx) => {
     const schema = schemaOf(ctx, req.projectId);
@@ -273,7 +269,7 @@ const builders: TemplateBuilders = {
     ];
   },
 
-  // @kf-batch 50-WP9a-durable-jobs —— 进 isolated 的前置(WORK-PACKAGES WP-9 ⑨-7)。
+  // 进 isolated 的前置(⑨-7)。
   // Redshift 默认给 PUBLIC 授 `CREATE ON SCHEMA public` ⇒ 不撤的话,项目身份照样能往 public 里建表,
   // 「新写入不再落 public」就只是约定。撤掉之后 C-6 才可能判 pass。
   // 🔴 这是**收紧**而不是放开;但它会让依赖「往 public 建表」的非 admin 身份当场报错 ⇒ 只由管理员显式触发

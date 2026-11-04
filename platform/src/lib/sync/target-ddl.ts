@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 /**
  * 同步向导「生成 DDL / 执行 DDL」的**唯一作者**:建表参数 ⇒ 目标表全名 + 建表语句。
  *

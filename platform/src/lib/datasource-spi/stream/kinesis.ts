@@ -1,14 +1,14 @@
-// 模块 42 — Kinesis provider(流范式 stream,P42.7a)。
+// Kinesis provider(流范式 stream)。
 //
 // 【为什么】实时计算(Flink)要支持多数据源、两层选择、按需新建源。Kinesis 是流范式首个 provider,
 // 把此前散落在 realtime-compute/page.tsx 的硬编码 kinesis 源接线收编到 SPI(与 mysql-cdc 走 datasourceId 同构)。
 // 见 DESIGN.md §10.3。MSK(§6.4)是同范式姊妹,收编底座就位后加它 = registry 加一行。
 //
 // 连接袋:{streamName, region}。凭证=iam-role(用 FlinkRole/平台角色,无需存密钥 → 无 secret)。
-// P42.7a 只做【读能力】(introspect/ping/buildConnection);provision(新建流)见 P42.7b。
+// 只做【读能力】(introspect/ping/buildConnection);provision(新建流)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import {
   KinesisClient,
@@ -26,7 +26,7 @@ import type {
   DataSourceCapabilities,
 } from "../types";
 
-// L4 过渡:语义是缺省回落主控区(静默默认值类),序 6 再按落点改
+// L4 过渡:语义是缺省回落主控区(静默默认值类),再按落点改
 const REGION = homeRegion();
 
 const capabilities: DataSourceCapabilities = {
@@ -39,7 +39,7 @@ const capabilities: DataSourceCapabilities = {
   needsGlueConnection: false, // 不走 Glue Connection
   syncChannels: ["flink-cdc"], // Flink 消费 → S3Tables/Redshift(复用实时计算底座)
   analysisChannels: [], // 流不被查询引擎直查(需先落地)
-  canProvision: true, // 🔴 可按需新建流(P42.7b 实现 provision);UI 第二层显示「➕ 新建流」
+  canProvision: true, // 🔴 可按需新建流(实现 provision);UI 第二层显示「➕ 新建流」
   icon: "🌊",
   label: "Kinesis 流",
 };
@@ -142,7 +142,7 @@ export const kinesisProvider: DataSourceProvider = {
       return [{
         name: s.streamName,
         kind: "stream",
-        columns: [], // 流消息无固定 schema(P42.7a 不采样;后续可 GetRecords 采样推断)
+        columns: [], // 流消息无固定 schema(不采样;后续可 GetRecords 采样推断)
         meta: {
           shardCount,
           retentionHours: d?.RetentionPeriodHours,
@@ -157,7 +157,7 @@ export const kinesisProvider: DataSourceProvider = {
     }
   },
 
-  // 【P42.7b 写语义】按需新建 Kinesis 流(幂等)。见 DESIGN §10.4。
+  // 【写语义】按需新建 Kinesis 流(幂等)。见 DESIGN §10.4。
   //  🔴 幂等:流已存在(ResourceInUseException)视为成功,直接返回其连接袋——支持"新建但恰好同名已存在"。
   //  🔴 必须由用户在页面显式确认(含成本告知)后,经建源 API 调用;不在此层做确认(纯函数职责)。
   //  建流后轮询等 ACTIVE(CreateStream 是异步的,刚建时 CREATING,直接用会连不上)。

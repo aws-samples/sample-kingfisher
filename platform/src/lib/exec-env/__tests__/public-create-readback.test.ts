@@ -1,4 +1,4 @@
-// @kf-batch 42-B80-revoke-readback —— 撤 PUBLIC CREATE 的收口回读(台账 B-80)。
+// 撤 PUBLIC CREATE 的收口回读(台账)。
 // 钉三件事:① nspacl / has_schema_privilege 的解析钉真环境原话;② 回读循环「读到 false 才算、预算用尽如实 unsettled、语句失败不算撤」;
 // ③ 路由调用点:executeAdminDdl 之后必须回读,unsettled ⇒ 502,没凭证 ⇒ 200 带 verified:false。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -58,7 +58,7 @@ describe("① 解析", () => {
     expect(publicEntryHasCreate('{"a b"=UC/rdsdb,=U/rdsdb}')).toBe(false);
     expect(publicEntryHasCreate("{=C/rdsdb}")).toBe(true);
   });
-  it("标量 `<nspacl>|<bool>`:目录与有效判定都为否才 revoked;有效判定仍 true(B-80 的窗口)⇒ 不算撤;形态不对就抛", () => {
+  it("标量 `<nspacl>|<bool>`:目录与有效判定都为否才 revoked;有效判定仍 true(该缺陷的窗口)⇒ 不算撤;形态不对就抛", () => {
     expect(parsePublicCreateReadback(`${AFTER}|false`)).toEqual({ nspacl: AFTER, publicHasCreate: false, effectiveHasCreate: false, revoked: true });
     expect(parsePublicCreateReadback(`${AFTER}|true`).revoked).toBe(false);
     expect(parsePublicCreateReadback(`${BEFORE}|false`).revoked).toBe(false);

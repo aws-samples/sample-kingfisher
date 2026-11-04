@@ -1,5 +1,4 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
-// 模块 52 P52.2 + 模块 50 P50.1 —— `bgp-task-runs` 的**唯一写通道**(合同里说的"盖章封装")。
+// `bgp-task-runs` 的**唯一写通道**(合同里说的"盖章封装")。
 //
 // 合同:52 SPEC §1(`bgp-task-runs` 加 `projectId`,与 50 同一批写入点一次改齐)
 //      · 50 SPEC §1.2(加 `targetId`)· 50 SPEC §6 S10(**禁裸** `PutCommand/UpdateCommand`
@@ -17,7 +16,7 @@
 // ① **漏盖章**:27 处各自拼 Item,少一处就有一批 run 不带 `projectId` ⇒ 项目视图凭空少数据。
 //    ⇒ `putRunRecord` 的 `stamp` 是**必填参数**:新写入方在类型层就造不出无章的 run 行。
 // ② **幽灵行**:`UpdateCommand` 在 DDB 里是 **upsert** —— taskId/runId 打错会凭空造出一条
-//    只有键的 run(与 P52.1 修掉的 `schedule/enable` 盲 Update 同族;`fireDownstreamOnce`
+//    只有键的 run(与修掉的 `schedule/enable` 盲 Update 同族;`fireDownstreamOnce`
 //    原先的 `attribute_not_exists(downstreamFired)` 对**不存在的行恒真**,正是这个洞)。
 //    ⇒ 本通道的回写一律 `attribute_exists(taskId)`,并把条件不满足**如实回报为 false**。
 // ③ **保留字漏起别名**:`status`/`duration`/`error`/`metrics` 全是 DDB 保留字,漏一个别名
@@ -28,17 +27,17 @@
 // · **建行不加 `attribute_not_exists` 条件**:`sync/[id]/start` 的 zero-etl 通道**刻意**用同一个
 //   runId 反复 Put 来推进状态(Put = 整行替换)。加条件会当场弄坏它。整行替换会丢属性是**存量语义**,
 //   本批不改(要改是独立一批,得连读侧一起验)。
-// · **不写 `taskTargetKey`**:50 SPEC §1.2 的复合 `runId` + GSI `byTaskTarget` 属 P50.1 未完成部分,
+// · **不写 `taskTargetKey`**:50 SPEC §1.2 的复合 `runId` + GSI `byTaskTarget` 未完成部分,
 //   GSI 现在**并不存在**。先写一个没人读的属性 = 记忆 `unwired-code-is-unverified` 那个坑
 //   (格式没被任何真实读路径验证过,却看起来"已经做了")。
-//   🔴 单一写通道的真正收益在这里:等 P50.1 做复合 runId 时,**写侧只改本文件一处**,
+//   🔴 单一写通道的真正收益在这里:等做复合 runId 时,**写侧只改本文件一处**,
 //   不必再回去动那 27 个站点(50 SPEC §6.6「一次改齐」)。
 
 import { PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
-// @kf-batch 50-W3f-T0-T3 —— 多区扇出的关联标识(T2 只透传;形态与属性名的单一作者在 run-group.ts)
+// 多区扇出的关联标识(T2 只透传;形态与属性名的单一作者在 run-group.ts)
 import { RUN_GROUP_ATTR, isRunGroupId } from "./run-group";
 
 /** 一条 run 的归属两维:项目空间(52)× 执行目标(50)。 */
@@ -61,19 +60,19 @@ export interface RunOwner {
  *
  * 🔴 **为什么取资源行、不取请求头**:run 归属于任务,任务的 `projectId` 才是权威。
  * 请求头可以与之不一致(换个 `x-bgp-project` 打同一个 taskId),那样盖出来的章会把别人的 run
- * 记到自己名下。P52.1 已经把 by-id 路由统一成"按**资源归属项目**判"(`guardResourceAccess`),
+ * 记到自己名下。已经把 by-id 路由统一成"按**资源归属项目**判"(`guardResourceAccess`),
  * 盖章沿用同一条判据,前后端口径才不会分叉。
  *
  * 🔴 **两个缺省值各自的理由(都不是"随手兜底")**:
  * · `projectId` 缺省 `proj-default` —— 存量资源没有该属性,而"没有 projectId 的存量属默认工作区"
  *   是全平台既定口径(`guardResourceAccess` 同款,且 `projectFilter(默认)` 专门带
  *   `attribute_not_exists(projectId)` 让存量可见)。这里若改成抛错,存量任务会一跑就炸。
- * · `targetId` 缺省 `tgt_home` —— 在 P50.3 把资源绑到 target **之前**,平台只有一条执行路径:
+ * · `targetId` 缺省 `tgt_home` —— 在把资源绑到 target **之前**,平台只有一条执行路径
  *   所有 run 都在 home 跑(实测 `tgt_usw2_a` 只装了组件、没有任何资源绑上去)。
  *   这与外部审核 P0-4 抓的 fail-open(`registry.getTarget(id) ?? homeTarget`)**不是一回事**:
  *   那处是"要了一个 target、给了另一个 target 的凭证"(跨区泄露);这里是"资源还没有 target 维,
  *   记下它实际跑的那个"。⇒ 一旦资源带上 `targetId`,本函数立刻跟着它走;
- *   而 P50.3 扇出到多 target 时,由扇出侧用 `explicitTargetId` 传"这次真跑在哪"。
+ *   而扇出到多 target 时,由扇出侧用 `explicitTargetId` 传"这次真跑在哪"。
  */
 export function resolveRunStamp(owner: RunOwner | null | undefined, explicitTargetId?: string): RunStamp {
   return {
@@ -91,7 +90,6 @@ export async function putRunRecord(args: {
   status?: string;
   startedAt?: string;
   triggeredBy?: string;
-  // @kf-batch 50-W3f-T0-T3
   /**
    * 同一次多区扇出里各条 run 共享的关联标识(T2 只透传,不做父对象)。
    * 只能从这个一等参数进来(`extra` 里混进来会被拒),形态由 `run-group.ts` 校验;
@@ -174,9 +172,9 @@ export async function updateRunRecord(args: {
   }
   if (!sets.length) return false; // 无字段可写:不发空 Update(DDB 会报错)
 
-  // @kf-batch 50-WP18b-fanout-seam(顺带:取消不许被自动化改写)
+  // (顺带:取消不许被自动化改写)
   // 🔴🔴 **用户取消是人的意图,不许被任何自动化写回覆盖。**
-  //   2026-09-16 段 o2 的 E-163-2 实测形态:组取消 ⇒ `run-cancel` 把两条 run 写成 `stopped`(对),
+  //   2026-09-16 实测形态:组取消 ⇒ `run-cancel` 把两条 run 写成 `stopped`(对),
   //   而 ETL 的**读时对账**与**进程内轮询**紧接着看到 `describe-statement` 说这条语句
   //   `ABORTED` / 查不到 ⇒ 把同一行改写成 `failed`。于是页面上「我自己按的取消」显示成**失败**,
   //   组派生状态也从 `cancelled` 变成 `failed`(词表:子 stopped ⇒ 组 cancelled;子 failed ⇒ 组 failed)。
@@ -221,7 +219,6 @@ export async function updateRunRecord(args: {
  * 🔴 顺带修掉存量的两个毛病:① 原先 5 处的 `Query` **都没有翻页**(单任务 run 多到超 1MB
  * 就漏收口,留下永久 running 污染监控"运行中"计数);② 原先没有条件写(见 ② 幽灵行)。
  */
-// @kf-batch 50-WP5-rungroup
 /**
  * 按 taskId 读**全部** run 行(自动翻页)。
  *
@@ -307,7 +304,7 @@ function assertStampable(obj: Record<string, unknown> | undefined, where: string
       throw new Error(`${where} 不许直接携带归属字段 ${k};归属只能经 stamp 参数落地(52 SPEC §1)`);
     }
   }
-  // @kf-batch 50-W3f-T0-T3 —— 关联标识同理:只能经 `runGroupId` 一等参数进来(建行时定,回写不可改)。
+  // 关联标识同理:只能经 `runGroupId` 一等参数进来(建行时定,回写不可改)。
   if (RUN_GROUP_ATTR in obj) {
     throw new Error(`${where} 不许直接携带 ${RUN_GROUP_ATTR};它只能经 putRunRecord 的 runGroupId 参数落地`);
   }

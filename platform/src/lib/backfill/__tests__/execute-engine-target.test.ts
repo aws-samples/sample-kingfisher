@@ -1,5 +1,4 @@
-// @kf-batch 50-B51-backfill-pump
-// 🔴 B-51a:EMR(engine-job)补数实例必须**按自己的 targetId 提交**。原来不传 ⇒ provider 缺省主控区 ⇒
+// 🔴 EMR(engine-job)补数实例必须**按自己的 targetId 提交**。原来不传 ⇒ provider 缺省主控区 ⇒
 //   绑两区的作业两区实例都在主控区跑(主控区两遍、非主控区零补),页面显示成功。
 // 只 mock 真外部(DDB / 引擎 provider / 数仓客户端);判据断「provider 收到的 targetId」。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -31,7 +30,7 @@ beforeEach(() => {
   h.job = { jobId: "job-1", engine: "emr-serverless", targets: ["tgt_home", "tgt_usw2_a"] };
 });
 
-describe("🔴 B-51a EMR 补数按实例的区提交", () => {
+describe("🔴 EMR 补数按实例的区提交", () => {
   it("两个区的实例各自提交到自己的区(不是都落主控区)", async () => {
     await executeInstance(plan, inst({ targetId: "tgt_home" }));
     await executeInstance(plan, inst({ targetId: "tgt_usw2_a" }));
@@ -45,8 +44,8 @@ describe("🔴 B-51a EMR 补数按实例的区提交", () => {
   });
 });
 
-// @kf-batch 37-emr-run-date —— B-56 的补数那一半:实例日期逐条进 provider.submit 的 runDate(provider 再把它变成 --ds 等参数)
-describe("🔴 B-56 EMR 补数实例按**自己的日期**提交", () => {
+// 该缺陷的补数那一半:实例日期逐条进 provider.submit 的 runDate(provider 再把它变成 --ds 等参数)
+describe("🔴 EMR 补数实例按**自己的日期**提交", () => {
   it("三个日期的实例 ⇒ 三次 submit 各带各的 runDate(不是都用今天 / 都用第一个)", async () => {
     for (const d of ["2026-09-01", "2026-09-02", "2026-09-03"]) await executeInstance(plan, inst({ date: d, targetId: "tgt_home" }));
     expect(h.submits.map((o) => o.runDate)).toEqual(["2026-09-01", "2026-09-02", "2026-09-03"]);

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 ###############################################################################
-# @kf-batch 50-WP7-sync-pushdown
 # 32-verify-all-regions.sh —— **每个 region 一遍七类能力**的可复用验证入口(造数 → 真跑 → 收官表)。
 #
 #   ./scripts/32-verify-all-regions.sh <aws-profile> [home-region] [选项]
@@ -18,7 +17,7 @@
 #   ① 造数据:非 home 用 `23-seed-game-region.sh` 在**该区**就地生成(与主控区**同构**的 7 张表);
 #      home 用 `22-seed-game.sh` 灌源库 MySQL(auto 模式下按 Glue 作业是否成功跑过判断)。
 #   ② **九类**能力真跑:`31-showcase-region.py`(产品 API 建**长期保留**的 Showcase-* 对象并跑到成功;
-#      2026-09-19 WP-27 补上实时计算与智能问数 —— 此前它们在矩阵外 = 默认豁免):
+#      2026-09-补上实时计算与智能问数 —— 此前它们在矩阵外 = 默认豁免):
 #      数据源 → 同步 → 离线 ETL(Redshift SQL + Glue PySpark)→ 计算(EMR Serverless)
 #      → 编排(发布 + 每日定时 + 触发一次)→ 数据治理(元数据镜像 + 质量规则评估)→ 数据建模(落地)。
 #   ③ 汇总:每区一张能力 × 状态表,末尾打总表;**任一区有失败就整体非零退出**。

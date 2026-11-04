@@ -1,4 +1,4 @@
-// 模块 35 — 数仓建模:类型定义。
+// 数仓建模:类型定义。
 // 分层(D1)/ 数据域·主题域(D2)/ 数据标准(D2)/ 码表(D2)/ 建模资产归属。
 
 // ─── D1 数据分层 ───────────────────────────────────────────────────────────────
@@ -11,7 +11,7 @@ export interface DataLayer {
   seq: number; // 排序(ODS=1 … ADS=4)
   description?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-37)—— 这条治理约定**适用于哪些执行区**。
+   * 这条治理约定**适用于哪些执行区**。
    * 🔴 **不写 / 空 = 全平台通用**(读侧用 `filterRowsByApplicableScope`,它把「未声明」当成
    * 「对所有区可见」;而 B 类 `filterRowsByScope` 的「无章 ⇒ 主控区」在这里是**错的语义** ——
    * 会让存量定义在非主控区视角整体消失)。
@@ -35,7 +35,7 @@ export interface DataDomain {
   owner?: string; // 域负责人
   description?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-37)—— 这条治理约定**适用于哪些执行区**。
+   * 这条治理约定**适用于哪些执行区**。
    * 🔴 **不写 / 空 = 全平台通用**(读侧用 `filterRowsByApplicableScope`,它把「未声明」当成
    * 「对所有区可见」;而 B 类 `filterRowsByScope` 的「无章 ⇒ 主控区」在这里是**错的语义** ——
    * 会让存量定义在非主控区视角整体消失)。
@@ -61,7 +61,7 @@ export interface DataStandard {
   constraint?: string; // 约束描述,如 "非空、>=0"
   description?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-37)—— 这条治理约定**适用于哪些执行区**。
+   * 这条治理约定**适用于哪些执行区**。
    * 🔴 **不写 / 空 = 全平台通用**(读侧用 `filterRowsByApplicableScope`,它把「未声明」当成
    * 「对所有区可见」;而 B 类 `filterRowsByScope` 的「无章 ⇒ 主控区」在这里是**错的语义** ——
    * 会让存量定义在非主控区视角整体消失)。
@@ -86,7 +86,7 @@ export interface CodeTable {
   code: string; // 如 order_status(落地表名取自此)
   description?: string;
   values: CodeValue[]; // 枚举项(内嵌,远小于 400KB)
-  // @kf-batch 50-P50.3-modeling —— 轴A(50 SPEC §1.3):`landed:bool` → **`landedByTarget` 观测态**。
+  // 轴A(50 SPEC §1.3):`landed:bool` → **`landedByTarget` 观测态**。
   // 🔴 两个旧字段**保留只为读兼容**(存量行与列表页在用);新代码一律走 `landedByTarget`。
   landed?: boolean; // 是否已落地 Redshift(= home 那一格的投影,读兼容)
   landedTable?: string; // 落地后的表名(schema.table)
@@ -145,7 +145,7 @@ export interface ModelTable {
   dimensionRefs?: string[]; // 关联维度表 modelTableId(元数据关联,不强制外键)
   measures?: string[]; // 度量列名
   // 应用状态
-  // @kf-batch 50-P50.3-modeling —— 同码表:`applied:bool` 降为 home 那一格的投影(读兼容)。
+  // 同码表:`applied:bool` 降为 home 那一格的投影(读兼容)。
   applied?: boolean; // 是否已建到 Redshift
   appliedTable?: string; // 落地后的限定表名(schema.table)
   appliedAt?: string;
@@ -154,9 +154,9 @@ export interface ModelTable {
   /** 🔴 逐 target 的落地观测态(见 `lib/modeling/landing.ts`) */
   landedByTarget?: Record<string, import("./landing-shared").LandedRecord>;
   description?: string;
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 这条定义从哪来:建模页建的(缺省)/ 数据目录「新建表」建的 / 数据目录「修改表结构」认领的已有表
+  // 这条定义从哪来:建模页建的(缺省)/ 数据目录「新建表」建的 / 数据目录「修改表结构」认领的已有表
   origin?: "modeling" | "catalog" | "catalog-adopted";
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 非主控区图形化改表的**待执行计划**:admin 执行器模板 `alter-model-table` 只认台账上的这份(不收调用方的语句);执行完即清
+  // 非主控区图形化改表的**待执行计划**:admin 执行器模板 `alter-model-table` 只认台账上的这份(不收调用方的语句);执行完即清
   pendingAlter?: import("./alter").AlterPlan;
   createdBy?: string;
   createdAt: string;
@@ -164,7 +164,7 @@ export interface ModelTable {
 }
 
 // ─── D4 指标体系(P1)──────────────────────────────────────────────────────────
-// 模块20 之上的治理建模层(不动 bgp-metrics):原子指标(绑定表+聚合)→派生指标(原子+修饰词+时间周期)。
+// 之上的治理建模层(不动 bgp-metrics):原子指标(绑定表+聚合)→派生指标(原子+修饰词+时间周期)。
 export type MetricAgg = "count" | "count_distinct" | "sum" | "avg" | "min" | "max";
 export type MetricFormat = "number" | "currency" | "percent";
 // 时间周期枚举(映射为安全 WHERE 谓词,不接受自由表达式)。
@@ -203,7 +203,7 @@ export interface ModelMetric {
   lastValue?: number;
   lastComputedAt?: string;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-37)—— **每个执行区一份计算结果**。
+   * **每个执行区一份计算结果**。
    * 键 = targetId;`lastTargetId` = 最近一次算的是哪个区(供「不分区」的旧读法说清它是谁)。
    */
   valueByTarget?: Record<string, { value: number; computedAt: string }>;

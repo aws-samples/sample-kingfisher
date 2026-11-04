@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-fanout
 // 🔴🔴 **提交路径必须过真的 run 写通道** —— 这一条是被真环境咬出来的。
 //
 // ── 事故经过(2026-09-04,W3-a 真环境验收 W3a-5)────────────────────────────────
@@ -53,7 +52,7 @@ vi.mock("@/lib/exec-env/data-plane-target", async (importOriginal) => {
     ...real,
     resolveRedshiftBinding: vi.fn(async (args: { targetId?: string }) => {
       const tid = args.targetId || "tgt_home";
-      // @kf-batch 50-W5-seg2-WP10a:真 RedshiftBinding 带 `jurisdiction`(此前 mock 漏了;同法域 ⇒ 运行提交不写区域审计、不读注册表)
+      // 真 RedshiftBinding 带 `jurisdiction`(此前 mock 漏了;同法域 ⇒ 运行提交不写区域审计、不读注册表)
       return tid === "tgt_home"
         ? {
             targetId: tid, region: "us-east-1", workgroup: "bgp-workgroup", database: "dev",
@@ -136,7 +135,6 @@ describe("🔴🔴 正式运行:真的过 run 写通道(往 extra 塞归属字�
   });
 });
 
-// @kf-batch 50-W3f-T0-T3
 describe("🔴 T2:扇出分组透传到 run 行(真过写通道)", () => {
   it("同一次请求的两条 run 带**同一个** runGroupId;单区运行不带;试运行同样透传", async () => {
     const { runGroupIdFor } = await import("@/lib/monitor/run-group");

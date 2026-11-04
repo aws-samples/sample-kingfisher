@@ -67,7 +67,7 @@ ROOT="$(cd "$HERE/.." && pwd)"
 # 导致 step7 `cdk deploy MwaaStack` 连带重刷 Platform(MWAA 依赖 Platform)时,那次 synth 未带 -c 接线、
 # 自愈又因无 profile 失效 → GENBI 等 env 被冲回 inprocess。与 redeploy-platform.sh:29 保持一致。
 export AWS_PROFILE="$PROFILE"
-# @kf-batch 50-WP20-retire-classic-mwaa —— 经典 MWAA 栈还在就别更新平台栈(会 UPDATE_ROLLBACK;理由见该脚本头)
+# 经典 MWAA 栈还在就别更新平台栈(会 UPDATE_ROLLBACK;理由见该脚本头)
 bash "$HERE/preflight-classic-mwaa.sh" "$PROFILE" "$REGION" || exit 1
 export CDK_DEFAULT_REGION="$REGION"
 # 🔴 CDK CLI 解析目标区时 AWS_REGION / AWS_DEFAULT_REGION 优先于 CDK_DEFAULT_REGION(会覆盖它)⇒ 必须一起对齐,
@@ -89,11 +89,11 @@ export BGP_DEPLOY_MODE
 # The three AI capabilities share one build/deploy shape (module 28 standard).
 # Keyed maps keep the two-pass logic DRY instead of copy-pasting it three times.
 # 映射表与「构建推送镜像 / 部署 Runtime」两个函数的**单一事实源**在 scripts/lib/agentcore-agents.sh
-# (redeploy-platform.sh 第 1 步、redeploy-agents.sh 也 source 它;B-76 2026-10-14 抽出:升级路径原来漏了智能体)。
+# (redeploy-platform.sh 第 1 步、redeploy-agents.sh 也 source 它;2026-10-14 抽出:升级路径原来漏了智能体)。
 # shellcheck source=lib/agentcore-agents.sh
 source "$HERE/lib/agentcore-agents.sh"
-source "$HERE/lib/s3tables-catalog.sh"   # 序 43 B-91:S3 Tables 联邦目录 s3tablescatalog 的安装期唯一作者(第 6.3 步)
-source "$HERE/lib/execution-regions.sh"  # 序 48:放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 2.6 步)
+source "$HERE/lib/s3tables-catalog.sh"   # S3 Tables 联邦目录 s3tablescatalog 的安装期唯一作者(第 6.3 步)
+source "$HERE/lib/execution-regions.sh"  # 放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 2.6 步)
 
 say()  { printf '\n\033[1;36m== %s ==\033[0m\n' "$*"; }
 info() { printf '   %s\n' "$*"; }
@@ -172,7 +172,7 @@ say "1) Account-level prerequisites (service-linked roles, DMS roles)"
 say "2) CDK bootstrap (idempotent)"
 ###############################################################################
 cd "$ROOT/infra"
-# @kf-batch 50-PROD-A-launch-hardening(h):CloudFront 的 WAF 栈固定建在 us-east-1(AWS 规则)⇒ 主控区不是
+# CloudFront 的 WAF 栈固定建在 us-east-1(AWS 规则)⇒ 主控区不是
 #   us-east-1 时那个区也要 bootstrap(否则 BgpWafStack 部署时找不到 bootstrap 资源)。
 # 🔴 本次部署会往哪些区放 CDK 资产 = 这一张清单(bootstrap 与第 2.5 步资产自愈**共用**,不各写一份)。
 #   CLOUDFRONT_WAF_REGION 必须与 infra/lib/waf-stack.ts 的同名常量相等(离线判据 deploy-all-checks 钉着)。
@@ -183,7 +183,7 @@ for _r in $BOOTSTRAP_REGIONS; do
   npx cdk bootstrap "aws://$ACCOUNT/$_r" --profile "$PROFILE"
 done
 
-# @kf-batch 50-PROD-A-launch-hardening(h):默认大模型按**主控区账号真值**选(出厂默认是 us.* 美国推理配置,
+# 默认大模型按**主控区账号真值**选(出厂默认是 us.* 美国推理配置,
 #   主控区在欧洲 / 亚太时调不通 ⇒ 9 个 AI 能力全哑火而部署是绿的)。显式给了 BEDROCK_MODEL_ID 就用它。
 if [ -z "${BEDROCK_MODEL_ID:-}" ]; then
   BEDROCK_MODEL_ID=$(bash "$HERE/resolve-home-model.sh" "$PROFILE" "$REGION") \
@@ -193,7 +193,7 @@ export BEDROCK_MODEL_ID
 info "默认大模型(主控区 $REGION 账号真值,真调用通过)= $BEDROCK_MODEL_ID"
 
 ###############################################################################
-say "2.6) 执行区候选预授权(序 48):放行清单 = home ∪ 注册表在用区 ∪ 候选区"
+say "2.6) 执行区候选预授权:放行清单 = home ∪ 注册表在用区 ∪ 候选区"
 ###############################################################################
 # 🔴 为什么在安装期就定(2026-10-19 客户现网法兰克福加区实录):平台 TaskRole 等 18 处 IAM `aws:RequestedRegion` 条件在 synth 期
 #   烘入模板 ⇒ 不预授权的话,客户每在页面建一个执行区,运维都得再跑一次 redeploy-platform.sh「放行」(SPEC §12.0 不许让执行环境
@@ -297,7 +297,7 @@ PY
     # 🔴 fail-closed 账号护栏:清单里的 bucket **必须属于本次部署的账号**。
     # 缘由(实测):清单的 bucketName 是我们信任的外部输入,只要有一次 synth 没绑对 profile,
     # 它就会指向别的账号 —— 那时"自愈"会变成"拿本账号凭证去动别人账号的桶"。宁可当场拒绝。
-    # ⚠️ 模块 50 多 target/多账号落地时需重新审这条(届时应按 target 的账号逐一放行,而非单账号)。
+    # ⚠️ 多 target/多账号落地时需重新审这条(届时应按 target 的账号逐一放行,而非单账号)。
     # 区也必须是本次 bootstrap 过的区(BOOTSTRAP_REGIONS),否则同样拒绝 —— 不许往清单外的区写。
     case " ${BOOTSTRAP_REGIONS:-$REGION} " in
       *" ${dreg} "*) ;;
@@ -362,7 +362,7 @@ say "3) Foundation + OpenMetadata + AI base stacks"
 
 # 各 AI 能力的 core-dist(+②runtime件)编译分发:部署(fromAsset/容器 COPY 打包)前刷新,
 # 保证 Lambda/容器里的 core 副本 + agent-runner 与 TS 源同步。幂等。
-# 【模块47 L2】改调通用 core-prebuild.sh all(原只刷 genbi;paramadvisor 的 core-dist/_runtime
+# 改调通用 core-prebuild.sh all(原只刷 genbi;paramadvisor 的 core-dist/_runtime
 # 曾漏刷,靠提交入库兜底但改源忘 prebuild 会部署陈旧容器)。all 遍历能力注册表全刷,加能力零改此处。
 info "Prebuild all AI cores → core-dist(+_runtime) [genbi Lambda+容器 / paramadvisor 容器]"
 # 用 $HERE(第54行已解析的脚本绝对路径),不能用 $(dirname "$0"):此处 cwd 已在第112行 cd 到
@@ -403,7 +403,7 @@ say "4) Build & push the three AgentCore images (ARM64)"
 TAG=$(git -C "$ROOT" rev-parse --short HEAD)
 info "Image tag (git SHA): $TAG"
 # 实现(buildx 构建器 · 一次 ECR 登录 · 逐个 build --push · 核单平台 manifest)在 scripts/lib/agentcore-agents.sh,
-# 与 redeploy-agents.sh 共用同一份(B-76)。
+# 与 redeploy-agents.sh 共用同一份。
 agentcore_build_push_images "$TAG"
 
 ###############################################################################
@@ -441,7 +441,7 @@ npx cdk deploy BgpPlatformStack --require-approval never --profile "$PROFILE" \
   -c paramadvisor-memory-backend=agentcore \
   -c paramadvisor-memory-id="${MEM_ID[paramadvisor]}" \
   -c execution-regions="$EXEC_REGIONS" \
-  --output "/tmp/cdk-out-platform-${PROFILE}"   # B-78:按 profile 分目录 —— 同机两条部署链(两个账号)并行到这一步不再互撞「Other CLIs are currently reading from …」
+  --output "/tmp/cdk-out-platform-${PROFILE}"   # 按 profile 分目录 —— 同机两条部署链(两个账号)并行到这一步不再互撞「Other CLIs are currently reading from …」
 
 PLATFORM_URL=$(out BgpPlatformStack PlatformUrl)
 
@@ -465,7 +465,7 @@ ssm_put /bgp/wiring/paramadvisor-runtime-arn    "${RT_ARN[paramadvisor]}"
 ssm_put /bgp/wiring/paramadvisor-memory-backend "agentcore"
 ssm_put /bgp/wiring/paramadvisor-memory-id      "${MEM_ID[paramadvisor]}"
 
-# 🔴 序 43 B-91:S3 Tables 联邦目录 s3tablescatalog(Athena 直查 / 问数的数据湖入口)不是 CDK 资源,首装必须显式开通。
+# 🔴 S3 Tables 联邦目录 s3tablescatalog(Athena 直查 / 问数的数据湖入口)不是 CDK 资源,首装必须显式开通。
 #   原来只有「同步任务写 S3 Tables」的启动路径懒创建 ⇒ 没跑过那种同步的全新账号,直查 / 问数一律 CATALOG_NOT_FOUND
 #   (2026-10-16 全新账号页面驱动坐实)。幂等:已在则秒过。执行区的目录由加区后的 redeploy-platform.sh 第 3c 步开通。
 s3tables_catalog_step() { ( ensure_s3tables_catalog "$REGION" ); }   # 子 shell:lib 里的 die 只结束这一步,由 run_step 记账
@@ -480,7 +480,7 @@ say "6.5) Execution-environment deploy mechanism (BgpExecEnvDeployStack: broker 
 ###############################################################################
 # 🔴 根治(2026-09-06 新账号真跑撞出):向导「新建执行环境」注册成功、自动「触发部署」报
 #   `Function not found: …:function:bgp-exec-env-broker` —— 本脚本从未部署过 BgpExecEnvDeployStack
-#   (窄权 broker Lambda + exec-env 专用 CodeBuild 项目 + 源包 asset),旧账号是 P50.2g 时手工发的。
+#   (窄权 broker Lambda + exec-env 专用 CodeBuild 项目 + 源包 asset),旧账号是时手工发的。
 #   一个全新账号跑完 deploy-all,产品的多区域能力**整条断掉**而 13 步全绿 = 假就位。
 #   它依赖 BgpDatabaseStack(bgp-execution-envs / bgp-audit 表)+ BgpKmsStack(表 CMK),放在平台栈之后、
 #   MWAA 之前;源包按内容哈希不可变 ⇒ 无改动时秒级 no-op。第 13 步会核它**真在**(缺则自愈补发)。
@@ -491,7 +491,7 @@ run_step "6.5) BgpExecEnvDeployStack(执行环境部署机制)" \
 ###############################################################################
 say "6.6) MWAA Serverless entry for home (BgpAirflowServerlessStack: bucket + SG + role, minutes, no environment)"
 ###############################################################################
-# @kf-batch 50-WP15-airflow-serverless:用户拍板「经典 MWAA 保留、新增 serverless 入口」;home 是两区验收之一。
+# 用户拍板「经典 MWAA 保留、新增 serverless 入口」;home 是两区验收之一。
 #   seed-home(11.5 步)按 SSOT 名探到桶 / 角色 / SG 才在 home 描述符声称 airflow-serverless。redeploy-platform §2c 随 HEAD 刷新。
 run_step "6.6) BgpAirflowServerlessStack(home 的 MWAA Serverless 入口)" \
   npx cdk deploy BgpAirflowServerlessStack --require-approval never --profile "$PROFILE"
@@ -500,7 +500,7 @@ run_step "6.6) BgpAirflowServerlessStack(home 的 MWAA Serverless 入口)" \
 say "7) 经典 MWAA(Airflow)—— 🔴 **默认不再部署**(用户 2026-09-14 拍板:一律走 MWAA Serverless)"
 ###############################################################################
 # 为什么去掉:经典 MWAA 是**常驻**环境(≈$350/月,建栈 ~30 min,是本脚本最长的一步);
-# 而 MWAA Serverless 按任务秒计费、建栈分钟级(第 6.6 步),平台侧调度/编排语义已由 WP-17 统一到它。
+# 而 MWAA Serverless 按任务秒计费、建栈分钟级(第 6.6 步),平台侧调度/编排语义已由统一到它。
 # 🔴 栈类仍在 infra 里(存量账号那一个要能被认领与删除),只是不再默认实例化。
 # 需要它时:DEPLOY_CLASSIC_MWAA=1 ./scripts/deploy-all.sh …
 if [[ "${DEPLOY_CLASSIC_MWAA:-0}" == "1" ]]; then

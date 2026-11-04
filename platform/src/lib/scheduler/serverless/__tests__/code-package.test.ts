@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless(T-11)
 // Code 包契约:**zip、模块在根、内容 = 运行时源码、同内容同字节、key 以 .zip 结尾**。
 // 真环境教训:裸 .py 的 Code ⇒ CreateWorkflow 成功、workflow READY、cron 照触发,而每个 run 在 DagBag 阶段
 //   `ModuleNotFoundError: No module named 'bgp_runtime'` 秒死 —— 只有把「包形态」钉成单测,这类「发得出去、跑不起来」才不会复发。
@@ -7,7 +6,7 @@ import AdmZip from "adm-zip";
 import { BGP_RUNTIME_MODULE, BGP_RUNTIME_PY, BGP_RUNTIME_VERSION } from "@/lib/scheduler/serverless/runtime-py";
 import { BGP_RUNTIME_S3_KEY, BGP_RUNTIME_ZIP, BGP_RUNTIME_ZIP_ENTRY } from "@/lib/scheduler/serverless/code-package";
 
-describe("T-11 serverless Code 包 = zip(模块在根)", () => {
+describe("serverless Code 包 = zip(模块在根)", () => {
   it("是合法 zip:恰好一个条目、名为 bgp_runtime.py、在根(无目录前缀)", () => {
     const entries = new AdmZip(BGP_RUNTIME_ZIP).getEntries();
     expect(entries.map((e) => e.entryName)).toEqual([`${BGP_RUNTIME_MODULE}.py`]);
@@ -52,8 +51,7 @@ describe("T-11 serverless Code 包 = zip(模块在根)", () => {
   });
 });
 
-// @kf-batch 50-WP15-airflow-serverless(T-14)
-describe("T-14 下线:有 run 在跑时不许假装已下线", () => {
+describe("下线:有 run 在跑时不许假装已下线", () => {
   it("deleteWorkflow 停跑后**等终态**再删,冲突退避重试,仍失败就抛(不返回 deleted:true)", async () => {
     const { readFileSync } = await import("node:fs");
     const { dirname, resolve } = await import("node:path");
@@ -76,7 +74,7 @@ describe("T-14 下线:有 run 在跑时不许假装已下线", () => {
       expect(src, `${f} 失败仍在清台账`).toContain("if (!r.failed) await removeDeployment(");
       expect(src).toContain("failed: true");
     }
-    // @kf-batch 50-WP18d-unpublish-seam —— 🔴 这里原来钉的是**文案字面量**「下线调度失败(」,
+    // 🔴 这里原来钉的是**文案字面量**「下线调度失败(」,
     // 而那句人话已经收进单一作者 `offlineFailureMessage`(四个调用点共用);把逐字文案钉在调用点上
     // ⇒ 收成单一作者反而把门禁打红(判据钉形态而承重是事实)。改钉事实:
     //   ① 路由必须**问过**「哪些区没撤下来」(`offlineFailures(`);② 必须报 502;

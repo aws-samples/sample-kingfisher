@@ -1,20 +1,20 @@
-// 模块 55 长操作统一框架 —— 任务表服务层(bgp-long-ops)。= 序 46 B-107 `lib/ai/long-call.ts` 泛化(AI 专用 ⇒ 全平台唯一)。
+// 长操作统一框架 —— 任务表服务层(bgp-long-ops)。= `lib/ai/long-call.ts` 泛化(AI 专用 ⇒ 全平台唯一)。
 //
-// 【为什么有它】B-74 同步列 / B-95 删项目 / B-107 七条 AI / B-111 建模落地 —— 同一病四次发作:请求处理器同步等外部系统到终态,
+// 【为什么有它】同步列 删项目 七条 AI 建模落地 —— 同一病四次发作:请求处理器同步等外部系统到终态,
 //   外部耗时不可控(数仓冷启动 / 模型推理 / 大表),边缘 60s 硬墙(CloudFront origin readTimeout 60s · ALB idle 60s)⇒ 504 HTML。
 //   用户 2026-10-21 拍板「不是修修补补,要高度抽象地解决,一劳永逸」⇒ 全平台只剩一个「提交长操作」原语(./driver.ts)
 //   和一张任务表(本文件),页面调用点零改动(客户端传输层 ./client/follow.ts)。
 //
-// 状态机:pending → running →(succeeded | failed | timeout)。终态不可逆。并发三保证(照 GenBI / B-107 原文):
+// 状态机:pending → running →(succeeded | failed | timeout)。终态不可逆。并发三保证(照 GenBI 原文):
 //  1) 抢占 / 重认领用 DynamoDB **条件写**:并发轮询里只有一个执行者能把 pending→running(或重认领 stale 的 running)。
 //  2) **runToken**(每次认领生成新 ULID):终态 / 心跳写入条件带 runToken=:tok —— 被取代的僵尸执行者无法覆盖当前 owner。
 //  3) 终态写入一律条件 `status=running`:状态永不回退,第一个写终态者赢。
 // 强制结束两层:执行进程活着 ⇒ 驱动器到 CEILING 主动 abort 写 timeout;执行进程已死 ⇒ 轮询读时按 startedAt 判天花板
 //  forceTimeoutIfExpired,**绝不重跑**。
 //
-// 与 B-107 的三点不同:① `model` 泛化为 `meta`(AI 类有 model,建模 / 目录类无);② 新增 `resultStatus`(目录建表 201)与
+// 与该缺陷的三点不同:① `model` 泛化为 `meta`(AI 类有 model,建模 / 目录类无);② 新增 `resultStatus`(目录建表 201)与
 //  `errorStatus` / `errorBody`(执行体抛 LongOpHttpError 时落库 ⇒ 异步分支失败的状态码 / 信封与同步分支逐字一致 ——
-//  B-107 的异步失败一律丢状态码,是本次顺手修的缺口);③ 环境变量改 `LONG_OPS_*`(AI_* 五个删除,B-107 未发版无兼容义务)。
+//该缺陷的异步失败一律丢状态码,是本次顺手修的缺口);③ 环境变量改 `LONG_OPS_*`(AI_* 五个删除,未发版无兼容义务)。
 
 import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
@@ -29,7 +29,7 @@ function intEnv(name: string, fallback: number): number {
 }
 
 // 300s 天花板(与 GenBI 同一用户拍板「5 分钟查不出强制掐掉」);心跳 stale 30s;心跳间隔 8s;进程内同步等待 45s
-// (< CloudFront origin 60s;与序 38 schema-sync 的 respondWithinMs 同值)。`LONG_OPS_SYNC_WAIT_MS` 是容器 env(CDK context
+// (< CloudFront origin 60s;与schema-sync 的 respondWithinMs 同值)。`LONG_OPS_SYNC_WAIT_MS` 是容器 env(CDK context
 // `-c long-ops-sync-wait-ms`),测试账号给 500 把每条已接入路由逼进 202 路径页面驱动验收;生产不给 = 45000。
 export const CEILING_MS = intEnv("LONG_OPS_MAX_MS", 300_000);
 export const STALE_MS = intEnv("LONG_OPS_STALE_MS", 30_000);

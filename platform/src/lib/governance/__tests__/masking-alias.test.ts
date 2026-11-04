@@ -1,4 +1,4 @@
-// @kf-batch 18-classification-masking —— B-119(2026-10-23):结果列有别名 / 是表达式时,脱敏仍要按物理列的分级生效。
+// 结果列有别名 / 是表达式时,脱敏仍要按物理列的分级生效。
 // 只 mock 真外部(DynamoDB 文档客户端);分级读取 classification.ts 与 SQL 解析 sql-lineage.ts 都走真实现。
 // 判据钉事实:哪些值被遮、maskedColumns 报的是**结果列名**(前端据此提示「可申请访问」)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -41,7 +41,7 @@ beforeEach(() => {
   state.queries = [];
 });
 
-describe("maskRows × 别名 / 表达式(B-119)", () => {
+describe("maskRows × 别名 / 表达式", () => {
   it("🔴🔴 `country AS 地区`:结果列叫「地区」,分级落在 country ⇒ 「地区」整列 *** 且 maskedColumns 报「地区」(修前明文)", async () => {
     const out = await maskRows({
       columns: [{ name: "地区" }, { name: "客户数" }],

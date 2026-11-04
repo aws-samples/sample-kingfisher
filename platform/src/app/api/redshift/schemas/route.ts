@@ -2,10 +2,8 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { ZEROETL_WORKGROUP, getZeroEtlSecretArn } from "@/lib/realtime/zeroetl-service";
 import { requireProject } from "@/lib/projects/guard";
-// @kf-batch 50-WP31-place-first-class
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
-// @kf-batch 50-WP2-directquery
 // 🔴 裸客户端 / 落点 / 轮询收编;`?targetId=` 跟编辑器自己的执行目标选择走(不读 `?scope=`)。
 // 🔴 zero-ETL 分支**原样保留**:它是主控区里的**独立 namespace**,有自己的密钥缓存
 //    (R9★ 教训:只改 admin-secret 会让 zero-etl 查询绕过隔离)⇒ 那条路的 SecretArn 不许被落点覆盖。
@@ -30,11 +28,11 @@ function cellValue(cell: any): unknown {
   return v == null ? null : v;
 }
 
-// @kf-batch 52-P52.5a-supply — 加 `project` 形参(静态归类:**project-context**)。
+// 加 `project` 形参(静态归类:**project-context**)。
 // 🔴 上面那段注释说的"必须用 superuser 才看得到别人 owner 的列"在 flag=on 下会**变成**
 //    "只看得到本项目 schema 的列" —— 那正是本模块要的隔离(也正是本路由注释里
 //    「仍欠:按项目过滤返回的 schema 集合」那条欠账被真正还掉的方式)。
-//    ⇒ 但它要求现网数据已迁进 `proj_<id>`(P52.5b),所以 flag 缺省 off。
+//    ⇒ 但它要求现网数据已迁进 `proj_<id>`,所以 flag 缺省 off。
 async function runQuery(sql: string, place: DirectQueryPlace) {
   // Execute with the shared admin (superuser) secret — same identity as /api/redshift/execute
   // and GenBI introspectSchema. Without it the query runs as the ECS task role (a non-superuser),
@@ -65,18 +63,18 @@ async function runQuery(sql: string, place: DirectQueryPlace) {
 // 身份**枚举全库 schema/表/列(见下方 runQuery 的注释:它刻意用 superuser 以便看到别人建的表)。
 // 那是跨项目元数据泄露,且它**不在 52 的"12 越权面"清单里** ⇒ 该清单须扩为 **13 面**。
 // 本批先补最低门槛 `requireProject(viewer)`(至少要求调用者是某个项目的成员);
-// ⚠️ 仍欠(属 P52.1):按项目过滤返回的 schema 集合 —— 现在成员仍能看到**全部** schema,
+// ⚠️ 仍欠:按项目过滤返回的 schema 集合 —— 现在成员仍能看到**全部** schema,
 // 真正的收口要等 `proj_<id>` 数据面隔离(52 §7bis)落地后按项目 schema 白名单裁剪。
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
   const sp = req.nextUrl.searchParams;
-  // @kf-batch 50-WP2-directquery —— 落点:`?targetId=` +(编辑器显式给的)workgroup / database。
+  // 落点:`?targetId=` +(编辑器显式给的)workgroup / database。
   // 该 target 没装数仓 ⇒ 回能力态,页面把左侧树置灰并说清原因(而不是给一棵空树)。
   let pre: Awaited<ReturnType<typeof resolveDirectQueryPlaceSafe>>;
   try {
     pre = await resolveDirectQueryPlaceSafe({
-      // @kf-batch 50-WP31-place-first-class —— 🔴 落点必须点名(缺 / 非法 ⇒ 400,不再「没给 = 主控区」)
+      // 🔴 落点必须点名(缺 / 非法 ⇒ 400,不再「没给 = 主控区」)
       targetId: requestedTargetId(sp.get("targetId"), "列库表结构"),
       projectId: ctx.projectId,
       workgroupOverride: sp.get("workgroup"),
@@ -97,7 +95,7 @@ export async function GET(req: NextRequest) {
   const place = pre.place;
 
   try {
-    // 序 49 ⑦ UX ③:`?mode=schemas` ⇒ 只列 schema 名(含还没有表的空 schema),不扫表与列 —— 「新建表」向导的
+    // UX ③:`?mode=schemas` ⇒ 只列 schema 名(含还没有表的空 schema),不扫表与列 —— 「新建表」向导的
     //   schema 下拉用(用户 10-20 拍板:schema 从手打改成「下拉已有 + 可输新」)。系统 schema 与 pg_ 前缀剔掉;
     //   项目私有 proj_* 由向导侧过滤(服务端建表校验仍是权威)。
     if (sp.get("mode") === "schemas") {

@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 工具注册表(单一事实源)。
+// Copilot 工具注册表(单一事实源)。
 // 只读工具人人可用;创建工具【仅当调用者具 editor 角色时】才装入(闸3:能力随角色收敛)。
 // 注册表同时供:① inprocess agent(lib/copilot/agent.ts)② 将来 AgentCore 容器(共享同一份声明,防漂移)。
 

@@ -1,4 +1,4 @@
-// 序 43 B-92 —— 告警规则「编辑」保存 400:updateRule 的 UpdateExpression 裸写了 DynamoDB 保留字 scope / condition
+// 告警规则「编辑」保存 400:updateRule 的 UpdateExpression 裸写了 DynamoDB 保留字 scope / condition
 //   (真环境原话「Invalid UpdateExpression: Attribute name is a reserved keyword; reserved keyword: scope」,页面驱动 p43m A5 坐实)。
 //   判据钉事实:发给 DDB 的 UpdateCommand 里,每个 SET 左值要么是 #别名(且别名表映射到真属性名),要么不是保留字;
 //   同时钉 channels / events 两个同类构造器没有同一种病(只 mock 真外部 DDB)。
@@ -52,7 +52,7 @@ function assertNoBareReserved(cmd: { input: Record<string, unknown> }) {
 
 beforeEach(() => { h.cmds.length = 0; });
 
-describe("B-92 updateRule:scope / condition 走 ExpressionAttributeNames 别名", () => {
+describe("updateRule:scope / condition 走 ExpressionAttributeNames 别名", () => {
   it("整表单编辑(name + scope + condition + severity + channelIds + enrichWithDiagnosis + enabled + silenced)没有一个裸保留字;别名映射到真属性", async () => {
     await updateRule("r1", {
       name: "p43m-rule", scope: { taskType: "sync" }, condition: { type: "failure" }, severity: "P2",

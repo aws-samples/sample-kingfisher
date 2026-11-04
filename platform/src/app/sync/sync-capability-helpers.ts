@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 同步向导新控件用到的纯函数(不依赖 React / antd,可单测)。
+// 同步向导新控件用到的纯函数(不依赖 React / antd,可单测)。
 import { renderSyncTemplate, isValidBusinessTimezone, syncRunVars } from "@/lib/sync/run-vars";
 
 /** 今天的 UTC 日期(预览用;运行时由脚本按业务日期 / 业务时区算)。 */
@@ -48,7 +48,7 @@ const MATCHER_DS = "2026-01-15";
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
- * 序 56 守卫 1:把带日期变量的表名变成「它的实例表」匹配器 —— 每个变量按固定日期渲染后数字一律换成 \d(位数不变),
+ * 守卫 1:把带日期变量的表名变成「它的实例表」匹配器 —— 每个变量按固定日期渲染后数字一律换成 \d(位数不变),
  * 其余字符原样。`orders_${bizmonth}` ⇒ /^orders_\d\d\d\d\d\d$/,匹配 orders_202609 / orders_202610。
  * 客户为了看列结构把这类月表也勾成普通表 ⇒ 第 1 步行上打黄标提醒。模板不合法(未知变量 / 写法不完整)⇒ null。
  */

@@ -1,5 +1,4 @@
-// @kf-batch 50-G7-P0P1P2
-// G1(模块 50)—— 执行目标(ExecutionTarget)注册表读侧。
+// G1—— 执行目标(ExecutionTarget)注册表读侧。
 //
 // 设计合同:docs/design/50-multi-region-execution/SPEC.md §1.1(表结构 + stale 定义 + home seed 时机)、
 //          §1.1a(targetId 格式)、§3.1(准入不缓存 + 强一致读)、§3.1a(运行时整包校验)、§2.2(绝不回落 home)。
@@ -41,14 +40,14 @@ import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/li
 import { z } from "zod";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { HOME_TARGET_ID, assertTargetId, isHome, isValidTargetId } from "@/lib/exec-env/target-id";
-// @kf-batch 50-W5-seg1-WP3 —— 执行角色键的单一作者(SPEC v3.21 §3.1a 规则 ②:补充部署窄通道的唯一例外)
+// 执行角色键的单一作者(SPEC v3.21 §3.1a 规则 ②:补充部署窄通道的唯一例外)
 import { execRoleRotationVerdict, isExecRoleResourceKey } from "@/lib/exec-env/exec-roles";
-// @kf-batch 50-W5-seg1-WP10a —— 跨法域技术前置 / 项目白名单 / 法域格式的单一作者(SPEC v3.22;DESIGN 6quinquies)
+// 跨法域技术前置 / 项目白名单 / 法域格式的单一作者(SPEC v3.22;DESIGN 6quinquies)
 import { JURISDICTION_RE, isCrossJurisdiction, parseTargetAccess, residencyPrerequisite } from "@/lib/exec-env/residency";
 import { isCurrentDisclaimerAck } from "@/lib/residency/disclaimer";
 import { readExecEnvStackOutputs, type ExecEnvStackOutputs } from "@/lib/exec-env/stack-outputs";
 import { orderComponents, isComponentRetired, retiredComponentMessage, requiredComponentsFor, requiredComponentsForTarget } from "@/lib/exec-env/implemented-components";
-// @kf-batch 50-WP23-xregion-peering —— VPC 地址池(与 infra/lib/exec-env/vpc-cidr.ts 由 parity 门禁钉住)
+// VPC 地址池(与 infra/lib/exec-env/vpc-cidr.ts 由 parity 门禁钉住)
 import { EXEC_ENV_VPC_CIDR_POOL, EXEC_ENV_VPC_CIDR_RE, allocateExecEnvVpcCidr } from "@/lib/exec-env/vpc-cidr";
 // 🔴 值依赖 registry → lifecycle **单向**(lifecycle 反向只 `import type`,编译期擦除,无运行时循环)。
 //    状态写一律经 lifecycle 的单写通道 transitionPhase;spec/observed 权威类型也在那儿。
@@ -90,7 +89,7 @@ const GSI_BY_REGION = "byRegion";
  * 🔴 **描述符新鲜度阈值**(SPEC §1.1 v3.4 的 `stale` 定义)。
  *
  * 时间源 = `probe.at`,缺则退到 `updatedAt`;**仅对非 home 生效**。
- * 硬约束:P50.2 的探活 / reconcile 周期必须 **≤ 本值/3**(即 ≤5min),否则探活一慢就把整个 region 判死。
+ * 硬约束:探活 / reconcile 周期必须 **≤ 本值/3**(即 ≤5min),否则探活一慢就把整个 region 判死。
  */
 export const TARGET_FRESHNESS_MAX_AGE_MS = 15 * 60_000;
 
@@ -148,7 +147,7 @@ export const TARGET_COMPONENTS = [
   "flink",
   "agentcore",
   "residency-api",
-  // @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §3.15)
+  // (SPEC v3.27 §3.15)
   "airflow-serverless",
 ] as const;
 
@@ -178,26 +177,25 @@ export interface ExecutionTarget {
   region: string;
   cellId?: string;
   stage?: string;
-  /** @kf-batch 50-WP15-airflow-serverless(K-5):网络规模(顶层描述符字段;注册时写、`POST .../network-profile` 改;broker 据此派生 NAT 数) */
+  /** 网络规模(顶层描述符字段;注册时写、`POST .../network-profile` 改;broker 据此派生 NAT 数) */
   networkProfile?: NetworkProfile;
   /**
-   * @kf-batch 50-WP23-xregion-peering
    * 🔴 本执行环境 VPC 的 CIDR(**注册时由服务端从地址池分配,之后不可改**)。
    * 为什么必须落描述符:broker 只读描述符,要把它透传给 `cdk deploy -c exec-env-vpc-cidr=`;
    * 而分配必须看**全量已用值**(同账号里任意两个执行环境不许重叠,否则主控区路由表没法同时指向两条 peering)。
-   * 🔴 存量描述符没有这个字段(WP-23 之前注册的、以及 home)—— 非 home 缺它 ⇒ **部署路径 fail-closed**,
+   * 🔴 存量描述符没有这个字段(此前注册的、以及 home)—— 非 home 缺它 ⇒ **部署路径 fail-closed**,
    *    不猜默认值:CDK 默认的 10.0.0.0/16 与主控区逐位相同,建出来的环境**回写不了台账**(SPEC §3.14ter)。
    */
   vpcCidr?: string;
-  /** @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §3.15):两种调度组件都装时用哪个;缺省 serverless */
+  /** (SPEC v3.27 §3.15):两种调度组件都装时用哪个;缺省 serverless */
   schedulerPreference?: "serverless" | "mwaa";
   displayName?: string;
   isHome?: boolean;
   /** 法域标记;缺省 "home"。🔴 v3.22:只是标签 + 审计维度 + 技术前置的触发条件(`residencyPrerequisite`),不驱动任何拒绝 */
   jurisdiction?: string;
-  /** @kf-batch 50-W5-seg1-WP10a 项目白名单(SPEC §1.1 `access?`,通用,缺省全部项目;只许 `setTargetAccess` 写) */
+  /** 项目白名单(SPEC §1.1 `access?`,通用,缺省全部项目;只许 `setTargetAccess` 写) */
   access?: { mode: "all-projects" } | { mode: "allowlist"; projects: string[] };
-  /** @kf-batch 50-W5-seg1-WP10a 注册跨法域 target 时 admin 对免责告知的同意(之后不可改;每用户的同意另存 S13) */
+  /** 注册跨法域 target 时 admin 对免责告知的同意(之后不可改;每用户的同意另存 S13) */
   residencyAck?: { by: string; at: string; version: string; textHash: string };
   status: TargetStatus;
   /** 实名资源袋(**非派生**:不许由 region 拼出来) */
@@ -210,7 +208,7 @@ export interface ExecutionTarget {
   /** 🔴 v3.15:canonical 探活结果(唯一权威在 lifecycle.ProbeResult)。完成态 fence 对它做 exact 等值条件写。 */
   probe?: ProbeResult;
   /**
-   * 🔴 **v3.15(P50.3b)期望态/观测态**(SPEC §1.1):`status`/`ready`/`components` 自本版起是
+   * 🔴 **v3.15期望态/观测态**(SPEC §1.1):`status`/`ready`/`components` 自本版起是
    * **由 `(spec, observed)` 派生的兼容投影**(见 lifecycle.ts)。过渡期两种形态并存:
    * 存量 item 只有 legacy 字段、无 spec/observed,由控制器 `adoptLegacy` 收养;新写入两者都落。
    */
@@ -279,17 +277,16 @@ const DescriptorSchema = z.object({
     .regex(/^[a-z]{2}(-[a-z]+)+-\d$/, "region 形如 us-east-1 / cn-north-1 / us-gov-west-1"),
   cellId: z.string().optional(),
   stage: z.string().optional(),
-  // @kf-batch 50-WP15-airflow-serverless(K-5)
   networkProfile: z.enum(NETWORK_PROFILES).optional(),
-  // @kf-batch 50-WP23-xregion-peering:形如 10.128.0.0/16 … 10.255.0.0/16(池子与主控区 10.0.0.0/16 构造上不相交)
+  // 形如 10.128.0.0/16 … 10.255.0.0/16(池子与主控区 10.0.0.0/16 构造上不相交)
   vpcCidr: z.string().regex(EXEC_ENV_VPC_CIDR_RE, `vpcCidr 须是地址池 ${EXEC_ENV_VPC_CIDR_POOL} 里的一个 /16`).optional(),
-  // @kf-batch 50-WP15-airflow-serverless(施工序 6):两者都装时走哪个调度器(SPEC §3.15;缺省 serverless)
+  // 两者都装时走哪个调度器(SPEC §3.15;缺省 serverless)
   schedulerPreference: z.enum(SCHEDULER_PREFERENCES).optional(),
   displayName: z.string().optional(),
   isHome: z.boolean().optional(),
-  // @kf-batch 50-W5-seg1-WP10a:法域格式(SPEC §1.1 v3.22)—— `Home` / `HOME` / `EU` 变体不进库
+  // 法域格式(SPEC §1.1 v3.22)—— `Home` / `HOME` / `EU` 变体不进库
   jurisdiction: z.string().regex(JURISDICTION_RE, "jurisdiction 形如 home / eu-sim(小写字母开头,[a-z0-9-],2–32 位)").optional(),
-  // @kf-batch 50-W5-seg1-WP10a:项目白名单(通用)与注册时的免责告知同意(跨法域必填,之后不可改)
+  // 项目白名单(通用)与注册时的免责告知同意(跨法域必填,之后不可改)
   access: z
     .union([
       z.object({ mode: z.literal("all-projects") }),
@@ -309,7 +306,7 @@ const DescriptorSchema = z.object({
   // 🔴 v3.15(§21.1):probe 不再 z.record —— 用 canonical ProbeResultSchema 做结构校验
   //    (canonical `at` + ok===every(ok) 由 parseProbeResult 在写侧把关,不在描述符层重复)。
   probe: ProbeResultSchema.optional(),
-  // 🔴 v3.15(P50.3b):期望态/观测态。此处**松校验**(z.record,与 agentcore/probe 同款)——
+  // 🔴 v3.15:期望态/观测态。此处**松校验**(z.record,与 agentcore/probe 同款)——
   //    精确形状由 lifecycle.ts 的类型 + 写通道(transitionPhase/writeSpec)保证;§3.1a 的跨字段不变量
   //    仍由 descriptorViolation 把关。未知多余属性放行(向前兼容),已知字段类型错才拒。
   spec: z.record(z.string(), z.unknown()).optional(),
@@ -336,7 +333,7 @@ const DescriptorSchema = z.object({
   provisioningDeadlineAt: z.string().optional(),
 });
 
-/** region 前缀 → partition 的权威映射(SPEC §3.1a 的交叉校验)。P50.2e2 起导出:register 路由的分区护栏与 aws-context 复用同一映射。 */
+/** region 前缀 → partition 的权威映射(SPEC §3.1a 的交叉校验)。导出:register 路由的分区护栏与 aws-context 复用同一映射。 */
 export function partitionForRegion(region: string): string {
   if (region.startsWith("cn-")) return "aws-cn";
   if (region.startsWith("us-gov-")) return "aws-us-gov";
@@ -369,7 +366,7 @@ export const ARN_RESOURCE_KEYS = [
   "glueRoleArn",
   "redshiftSecretArn",
   "flinkRoleArn",
-  // @kf-batch 50-W5-seg1-WP3(SPEC v3.21 §3.1a):三个新执行角色键,**有则必须是合法 ARN**(不追溯存量必填,见 COMPONENT_OPTIONAL_RESOURCES)
+  // (SPEC v3.21 §3.1a):三个新执行角色键,**有则必须是合法 ARN**(不追溯存量必填,见 COMPONENT_OPTIONAL_RESOURCES)
   "emrExecutionRoleArn",
   "redshiftCopyRoleArn",
   "dmsKinesisRoleArn",
@@ -396,7 +393,6 @@ const RESOURCE_SHAPES: Record<string, keyof typeof SHAPE> = {
   mwaaEnvName: "name",
   dmsSubnetGroup: "name",
   emrSecurityGroupId: "sgId",
-  // @kf-batch 50-W5-seg1-WP10a
   residencyAuditTable: "name",
   residencyResultsTable: "name",
   residencyBucket: "bucket",
@@ -408,18 +404,17 @@ const COMPONENT_REQUIRED_RESOURCES: Record<string, readonly string[]> = {
   mwaa: ["dagBucket", "mwaaEnvName"],
   dms: ["dmsSubnetGroup"],
   flink: ["flinkRoleArn"],
-  // @kf-batch 50-W5-seg1-WP10a(SPEC v3.22 §1.3a S4 / §1.3 D):residency-api 片 1 的三样实名资源(区域审计表 / 结果表 / 结果桶)。
+  // (SPEC v3.22 §1.3a S4 / §1.3 D):residency-api 片 1 的三样实名资源(区域审计表 / 结果表 / 结果桶)。
   "residency-api": ["residencyAuditTable", "residencyResultsTable", "residencyBucket"],
-  // @kf-batch 50-WP15-airflow-serverless(SPEC v3.27 §1.1 / §3.15):定义桶 / 执行角色 / 工作 SG 三样实名资源
+  // (SPEC v3.27 §1.1 / §3.15):定义桶 / 执行角色 / 工作 SG 三样实名资源
   "airflow-serverless": ["workflowBucket", "airflowServerlessRoleArn", "airflowServerlessSgId"],
   // kafka 在 §1.1 里没有实名资源字段 ⇒ 刻意不设不变量(不发明合同)。
 };
 
 /**
- * @kf-batch 50-W5-seg1-WP3
  * 组件 → 该组件**可选**的资源键(SPEC v3.21 §1.1:`redshiftCopyRoleArn?` / `dmsKinesisRoleArn?`)。
  * 与 `COMPONENT_REQUIRED_RESOURCES` 的差别只有一条:**存量描述符缺它不判死**(否则 tgt_usw2_a 在重新部署前当场不可用)。
- * finalize 从组件栈 Output **读到才写**;「非 home 必须有」这道前置由准入 `hasPerTargetExecRoles`(WP-10a)判。
+ * finalize 从组件栈 Output **读到才写**;「非 home 必须有」这道前置由准入 `hasPerTargetExecRoles`判。
  * 🔴 v1.3 施工包写的「Output 原样进袋、零改动」只对 core 成立 —— 组件栈的 Output 只取合同声明的键(袋子是路由输入,面要窄),
  *    所以新键必须在这里**登记**才流得进来。
  */
@@ -591,7 +586,7 @@ export function descriptorAgeMs(t: ExecutionTarget, now = Date.now()): number | 
  * 🔴 顶层残留部署锁检查(v2 审核 §20.2):必须**早于** classifyDescriptor/收养 ——
  * 一个 legacy-stable item(`observed.operation` 缺失)否则会绕过 operation 校验被准入,
  * 而它其实正被一次在途部署持锁。锁三字段任一存在即视为"有在途会话",fail-closed。
- * (锁的 lease 过期清理 / 恢复归 P50.3b-2/4 的 reconciler + 失败恢复;在那之前残留锁 = 不承接,No-Go。)
+ * (锁的 lease 过期清理 / 恢复-2/4 的 reconciler + 失败恢复;在那之前残留锁 = 不承接,No-Go。)
  */
 function activeDeployLockReason(t: ExecutionTarget): string | null {
   return t.deployLockToken !== undefined || t.deployLockExpiresAt !== undefined || t.deployLockOperationId !== undefined
@@ -602,7 +597,7 @@ function activeDeployLockReason(t: ExecutionTarget): string | null {
 /**
  * 描述符是否可承接新工作;不可用时返回原因字符串(便于把"为什么被拒"讲清楚)。
  *
- * 🔴 **v3.15 改【单一派生判定】**(P50.3b):可服务性由 `(spec, observed)` 派生 —— 存量 legacy item
+ * 🔴 **v3.15 改【单一派生判定】**:可服务性由 `(spec, observed)` 派生 —— 存量 legacy item
  * 经 `specObservedOf`→`adoptLegacy` 收养成双轴,再过 `serviceabilityReason`(intent=serve ∧ phase=ready ∧
  * 无破坏性 operation)。**新鲜度仍在本函数**(它持时间源解析 `descriptorAgeMs` + home 豁免,那是准入的另一维)。
  * 顺序:先"有没有" → 再"可服务性(派生)" → 最后"新鲜度";报错取第一条(最根本的原因)。
@@ -623,7 +618,7 @@ function unusableReason(t: ExecutionTarget | null, now = Date.now()): string | n
     return `${svc}(status=${t.status}${readyHint})`;
   }
 
-  // @kf-batch 50-W5-seg1-WP10a —— 🔴 跨法域 target 的**唯一**技术前置(SPEC §2.1 v3.22 / §3.2;DESIGN §18 决策 6quinquies):
+  // 🔴 跨法域 target 的**唯一**技术前置(SPEC §2.1 v3.22 / §3.2;DESIGN §18 决策 6quinquies):
   //    装了 residency-api(区域审计 / 结果存储)+ 本 target 自己的执行角色齐(SPEC §6.1 段二)。
   //    放在准入内核里 ⇒ 管理页「不承接:<原因>」与数据面拒因**逐字同源**;放在这一步(可服务性之后、新鲜度之前)
   //    是因为它比 stale 更根本(缺组件的 target 再新鲜也承接不了)。**没有法务判定**:平台不设法务门。
@@ -631,7 +626,7 @@ function unusableReason(t: ExecutionTarget | null, now = Date.now()): string | n
   if (residency) return residency;
 
   // 🔴 stale 仅对非 home 生效(SPEC §1.1 v3.4)。理由见该节:home 没有"探活失联"这一失败模式,
-  // 且探活写入方随 P50.2 才来 —— 若 home 也判 stale,G0 接线当天全平台 fail-closed。
+  // 且探活写入方才来 —— 若 home 也判 stale,G0 接线当天全平台 fail-closed。
   if (!isHome(t.targetId)) {
     const age = descriptorAgeMs(t, now);
     if (age === null) {
@@ -728,7 +723,7 @@ async function admit(targetId: string): Promise<{ target: ExecutionTarget } | { 
 }
 
 /**
- * 管理页用的**只读**可服务性呈现(P50.3b-4 收尾;根治 ROADMAP 记的"把原因链呈现出来")。
+ * 管理页用的**只读**可服务性呈现(4 收尾;根治 ROADMAP 记的"把原因链呈现出来")。
  *
  * 【它买到什么 —— 用真实撞过的场景说】新注册的 region 因为平台 IAM 的 region 条件是**部署时快照**,
  * 探活被 `AccessDenied` ⇒ 完成栅栏收不了口 ⇒ 页面把补充部署整体禁用。用户当时的原话是
@@ -923,7 +918,7 @@ function stableJson(v: unknown): string {
  *      已存在但不合格返回 `conflict-incomplete`(旧实现会把"库里有个坏 item"静默当成"seed 成功",
  *      而条件写又保证它**永远补不上** = 永久锁死)。
  *
- * 🔴 **谁调它**:部署期收尾(从 CFN Outputs / 实时查询组装描述符)。该调用方归 **P50.2**
+ * 🔴 **谁调它**:部署期收尾(从 CFN Outputs / 实时查询组装描述符)。该调用方另有归属
  * (`emrSecurityGroupId` 须运行时查询、`components` 取决于真实部署清单)。**在它落地前 home 不会被 seed,
  * `getHomeTarget()` 恒 fail-closed —— 这是刻意的**(G 批零生产调用方 ⇒ 零行为变化)。
  */
@@ -1146,7 +1141,7 @@ export async function reconcileTarget(
   }
 
   // 🔴 ① 条件同时绑 version + ready 不为 true + status ∈ 维修态(read-then-check 只给好报错;真正防 TOCTOU 是这行)。
-  //    P50.2e 集成缝:`#r = :false` 用 `(attribute_not_exists(#r) OR #r = :false)`(register 刻意不写 ready,缺失=false 同义)。
+  //    集成缝:`#r = :false` 用 `(attribute_not_exists(#r) OR #r = :false)`(register 刻意不写 ready,缺失=false 同义)。
   //    §21.2:再附加 route 传入的 finalize fence(不从 axes.observed.operation 重新生成)。
   const conditions = [
     "attribute_exists(sk)",
@@ -1171,14 +1166,14 @@ export async function reconcileTarget(
 }
 
 // ——————————————————————————————————————————————————————————————
-// 🔴 @kf-batch 50-WP15-airflow-serverless —— home 组件**只增采纳**通道(SPEC v3.28 §1.1 / §2.1 seed-home)
+// 🔴 home 组件**只增采纳**通道(SPEC v3.28 §1.1 / §2.1 seed-home)
 // ——————————————————————————————————————————————————————————————
 
 /**
  * home 已存在且在服务(active / ready)时,把**控制面新建的组件**(如 deploy-all 6.6 的 BgpAirflowServerlessStack)采纳进描述符。
  *
  * 【为什么需要】home 的组件由控制面栈建、不经 broker ⇒ 没有部署会话 / finalize fence 可带,借不了 `mergeComponentResources`;
- * `reconcileTarget` 是维修态门(ready=false 且 status ∈ 维修态),对 active 的 home 必拒 —— 真环境(WP-15 首刀):
+ * `reconcileTarget` 是维修态门(ready=false 且 status ∈ 维修态),对 active 的 home 必拒 —— 真环境(首刀):
  * `POST seed-home` 走 reconcileTarget ⇒ HTTP 500「只能修补维修态」,home 永远声称不了 airflow-serverless。
  * 那道门的理由是「对正在承接流量的 target **改** resources = 在线改路由」,对**加**不成立(与 mergeComponentResources 同一论证)。
  *
@@ -1322,7 +1317,6 @@ export async function adoptHomeComponents(input: {
 }
 
 // ——————————————————————————————————————————————————————————————
-// @kf-batch 50-WP20-retire-classic-mwaa
 // 🔴🔴 **摘除组件**(component retirement)—— 组件在现网被真的删掉之后,描述符停止声称它
 // ——————————————————————————————————————————————————————————————
 //
@@ -1386,7 +1380,7 @@ export async function retireComponents(input: {
   const existing = Array.isArray(current.components) ? current.components.filter((c): c is string => typeof c === "string") : [];
   const notThere = retiring.filter((c) => !existing.includes(c));
   if (notThere.length) throw new ComponentRetirementRefused(`这些组件本来就不在描述符里:${notThere.join("、")}`);
-  // @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不提供精简形态:完整组件集里的组件**一个都不许摘**
+  // ② —— 🔴🔴 不提供精简形态:完整组件集里的组件**一个都不许摘**
   //   (摘掉 = 把环境变成精简形态)。组件真坏了的出路是〔补齐缺失组件〕/ 重新部署,不是从描述符里藏起来。
   //   能摘的只剩要求集以外的存量组件(如已停供的 mwaa)。
   const requiredHere = requiredComponentsForTarget(current);
@@ -1490,11 +1484,10 @@ export class CredentialTransitionRejected extends Error {
   }
 }
 
-// @kf-batch 52-P52.5a-supply
 /**
  * `provisioningDeadlineAt` 的**唯一校验口**(§3.9b「deadline 必须可执行」)。
  *
- * 🔴 为什么抽出来:P52.5a 起有**两个**写入点会写这个字段 —— ① `registerTarget` 的**初始写**
+ * 🔴 为什么抽出来:有**两个**写入点会写这个字段 —— ① `registerTarget` 的**初始写**
  * (新 target 从 `provisioning` 起,见该函数的订正说明);② `advanceCredentialIsolationState`
  * 的状态迁移。两处各写一份校验 = 下一处漂移源(其中一处漏判"必须在未来"就等于开了一个
  * 一进去就过期、或永不过期的窗口)。⇒ 单一作者。
@@ -1550,10 +1543,10 @@ export const REGISTER_PROVISIONING_WINDOW_MS = PROVISIONING_MAX_WINDOW_MS;
  *
  * 🔴 **没有逆向函数,也不要加**。回滚应用代码**不得**回滚持久化状态(§3.9b 原文)。
  *
- * 🔴 **调用方归 P52.5a**(供给层:创建 per-project role/secret → canary → 推进状态)。
- * 本函数只提供**被合同约束住的那一条通道**,免得 P52.5a 施工时又去把 reconcile 的口子开大。
+ * 🔴 **调用方**(供给层:创建 per-project role/secret → canary → 推进状态)。
+ * 本函数只提供**被合同约束住的那一条通道**,免得施工时又去把 reconcile 的口子开大。
  * ⚠️ 如实登记:§3.9b 要求的**审计事件 / 指标 / provisioning 超时告警**不在本函数内 ——
- * 它们需要请求上下文与告警通道,随 P52.5a 一起接;**在那之前不得声称 §3.9b 的可观测闭环已完成**。
+ * 它们需要请求上下文与告警通道,一起接;**在那之前不得声称 §3.9b 的可观测闭环已完成**。
  */
 export async function advanceCredentialIsolationState(
   targetId: string,
@@ -1626,9 +1619,8 @@ export async function advanceCredentialIsolationState(
   );
 }
 
-// @kf-batch 50-WP9a-durable-jobs
 /**
- * **延期** `provisioning` 窗口(§3.9b「延期只能走受审计、带 epoch 的专用操作」;WP-9 合同差分 ③-2)。
+ * **延期** `provisioning` 窗口(§3.9b「延期只能走受审计、带 epoch 的专用操作」;合同差分 ③-2)。
  *
  * 🔴 为什么是又一个专用函数、而不是复用 `advanceCredentialIsolationState`:那个函数「只认两条前进边」,
  *    `provisioning → provisioning` 不是前进边;为了延期去放宽它,等于在单调不可逆的状态机上开一条自环口子,
@@ -1702,7 +1694,7 @@ export async function extendProvisioningDeadline(
 }
 
 // ——————————————————————————————————————————————————————————————
-// §2.1 register(P50.2 切片 c)—— 身份/位置的**唯一**写通道
+// §2.1 register(切片 c)—— 身份/位置的**唯一**写通道
 //
 // 与 seed / reconcile 的分工(SPEC §1.1 v3.7 的通道表):
 //   · register  = 新建 target 的**身份与位置**(本函数;`status=registered`、不置 ready、不写 resources)
@@ -1718,12 +1710,12 @@ export interface RegisterTargetInput {
   accountId: string;
   cellId?: string;
   stage?: string;
-  /** @kf-batch 50-WP15-airflow-serverless(K-5):网络规模 standard(2 NAT)/ economy(1 NAT);缺省 standard */
+  /** 网络规模 standard(2 NAT)/ economy(1 NAT);缺省 standard */
   networkProfile?: NetworkProfile;
   /** 缺省 "home"(SPEC §1.1:jurisdiction 是可默认字段)。 */
   jurisdiction?: string;
   components: string[];
-  /** @kf-batch 50-W5-seg1-WP10a `jurisdiction≠home` 时**必填**:客户端回传的免责告知同意(须逐字等于当前版本,SPEC §2.1 v3.22) */
+  /** `jurisdiction≠home` 时**必填**:客户端回传的免责告知同意(须逐字等于当前版本,SPEC §2.1 v3.22) */
   residencyAck?: { version: string; textHash: string };
 }
 
@@ -1754,7 +1746,6 @@ export class RegisterNamespaceExhausted extends Error {
 }
 
 /**
- * @kf-batch 50-WP23-one-env-per-region
  * 🔴🔴 **一个 region 只允许一套执行环境**(用户反复拍板;2026-09-15 第 N 次:
  * 「我不是跟你说过 N 次了吗?一个 region 只能有一个执行环境」)。
  *
@@ -1838,7 +1829,7 @@ export async function registerTarget(
     bad(`components 含未知组件:${unknownComp.join(", ")}(合法:${TARGET_COMPONENTS.join(", ")})`);
   }
   if (!components.includes("core")) bad("components 必须含 core(SPEC §1.1:core 必有)");
-  // @kf-batch 50-WP17-serverless-workflow —— 🔴 **注册 = 新装**,停供组件一律拒(用户 2026-09-11 拍板)。
+  // 🔴 **注册 = 新装**,停供组件一律拒(用户 2026-09-11 拍板)。
   //   与 `planComponentAddition` 的差别:那里是「全集」语义、要放行**存量已装**的;这里是全新目标,
   //   压根没有「已装」⇒ 带了就是要新装 ⇒ 直接拒,并把出路(airflow-serverless)写在拒因里。
   const retired = components.filter((c) => isComponentRetired(c));
@@ -1847,7 +1838,7 @@ export async function registerTarget(
   if (typeof jurisdiction !== "string" || jurisdiction.length === 0) {
     bad(`jurisdiction 须为非空字符串:${JSON.stringify(input.jurisdiction)}`);
   }
-  // @kf-batch 50-W5-seg1-WP10a:法域格式(SPEC §1.1 v3.22)+ 跨法域注册必带当前版本的免责告知同意(§2.1 register)
+  // 法域格式(SPEC §1.1 v3.22)+ 跨法域注册必带当前版本的免责告知同意(§2.1 register)
   if (typeof jurisdiction === "string" && !JURISDICTION_RE.test(jurisdiction)) {
     bad(`jurisdiction 格式非法:${JSON.stringify(jurisdiction)}(须匹配 ${JURISDICTION_RE.source},如 home / eu-sim;不收 Home / EU 这类变体)`);
   }
@@ -1861,7 +1852,7 @@ export async function registerTarget(
   if (!crossJurisdictionRegister && input.residencyAck !== undefined) {
     bad("home 法域的执行目标不接受 residencyAck(告知只对跨法域 target 有意义;带了说明调用方拼错了法域)");
   }
-  // @kf-batch 50-PROD-B-seq33 ② —— 🔴🔴 不许精简(用户 2026-10-10):注册带的组件集必须**逐项等于**要求集。
+  // ② —— 🔴🔴 不许精简(用户 2026-10-10):注册带的组件集必须**逐项等于**要求集。
   //   注册的一律是非主控区(主控区由 seed-home 探测写入,不走这里)。少一个 = 精简形态 ⇒ 拒;
   //   多一个(kafka 未实现 / 非主控区带 agentcore)= 装不出来或违反「一个 AgentCore」⇒ 同样拒。
   if (typeof jurisdiction === "string" && Array.isArray(components)) {
@@ -1897,7 +1888,7 @@ export async function registerTarget(
   //    **确定性耗尽**,重试一万次也不会成 ⇒ 运维会一直重试而不是去删一个不用的环境
   //    (「最坏的不是不能用,是看不出为什么不能用」的又一例)。
   //    ⇒ 字母空间给满 26 个;**耗尽**与**争抢**分成两种错(见 RegisterNamespaceExhausted)。
-  // @kf-batch 50-WP23-xregion-peering —— 分配本环境的 VPC 地址段
+  // 分配本环境的 VPC 地址段
   // 🔴 为什么在注册这一刻分配(而不是部署时):跨区 peering 要求两侧 CIDR 不重叠,而「不重叠」是
   //    **账号内全局**的性质(主控区路由表要同时指向 N 条 peering,目的地段不能撞)⇒ 只有注册表这一侧
   //    看得见全量已用值。落进描述符后 broker 直接透传,部署期不再有第二处判断。
@@ -1907,15 +1898,15 @@ export async function registerTarget(
   //    两个环境撞同一段时,主控区那条回程路由 `CreateRoute` 会 `RouteAlreadyExists` ⇒ 自定义资源失败
   //    ⇒ 整栈回滚,并在错误里点名冲突的那一段(SPEC §3.14ter)。**不是静默错**,所以不值得为它再开一张表。
   const allTargets = await listTargetsRaw();
-  // @kf-batch 50-WP23-one-env-per-region —— 🔴🔴 同区已有执行环境 ⇒ 硬拒(见 RegionAlreadyHasEnvironmentError)
+  // 🔴🔴 同区已有执行环境 ⇒ 硬拒(见 RegionAlreadyHasEnvironmentError)
   //   复用这一次全量读,不额外扫表。
   // ⚠️ 残留窄窗口(**刻意保留,理由与上面 CIDR 那条同族**):这是「读了再写」,两笔**并发**注册可能都通过。
   //   条件写 `attribute_not_exists(sk)` 只保护 targetId 唯一,管不了「这个 region 已经有一个」。
   //   消除它的做法是给 region 单开一条 claim 项(`pk=env-region` + 事务写),但那会多出一份**必须跟着删干净**
-  //   的生命周期 —— 而「删执行环境」在本项目里**还没有产品路径**(序 15 未实现,今天清 `tgt_usw2_e` 是手工删栈 + 手工删行)。
+  //   的生命周期 —— 而「删执行环境」在本项目里**还没有产品路径**(未实现,今天清 `tgt_usw2_e` 是手工删栈 + 手工删行)。
   //   claim 一旦成为孤儿,症状是「这个 region 从此再也注册不进去」,比现在这个窄窗口更难诊断、更伤人。
   //   ⇒ 现阶段的兜底有两层:① 真实注册全部来自页面/脚本的**串行**调用;② 验收侧 `vlib.assert_one_env_per_region()`
-  //   在**每一段**开跑前扫注册表,一区多套当场硬红。等序 15(环境回收)落地、有了单一的删除作者,再把 claim 并进它的事务里。
+  //   在**每一段**开跑前扫注册表,一区多套当场硬红。等(环境回收)落地、有了单一的删除作者,再把 claim 并进它的事务里。
   const sameRegion = allTargets
     .filter((x) => x.region === region && x.status !== "deleted")
     .map((x) => ({ targetId: x.targetId, status: String(x.status) }));
@@ -1941,15 +1932,14 @@ export async function registerTarget(
       accountId,
       region,
       jurisdiction,
-      // @kf-batch 50-W5-seg1-WP10a:跨法域注册时 admin 的同意入描述符(服务端补 by / at;之后不可改)
+      // 跨法域注册时 admin 的同意入描述符(服务端补 by / at;之后不可改)
       ...(crossJurisdictionRegister && input.residencyAck
         ? { residencyAck: { by: actor, at: now, version: input.residencyAck.version, textHash: input.residencyAck.textHash } }
         : {}),
       status: "registered",
       components: normalized,
-      // @kf-batch 50-WP23-xregion-peering:VPC 地址段(不可改;部署期由 broker 透传给栈组)
+      // VPC 地址段(不可改;部署期由 broker 透传给栈组)
       vpcCidr,
-      // @kf-batch 52-P52.5a-supply
       // 🔴🔴 **订正一处现网 fail-open**(50 ROADMAP §2quinquies 事实 ③;实测 `tgt_usw2_a` 就是这个形态)。
       // 原来这里硬编码 `legacy-seeded`,而 §3.9b 的权威合同写的是:
       //   「**仅部署迁移脚本显式登记**的存量 home target 可进入 `legacy-seeded`;
@@ -1972,8 +1962,8 @@ export async function registerTarget(
     };
     if (input.cellId !== undefined) item.cellId = input.cellId;
     if (input.stage !== undefined) item.stage = input.stage;
-    // @kf-batch 50-WP15-airflow-serverless(K-5):显式写缺省,让「没写 = standard」不靠读方猜
-    // @kf-batch 50-WP16-zero-egress:新注册的 target **不再写** networkProfile(零出网无 NAT 档)。
+    // 显式写缺省,让「没写 = standard」不靠读方猜
+    // 新注册的 target **不再写** networkProfile(零出网无 NAT 档)。
     //   只有客户端显式给了(= 存量迁移场景)才落库,保持向后兼容。
     if (input.networkProfile) item.networkProfile = input.networkProfile;
     try {
@@ -2016,7 +2006,7 @@ export async function listTargetsRaw(): Promise<ExecutionTarget[]> {
 }
 
 // ——————————————————————————————————————————————————————————————
-// P50.2 切片 e —— 部署回写 / 就绪置位 / 探活写入 / 启用(G 批欠账的收口:
+// 切片 e —— 部署回写 / 就绪置位 / 探活写入 / 启用(G 批欠账的收口
 // seed/回写与 probe 第一次有**真实调用方与真实写入方**,stale 判定第一次有真值)
 //
 // 通道分工(SPEC §1.1 v3.7 的通道表,一条不混):
@@ -2420,7 +2410,7 @@ export async function reconcileAfterProbe(targetId: string, input: ProbeReconcil
       probeInput: evidence.probeInput,
     };
   } else {
-    // legacy E-99 / 初装:probe 前捕获的是"无双轴"快照;probe 后若出现双轴/operation,立即拒。
+    // legacy 初装:probe 前捕获的是"无双轴"快照;probe 后若出现双轴/operation,立即拒。
     const evidence = input.evidence;
     if (hasSpec || hasObserved) {
       return { advanced: false, reason: "legacy-replaced-during-probe" };
@@ -2578,10 +2568,9 @@ export function deploymentNeedsFinalize(target: ExecutionTarget): boolean {
 /** base/core 两栈各自必须给出的 OutputKey(栈组的合同:OutputKey = 描述符字段名,中间零映射表)。 */
 const BASE_STACK_OUTPUT_KEYS = ["vpcId", "dataKeyArn", "privateSubnetIds", "targetId"] as const;
 /**
- * @kf-batch 50-WP23-xregion-peering
  * 🔴🔴 base 栈的**网络观测** Output —— **读到才写,缺不算合同破坏**(老版本的 base 栈没有它们)。
  *
- * 【为什么补这一条:一个「写了没接上」的真缺陷】WP-16 让 base 栈输出了 `endpointIds` /
+ * 【为什么补这一条:一个「写了没接上」的真缺陷】让 base 栈输出了 `endpointIds` /
  * `crossRegionDdbEndpointId` / `homeLinkHostedZoneId`,探活(`probe-runner`)也照它们写了
  * `network:egress-none` / `network:home-link` 两项 —— 但**没有人把这些 Output 装进资源袋**:
  * 下面的组装是一张**写死的键清单**,只含 vpcId / dataKeyArn / privateSubnetIds。
@@ -2604,7 +2593,7 @@ const CORE_STACK_OUTPUT_KEYS = [
   "glueRoleArn",
   "emrSecurityGroupId",
   "emrSubnetIds",
-  // @kf-batch 50-W5-seg1-WP3:core 栈从此必吐 EMR 执行角色(SPEC v3.21 §6.1 段二);栈是 WP-3 后的版本才有它 ——
+  // core 栈从此必吐 EMR 执行角色(SPEC v3.21 §6.1 段二);栈是后的版本才有它
   // 旧版栈缺它 ⇒ finalize 整轮拒(一个字节都不写),这正是「先重新部署再回写」的顺序保证。
   "emrExecutionRoleArn",
 ] as const;
@@ -2617,7 +2606,7 @@ const CORE_STACK_OUTPUT_KEYS = [
  * 成功才跑,部分成功后失败会让注册表陈旧;CFN Outputs 是**真实资源的权威 SSOT**,平台侧随时可重放。
  * 🔴 缺任何一个 Output ⇒ **一个字节都不写**(§20.11-N2:半份描述符比没有更糟)。
  *
- * 🔴 **P50.3a 起同时回写 `components`(observed 语义)**:值 = `core` + 真读到栈且 Output 齐的可选组件。
+ * 🔴 **同时回写 `components`(observed 语义)**:值 = `core` + 真读到栈且 Output 齐的可选组件。
  *    这意味着它**可能变短** —— 注册时勾了 redshift 但那个栈没部署成功,回写后 components 里就没有它。
  *    这是刻意的:注册表宁可如实反映"现在真装了什么",也不保留一个没有资源支撑的声称
  *    (desired 与 observed 的分离字段归后续批次,见 SPEC §3.5 desired/observed)。
@@ -2677,10 +2666,10 @@ export async function finalizeTargetResources(
     emrSecurityGroupId: core.emrSecurityGroupId,
     emrSubnetIds: core.emrSubnetIds.split(",").filter(Boolean),
   };
-  // @kf-batch 50-WP23-xregion-peering:base 的网络观测键(读到才写;见上面那段「写了没接上」的说明)
+  // base 的网络观测键(读到才写;见上面那段「写了没接上」的说明)
   for (const k of BASE_STACK_OPTIONAL_OUTPUT_KEYS) if (base[k]) resources[k] = base[k];
 
-  // ── 可选组件栈(P50.3a):**observed 语义 —— 只声称"真读到栈"的组件** ─────────────
+  // ── 可选组件栈:**observed 语义 —— 只声称"真读到栈"的组件** ─────────────
   // 🔴 为什么组件集由这里回写、而不是由 add-components 端点写:G 批 P1-1 的教训 ——
   //    资源真实存在**之前**绝不声称装了某组件(声称了没装,下推任务时才在很远的地方炸)。
   //    add-components 只触发部署;"装上了"这件事由本函数在读到栈的 Outputs 之后才写。
@@ -2702,12 +2691,12 @@ export async function finalizeTargetResources(
     }
     // 只取合同声明的键:防一个组件栈往资源袋里塞未登记字段(袋子是路由输入,面要窄)。
     for (const k of need) resources[k] = compOuts[k];
-    // @kf-batch 50-W5-seg1-WP3:合同声明的**可选**键(读到才写;缺不算合同破坏 —— 旧版组件栈没有它们)
+    // 合同声明的**可选**键(读到才写;缺不算合同破坏 —— 旧版组件栈没有它们)
     for (const k of COMPONENT_OPTIONAL_RESOURCES[comp] ?? []) if (compOuts[k]) resources[k] = compOuts[k];
     observedComponents.push(comp);
   }
 
-  // ── 落库:按 target 是否**已在承接流量**分两条通道(P50.3a 真跑撞出的合同缺口)──────────
+  // ── 落库:按 target 是否**已在承接流量**分两条通道(真跑撞出的合同缺口)──────────
   // 🔴 首装(ready 未置)走 **reconcileTarget**:它的维修态条件 + 合并后 §3.1a 整包校验就是这次
   //    写入的门,不绕开不复刻。`components` 与 `resources` **同一次**写(分两次会出现"声称了组件
   //    但资源还没落"的中间态)。
@@ -2735,14 +2724,12 @@ export async function finalizeTargetResources(
 }
 
 /**
- * @kf-batch 50-WP23-xregion-peering
  * base 栈的网络观测键(补充部署通道允许**只增**)。与 `BASE_STACK_OPTIONAL_OUTPUT_KEYS` 同源,
  * 不另抄一份 —— 抄一份就会出现「finalize 写了、窄通道拒了」这种两处不一致。
  */
 const BASE_OBSERVED_ADDABLE_KEYS: ReadonlySet<string> = new Set<string>(BASE_STACK_OPTIONAL_OUTPUT_KEYS);
 
 /**
- * @kf-batch 50-WP18e-setvalued-resource
  * 🔴🔴 **集合型**观测键(逗号分隔的 id 集合)。这类键的「只增不改」判定必须按**集合**来,
  * 不能按字符串逐字节比 —— 否则一次合法的重新部署(多建了一个接口端点)会把整个 target **永久堵死**。
  *
@@ -2780,12 +2767,12 @@ export function setValuedResourceVerdict(before: unknown, after: unknown): "same
 /** 组件私有的资源键集合(= §3.1a 配套映射的值域)。core/base 的键**不在**里面,故窄通道碰不到它们。 */
 const COMPONENT_OWNED_RESOURCE_KEYS: ReadonlySet<string> = new Set([
   ...Object.values(COMPONENT_REQUIRED_RESOURCES).flatMap((v) => [...v]),
-  // @kf-batch 50-W5-seg1-WP3:组件可选键同属组件私有(它们的写入另受执行角色键规则 ② 的 SSOT 名判定,见下)
+  // 组件可选键同属组件私有(它们的写入另受执行角色键规则 ② 的 SSOT 名判定,见下)
   ...Object.values(COMPONENT_OPTIONAL_RESOURCES).flatMap((v) => [...v]),
 ]);
 
 /**
- * 🔴 **补充部署的窄写通道**(P50.3a):给**已启用**(ready=true)的 target 追加组件的实名资源。
+ * 🔴 **补充部署的窄写通道**:给**已启用**(ready=true)的 target 追加组件的实名资源。
  *
  * 【为什么不走 reconcileTarget】它要求 `ready=false`(维修态),理由是"对正在承接流量的 target 改
  * resources = 在线改路由"。那个理由对**改**成立,对**加**不成立:加一个 `dmsSubnetGroup` 不会动
@@ -2853,8 +2840,8 @@ export async function mergeComponentResources(
   for (const [k, v] of Object.entries(input.resources)) {
     const before = existing[k];
     if (before !== undefined && JSON.stringify(before) === JSON.stringify(v)) continue; // 值相同 ⇒ 无需写
-    // ── @kf-batch 50-W5-seg1-WP3:执行角色键的**唯一例外**(SPEC v3.21 §3.1a 规则 ②)────────────────
-    // 已启用 target 从「共享 home 角色」切到「本 target 角色」(WP-3)只能经本通道回写,而 ①② 会把它拒掉
+    // ──:执行角色键的**唯一例外**(SPEC v3.21 §3.1a 规则 ②)────────────────
+    // 已启用 target 从「共享 home 角色」切到「本 target 角色」只能经本通道回写,而 ①② 会把它拒掉
     // (glueRoleArn 是 core 键且值变了;emrExecutionRoleArn 是 core 新键)。例外只放两种、且由命名 SSOT 判定:
     //   「新增」= 前值不存在 ∧ 新值角色名 = 本 target 名;「切换」= 前值角色名 = 该 kind 的 home 名 ∧ 新值 = 本 target 名。
     // 其它任何形态(切成别的 target / 切回 home / 非 ARN)照旧拒 —— 桶 / workgroup / 凭证一个字节都碰不到。
@@ -2870,7 +2857,7 @@ export async function mergeComponentResources(
       continue;
     }
     if (before !== undefined) {
-      // @kf-batch 50-WP18e-setvalued-resource —— 集合型观测键按**集合**判(见 SET_VALUED_OBSERVED_RESOURCE_KEYS 注释)
+      // 集合型观测键按**集合**判(见 SET_VALUED_OBSERVED_RESOURCE_KEYS 注释)
       if (SET_VALUED_OBSERVED_RESOURCE_KEYS.has(k)) {
         const verdict = setValuedResourceVerdict(before, v);
         if (verdict === "same") continue;   // 只是顺序不同 ⇒ 无变化,不写
@@ -2887,7 +2874,7 @@ export async function mergeComponentResources(
       }
       continue; // 值相同 ⇒ 无需写
     }
-    // @kf-batch 50-WP23-xregion-peering:base 的**网络观测**键允许「只增」——
+    // base 的**网络观测**键允许「只增」——
     //   它们不是路由输入(只被探活读),而「一个已启用的环境第一次装上跨区通路」正是升级路径:
     //   若一律拒,重新部署会在回写这一步整轮失败(而资源其实已经建好了 ⇒ 最难查的那种不一致)。
     //   🔴 **改**它们仍然拒 —— 上面那段「只增不改」的检查在此之前就跑了。
@@ -2973,7 +2960,6 @@ export async function mergeComponentResources(
 }
 
 /**
- * @kf-batch 50-W5-seg1-WP10a
  * 🔴 **项目白名单的唯一写通道**(SPEC §1.1 `access?` / §2.1 `POST .../[targetId]/access`)。
  * 通用:任何 target(含 home)都可设;缺省 all-projects。
  * 为什么单独一条通道而不是塞进 reconcile / 窄通道:`access` 是**授权输入**,不属 resources(路由输入)也不属
@@ -3128,7 +3114,7 @@ export async function getHomeTarget(): Promise<ExecutionTarget> {
   throw new TargetNotReadyError(
     HOME_TARGET_ID,
     `${r.why};home 描述符须由**部署期** seed(seedHomeTarget,SPEC §1.1 v3.4),` +
-      `平台读路径不再自愈写库 —— 部署期真调用方归 P50.2`
+      `平台读路径不再自愈写库 —— 部署期真调用方另有归属`
   );
 }
 

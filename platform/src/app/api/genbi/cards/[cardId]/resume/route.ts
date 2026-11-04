@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-// @kf-batch 54-genbi-session-cards
 // POST /api/genbi/cards/[cardId]/resume —— 打开续聊(54 DESIGN v1.3 §5.5)
 //
 // 做的事:用卡片正文**覆盖式重建**这段对话的短期记忆,并回「该切到哪个 target」。

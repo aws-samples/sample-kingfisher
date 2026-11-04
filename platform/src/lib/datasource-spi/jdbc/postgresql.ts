@@ -1,6 +1,6 @@
-// 模块 42 — PostgreSQL provider(JDBC 范式,P42.2 底座试金石)。
+// PostgreSQL provider(JDBC 范式,底座试金石)。
 //
-// 【驱动】pg@8(纯 JS,P42.0 实证 alpine 可用)。按需 dynamic import——若 pg 未装则 introspect/ping
+// 【驱动】pg@8(纯 JS,实证 alpine 可用)。按需 dynamic import——若 pg 未装则 introspect/ping
 // 优雅降级(返回 [] / reachable:false),不让顶层 import 崩(与"驱动可得性分期"一致)。
 // 【方言差异】PG 有 schema 概念(默认 public);driver=org.postgresql.Driver;URL=jdbc:postgresql://。
 

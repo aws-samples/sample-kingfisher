@@ -1,7 +1,6 @@
-// @kf-batch 50-WP15-airflow-serverless
 // 🔴 home 组件**只增采纳**通道(SPEC v3.28 §1.1 / §2.1 seed-home):真环境首刀 `POST seed-home` 走 reconcileTarget 被维修态门拒(HTTP 500),
 //    home 永远声称不了控制面新建的 airflow-serverless。本文件钉五条硬约束(只 home / 只增不改 / 三处同步 / 真探全绿 / 条件写)。
-// 🔴 涉网依赖一律顶层 import + 顶层 vi.mock(E-64)。
+// 🔴 涉网依赖一律顶层 import + 顶层 vi.mock。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { getMock, updateMock } = vi.hoisted(() => ({ getMock: vi.fn(), updateMock: vi.fn() }));

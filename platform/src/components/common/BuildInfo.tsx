@@ -1,5 +1,5 @@
 "use client";
-// @kf-batch 39-release-visibility —— 「运行中的平台是哪一版」的页面载体(序 39 第二刀)。
+// 「运行中的平台是哪一版」的页面载体。
 // 两个出口同一份数据与同一条文案规则:登录页页脚一行(`BuildLabel`)、系统设置「平台版本」卡(`BuildInfoCard`)。
 // 事实只来自 `GET /api/public/version`(唯一作者 lib/build-info.ts);取不到就显示「构建信息不可用」,不编造。
 import React, { useEffect, useState } from "react";

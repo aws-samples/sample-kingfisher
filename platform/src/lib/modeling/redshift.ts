@@ -1,4 +1,4 @@
-// 模块 35 — 码表落地 Redshift 的安全 SQL 工具 + 执行。
+// 码表落地 Redshift 的安全 SQL 工具 + 执行。
 //
 // 安全(防注入):schema/表/列标识符严格白名单校验后双引号包裹;枚举值(value/label)
 // 单引号转义。无自由用户 SQL。执行复用指标中台同款(统一 admin 身份 / Redshift Data API / 轮询)。
@@ -9,17 +9,17 @@ import {
   GetStatementResultCommand,
 } from "@aws-sdk/client-redshift-data";
 import type { CodeValue, ModelColumn } from "./types";
-// 模块 55 第二批:等待终态的唯一原语(请求路径没有等待上下文 ⇒ 抛;本函数只能在长操作 modeling-metric-compute 里被调)
+// 等待终态的唯一原语(请求路径没有等待上下文 ⇒ 抛;本函数只能在长操作 modeling-metric-compute 里被调)
 import { awaitTerminal, LongOpWaitBudgetExceeded } from "@/lib/long-ops/await-terminal";
-// @kf-batch 50-WP11b-shared-writer —— 码表物理落点的唯一作者(SPEC §3.9d.3)
+// 码表物理落点的唯一作者(SPEC §3.9d.3)
 import { codeTableLandingFqn } from "./landing-fqn";
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
-// @kf-batch 50-WP11b-shared-writer —— 原来这里有一个模块级 home 客户端(理由值「建模 DDL 缺写入通道」)
+// 原来这里有一个模块级 home 客户端(理由值「建模 DDL 缺写入通道」)
 // + `execStatements` / `landCodeTable` / `applyModelTableDDL` / `execScalar` 四个执行函数。勘定实测:四个函数
 // **零生产调用方**(落地早已改走 `landing.ts` 的逐 target 通道,指标计算走 `execScalarAt`),那个 home-only
-// 理由也随 WP-11b 交付失效 ⇒ 整块删除,理由值退役(`HomeOnlyReason` 只减不增)。
+// 理由也随后交付失效 ⇒ 整块删除,理由值退役(`HomeOnlyReason` 只减不增)。
 // 本文件只剩**纯 SQL 生成** + 一个按区只读查询。
 
 // 标识符白名单(与 lib/metrics/service.ts 同款):字母/下划线起头,后续字母数字下划线。
@@ -39,7 +39,6 @@ export function codeTableName(code: string): string {
   return codeTableLandingFqn({ code }).table;
 }
 
-// @kf-batch 50-WP11b-shared-writer
 // 🔴 码表落地拆成**两层**(50 SPEC §3.9a §4.6 / §3.9d):① 结构(建表)② 数据(清空 + 灌数)。
 //    home 仍是两层顺序拼起来(`buildLandStatements`,逐字节不变);非 home 第一层走 admin 模板
 //    `land-code-table`(它 brand 的正是 `buildCodeTableCreateStatement` 的产物 ⇒ 列定义**只有这一个作者**),
@@ -176,17 +175,16 @@ export function buildCreateTableStatements(spec: ModelTableDDLSpec): string[] {
 // ─── D4 指标计算:只读执行取首行首列标量值 ───────────────────────────────────────
 // 用于指标计算(SELECT <agg> AS value FROM ...)。统一 admin 身份,轮询到 FINISHED 取结果。
 // SQL 由 buildMetricSql 安全构造(无自由用户 SQL),这里仅负责执行。
-// @kf-batch 50-WP4quater-reads(工单 SC-37)
 /**
  * **按区跑一条只读标量查询**(指标计算专用)。
  *
  * 🔴 读与写分两条路:建模**落地(DDL/DML)**非 home 走 §3.9a 闭合执行器 + 窄权 shared_writer
- * (`landing.ts`,WP-11b);指标计算是 `SELECT <agg>` 的**只读**标量查询,走的是与问数 / 数仓直查同一条
+ * (`landing.ts`);指标计算是 `SELECT <agg>` 的**只读**标量查询,走的是与问数 / 数仓直查同一条
  * 已交付的读路径(`resolveRedshiftBinding`,带项目凭证)。
  *
  * 用户 2026-09-10:「指标」不能算平台级不分区 —— 它有**计算值**,而那个值就是从某个区的数仓算出来的。
  */
-// @kf-batch 50-WP31-place-first-class —— projectId 必填:非主控区凭证按项目取(§3.9b),原来不传 ⇒ 非主控区恒 500
+// projectId 必填:非主控区凭证按项目取(§3.9b),原来不传 ⇒ 非主控区恒 500
 //   「必须带 projectId」(段 wp31 坐实:建模指标在非主控区从来没算成过)
 export async function execScalarAt(sql: string, targetId: string, projectId: string): Promise<number> {
   const { resolveRedshiftBinding } = await import("@/lib/exec-env/data-plane-target");
@@ -201,7 +199,7 @@ export async function execScalarAt(sql: string, targetId: string, projectId: str
       ...(b.secretArn ? { SecretArn: b.secretArn } : {}),
     })
   );
-  // 模块 55 第二批:原 50 × 700ms 的本地 sleep 循环改经 awaitTerminal(预算与文案逐字保留;无等待上下文 ⇒ 抛 LongOpContextMissing)
+  // 原 50 × 700ms 的本地 sleep 循环改经 awaitTerminal(预算与文案逐字保留;无等待上下文 ⇒ 抛 LongOpContextMissing)
   try {
     await awaitTerminal<void>({
       what: `Redshift 查询(${b.region} / ${b.workgroup})`,

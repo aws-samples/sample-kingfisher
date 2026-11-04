@@ -17,7 +17,7 @@ export interface SystemPromptOpts {
   published?: { schema?: string; table?: string; targetTable?: string; title?: string; question?: string }[];
   // 历史记忆(以往对话的长期摘要,供参考口径/偏好)。
   memory?: string;
-  // @kf-batch 50-B26-lake-place —— Athena 三段名的**该区**联邦目录引用(`<catalog>/<表桶>`)。
+  // Athena 三段名的**该区**联邦目录引用(`<catalog>/<表桶>`)。
   // 🔴 原来示例里写死主控区的 "s3tablescatalog/bgp-table-bucket",模型会照抄 ⇒ 在别的区拼出主控区的表名。
   //    没给就不举具体名字(只指向下方数据目录),绝不回落到主控区那个名字。
   athenaRef?: string;

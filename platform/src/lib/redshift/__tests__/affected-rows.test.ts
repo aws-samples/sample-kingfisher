@@ -1,4 +1,4 @@
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101):Redshift Data API 受影响行数唯一作者的判据。
+// Redshift Data API 受影响行数唯一作者的判据。
 import { describe, it, expect } from "vitest";
 import { affectedRowsOf, affectedRowsMetrics } from "../affected-rows";
 

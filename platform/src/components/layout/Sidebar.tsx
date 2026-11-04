@@ -6,7 +6,7 @@ import { Layout, Menu } from "antd";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken, isAnalystOnly } from "@/lib/auth/roles";
 import { menuTree, isGroup, type Node } from "./routes";
-// @kf-batch 53-guide-tour-reach —— 导览锚点可达性(收起的菜单分类里子项不在 DOM ⇒ 锚点找不到)
+// 导览锚点可达性(收起的菜单分类里子项不在 DOM ⇒ 锚点找不到)
 import { useGuide } from "@/components/guide/GuideProvider";
 import { tourStepAt } from "@/lib/guide/tour";
 import { withParentGroupOpen } from "@/lib/guide/nav-open";
@@ -76,7 +76,6 @@ export default function Sidebar() {
     setOpenKeys((prev) => withParentGroupOpen(menuTree, prev, pathname));
   }, [pathname]);
 
-  // @kf-batch 53-guide-tour-reach
   // 🔴🔴 导览走到哪一步，就把**那一步的菜单锚点**变成真的看得见的：
   //   ① 展开它所属的分类 —— antd inline 菜单**收起的分类子项压根不在 DOM 里**
   //      (真环境实测:首次进站 7 个分类全收起 ⇒ `nav-/sync` count=0 ⇒ 导览第一步就报「控件不在页面上」);
@@ -91,7 +90,6 @@ export default function Sidebar() {
   }, [tourStepPath]);
 
   // menuTree 的 label 是中文源串(作字典 key);渲染处按当前语种翻译,routes.tsx 不动。
-  // @kf-batch 53-guide-tour
   // 🔴 每个菜单项的 label 包一层带 `data-testid="nav-<key>"` 的 span —— **新手导览的锚点**。
   //    为什么锚在这里:导览的每一步几乎都要先说「点左侧的 X 进这一页」,而全站 31 个菜单叶子
   //    在这一处一次性获得稳定锚点(逐页给主按钮加 testid 要改十几个文件,且仍然缺导航那一步)。

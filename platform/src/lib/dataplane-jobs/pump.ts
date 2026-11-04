@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 数据面长作业的**推进泵**(WORK-PACKAGES WP-9 ④-2)—— 挂在周期 reconciler 旁的独立 15s 计时器。
+// 数据面长作业的**推进泵**(④-2)—— 挂在周期 reconciler 旁的独立 15s 计时器。
 //
 // ── 它只做两件事,而且刻意只做这两件 ────────────────────────────────────────────
 //   ① 一次轻量 Query(稀疏 GSI byDue)取到期作业 id(每轮 ≤5);
@@ -20,7 +19,7 @@ import {
   INTERNAL_SOURCE_HEADER,
 } from "@/lib/scheduler/internal-source";
 
-/** 泵周期(WP-9 ④-2:15s)。 */
+/** 泵周期(④-2:15s)。 */
 export const PUMP_INTERVAL_MS = 15_000;
 /** 每多少轮补一次队(15s × 40 = 10 分钟)。 */
 export const SWEEP_EVERY_TICKS = 40;
@@ -67,7 +66,7 @@ export function __resetPumpKeyCache(): void {
 
 /**
  * 内部端点的共享密钥(与分发 Lambda 同一份;平台进程按 ARN 读,缓存 5 分钟)。读不到 ⇒ 空串(本轮不跑)。
- * @kf-batch 50-B51-backfill-pump —— 导出给补数推进泵复用(同一把钥匙、同一份缓存,不另写第二个读法)。
+ * 导出给补数推进泵复用(同一把钥匙、同一份缓存,不另写第二个读法)。
  */
 export async function loadInternalDispatchKey(): Promise<string> {
   const arn = process.env.ACTION_DISPATCH_SECRET_ARN || "";
@@ -76,9 +75,9 @@ export async function loadInternalDispatchKey(): Promise<string> {
   const { SecretsManagerClient, GetSecretValueCommand } = await import("@aws-sdk/client-secrets-manager");
   const { sdkClient } = await import("@/lib/aws/clients");
   const { ctrlRegionOf } = await import("@/lib/workflow/dag-place");
-  // @kf-batch 50-WP31-place-first-class 序 31 第三刀 ①:这把钥匙是平台**控制面**的(与分发 Lambda 共享,只在主控区),
+  // 这把钥匙是平台**控制面**的(与分发 Lambda 共享,只在主控区),
   //   原来经数据面工厂 regionalClient("secrets") 建客户端 ⇒ observe 凭证模式下每 5 分钟先用数据面角色被拒一次再回任务角色
-  //   (第四十轮 creds 缺口榜首 38 条),enforce 凭证模式下直接读不到 ⇒ 泵停。控制面一律 sdkClient("control-plane")(B-47 同一条口径)。
+  //   (第四十轮 creds 缺口榜首 38 条),enforce 凭证模式下直接读不到 ⇒ 泵停。控制面一律 sdkClient("control-plane")(同一条口径)。
   const sm = sdkClient("control-plane", SecretsManagerClient, { region: ctrlRegionOf() });
   const r = await sm.send(new GetSecretValueCommand({ SecretId: arn }));
   const value = String(r.SecretString || "");

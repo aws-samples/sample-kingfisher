@@ -1,5 +1,5 @@
-// 模块 55 — 判据夹具:内存版 bgp-long-ops(只替真外部 DynamoDB;条件写 / SET 表达式按 lib/long-ops/store.ts 真用到的形态求值)。
-// 原 序 46 B-107 的 mem-ai-tasks 改名泛化。
+// 判据夹具:内存版 bgp-long-ops(只替真外部 DynamoDB;条件写 / SET 表达式按 lib/long-ops/store.ts 真用到的形态求值)。
+// 原该缺陷的 mem-ai-tasks 改名泛化。
 // 用法:`vi.mock("@/lib/aws/dynamodb", () => import("./fixtures/mem-long-ops"))`,再从本模块 import `rows` 读真值。
 // 🔴 条件表达式不是「永远通过」——抢占 / 重认领 / 终态条件写的并发正确性正是被测的东西,mock 回自己编的值 = 空断言。
 

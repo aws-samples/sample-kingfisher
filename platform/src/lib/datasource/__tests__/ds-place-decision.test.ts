@@ -1,4 +1,4 @@
-// @kf-batch 50-WP31-place-first-class 序 31 二刀 ⑤ —— 数据源落点的决策记账 + 接缝调用点判据。
+// 数据源落点的决策记账 + 接缝调用点判据。
 // 【缺陷原形】测试账号 observe 未归因榜:`ec2 / secretsmanager / glue / rds … /api/datasources`(建源)、
 //   `secretsmanager.GetSecretValue /api/datasources/<id>/tables`(浏览表)、`glue.GetJobRun /api/datasources`(发现推进)、
 //   `s3 … /s3-external`、`rds / secretsmanager … /api/datasources/discover`、`secretsmanager.DeleteSecret /api/internal/dataplane-jobs/step`
@@ -99,8 +99,8 @@ describe("接缝:每条「按行做事」的路径在第一个 AWS 调用之前�
     expect(reclaim).toMatch(/notePlaceDecision\(\{ targetId: job\.targetId, via: PROJECT_CRED_RECLAIM_VIA \}\)/);
     expect(reclaim.indexOf("notePlaceDecision({ targetId: job.targetId")).toBeLessThan(reclaim.indexOf("await getTargetRaw(job.targetId)"));
     const probe = read("lib/network-advisor/environment-probe.ts");
-    // @kf-batch 41-B115-netadvisor-place —— 序 31 二刀 ⑤ 时这里记的是「主控区 + homeReason」(如实记);B-115 根治后记**请求落点本身**(req.targetId),再没有 homeReason
+    // 时这里记的是「主控区 + homeReason」(如实记);根治后记**请求落点本身**(req.targetId),再没有 homeReason
     expect(probe).toMatch(/notePlaceDecision\(\{ targetId: req\.targetId, via: NETWORK_ADVISOR_PROBE_VIA \}\)/);
-    expect(probe, "B-115 根治后不许再回到「探测恒主控区」").not.toMatch(/homeReason:\s*"network-advisor/);
+    expect(probe, "根治后不许再回到「探测恒主控区」").not.toMatch(/homeReason:\s*"network-advisor/);
   });
 });

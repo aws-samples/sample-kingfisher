@@ -5,7 +5,7 @@ import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// @kf-batch 50-WP7-sync-pushdown —— 日志按**这条 run 自己的章**取(run-cancel 同款):
+// 日志按**这条 run 自己的章**取(run-cancel 同款):
 // 日志存在跑它的那个区的 scripts 桶(pollGlueJob 写入侧),桶名/区都从 binding 解析,
 // 存量 run 无 targetId ⇒ home(与 resolveRunStamp 的三级回落同一条理由)。
 import { resolveGlueBinding, stampedTargetOf } from "@/lib/exec-env/data-plane-target";

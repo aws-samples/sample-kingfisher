@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 37 — Widget 渲染器:把取数结果 {columns, rows} + 可视化 spec(viz)映射到具体图表。
+// Widget 渲染器:把取数结果 {columns, rows} + 可视化 spec(viz)映射到具体图表。
 // v2:图形类(bar/line/pie/barh/gauge/scatter)走 ECharts <BiChart>(精致+交互);table 用 antd Table;
 // metric 用 charts.tsx 的 MetricCard(只 import 不改它)。auto=true 时用 suggestChart 推断。
 // 隔离红线:本文件是 BI 私有组件;不改共享 charts.tsx。

@@ -4,7 +4,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { listRules, createRule } from "@/lib/alerting/rules";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-10)。规则的区绑定在 **`scope.targets`**(嵌一层),
+// 执行范围。规则的区绑定在 **`scope.targets`**(嵌一层),
 // 所以这里不能直接用 `filterRowsByScope`(它读顶层属性)⇒ 用 `bindingTargets` 这个**同一个作者**
 // 手工取那一层,回落语义(空 ⇒ 主控区)保持一致,不复制第二份判定。
 import { requireScope } from "@/lib/exec-env/scope";
@@ -15,7 +15,6 @@ import { scopeTargets } from "@/lib/scope/scope";
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
   if (ctx instanceof NextResponse) return ctx;
-  // @kf-batch 50-WP4ter-coverage
   const scope = await requireScope(req, ctx.projectId);
   if (scope instanceof NextResponse) return scope;
   try {

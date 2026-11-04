@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4bis-p1-scope
 // `RunLockBusy` 分流门禁 —— 「抢不到运行锁」必须是**用户可修的 409**,不是平台故障 500。
 //
 // 🔴 为什么要门:这个错是**跨四个抢锁点 + 两条运行路由**的约定,而它的失效形态**完全静默** ——
@@ -22,7 +21,7 @@ const LOCK_SITES = [
   "lib/backfill/execute.ts",
 ];
 /** 两条运行路由(做 409 / 500 分流的地方)。 */
-// B-136:引擎运行的提交段(含 rejected: 分流)搬进长操作执行体 lib/engines/long-ops.ts,路由里只剩快校验
+// 引擎运行的提交段(含 rejected: 分流)搬进长操作执行体 lib/engines/long-ops.ts,路由里只剩快校验
 const RUN_ROUTES = ["app/api/etl-jobs/[id]/run/route.ts", "lib/engines/long-ops.ts"];
 
 describe("RunLockBusy 类型本身", () => {

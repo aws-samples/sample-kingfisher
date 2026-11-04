@@ -1,4 +1,3 @@
-// @kf-batch 50-WP4quater-reads(工单 SC-37)
 /**
  * 钉住建模四块的区维。用户 2026-09-10 驳回了我写的「平台级定义,本身不分区(设计如此)」:
  * 「**这里为什么不能做成区域维度?我认为都可以切出来的。**」
@@ -16,7 +15,7 @@ import { metricValueFor } from "../model-metrics";
 const HOME = "tgt_home";
 const USW2 = "tgt_usw2_a";
 
-describe("治理约定的适用区(SC-37)", () => {
+describe("治理约定的适用区", () => {
   const rows = [
     { code: "ODS" }, // 未声明 ⇒ 全平台通用
     { code: "DWD", targets: [USW2] }, // 只适用于 usw2
@@ -50,7 +49,7 @@ describe("治理约定的适用区(SC-37)", () => {
   });
 });
 
-describe("指标计算值按区(SC-37)", () => {
+describe("指标计算值按区", () => {
   const m = {
     valueByTarget: { [HOME]: { value: 100, computedAt: "2026-09-10T00:00:00Z" }, [USW2]: { value: 7, computedAt: "2026-09-10T01:00:00Z" } },
     lastValue: 7,

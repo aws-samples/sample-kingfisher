@@ -5,7 +5,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { adoptFindings, type AdoptItem } from "@/lib/governance/sensitive/scan";
 import { recordAudit } from "@/lib/audit";
 
-// 模块 36 (E5): 采纳敏感识别建议 → 写入数据分级（仅平台管理员，与分级设置同权）。
+// (E5): 采纳敏感识别建议 → 写入数据分级（仅平台管理员，与分级设置同权）。
 //   POST {scanId, items:[{fqn, column, level?, category?, maskStrategy?}]}
 
 export async function POST(req: NextRequest) {

@@ -11,10 +11,10 @@ import {
   type GenBiTaskRow,
 } from "@/lib/genbi/tasks";
 import type { Identity } from "@/lib/auth/identity";
-// @kf-batch 50-W5-seg2-WP8 — 模块 51:把认领请求的 correlationId 透进执行体(终态 result._meta.correlationId)。
+// 把认领请求的 correlationId 透进执行体(终态 result._meta.correlationId)。
 import { getCorrelationId } from "@/lib/observability/logger";
 
-// 模块 38 — GenBI 异步化:轮询 + 抢占驱动执行 + 心跳 + 读时对账(强制结束)。
+// GenBI 异步化:轮询 + 抢占驱动执行 + 心跳 + 读时对账(强制结束)。
 //
 // GET /api/genbi/tasks/[taskId]:前端每 ~2s 轮询。本端点是**执行的唯一驱动入口**:
 //  · pending  → claimForRun 抢占(幂等,只一个赢)→ 赢者 fire-and-forget 后台跑 executeGenBiAsk。
@@ -35,9 +35,9 @@ async function driveExecution(task: GenBiTaskRow, runToken: string, identity: Id
       engine: task.engine,
       workgroup: task.workgroup,
       database: task.database,
-      // @kf-batch 50-WP2-directquery —— 落点跟着任务行走(异步任务由**另一次请求**接管,
+      // 落点跟着任务行走(异步任务由**另一次请求**接管,
       // 不从这次请求的上下文猜:猜出来的区就是「换个人接手就换了个区」)。
-      targetId: targetOfStamp(task.targetId), // @kf-batch 50-WP31-place-first-class —— 任务行的章(无章 = 存量 = 主控区)
+      targetId: targetOfStamp(task.targetId), // 任务行的章(无章 = 存量 = 主控区)
       projectId: task.projectId,
       conversationId: task.conversationId,
       userId: task.userId,
@@ -52,7 +52,7 @@ async function driveExecution(task: GenBiTaskRow, runToken: string, identity: Id
         userId: task.userId, question: task.question, answer: result.answer, sql: result.sql,
         engine: task.engine, backend: usedBackend, projectId: task.projectId,
         conversationId: task.conversationId, result,
-        // @kf-batch 50-WP4ter-coverage —— 异步路径同样盖章(落点跟任务行走)
+        // 异步路径同样盖章(落点跟任务行走)
         targetId: ranInTarget,
       });
     }

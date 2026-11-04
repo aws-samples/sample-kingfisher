@@ -1,10 +1,9 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-W5-seg1-WP11a
 // POST /api/modeling/dimensions/[id]/unbind —— 维度 / 事实表从某个执行区**显式解绑**(50 SPEC v3.20 §3.8;仅平台管理员)。
 // 语义与码表完全一致(只解绑 = 记录保留 ⇒ 残留可见;清理 = 先 DROP、观测为空、再去记录;confirm = 物理表名)。
-// 模块 55 / 序 50:主体在 lib/modeling/long-ops.ts(modeling-unbind);45s 未终态 ⇒ 202 + 客户端传输层轮询(错误口径逐字不变)。
+// 主体在 lib/modeling/long-ops.ts(modeling-unbind);45s 未终态 ⇒ 202 + 客户端传输层轮询(错误口径逐字不变)。
 import { NextRequest } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+// 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { apiError } from "@/lib/api-response";

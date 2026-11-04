@@ -14,11 +14,11 @@ interface Props {
   open: boolean;
   editing?: DataSource;
   onClose: () => void;
-  /** @kf-batch 42-ux-feedback —— 成功后的提示由页面统一给("created" 报落点 / "updated" 报「已更新」),弹窗自己不弹 */
+  /** 成功后的提示由页面统一给("created" 报落点 / "updated" 报「已更新」),弹窗自己不弹 */
   onSuccess: (mode: "created" | "updated") => void;
-  /** @kf-batch 50-WP4quater-reads(工单 SC-2)—— 新建时的落点(顶栏单区视角 = 那个区;缺省 = 主控区) */
+  /** 新建时的落点(顶栏单区视角 = 那个区;缺省 = 主控区) */
   createTargetId?: string;
-  /** @kf-batch 50-WP31-place-first-class —— 新建时取区域资源(网络下拉)的落点,页面按视角算好(landingOfScope),必填 */
+  /** 新建时取区域资源(网络下拉)的落点,页面按视角算好(landingOfScope),必填 */
   landingTargetId: string;
 }
 
@@ -42,13 +42,13 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
   const [netSgIds, setNetSgIds] = useState<string[]>([]);
   // 监听 host 字段:网络顾问需要 host 才渲染。直接读 form.getFieldValue 不订阅变更(输入框改值不触发父组件重渲),须用 useWatch。
   const watchHost = Form.useWatch("host", form);
-  // 模块42 P42.7/P42.6:监听类型 → stream 范式走精简表单,不走 JDBC 的 host/port/db+网络。
+  // 监听类型 → stream 范式走精简表单,不走 JDBC 的 host/port/db+网络。
   //  stream 范式细分:kinesis(流名+新建) / msk(集群或 bootstrap + 认证)。两者表单不同,provider 能力标驱动。
   const watchType = Form.useWatch("type", form);
   const paradigm = (DS_TYPE_OPTIONS.find((o) => o.value === watchType) as any)?.paradigm;
   const isStream = paradigm === "stream";
-  const isDynamo = watchType === "dynamodb"; // NoSQL 范式(P42.5)
-  const isS3 = watchType === "s3"; // 对象存储范式(P42.4)
+  const isDynamo = watchType === "dynamodb"; // NoSQL 范式
+  const isS3 = watchType === "s3"; // 对象存储范式
   // 🔴 JDBC 专属表单(host/port/db + 网络 + RDS 选择)的守卫。此前用 !isStream,加 DDB/S3 后
   //   必须显式为 jdbc 范式,否则 DDB/S3(非 stream)会误落进 JDBC 表单要求填 host/port/database。
   const isJdbc = paradigm === "jdbc" || (!!watchType && !paradigm); // 未知类型按 JDBC 保底(与后端分流一致)
@@ -57,7 +57,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
   const [kinesisMode, setKinesisMode] = useState<"existing" | "new">("existing"); // 选已有流 / 新建流
   const [existingStreams, setExistingStreams] = useState<string[]>([]); // 账号已存在的 Kinesis 流名(ListStreams)
   const [loadingStreams, setLoadingStreams] = useState(false);
-  // MSK(P42.6):flavor(托管/自建)+ 认证 + 集群列表(托管选集群下拉)。
+  // MSK:flavor(托管/自建)+ 认证 + 集群列表(托管选集群下拉)。
   const [mskFlavor, setMskFlavor] = useState<"msk" | "self">("msk");
   const [mskAuth, setMskAuth] = useState<"iam" | "scram">("iam");
   const [mskClusters, setMskClusters] = useState<Array<{ arn: string; name: string; state?: string; auth: string[] }>>([]);
@@ -84,10 +84,10 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
     } catch { setExistingStreams([]); } finally { setLoadingStreams(false); }
   };
 
-  // @kf-batch 50-WP31-place-first-class —— 🔴 网络是区域资源:原来**不带落点** ⇒ 在 us-west-2 视角新建数据源,
+  // 🔴 网络是区域资源:原来**不带落点** ⇒ 在 us-west-2 视角新建数据源,
   //   网络下拉列的是**主控区**的 VPC / 子网 / SG(选中写进数据源网络配置,连的时候才炸)。
   //   落点 = 编辑时该源的归属章;新建时 = 页面按视角算好的建源落点(landingOfScope)。
-  // @kf-batch 41-B115-netadvisor-place —— 网络顾问也用**同一个**落点(它的预填要能在下面这份清单里选中)。
+  // 网络顾问也用**同一个**落点(它的预填要能在下面这份清单里选中)。
   const netTarget = editing ? targetOfStamp((editing as { ownerTargetId?: unknown }).ownerTargetId) : landingTargetId;
   useEffect(() => {
     if (!open) return;
@@ -112,7 +112,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
   const loadRdsInstances = async () => {
     setLoadingRds(true);
     try {
-      // 序 31 二刀 ⑤:从 RDS 发现实例也按建源落点点名(列的是**那个区**账号里的实例;缺落点服务端 400,不默认主控区)
+      // 从 RDS 发现实例也按建源落点点名(列的是**那个区**账号里的实例;缺落点服务端 400,不默认主控区)
       const res = await fetch(`/api/datasources/discover?targetId=${encodeURIComponent(landingTargetId)}`);
       const data = await res.json();
       setRdsInstances(data.success ? data.data : []);
@@ -124,7 +124,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
       const values = form.getFieldsValue(true); // Get ALL fields including hidden steps
       setTesting(true);
       setTestResult(null);
-      // 模块42:非 JDBC 源(DDB/S3)测连要把连接信息组装进 connection 袋(后端 test 端点非 JDBC 分流读 body.connection),
+      // 非 JDBC 源(DDB/S3)测连要把连接信息组装进 connection 袋(后端 test 端点非 JDBC 分流读 body.connection),
       //   否则扁平 tableName/bucket 落不到 provider.validateConfig 里(报"缺少表名/桶")。JDBC 仍发扁平 values(零回归)。
       let testBody: any = values;
       if (isDynamo) {
@@ -152,7 +152,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
       return;
     }
     const values = form.getFieldsValue(true); // Get ALL fields including hidden steps
-    // 模块42 P42.7/P42.6:stream 范式提交连接袋,不带 JDBC 的 host/port/db/network。
+    // stream 范式提交连接袋,不带 JDBC 的 host/port/db/network。
     let payload: any = values;
     if (isKinesis) {
       const streamName = (values.streamName || "").toString().trim();
@@ -197,12 +197,12 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
       const az = netSubnets.find((s) => s.id === netSubnetId)?.az;
       values.network = { subnetId: netSubnetId, securityGroupIds: netSgIds, ...(az ? { availabilityZone: az } : {}) };
     }
-    // @kf-batch 50-WP4quater-reads(工单 SC-2)—— 🔴 新建时把**落点**交给服务端(编辑不动既有源的章)。
+    // 🔴 新建时把**落点**交给服务端(编辑不动既有源的章)。
     // 服务端会当场解析那个区的网络与 Glue 角色:缺项 ⇒ 400 可修,而不是先把密钥建在一个区、
     // 安全组建在另一个区留下半截状态。
-    // @kf-batch 50-WP31-place-first-class —— 恒带落点(全部视角 = 主控区,由页面 landingOfScope 显式给;后端缺 ⇒ 400)
+    // 恒带落点(全部视角 = 主控区,由页面 landingOfScope 显式给;后端缺 ⇒ 400)
     if (!isEdit) payload = { ...payload, targetId: landingTargetId };
-    // @kf-batch 42-ux-feedback —— 🔴 编辑只提交**可编辑字段**(闭合清单 lib/datasources/editable-fields.ts):
+    // 🔴 编辑只提交**可编辑字段**(闭合清单 lib/datasources/editable-fields.ts):
     //   表单是用整条记录预填的,原样 PUT 回去会把 datasourceId / updatedAt / status / secretArn … 一起送到服务端 ⇒ 500(用户 2026-10-15 反馈「改名报错」)。
     //   密码框留空 = 不改密码(清单函数会丢掉空串)。
     if (isEdit) payload = pickEditableDatasourceFields(payload).picked;
@@ -277,7 +277,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
         </div>
 
         <div style={{ display: step === 1 ? undefined : "none" }}>
-          {/* 模块42 P42.7:Kinesis(stream 范式)专属连接区——选已有流 / 新建流。不走 JDBC 的 host/port/db+网络。 */}
+          {/* Kinesis(stream 范式)专属连接区——选已有流 / 新建流。不走 JDBC 的 host/port/db+网络。 */}
           {isKinesis && (
             <div>
               <div style={{ marginBottom: 16 }}>
@@ -330,7 +330,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
               )}
             </div>
           )}
-          {/* 模块42 P42.6:MSK / Kafka(stream 范式)专属连接区——托管(选集群)/自建(手填 bootstrap)+ 认证(IAM/SCRAM)。 */}
+          {/* MSK / Kafka(stream 范式)专属连接区——托管(选集群)/自建(手填 bootstrap)+ 认证(IAM/SCRAM)。 */}
           {isMsk && (
             <div>
               <div style={{ marginBottom: 16 }}>
@@ -392,7 +392,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
                   : t("SASL/SCRAM 账密将存入 Secrets Manager(不入库)。broker 在私有 VPC,作业消费时需选 VPC 子网+安全组。topic 在建作业时指定。")} />
             </div>
           )}
-          {/* 模块42 P42.5:DynamoDB(NoSQL 范式)专属连接区——表名 + 区域。iam-role 无密钥,不走 host/port/db+网络。 */}
+          {/* DynamoDB(NoSQL 范式)专属连接区——表名 + 区域。iam-role 无密钥,不走 host/port/db+网络。 */}
           {isDynamo && (
             <div>
               <Form.Item name="tableName" label={t("表名")}
@@ -414,7 +414,7 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
               )}
             </div>
           )}
-          {/* 模块42 P42.4:S3(对象存储范式)专属连接区——桶 + 前缀 + 格式。iam-role 无密钥。 */}
+          {/* S3(对象存储范式)专属连接区——桶 + 前缀 + 格式。iam-role 无密钥。 */}
           {isS3 && (
             <div>
               <Form.Item name="bucket" label={t("桶名(Bucket)")}
@@ -491,13 +491,13 @@ export default function DataSourceModal({ open, editing, onClose, onSuccess, cre
             <Form.Item name="database" label={t("数据库名")} rules={[{ required: true }]}>
               <Input placeholder="ecommerce" />
             </Form.Item>
-            {/* @kf-batch 44-jdbc-params(用户 2026-10-15 反馈 ③「数据源缺少 JDBC 连接参数化配置」)—— 形态校验与服务端同一函数 parseJdbcParams */}
+            {/* (用户 2026-10-15 反馈 ③「数据源缺少 JDBC 连接参数化配置」)—— 形态校验与服务端同一函数 parseJdbcParams */}
             <Form.Item name="jdbcParams" label={t("附加 JDBC 连接参数(可选)")} data-testid="ds-jdbc-params-item"
               tooltip={t("驱动级连接参数,形如 useSSL=false&serverTimezone=Asia/Shanghai&connectTimeout=10000。只作用于经 Glue 连接 / Glue 作业的 JDBC 连接(同步、表发现);控制面直连探测不读它。MySQL 默认已带 zeroDateTimeBehavior=CONVERT_TO_NULL(零值日期 / 时间戳按 NULL 读入,不让整个同步作业失败),填同名参数可覆盖。")}
               rules={[{ validator: (_, v) => { const r = parseJdbcParams(v); return r.ok ? Promise.resolve() : Promise.reject(new Error(r.error)); } }]}>
               <Input placeholder="useSSL=false&serverTimezone=Asia/Shanghai" allowClear data-testid="ds-jdbc-params" />
             </Form.Item>
-            {/* 序 38 B-70:源在自己的 VPC 时控制面直连不到(客户生产环境),探测与浏览表改走数据源自己的 Glue 连接 */}
+            {/* 源在自己的 VPC 时控制面直连不到(客户生产环境),探测与浏览表改走数据源自己的 Glue 连接 */}
             <Form.Item name="probeVia" label={t("探测与浏览表方式")} initialValue="auto"
               tooltip={t("「自动」先用平台控制面直连,连不上且有 Glue 连接时自动改经 Glue 连接(起一次性 Glue 作业在该连接的子网 / 安全组里登录源库并读表结构,约 1–3 分钟)。源在自有网络、与平台不在同一 VPC 时建议直接选「仅经 Glue 连接」。")}>
               <Radio.Group data-testid="ds-probe-via" options={[

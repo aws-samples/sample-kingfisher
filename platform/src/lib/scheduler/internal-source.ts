@@ -1,12 +1,11 @@
-// @kf-batch 50-WP28-platform-action-node
 // 内部端点来源判定的**纯头部**那两道(不 import 任何 node 内置 —— 中间件跑在 edge,
 // `node:crypto` 一旦进了它的可达面就构建失败;密钥比对在 `internal-guard.ts`,只在 Node 路由里用)。
 export const INTERNAL_KEY_HEADER = "x-bgp-internal-key";
 export const INTERNAL_SOURCE_HEADER = "x-bgp-internal-source";
 export const INTERNAL_SOURCE_ACTION_DISPATCHER = "action-dispatcher";
-// @kf-batch 50-WP9a-durable-jobs —— 第二个登记来源:数据面长作业的推进泵(平台进程自己回环调用,WP-9 ④-2)
+// 第二个登记来源:数据面长作业的推进泵(平台进程自己回环调用,④-2)
 export const INTERNAL_SOURCE_DATAPLANE_JOB_PUMP = "dataplane-job-pump";
-/** @kf-batch 50-B51-backfill-pump —— 补数计划的后台推进泵(回环调 `/api/internal/backfill/tick`)。 */
+/** 补数计划的后台推进泵(回环调 `/api/internal/backfill/tick`)。 */
 export const INTERNAL_SOURCE_BACKFILL_PUMP = "backfill-pump";
 /**
  * 登记过的内部来源(封闭集合)。🔴 中间件只判「是不是登记过的来源」;**哪个端点收哪个来源**由路由守卫按
@@ -17,9 +16,9 @@ export const INTERNAL_SOURCES: readonly string[] = [INTERNAL_SOURCE_ACTION_DISPA
 export const CLOUDFRONT_ORIGIN_HEADER = "x-amz-cf-id";
 /** 系统主体(审计 actor;没有 Cognito 身份)。 */
 export const INTERNAL_PRINCIPAL = { actor: "system:action-dispatcher", via: "schedule" } as const;
-/** @kf-batch 50-WP9a-durable-jobs —— 推进泵的系统主体(审计 actor;没有 Cognito 身份) */
+/** 推进泵的系统主体(审计 actor;没有 Cognito 身份) */
 export const DATAPLANE_JOB_PUMP_PRINCIPAL = { actor: "system:dataplane-job-pump", via: "dataplane-job" } as const;
-/** @kf-batch 50-B51-backfill-pump —— 补数推进泵的系统主体 */
+/** 补数推进泵的系统主体 */
 export const BACKFILL_PUMP_PRINCIPAL = { actor: "system:backfill-pump", via: "backfill" } as const;
 
 export type InternalPrincipal = typeof INTERNAL_PRINCIPAL | typeof DATAPLANE_JOB_PUMP_PRINCIPAL | typeof BACKFILL_PUMP_PRINCIPAL;

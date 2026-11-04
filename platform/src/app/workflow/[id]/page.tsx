@@ -6,19 +6,19 @@ import { Button, Space, message, Dropdown, Spin, Tabs, Card, Tag, Badge, Table, 
 import { SaveOutlined, PlusOutlined, ArrowLeftOutlined, PlayCircleOutlined, CloudUploadOutlined, DashboardOutlined, LinkOutlined, FileTextOutlined, ApartmentOutlined, HistoryOutlined, FieldTimeOutlined } from "@ant-design/icons";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-// 序 73 模块 57(R3):`?run=<runId>` 深链自动打开那次运行的「节点详情」;节点行按 backLink 点回作业 / 同步任务自己的运行历史(地址唯一作者)
+// `?run=<runId>` 深链自动打开那次运行的「节点详情」;节点行按 backLink 点回作业 / 同步任务自己的运行历史(地址唯一作者)
 import { nodeBackLinkHref, type NodeBackLink } from "@/lib/workflow/back-links";
 import dynamic from "next/dynamic";
 import type { Node, Edge } from "reactflow";
 import VersionHistoryDrawer from "@/components/common/VersionHistoryDrawer";
 import PromoteButton from "@/components/common/PromoteButton";
-// @kf-batch 50-SEQ47a-promote-ux —— 环境标签 + 各环境发布状态;「发布」改叫「发布到调度」与「发布到环境」区分
+// 环境标签 + 各环境发布状态;「发布」改叫「发布到调度」与「发布到环境」区分
 import EnvTag from "@/components/common/EnvTag";
 import EnvPromotionStatus from "@/components/common/EnvPromotionStatus";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
 import { useT } from "@/lib/i18n/useT";
 import { NODE_REGISTRY, PALETTE_NODE_TYPES } from "@/lib/workflow/node-registry";
-// @kf-batch 52-P52.1-guards:Airflow 控制台入口收成平台 admin 专用(服务端已硬拦,这里只是不让人白点)
+// Airflow 控制台入口收成平台 admin 专用(服务端已硬拦,这里只是不让人白点)
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
 
@@ -26,7 +26,7 @@ const DagEditor = dynamic(() => import("@/components/dag-editor/DagEditor"), { s
 
 // 33-B: 拖拽面板从 registry(SSOT)生成,加节点无需改这里。label 即 registry 的 labelKey,
 // 渲染时过 t()。data.label 用短名(去掉"节点"后缀)作画布默认标签。
-// @kf-batch 50-WP28-platform-action-node —— 平台合成的节点(platform-action)不进面板
+// 平台合成的节点(platform-action)不进面板
 const nodeTemplates = PALETTE_NODE_TYPES.map((type) => {
   const labelKey = NODE_REGISTRY[type].labelKey;
   return { key: type, label: labelKey, type, data: { label: labelKey.replace(/节点$/, "") } };
@@ -68,7 +68,7 @@ export default function WorkflowEditorPage() {
   // L5：未保存更改指示。savedRef 保存最近一次"已持久化"的 DAG 归一化快照。
   const [dirty, setDirty] = useState(false);
   const savedRef = useRef<string>("");
-  // 模块 14: version history drawer + a reload key to re-fetch the workflow after a rollback.
+  // version history drawer + a reload key to re-fetch the workflow after a rollback.
   const [versionOpen, setVersionOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // SCH-03: options (other workflows + sync tasks) for the downstream-dependency selector.
@@ -77,7 +77,7 @@ export default function WorkflowEditorPage() {
   // PLT-02: per-action loading so save/publish/trigger can't be double-submitted.
   const [actionLoading, setActionLoading] = useState<{ save?: boolean; publish?: boolean; trigger?: boolean }>({});
   /**
-   * 🔴 P52.1:Airflow 控制台入口只对**平台管理员**开放。
+   * 🔴 Airflow 控制台入口只对**平台管理员**开放。
    * 真授权在服务端(`api/workflow/airflow` 已硬拦 403);这里只是**不让人白点一下再吃 403**,
    * 并且**不隐藏、而是禁用 + Tooltip 说清原因** —— 与执行环境那批同一口径:
    * 「最坏的不是不能用,是看不出为什么不能用」。
@@ -96,7 +96,7 @@ export default function WorkflowEditorPage() {
   }, [getToken]);
   const [logModal, setLogModal] = useState<{ open: boolean; runId: string; logs: string[] }>({ open: false, runId: "", logs: [] });
   const [runs, setRuns] = useState<any[]>([]);
-  // 序 73(R3):运行列表至少到过一次(成功或失败)才按 `?run=` 开节点详情;只开一次
+  // 运行列表至少到过一次(成功或失败)才按 `?run=` 开节点详情;只开一次
   const [runsLoaded, setRunsLoaded] = useState(false);
   const searchParams = useSearchParams();
   const openedRunFromQueryRef = useRef<string>("");
@@ -108,7 +108,7 @@ export default function WorkflowEditorPage() {
   const viewNodes = async (runId: string) => {
     setNodeModal({ open: true, runId, nodes: [], loading: true, selected: "", logs: [], logsLoading: false });
     try {
-      // 🔴 runId 必须 encodeURIComponent:调度器写的 run 行 id 形如 `<raw>#<targetId>`(T-12 复合键),
+      // 🔴 runId 必须 encodeURIComponent:调度器写的 run 行 id 形如 `<raw>#<targetId>`(复合键),
       //    `#` 在 URL 里是 fragment 起点 ⇒ 服务端只收到前半段 ⇒ 404 ⇒ 界面看起来像「这次运行没有节点」。
       const res = await fetch(`/api/workflow/${id}/runs/${encodeURIComponent(runId)}/nodes`);
       const data = await res.json();
@@ -168,8 +168,8 @@ export default function WorkflowEditorPage() {
   }, [id]);
   const [activeTab, setActiveTab] = useState("editor");
 
-  // 序 73 模块 57(R3):作业 / 同步任务运行历史里「由工作流「X」触发」点过来 ⇒ 切到运行历史并打开**这次**运行的节点详情。
-  // 🔴 query 只在挂载后的 effect 里读(首帧与服务端一致,B-138);同一个 runId 只开一次(用户关掉后不再弹回)。
+  // 作业 / 同步任务运行历史里「由工作流「X」触发」点过来 ⇒ 切到运行历史并打开**这次**运行的节点详情。
+  // 🔴 query 只在挂载后的 effect 里读(首帧与服务端一致);同一个 runId 只开一次(用户关掉后不再弹回)。
   useEffect(() => {
     const want = searchParams?.get("run") || "";
     if (!want || !runsLoaded || openedRunFromQueryRef.current === want) return;
@@ -360,7 +360,7 @@ export default function WorkflowEditorPage() {
       const data = await res.json();
       if (data.success !== false && !data.error) {
         message.success(t("已发布到 Airflow"));
-        // @kf-batch 43-page-sweep(B-89)—— 🔴 发布成功后页头必须立刻反映真相:原来只弹 toast,状态 Badge 仍是 draft、
+        // 🔴 发布成功后页头必须立刻反映真相:原来只弹 toast,状态 Badge 仍是 draft、
         //   「DAG: …」标不出现,直到用户离开再进来(…7698 页面驱动 p43b W5 坐实)。服务端已把 status=active / airflowDagId 落库,
         //   这里按**服务端返回的 dagId** 同步本地状态(与 applySchedule 同一写法)。
         setWorkflow((w: any) => ({ ...(w || {}), status: "active", airflowDagId: data.dagId || w?.airflowDagId }));
@@ -405,7 +405,7 @@ export default function WorkflowEditorPage() {
 
   const openAirflowConsole = async () => {
     const dagId = workflow?.airflowDagId || "";
-    // @kf-batch 50-WP31-place-first-class —— 控制台在**这条编排绑定的区**(记录上的章;无章 = 存量 = 主控区)
+    // 控制台在**这条编排绑定的区**(记录上的章;无章 = 存量 = 主控区)
     const wfTarget = targetOfStamp((Array.isArray(workflow?.targets) && workflow.targets[0]) || (workflow as { targetId?: unknown } | null)?.targetId);
     const res = await fetch(`/api/workflow/airflow?dagId=${dagId}&targetId=${encodeURIComponent(wfTarget)}`);
     const data = await res.json();
@@ -431,7 +431,7 @@ export default function WorkflowEditorPage() {
     setDirty(true);
   };
 
-  // 序 73 模块 57(R1 / R8):这个工作流的执行区(行上的章 `targets[]`;无章的存量工作流 = 主控区,与 openAirflowConsole 同口径)。
+  // 这个工作流的执行区(行上的章 `targets[]`;无章的存量工作流 = 主控区,与 openAirflowConsole 同口径)。
   //   节点面板按它过滤候选同步任务 / 离线作业(?scope=),与发布期落点一致性判定同一口径。权威判定在服务端(job-node-spec.ts)。
   const wfTargets: string[] =
     Array.isArray(workflow?.targets) && workflow.targets.length
@@ -543,8 +543,8 @@ export default function WorkflowEditorPage() {
               columns={[
                 { title: t("运行ID"), dataIndex: "runId", width: 180, render: (v: string) => <code style={{fontSize:11}}>{v?.slice(0,20)}</code> },
                 { title: t("状态"), dataIndex: "status", width: 100, render: (v: string) => <Badge status={v === "succeeded" ? "success" : v === "failed" ? "error" : v === "running" ? "processing" : "default"} text={v} /> },
-                // @kf-batch 43-page-sweep(B-90)—— 🔴 MWAA Serverless 的运行行由运行时 __start 写台账,triggeredBy 写死 "schedule"
-                //   (worker 侧分不出手动 / 定时,与离线计算页 T-13 同一事实);原来这里照抄出来 ⇒ 用户点「触发运行」看到的却是「schedule」
+                // 🔴 MWAA Serverless 的运行行由运行时 __start 写台账,triggeredBy 写死 "schedule"
+                //   (worker 侧分不出手动 / 定时,与离线计算页同一事实);原来这里照抄出来 ⇒ 用户点「触发运行」看到的却是「schedule」
                 //   (…7698 页面驱动 p43b W6 坐实)。与离线计算页同口径:serverless 运行只标调度器,不宣称触发来源。
                 { title: t("触发方式"), dataIndex: "triggeredBy", width: 100, render: (v: string, r: any) => r.scheduler === "serverless"
                   ? <Tag color="gold" data-testid="run-scheduler-tag">Serverless</Tag>
@@ -587,7 +587,7 @@ export default function WorkflowEditorPage() {
                 columns={[
                   { title: t("节点"), dataIndex: "taskId", ellipsis: true },
                   { title: t("状态"), dataIndex: "state", width: 100, render: (v: string) => <Badge status={v === "success" ? "success" : v === "failed" ? "error" : v === "running" ? "processing" : "default"} text={v} /> },
-                  // 序 73 模块 57(R3):作业 / 同步节点 ⇒ 点回它自己的运行历史(backLink 由节点状态接口按发布定义挂上;地址唯一作者 nodeBackLinkHref)
+                  // 作业 / 同步节点 ⇒ 点回它自己的运行历史(backLink 由节点状态接口按发布定义挂上;地址唯一作者 nodeBackLinkHref)
                   { title: "", width: 90, render: (_: any, r: { backLink?: NodeBackLink | null }) => {
                     const href = nodeBackLinkHref(r.backLink);
                     return href ? <Link href={href} data-testid="node-job-run-link" style={{ fontSize: 12 }}>{r.backLink?.nodeType === "sync" ? t("同步运行历史") : t("作业运行历史")}</Link> : null;

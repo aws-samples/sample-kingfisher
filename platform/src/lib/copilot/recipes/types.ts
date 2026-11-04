@@ -1,4 +1,4 @@
-// 模块 44 → 45 迁移兼容层。工程配方库已提升为【平台级】lib/cookbook(见 docs/design/45)。
+// → 45 迁移兼容层。工程配方库已提升为【平台级】lib/cookbook(见 docs/design/45)。
 // 本文件保留旧路径 import 兼容:Copilot 侧现有代码继续从 ../recipes/types 拿类型,行为不变。
 // 新代码请直接从 @/lib/cookbook 导入。
 

@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-D4
 import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProjectConfigAdmin } from "@/lib/projects/guard";
@@ -14,12 +13,12 @@ import { isResourceType, ResourceType } from "@/lib/versions/version-service";
 import { executePromote } from "@/lib/env/promote-service";
 import { grantAccess } from "@/lib/governance/classification";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP30-decommission —— 删除执行环境的审批(平台 admin 专属;批准 ⇒ 写删除计划 + broker 销毁)
+// 删除执行环境的审批(平台 admin 专属;批准 ⇒ 写删除计划 + broker 销毁)
 import { EXEC_ENV_DELETE_APPROVAL_TYPE, preflightApprovedDelete, startApprovedDestroy } from "@/lib/exec-env/decommission";
 import { decommissionErrorResponse } from "@/lib/exec-env/decommission-http";
-// @kf-batch 50-SEQ47c-catalog-ddl —— prod 环境的数据目录建表 / 改表审批(批准 ⇒ 由批准人身份执行同一份编排)
+// prod 环境的数据目录建表 / 改表审批(批准 ⇒ 由批准人身份执行同一份编排)
 import { DDL_APPROVAL_TYPE, isDdlApprovalPayload } from "@/lib/governance/catalog-ddl";
-// 模块 55 / 序 50:批准后的建表 / 改表执行是长操作(目标区数仓冷时 >45s)⇒ 主体在 lib/governance/long-ops.ts(approval-execute-ddl),
+// 批准后的建表 / 改表执行是长操作(目标区数仓冷时 >45s)⇒ 主体在 lib/governance/long-ops.ts(approval-execute-ddl),
 //   decideApproval 仍在路由里先做;45s 未终态 ⇒ 202(协议 long-op/1)+ 客户端传输层轮询,终态 data = `{ ...decided, ddl }` 与同步分支同形。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
 import { getCorrelationId } from "@/lib/observability/logger";
@@ -45,7 +44,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const decision = body?.decision === "approve" ? "approved" : body?.decision === "reject" ? "rejected" : null;
   if (!decision) return apiError("decision 必须是 approve 或 reject");
 
-  // @kf-batch 50-WP30-decommission —— 🔴 删除执行环境:**只许平台管理员**决策(本项目 owner ∧ 研发经理也不行 ——
+  // 🔴 删除执行环境:**只许平台管理员**决策(本项目 owner ∧ 研发经理也不行
   //   这张单毁的是一整个区,不属于任何项目的配置权);批准前**先零写预检**(影响预览必须仍等于申请时那一份、仍为 0),
   //   预检不过 ⇒ 409,审批单保持待审(审批人可以驳回)。批准后写删除计划 + 起销毁;起不来 ⇒ 审批照样成立,页面给「重试销毁」。
   if (approval.type === EXEC_ENV_DELETE_APPROVAL_TYPE) {
@@ -113,8 +112,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       }
     }
 
-    // @kf-batch 50-SEQ47c-catalog-ddl —— 批准 prod 环境的建表 / 改表 ⇒ 现在执行(失败如实回 4xx/5xx;审批单已置 approved,申请人重新提交即可)
-    // 模块 55:执行 + 审计记录在执行体里;这里只提交并按混合响应回(同步 200 `{ ...updated, ddl }` 与接入前逐字相同)
+    // 批准 prod 环境的建表 / 改表 ⇒ 现在执行(失败如实回 4xx/5xx;审批单已置 approved,申请人重新提交即可)
+    // 执行 + 审计记录在执行体里;这里只提交并按混合响应回(同步 200 `{ ...updated, ddl }` 与接入前逐字相同)
     if (decision === "approved" && approval.type === DDL_APPROVAL_TYPE) {
       if (!isDdlApprovalPayload(approval.payload)) return apiError("审批单 payload 不是合法的建表 / 改表请求", 400);
       try {

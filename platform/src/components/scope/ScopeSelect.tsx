@@ -1,5 +1,4 @@
 "use client";
-// @kf-batch 50-WP4-o1-scope
 // 顶栏第三层「执行范围」选择器(交互 INTERACTION §9.2;合同 SPEC v3.36 §2.6.5a)。
 //
 // 🔴 三条:

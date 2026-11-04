@@ -1,4 +1,4 @@
-// 模块 37 — 仪表盘集合路由:GET 列表 / POST 建。
+// 仪表盘集合路由:GET 列表 / POST 建。
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";

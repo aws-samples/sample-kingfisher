@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.3-mirror
 // 🔴🔴 **instrumentation 可达面门禁** —— 这条是被一次真部署失败咬出来的,不是预防性洁癖。
 //
 // ── 事故经过 ────────────────────────────────────────────────────────────────
@@ -150,7 +149,7 @@ describe("🔴🔴 instrumentation(周期 reconciler)的 import 图不许碰 nod
     expect(REPO.length).toBeGreaterThan(0);
   });
 
-  // @kf-batch 50-WP9a-durable-jobs —— 🔴 数据面长作业的推进泵挂在 reconciler 旁:钉住「泵在图里、执行侧不在图里」
+  // 🔴 数据面长作业的推进泵挂在 reconciler 旁:钉住「泵在图里、执行侧不在图里」
   it("🔴 推进泵在可达面里,而作业模型 / store / runner / 执行器**不在**(泵侧零执行器 import)", () => {
     const { files } = walkGraph(resolve(SRC, "instrumentation.ts"));
     const rels = new Set(Array.from(files).map((f) => relative(SRC, f)));

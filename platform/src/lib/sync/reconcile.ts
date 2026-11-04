@@ -1,10 +1,9 @@
-// @kf-batch 56-B128-channel-reconcile
 // 数据同步 — 读时对账(reconcile-on-read)的**唯一入口**,按通道分派。
 //
 // 【为什么有这个文件】列表纯读 DB;若进程内 pollGlueJob 因重启丢失,Glue 批同步任务会永久卡 running ⇒ 对 running 的 glue
 //   任务查真实 JobRun 并回写(原逻辑,保持不变)。
 //
-// 【B-128 原形(2026-10-27 测试账号 production 形态实测)】DMS 复制任务在 DMS 侧 FATAL(源库未开 binlog)后,同步**列表**
+// 【原形(2026-10-27 测试账号 production 形态实测)】DMS 复制任务在 DMS 侧 FATAL(源库未开 binlog)后,同步**列表**
 //   仍显示「运行中」且带「停止」入口,1.5 小时不变;只有打开该任务详情页(它轮询 realtime-status)才回写 failed。
 //   根因:本文件此前只对 glue 通道对账(文件头还写着「DMS / Zero-ETL … 这里不强行降级」),DMS / Zero-ETL 的终态判定与回写
 //   散在两个详情页路由里,列表没有同一份逻辑;Zero-ETL 更只在响应里算成 error、**不落库**。
@@ -14,20 +13,20 @@
 //   · zero-etl:running / provisioning 查集成 ⇒ `judgeZeroEtlIntegration`
 //     (active 时「补建目标库 + 置 running」仍只在详情页做 —— 那是**推进**,不是对账)。
 // 🔴 回写带「行仍是我读到的那个在途状态」条件:用户同一瞬间点了「停止」/ 又点了「启动」⇒ 让路、不碰运行记录
-//   (B-121 同一条不变量:用户的停止永不被自动化盖回)。
+//   (同一条不变量:用户的停止永不被自动化盖回)。
 // 🔴 查不到 / 查不动(返回 null)⇒ 保留原状态:「不知道」不许写成任何终态。
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { GetJobRunsCommand } from "@aws-sdk/client-glue";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-// @kf-batch 52-P52.2-W2a-run-stamp — task-runs 唯一写通道(50 SPEC §6 S10)。
+// task-runs 唯一写通道(50 SPEC §6 S10)。
 import { updateRunRecord, resolveRunStamp, settleRunningRuns } from "@/lib/monitor/run-records";
-// @kf-batch 50-WP7-sync-pushdown —— 对账按任务章取区:home 客户端查非 home 的 JobRun **必然查不到**,
+// 对账按任务章取区:home 客户端查非 home 的 JobRun **必然查不到**,
 // 而「查不到」在这条路上会让非 home 的任务永远卡 running(对账形同虚设)。区解析失败即抛
 // (regionOfTarget 不回落 home),由下方 catch 接住 ⇒ 保留原状态,绝不用错区的答案改状态。
 import { bindingTargets, regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import { glueClientFor } from "@/lib/exec-env/target-clients";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
-// 序 61 B-133 —— 终态失败原话分类(与 pollGlueJob 同一作者);网络漂移 ⇒ 源行标 broken,下一次启动前自愈
+// 终态失败原话分类(与 pollGlueJob 同一作者);网络漂移 ⇒ 源行标 broken,下一次启动前自愈
 import { classifyRunError, isNetworkDrift } from "@/lib/sync/run-error";
 import { noteNetworkDriftFromRunError } from "@/lib/datasource/network-reconcile";
 import { describeReplicationTaskState, type ReplicationTaskState } from "@/lib/realtime/dms-service";
@@ -132,7 +131,7 @@ export async function settleSyncChannelVerdict(task: SyncTaskRowLike, verdict: C
       sets.push("realtimeConfig.#err = :err");
     }
   }
-  // @kf-batch 50-B08-sync-task-write-guard —— 唯一写通道(行不存在 no-op);叠加「状态未被别人改过」条件
+  // 唯一写通道(行不存在 no-op);叠加「状态未被别人改过」条件
   const wrote = await updateSyncTaskIfExists({
     taskId: task.taskId,
     UpdateExpression: `SET ${sets.join(", ")}`,
@@ -194,7 +193,6 @@ async function reconcileGlue(task: SyncTaskRowLike): Promise<SyncTaskRowLike> {
   if (!state || !GLUE_DONE.includes(state)) return task;
   const now = new Date().toISOString();
   const newStatus = state === "SUCCEEDED" ? "succeeded" : "error";
-  // @kf-batch 50-B08-sync-task-write-guard
   // 🔴🔴 本处是这类缺陷**最危险**的一个入口:对账的 `task` 来自**列表**(没有重新 Get),
   //   从读列表到写回之间行完全可能已被删掉 ⇒ 盲 Update 会把它**凭空造回来**。
   await updateSyncTaskIfExists({
@@ -215,7 +213,7 @@ async function reconcileGlue(task: SyncTaskRowLike): Promise<SyncTaskRowLike> {
       ExpressionAttributeValues: { ":t": task.taskId }, ScanIndexForward: false, Limit: 1,
     }));
     if (Items[0]?.status === "running") {
-      // @kf-batch 52-P52.2-W2a-run-stamp — 走唯一写通道(条件写 + 保留字自动起别名)。
+      // 走唯一写通道(条件写 + 保留字自动起别名)。
       await updateRunRecord({
         taskId: task.taskId,
         runId: Items[0].runId,
@@ -226,7 +224,7 @@ async function reconcileGlue(task: SyncTaskRowLike): Promise<SyncTaskRowLike> {
           error: errCls.message || null,
           ...(run.ErrorMessage ? { errorRaw: run.ErrorMessage, errorKind: errCls.kind } : {}),
         },
-        // @kf-batch 50-WP7-sync-pushdown —— 章按真落点显式盖(同步任务区维在 targets[],裸调必盖 home)
+        // 章按真落点显式盖(同步任务区维在 targets[],裸调必盖 home)
         stamp: resolveRunStamp(task, tid),
       }).catch(() => {});
     }

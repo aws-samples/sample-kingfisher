@@ -1,4 +1,4 @@
-// 模块 13 — 前端「当前项目空间」状态（localStorage）。
+// 前端「当前项目空间」状态（localStorage）。
 // 全局 fetch 拦截器（AuthProvider）据此附加 x-bgp-project 请求头。
 
 import { DEFAULT_PROJECT_ID } from "./constants";
@@ -22,7 +22,7 @@ export function setActiveProject(id: string): void {
   }
 }
 
-// 模块 15 — 当前环境 (dev/staging/prod)。
+// 当前环境 (dev/staging/prod)。
 export const ACTIVE_ENV_KEY = "bgp-active-env";
 
 export function getActiveEnv(): string {

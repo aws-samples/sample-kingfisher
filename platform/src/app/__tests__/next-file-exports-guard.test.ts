@@ -1,4 +1,4 @@
-// @kf-batch 42-ux-feedback —— Next.js 约定文件(page / layout / route …)只许**标准导出**。
+// Next.js 约定文件(page / layout / route …)只许**标准导出**。
 //
 // 🔴 为什么必须有这条:`next build` 对 app 目录的约定文件做导出面校验,多 `export const X` 一个常量就
 //   「Type error: "X" is not a valid Page export field」整包构建失败 —— 而 tsc / vitest 全绿(它们不认识这条规则)。

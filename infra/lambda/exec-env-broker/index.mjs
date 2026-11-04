@@ -1,5 +1,5 @@
-// @kf-batch 50-P50.3b-lifecycle-rootfix(前身 50-P50.2b/c:窄权 broker + 拆纯函数)
-// 执行环境部署 **broker**(50 DESIGN §12.0「更稳」修法② + P50.3b 写序焊死)。
+// (前身 50-/c:窄权 broker + 拆纯函数)
+// 执行环境部署 **broker**(50 DESIGN §12.0「更稳」修法② + 写序焊死)。
 //
 // 【为什么必须有 broker,而不是让平台直接持 codebuild:StartBuild】
 //   IR-P0-05 坐实:`StartBuild` API **自带** `buildspecOverride`(可 inline 明文)、`imageOverride`、
@@ -9,18 +9,18 @@
 //   ⇒ 定案:平台 ECS **完全不持 StartBuild**,只有 `lambda:InvokeFunction` 到本 broker;
 //     StartBuild 由 broker 独家持有,且 broker **只接三个白名单入参**、**绝不透传任何 caller 提供的 override**。
 //
-// 🔴 本文件的承重(P50.2 四条 + P50.3b 写序):
+// 🔴 本文件的承重(四条 + 写序):
 // ① 入参白名单:只认 `{targetId, components[], operationId}`,多一个字段就拒;
 // ② **region / account 一律从注册表读**,绝不从入参取;
 // ③ **部署锁**(§12.2 P0-C)+ ④ **fencing epoch**(§3.5):锁在 broker 抢、每次递增 epoch。
-// ⑤ 🔴 **P50.3b 写序(v2 审核拍板 C / §4.2 / §19)**:read → `planDeployOpen`(纯函数,validate.mjs)→
+// ⑤ 🔴 **写序(v2 审核拍板 C / §4.2 / §19)**:read → `planDeployOpen`(纯函数,validate.mjs)→
 //    **单次条件写开 `observed.operation` + 锁**(operation **先于** StartBuild 落库)→ StartBuild(带
 //    幂等 token)→ 按 exact op/epoch 附 `buildId`。`cb.send` 抛错=受理未知 ⇒ 写 `startUncertain`、
 //    **绝不清 operation/锁**。**绝不** `acquire lock → StartBuild → best-effort mark`(那有"基础设施在变、
 //    target 仍被准入"的窗口,且 mark 失败会永久丢 operation 事实)。旧 `markInitializing`(写 legacy
 //    `status=initializing`)与旧"直接换锁 takeover"已删除:状态由投影派生、陈锁走 §19.7 分类恢复。
 //
-// 🔴 所有**不碰 AWS 的判定**在 `./validate.mjs`(零依赖纯函数 + 仅 node:crypto,E-49/synth-gate 原生
+// 🔴 所有**不碰 AWS 的判定**在 `./validate.mjs`(零依赖纯函数 + 仅 node:crypto,/synth-gate 原生
 //    import 真执行);本文件只做"取数 → 调 planner 判定 → 发 AWS 调用 + 条件写"的接线。
 import { createHash } from "node:crypto";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -37,7 +37,6 @@ import {
   planDeployOpen,
   DEPLOY_OPEN_FENCED_FIELDS,
   deployOpenSnapshotHash,
-  // @kf-batch 50-WP30-decommission
   planDestroyOpen,
 } from "./validate.mjs";
 
@@ -50,7 +49,7 @@ const PK = "env";
 /**
  * 顶层 `deployLockExpiresAt` 的取值 = `operation.startedAt + LOCK_LEASE_MS`(强读回按此式逐字校验)。
  *
- * 🔴 **它是诊断性的"预期完成时限",不驱动任何自动释放/接管**(SPEC §3.5b;P50.3b-2b 订正):
+ * 🔴 **它是诊断性的"预期完成时限",不驱动任何自动释放/接管**(SPEC §3.5b;-2b 订正):
  *   · 普通 open 路径只接受"无锁"(`attribute_not_exists(deployLockToken)`),从不看它过没过期;
  *   · 陈锁只能走 §19.7 分类 + 管理员恢复端点(CodeBuild terminal ≠ CloudFormation 已稳定/已回滚)。
  *   ⇒ **绝不要**把 `OR deployLockExpiresAt < :now` 加回条件里:那会让"锁过期"变成自动接管 = fail-open。
@@ -66,8 +65,8 @@ const PK = "env";
  *    broker 只把它转录进 operation 与 build 入参,**不做任何判断**(判定属共享判据,在 build 侧与平台侧)。
  */
 const SOURCE_REF = process.env.EXEC_ENV_SOURCE_REF || "";
-// @kf-batch 50-WP15-airflow-serverless(K-5 网络规模)
-// @kf-batch 50-WP16-zero-egress:`networkProfile` → NAT 数这条链**已退役**(SPEC §3.16:执行环境零出网,
+// (K-5 网络规模)
+// `networkProfile` → NAT 数这条链**已退役**(SPEC §3.16:执行环境零出网,
 // NAT 恒为 0)。注册表字段保留只为兼容存量描述符,broker 不再读它、也不再注入 EXEC_ENV_NAT_GATEWAYS。
 // 🔴 **刻意不把它放进 environmentVariablesOverride**:build 侧那份必须来自 **CodeBuild 项目定义**
 //    (平台角色没有 UpdateProject ⇒ §12.0 同级保护),override 会遮蔽它、等于把基线判定的输入
@@ -83,15 +82,15 @@ export const handler = async (event) => {
     const req = validateInput(event);
     const target = await readTargetForDeploy(req.targetId);
 
-    // @kf-batch 50-WP30-decommission —— 下线销毁(WP-30 路 B)。放在 vpcCidr 守卫**之前**:
+    // 下线销毁。放在 vpcCidr 守卫**之前**:
     //   缺 vpcCidr 的存量环境部署不出来,但**必须删得掉**(否则它永远占着这个区的名额)。
     if (req.mode === "destroy") return await handleDestroy(req, target);
 
-    // @kf-batch 50-WP23-xregion-peering —— 缺 vpcCidr 的存量描述符一律拒(preview 也拒:它照样要 synth)
+    // 缺 vpcCidr 的存量描述符一律拒(preview 也拒:它照样要 synth)
     const cidrBlocked = vpcCidrRejection(target);
     if (cidrBlocked) throw new Rejected(cidrBlocked, "bad-descriptor");
 
-    // ── 🔴 P0-E preview 旁路(P50.3b-3;SPEC §3.5c):预演**不执行任何变更** ⇒ 不开 operation、不上锁、不涨 epoch。
+    // ── 🔴 P0-E preview 旁路(3;SPEC §3.5c):预演**不执行任何变更** ⇒ 不开 operation、不上锁、不涨 epoch。
     //    但必须**拒绝与在途会话并跑**:预演会在同一批栈上创建 change set,与正在跑的部署撞(CFN 会拒,
     //    更糟的是它可能给恢复闸留下"存在未执行 change set"的假象)。⇒ 有 operation / 有残留锁 ⇒ 直接拒。
     if (req.mode === "preview") {
@@ -504,7 +503,7 @@ async function startBuild(target, req, epoch, finalSnapshotName = "") {
         { name: "EXEC_ENV_REGION", value: target.region, type: "PLAINTEXT" },
         { name: "EXEC_ENV_ACCOUNT", value: target.accountId, type: "PLAINTEXT" },
         { name: "EXEC_ENV_COMPONENTS", value: req.components.join(","), type: "PLAINTEXT" },
-        // @kf-batch 50-WP23-xregion-peering:VPC 地址段**只从描述符读**(注册时分配,不接客户端入参);
+        // VPC 地址段**只从描述符读**(注册时分配,不接客户端入参);
         //   home 可以为空 —— 栈组对 home 沿用存量段(见 infra/lib/exec-env/vpc-cidr.ts 的 HOME_EXEC_ENV_VPC_CIDR)。
         { name: "EXEC_ENV_VPC_CIDR", value: target.vpcCidr ?? "", type: "PLAINTEXT" },
         { name: "EXEC_ENV_OPERATION_ID", value: req.operationId, type: "PLAINTEXT" },
@@ -513,7 +512,7 @@ async function startBuild(target, req, epoch, finalSnapshotName = "") {
         //    ① `EXEC_ENV_MODE=preview` ⇒ 只出裁决不部署;
         //    ② `EXEC_ENV_APPROVED_PLAN_HASH` ⇒ 闸拿它与**本地重算**的 planHash 逐字节比对,不匹配即 build 失败。
         //    这里只是**透传**:broker 不判断计划内容(它没有 synth 能力),判定权在闸里(不信上游结论)。
-        // @kf-batch 50-WP15-airflow-serverless(K-5):NAT 数量只从注册表 networkProfile 派生(默认 standard=2,与旧行为逐字节相同)
+        // NAT 数量只从注册表 networkProfile 派生(默认 standard=2,与旧行为逐字节相同)
         { name: "EXEC_ENV_MODE", value: req.mode ?? "deploy", type: "PLAINTEXT" },
         { name: "EXEC_ENV_APPROVED_PLAN_HASH", value: req.approvedPlanHash ?? "", type: "PLAINTEXT" },
         // 🔴 P0-E ④(SPEC §3.5c v3.6 订正:漂移可见 + 显式波次,**不重放旧源**)。
@@ -530,7 +529,7 @@ async function startBuild(target, req, epoch, finalSnapshotName = "") {
           value: target?.spec?.desiredTemplateVersion ?? "",
           type: "PLAINTEXT",
         },
-        // @kf-batch 50-WP30-decommission:最终快照名**只从注册表的删除计划读**(planDestroyOpen 校验过形态);
+        // 最终快照名**只从注册表的删除计划读**(planDestroyOpen 校验过形态);
         //   非 destroy 模式恒为空串。重试销毁复用同一个名字 ⇒ build 侧据「快照已存在」跳过创建,绝不重复删/建。
         { name: "EXEC_ENV_FINAL_SNAPSHOT", value: finalSnapshotName, type: "PLAINTEXT" },
       ],
@@ -775,7 +774,7 @@ async function audit(rec) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP30-decommission —— 下线销毁(WP-30 路 B):开销毁会话 → StartBuild(mode=destroy)→ attach buildId
+// 下线销毁:开销毁会话 → StartBuild(mode=destroy)→ attach buildId
 //   与部署同一把锁、同一个 epoch 序列、同一个写序(operation 先于 StartBuild 落库)。
 //   🔴 broker **不清锁**:销毁会话的收口(→ gone / 卡住 → decommissioning + lastError)由平台观测到真值后,
 //      在 lifecycle.ts 的唯一收口通道里带 fence 条件写完成(与部署成功 / 失败恢复同一纪律)。

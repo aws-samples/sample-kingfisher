@@ -8,8 +8,8 @@
 //  4) 幂等:执行前先查是否已存在(已存在则视为成功,不重复建)。
 //  5) 仅平台管理员可调用(在 route 层用 requireAdmin 强制);每次执行走审计。
 
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3)
-// @kf-batch 41-B115-netadvisor-place —— 改网络也打在**该落点的 region**(与探测同一份 facts.region),不再有模块级主控区客户端
+// 散建客户端收口到唯一工厂(L3)
+// 改网络也打在**该落点的 region**(与探测同一份 facts.region),不再有模块级主控区客户端
 import { regionalClient } from "@/lib/aws/clients";
 import {
   type EC2Client,

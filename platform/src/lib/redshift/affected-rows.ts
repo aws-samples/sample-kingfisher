@@ -1,4 +1,3 @@
-// @kf-batch 50-SEQ47b-backfill-observability —— 序 47b(B-101)
 // Redshift Data API `DescribeStatement` 的「受影响行数」唯一作者。
 //   · 批语句(BatchExecuteStatement)⇒ 各子语句 `SubStatements[].ResultRows` 之和;
 //   · 单语句 ⇒ 顶层 `ResultRows`;

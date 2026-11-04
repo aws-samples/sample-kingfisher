@@ -1,17 +1,17 @@
 "use client";
-// 序 52 / B-124(2026-10-25)—— 数据源页 S3 源行「建外部表(Athena 直查)」弹窗:
+// 数据源页 S3 源行「建外部表(Athena 直查)」弹窗
 //   选一个数据集(introspect 出的一级子前缀)⇒ 一键建 Athena 外部表 ⇒ 成功显示 `bgp_s3_ext.<表>` + 「去数据湖直查」。
-// 【为什么要有页面入口】模块 42 P42.4 的 S3 分析通道(POST …/[id]/s3-external)自 2026-07 起只有 API,用户在页面上建完 S3 源后
+// 【为什么要有页面入口】 S3 分析通道(POST …/[id]/s3-external)自 2026-07 起只有 API,用户在页面上建完 S3 源后
 //   无从把它变成一张可直查的表(用户 2026-10-25 拍板「做」)。
-// 【落点】外部表建在**这条源所在区**(行上的章,唯一读法 datasourceOwnerTarget;B-124 之前一律落主控区)的 Athena 工作组 / Glue 目录;
+// 【落点】外部表建在**这条源所在区**(行上的章,唯一读法 datasourceOwnerTarget;此前一律落主控区)的 Athena 工作组 / Glue 目录;
 //   标题与按钮都把区说出来(护栏 2:写操作在按钮上复述目标),成功后「去数据湖直查」把 ?scope=<该区>&sql=<示例查询> 带到直查页。
-// 【长操作】introspect 大桶 + 三条 DDL 常超 45s ⇒ 服务端转 202,全局 fetch 拦截器轮询到终态再整形成同形响应(序 50);本组件零感知。
+// 【长操作】introspect 大桶 + 三条 DDL 常超 45s ⇒ 服务端转 202,全局 fetch 拦截器轮询到终态再整形成同形响应;本组件零感知。
 import React, { useEffect, useState } from "react";
 import { Modal, Select, Alert, Button, Space, Tag, Collapse } from "antd";
 import { CloudServerOutlined, ConsoleSqlOutlined } from "@ant-design/icons";
 import type { DataSource } from "@/types/datasource";
 import { useT } from "@/lib/i18n/useT";
-// 序 38 B-70:取数据集清单的唯一作者(S3 源直连 introspect 回数组;与「浏览表」同一条路)
+// 取数据集清单的唯一作者(S3 源直连 introspect 回数组;与「浏览表」同一条路)
 import { fetchSourceTables, type SourceTableInfo } from "@/lib/datasource/tables-client";
 
 /** POST …/s3-external 成功响应的 data(与 lib/datasource/long-ops.ts 执行体回的字段同名) */

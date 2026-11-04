@@ -1,6 +1,5 @@
 "use client";
 
-// @kf-batch 50-P50.2c-control-api
 // 部署实时进度(50 INTERACTION §1.2 Step3 线框 + DESIGN §12.4)。
 //
 // 数据源(照 §12.4 定案,不是线框里的旧口径):
@@ -37,7 +36,6 @@ function phaseBadge(phase: string): { status: "processing" | "success" | "error"
 
 export default function BuildProgress({ targetId, buildId }: { targetId: string; buildId?: string }) {
   const t = useT();
-  // @kf-batch 50-rebuild-384-gaps
   // 🔴 **主控区(home)这一整块结构上无意义,而且会说假话**(2026-09-08 用户在全新账号的页面上一眼看到):
   //   ① `phase` 来自 CodeBuild,而 home **从不经** broker + CodeBuild ⇒ 恒 `none` ⇒ 徽标「当前无构建」;
   //   ② 逐栈来自 `candidateStackNames()`,它按 `execEnvStackName(targetId, comp)` 推名 ⇒ 对 home 推出

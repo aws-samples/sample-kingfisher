@@ -1,4 +1,3 @@
-// @kf-batch 50-PROD-A-launch-hardening
 /**
  * 鉴权模式的**唯一判定**(中间件 / 身份解析 / JWT 校验三处共用;零依赖 ⇒ Edge 中间件可引)。
  *

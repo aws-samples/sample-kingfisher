@@ -1,4 +1,4 @@
-// 模块 35 — 数仓建模服务层。
+// 数仓建模服务层。
 //
 // 分层(D1)/ 数据域·主题域(D2)/ 数据标准(D2)/ 码表(D2)/ 建模资产归属 的 CRUD,
 // + 码表落地 Redshift。均为低频低量配置数据,用"单逻辑分区 + ULID 排序键"(同指标中台模式)。
@@ -9,9 +9,8 @@ import { PutCommand, QueryCommand, GetCommand, DeleteCommand } from "@aws-sdk/li
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { safeIdent } from "./redshift";
-// @kf-batch 50-WP11b-shared-writer —— 码表物理落点的唯一作者(SPEC §3.9d.3;过渡期 = public.dim_code_<code>)
+// 码表物理落点的唯一作者(SPEC §3.9d.3;过渡期 = public.dim_code_<code>)
 import { codeTableLandingFqn } from "./landing-fqn";
-// @kf-batch 50-WP4quater-reads(工单 SC-37)
 import { isValidTargetId } from "@/lib/exec-env/target-id";
 import { perTargetTruth } from "./landing-shared";
 import { pushStandardGlossary } from "@/lib/openmetadata/om-glossary";
@@ -24,7 +23,6 @@ const CODETABLE_PK = "codetable";
 
 const now = () => new Date().toISOString();
 
-// @kf-batch 50-WP4quater-reads(工单 SC-37)
 /**
  * 治理约定的**适用区**(分层 / 数据域 / 数据标准共用这一个规范化器)。
  *
@@ -76,7 +74,7 @@ function validateLayer(input: any): Pick<DataLayer, "code" | "name" | "schema" |
   return {
     code, name: str(input.name), schema, seq,
     description: input.description ? str(input.description) : undefined,
-    // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 适用区(未给 = 全平台通用)
+    // 适用区(未给 = 全平台通用)
     ...(normalizeApplicableTargets(input.targets) ? { targets: normalizeApplicableTargets(input.targets)! } : {}),
   };
 }
@@ -141,7 +139,7 @@ async function validateDomain(input: any): Promise<Pick<DataDomain, "name" | "co
     name: str(input.name), code: str(input.code), parentId, level: parentId ? 2 : 1,
     owner: input.owner ? str(input.owner) : undefined,
     description: input.description ? str(input.description) : undefined,
-    // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 适用区(未给 = 全平台通用)
+    // 适用区(未给 = 全平台通用)
     ...(normalizeApplicableTargets(input.targets) ? { targets: normalizeApplicableTargets(input.targets)! } : {}),
   };
 }
@@ -200,7 +198,7 @@ function validateStandard(input: any): Omit<DataStandard, "standardId" | "create
     ...(input.namingRule ? { namingRule: str(input.namingRule) } : {}),
     ...(input.constraint ? { constraint: str(input.constraint) } : {}),
     ...(input.description ? { description: str(input.description) } : {}),
-    // @kf-batch 50-WP4quater-reads(工单 SC-37)—— 适用区(未给 = 全平台通用)
+    // 适用区(未给 = 全平台通用)
     ...(normalizeApplicableTargets(input.targets) ? { targets: normalizeApplicableTargets(input.targets)! } : {}),
   };
 }
@@ -288,7 +286,6 @@ export async function updateCodeTable(codeTableId: string, patch: any): Promise<
   return updated;
 }
 
-// @kf-batch 50-W5-seg1-WP11a
 // 🔴 删定义**受控**(50 SPEC v3.20 §3.8):此前这里只删 DDB 一行,而每个区落地的物理表原地不动、
 //    平台从此不再知道它们 = 静默造孤儿 —— 正是「残留」态要暴露的东西被入口自己制造出来。
 //    现在:仍有落地产物 ⇒ 抛 `DeleteDecisionRequired`(路由回 409),用户要么逐区〔解绑并清理〕,
@@ -311,7 +308,7 @@ export async function deleteCodeTable(
  */
 export async function unbindCodeTable(
   codeTableId: string,
-  // @kf-batch 50-WP11b-shared-writer —— `actor` 必填:非主控区的 DROP 走 admin 受控通道,要具名操作者
+  // `actor` 必填:非主控区的 DROP 走 admin 受控通道,要具名操作者
   opts: { targetId: string; cleanup: boolean; confirm?: string | null; actor: import("@/lib/exec-env/admin-ddl-executor").AuthenticatedActor | null }
 ): Promise<{ codeTable: CodeTable; dropped: boolean; table: string }> {
   const ct = await getCodeTable(codeTableId);
@@ -380,15 +377,14 @@ export async function previewUnbindCodeTable(
   };
 }
 
-// @kf-batch 50-P50.3-modeling
 // 码表落地 Redshift:建物理码表 dim_code_<code> 并幂等灌入枚举值。
 // 🔴 **逐 target 物化 + 观测态回写**(轴A,50 SPEC §1.3 / INTERACTION §4ter):
 //    落地不再是一个 bool,而是每个 target 一条 `LandedRecord`(含**观测到的列签名**)。
 //    `landed`/`landedTable`/`landedAt` 降为 **home 那一格的投影**,只为读兼容(列表页在用)。
 export async function landCodeTableById(
   codeTableId: string,
-  // @kf-batch 50-W5-seg2-WP10a —— `residencyActor`:落地前逐 target 写区域审计的行为主体(路由传用户;缺省平台服务主体)
-  // @kf-batch 50-WP11b-shared-writer —— `actor`(**必填**,无默认):非主控区落地走 admin 受控通道 + 窄权写者,
+  // `residencyActor`:落地前逐 target 写区域审计的行为主体(路由传用户;缺省平台服务主体)
+  // `actor`(**必填**,无默认):非主控区落地走 admin 受控通道 + 窄权写者,
   //   要具名操作者;路由传 `actorFromIdentity(identity)`,`null` = 显式声明没有(非主控区那一格判 failed 说清原因)。
   opts: {
     targets?: string[];
@@ -420,8 +416,7 @@ export async function landCodeTableById(
   const targets = Array.from(new Set([...bound, ...landing]));
 
   const statements = buildLandStatements(ct.code, ct.values, schema);
-  // @kf-batch 50-W5-seg2-WP10a
-  // 🔴 落地**之前**逐 target 写区域审计(entry=modeling-land;SPEC v3.23 §3.2 / E-190):home / 同法域 ⇒ null;
+  // 🔴 落地**之前**逐 target 写区域审计(entry=modeling-land;SPEC v3.23 §3.2):home / 同法域 ⇒ null;
   //    跨法域 ⇒ 先同意前置(409)再区域全量 + 中央摘要,写不成 ⇒ 抛、一条语句都不执行。probeOnly 只观测不动库,不审。
   //    与选 tgt_usw2_a 同一条路(没有任何「被驻留门控」的判定)。
   if (!opts.probeOnly) {

@@ -1,4 +1,4 @@
-// 序 73 模块 57(57 DESIGN §3.3 / §3.4 / §4)—— 离线作业节点的**运行期**判据:Python 真跑 `_exec_job` / `_exec_sync`
+// 离线作业节点的**运行期**判据:Python 真跑 `_exec_job` / `_exec_sync`
 // (假 boto3 只记录调用;执行器字节 = 两份运行时产物里拼的那份),spec 用真作者 serverlessJobSpecFor 算。
 //   ① 作业锁:先抢作业行上的锁(lockAttr)再 start_job_run,终态后释放;锁忙等满 45 分钟 ⇒ 写一行 failed 台账(回链齐)再抛
 //      (不 skip、不启动作业、不释放别人的锁;原话不许说 will retry —— YAML retries 可为 0);软限 50 分钟从**节点开始**算(含等锁),
@@ -8,7 +8,7 @@
 //      老产物的 env 没有 workflow_name ⇒ 行上不写 workflowName(页面回落显示 workflowId);
 //   ③ 失败照 run_node 口径:关账 failed + 释放锁 + 原始异常抛出;
 //   ④ 落点 fail-closed:章的 targetId ≠ 工作流落点 ⇒ 拒,一个 AWS 调用都不发;没有 jobSpec ⇒ 拒;
-//   ⑤ 同步节点(B-141 ②)写同步任务自己的运行行;同步任务自己的定时载体(ledger_task_id == taskId)不多写;
+//   ⑤ 同步节点写同步任务自己的运行行;同步任务自己的定时载体(ledger_task_id == taskId)不多写;
 //   ⑥ 两载体真分派:经典 build_dag 的 job operator 调 _exec_job(scheduler=mwaa · workflowRunId=run_id#target);serverless _run_node_body 同;
 //   ⑦ 两载体 py_compile 通过。
 // 变异提示:删 `_exec_job` 里的 `_acquire_run_lock` ⇒ ①红;删发布期落点判定 ⇒ job-node-spec / publish-guard 判据红。
@@ -311,7 +311,7 @@ describe("③ 失败 / ④ 落点 fail-closed", () => {
   });
 });
 
-describe("⑤ 同步节点写同步任务自己的运行行(B-141 ②)", () => {
+describe("⑤ 同步节点写同步任务自己的运行行", () => {
   const TASK = { userId: "default-user", taskId: "01SYNC000000000000000000AE", name: "订单同步", projectId: "proj-SYNC000000000000000000AF", targets: [USW2], glueJobName: "bgp-sync-orders", sourceTables: ["orders"], targetType: "redshift", status: "ready" };
   it("成功 ⇒ taskType sync · triggeredBy workflow · 回链 · glueJobName/glueJobRunId · 章取任务行的 projectId · runId 形态", () => {
     const o = runShared({ fn: "_exec_sync", env: ENV, taskId: TASK.taskId, nodeId: "sync-1", workflowRunId: "ex_abc#" + USW2, getItems: { "bgp-sync-tasks": TASK } });

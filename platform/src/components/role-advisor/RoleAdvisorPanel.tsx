@@ -52,7 +52,7 @@ export default function RoleAdvisorPanel({ request, onFilled, isAdmin = false, t
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request),
       }).then((x) => x.json());
       if (r?.success) {
-        // 🔴 B-21:已存在的角色后端会**对账补齐**并回 `reconciledSids` —— 原来这里只说「已复用」,
+        // 🔴 已存在的角色后端会**对账补齐**并回 `reconciledSids` —— 原来这里只说「已复用」,
         //   用户分不清「本来就齐」与「刚补了 N 条」。三态逐一说清(收口在 labels.ts 的唯一作者)。
         const o = provisionOutcome(r.data);
         setOutcome(o);

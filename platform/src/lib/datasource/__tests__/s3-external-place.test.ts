@@ -1,5 +1,4 @@
-// @kf-batch 52-s3-external-entry(B-124)
-// 🔴 B-124(2026-10-25 读代码挖出,台账 v2.10):S3 源「建 Athena 外部表」的三条 DDL 一律 startQuery(sql, { database }) 不带落点、
+// 🔴 (2026-10-25 读代码挖出,台账 v2.10):S3 源「建 Athena 外部表」的三条 DDL 一律 startQuery(sql, { database }) 不带落点、
 //   getExecution(id) 不带区 ⇒ 第二区的 S3 源建出来的外部表落在**主控区**的 Glue 目录 / 工作组(主控区 Athena 跨区读桶),
 //   而执行体明明已 noteDatasourceRowPlace(ds) 记了这条源所在区 —— 记了账、没把落点交给建表。
 // 根治 = ensureExternalTable(spec, place) 落点必填(TS 上没有缺省,运行时缺也抛),执行体按行上的章(datasourceOwnerTarget,唯一读法)
@@ -112,7 +111,7 @@ beforeEach(() => {
   h.row = null;
 });
 
-describe("🔴 B-124 S3 外部表建在数据源所在区(执行体 datasource-s3-external 装配判据)", () => {
+describe("🔴 S3 外部表建在数据源所在区(执行体 datasource-s3-external 装配判据)", () => {
   it("第二区的 S3 源 ⇒ 三条 DDL 与全部状态查询都打到 us-west-2 的该区工作组 / 湖桶;主控区零调用;响应回 targetId / region", async () => {
     h.row = { ...T2_ROW };
     const out = await runExecutor({ datasourceId: T2_ROW.datasourceId, projectId: "proj-a" });

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 // ETL 作业依赖上传:JAR / Python 文件(.py/.whl/.zip/.egg)传到脚本桶 glue-deps/<jobId>/ 下,
 // 返回 S3 URI 供表单填入 --extra-jars / --extra-py-files(对齐 Glue console 的依赖库配置)。
 //
-// 序 72 B-140(2026-11-03):改动前只传**主控区**脚本桶(读主控区的脚本桶 env),不看作业落点 ⇒ 非主控区作业用它上传的依赖,
+// 改动前只传**主控区**脚本桶(读主控区的脚本桶 env),不看作业落点 ⇒ 非主控区作业用它上传的依赖,
 //   该区的 Glue 角色读不到(仍是 403),文案却说「上传后自动填 S3 URI」。现在按作业**绑定的每个落点**各传一份(同 key,
 //   `resolveGlueBinding(targetId).scriptsBucket`,与脚本上传同一作者),返回第一个绑定区(home 优先)的 URI 回填表单;
 //   提交到别的区时 `localizePlatformDepUris` 把平台脚本桶形态的依赖 URI 换成该区的桶(lib/execution-role/s3-uris.ts)。

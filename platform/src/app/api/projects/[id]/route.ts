@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 52-P52.1-D4
 // 🔴 **D4**:改名/删项目由「项目 owner」收紧为 **平台 admin ∨(manager ∧ 本项目 owner)**
 //    (`requireProjectConfigAdmin`,判据与前端按钮显隐同源)。
 // 🔴 **删项目前置校验**(§D4 最后一条):项目下资源/成员/数据面表**全为 0** 才可删,
@@ -15,7 +14,7 @@ import {
 } from "@/lib/projects/project-service";
 import { recordAudit } from "@/lib/audit";
 import { getCorrelationId } from "@/lib/observability/logger";
-// 模块 55 / 序 50 第二批(B-95 根治的第二刀):删项目是长操作(kind project-delete,执行体 lib/projects/long-ops.ts:盘点 → 阻断 → 凭证回收入队 → 删)。
+// (根治的第二刀):删项目是长操作(kind project-delete,执行体 lib/projects/long-ops.ts:盘点 → 阻断 → 凭证回收入队 → 删)。
 //   数仓冷恢复时盘点语句在执行体里等到终态,超 45s 由统一框架转 202(页面右下「正在后台执行:删除项目空间」),原「正在唤醒数仓」202 协议退役。
 //   对象租约 `project:<id>`:删除进行中再改名 ⇒ 409「『删除项目空间』正在进行中」。
 import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";

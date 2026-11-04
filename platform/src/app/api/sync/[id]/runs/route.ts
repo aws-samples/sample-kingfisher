@@ -4,7 +4,7 @@ import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// 序 61 B-133 —— 存量 / 调度运行时写的失败行只有 AWS 原话 ⇒ 读侧按闭合清单翻成中文结论(写侧已分类的行原样)
+// 存量 / 调度运行时写的失败行只有 AWS 原话 ⇒ 读侧按闭合清单翻成中文结论(写侧已分类的行原样)
 import { presentRunRow } from "@/lib/sync/run-error";
 
 const USER_ID = "default-user";

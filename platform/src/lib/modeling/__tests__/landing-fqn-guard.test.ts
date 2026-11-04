@@ -1,5 +1,4 @@
-// @kf-batch 50-WP11b-shared-writer
-// 🔴🔴 E-233(单测):**落点 / 窄权写者身份唯一作者**的闭合式门禁(SPEC §3.9d.3)。
+// 🔴🔴 (单测):**落点 / 窄权写者身份唯一作者**的闭合式门禁(SPEC §3.9d.3)。
 //
 // 为什么必须是闭合式:码表物理落点曾经有两个作者各写一个名字(`public.dim_code_<code>` 与
 // `shared.code_<id>`),两者没有任何机械关系 —— 而它们各自的单测都是绿的。「枚举违规写法」的门禁
@@ -96,7 +95,7 @@ describe("🔴 SSOT 的值(过渡期逐字节 = 现网;B 段只改这一个返�
       { value: "A", label: "甲", seq: 0 },
       { value: "B'x", label: "乙", seq: 1 },
     ];
-    // 🔴 逐字节快照:WP-11b 改造前 buildLandStatements 的产物(home 路径零变化)
+    // 🔴 逐字节快照:改造前 buildLandStatements 的产物(home 路径零变化)
     expect(buildLandStatements("order_status", values)).toEqual([
       'CREATE TABLE IF NOT EXISTS "public"."dim_code_order_status" ("value" VARCHAR(64) NOT NULL, "label" VARCHAR(256), "seq" INTEGER)',
       'DELETE FROM "public"."dim_code_order_status"',

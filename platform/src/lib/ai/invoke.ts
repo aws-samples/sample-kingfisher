@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP8
-// 模块 51 — `invokeWithFallback`(51 SPEC §3.5;P0-3 Throttle 退避 + P0-4 冷悬崖降级的**唯一归宿**)。
+// `invokeWithFallback`(51 SPEC §3.5;P0-3 Throttle 退避 + P0-4 冷悬崖降级的**唯一归宿**)。
 //
 // 9 个消费点统一走它。两形态(SPEC §3.5 v1.1):
 //   形态① 命令型 `invokeConverse(...)` —— 8 个 ConverseCommand 点(可注入 command,单元=一次 send)
@@ -13,7 +12,7 @@
 //   · abortSignal 已触发的 AbortError ⇒ 立即抛(不重试不降级,守 300s 天花板语义)
 //   · 返回 `{ response, usedModelId, usedSource, attempts, degraded }` —— `_meta` 回显的是**实际用的**,不是打算用的
 //   · `FAULT_THROTTLE_MODEL` seam(fault-seam.ts):armed 且 modelId 命中 ⇒ 强制抛 ThrottlingException(M9)
-//   · @kf-batch 51-v2-multi-vendor(51 SPEC §7.2,D12):`invokeConverse` 是平台侧请求整形的**唯一落点** ——
+//   ·:`invokeConverse` 是平台侧请求整形的**唯一落点**
 //     build 出命令后按厂商档案剥掉该系列不支持的 inferenceConfig 字段、放大 maxTokens(Kimi K3 ×2),再 send;
 //     catch 里若 Bedrock 原话是「This model doesn't support the X field」⇒ 学到 X,**同层立即重试一次**(这次整形会剥掉 X;
 //     不占重试额度、不退避、不降级、只许一次),再走原三分支。对 Claude 系列整形是恒等(单测钉住)。

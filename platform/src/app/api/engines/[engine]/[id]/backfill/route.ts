@@ -12,7 +12,6 @@ import { guardResourceAccess } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { isEngineType, getProvider } from "@/lib/engines/registry";
 import { dateRange } from "@/lib/etl/run-params";
-// @kf-batch 50-W5-seg2-WP10a
 import { residencyErrorResponse, userActor } from "@/lib/exec-env/residency-audit";
 
 const USER_ID = "default-user";
@@ -43,7 +42,7 @@ export async function POST(
   try {
     const provider = getProvider(params.engine);
     const runs: Array<{ runDate: string; runId: string }> = [];
-    // @kf-batch 50-W5-seg2-WP10a —— 行为主体传给 provider 写区域审计(不带 targetId ⇒ home,同意前置为空操作)
+    // 行为主体传给 provider 写区域审计(不带 targetId ⇒ home,同意前置为空操作)
     const actor = userActor(guard.identity);
     for (const d of dates) {
       const res = await provider.submit(job, { runDate: d, triggeredBy: "backfill", actor });

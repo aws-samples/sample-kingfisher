@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { NextRequest, NextResponse } from "next/server";
 import { KafkaClient, ListClustersV2Command } from "@aws-sdk/client-kafka";
@@ -10,7 +10,7 @@ import { requireProject } from "@/lib/projects/guard";
 const REGION = homeRegion();
 
 // GET /api/datasources/msk-clusters — 列出本账号本区已存在的 MSK 集群(供建源"选择集群"下拉)。
-//  模块42 P42.6:MSK 托管 flavor 让用户从下拉选已有集群(免手敲 ARN)。分页续拉直到无 NextToken。
+//  MSK 托管 flavor 让用户从下拉选已有集群(免手敲 ARN)。分页续拉直到无 NextToken。
 //  返回每个集群支持的认证方式(iam/scram),供前端约束 auth 选项(集群没开的认证不给选)。
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");

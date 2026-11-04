@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-capability —— 序 37 B-64 的装配层判据:启动核心 startGlueSyncRun(真)撞上 Glue「上一次 run 收尾中」
+// 该缺陷的装配层判据:启动核心 startGlueSyncRun(真)撞上 Glue「上一次 run 收尾中」
 //   (StartJobRun 回 ConcurrentRunsExceededException)时的**有界**重试。
 //   真环境 2026-10-12 第二轮两次撞到:补数第二个日期紧接第一个日期启动 ⇒ 实例失败、计划「部分失败」;守卫刚拒掉一次运行、
 //   用户马上再点 ⇒ 500。规则(唯一作者 start-run.ts GLUE_START_RETRY):补数最多 12 次、手动 3 次,间隔 10–20s 全抖动;
@@ -95,7 +95,7 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); });
 
-describe("🔴 B-64 启动核心对 Glue「上一次 run 收尾中」的有界重试", () => {
+describe("🔴 启动核心对 Glue「上一次 run 收尾中」的有界重试", () => {
   it("手动:前两次 ConcurrentRunsExceededException、第三次成功 ⇒ 启动成功;StartJobRun 共 3 次;两次等待都在 10–20s 内", async () => {
     S.concurrentTimes = 2;
     const res = await startGlueSyncRun({ task: task(), taskId: TASK_ID, ds, tid: "tgt_home", dsOwner: "tgt_home", triggeredBy: "manual", sleep });

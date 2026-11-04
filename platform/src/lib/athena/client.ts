@@ -1,13 +1,13 @@
-// 模块 24 — Athena 执行封装。
+// Athena 执行封装。
 // StartQueryExecution → 轮询 GetQueryExecution → GetQueryResults，匹配平台既有 /api/redshift/* 风格。
 // 统一走自管 workgroup `bgp-athena`（结果落平台数据湖桶，强制 WG 配置 + SSE_S3）。
 
-// @kf-batch 50-WP31-place-first-class —— 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 观测模式的落点决策记账(只记录;必须在第一个 await 之前调,见 place/context.ts)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { homeRegion } from "@/lib/place/home-region";
 import { notePlaceDecision } from "@/lib/place/context";
-// @kf-batch 43-page-sweep(B-91)—— 打到联邦目录的查询先确保目录在(区级资源,按落点区取 Glue 客户端)
+// 打到联邦目录的查询先确保目录在(区级资源,按落点区取 Glue 客户端)
 import { glueClientFor } from "@/lib/exec-env/target-clients";
 import { ensureS3TablesFederatedCatalog, touchesS3TablesCatalog } from "@/lib/aws/s3tables-catalog";
 import {
@@ -25,7 +25,7 @@ export const ATHENA_WORKGROUP = process.env.ATHENA_WORKGROUP || "bgp-athena";
 // 仅当 workgroup 未强制结果位置时才需要；bgp-athena 已 EnforceWorkGroupConfiguration=true。
 export const ATHENA_OUTPUT_LOCATION = process.env.ATHENA_OUTPUT_LOCATION || "";
 
-// @kf-batch 50-WP4ter-coverage —— 工单 SC-4:数据湖查询按区。
+// 数据湖查询按区。
 // ── 为什么不是「换个 region 建客户端」就完了 ────────────────────────────────────
 // 与数仓直查(`lib/redshift/direct-query.ts`)一模一样的道理:一个 Athena 查询要**四样**东西
 // 同时对上 —— region、workgroup、结果落点、以及查的那个 S3 Tables 目录。只换 region 而 workgroup
@@ -60,7 +60,7 @@ export interface AthenaPlace {
  * (`athenaWorkgroup` / `datalakeBucket`,由部署期写入),不由本函数拼名字 ——
  * 拼名字就是命名 SSOT 之外的第二处派生(50 SPEC §6.5)。
  */
-// @kf-batch 50-WP31-place-first-class —— 落点必填(原来缺省 = 主控区);空串 / 非法 ⇒ 抛,不变成主控区
+// 落点必填(原来缺省 = 主控区);空串 / 非法 ⇒ 抛,不变成主控区
 export async function resolveAthenaPlace(targetId: string): Promise<AthenaPlace> {
   notePlaceDecision({ targetId, via: "resolveAthenaPlace" });
   const { HOME_TARGET_ID, isHome, assertTargetId } = await import("@/lib/exec-env/target-id");
@@ -111,7 +111,7 @@ export interface AthenaResults {
 export async function startQuery(
   query: string,
   context?: { catalog?: string; database?: string },
-  // @kf-batch 50-WP4ter-coverage —— 落点(缺省 = 主控区,现网行为逐字节不变)
+  // 落点(缺省 = 主控区,现网行为逐字节不变)
   place?: AthenaPlace
 ): Promise<string> {
   const ctx = context && (context.catalog || context.database)
@@ -124,7 +124,7 @@ export async function startQuery(
     : {};
   const wg = place ? place.workgroup : ATHENA_WORKGROUP;
   const outLoc = place ? place.outputLocation : ATHENA_OUTPUT_LOCATION;
-  // @kf-batch 43-page-sweep(B-91)—— 联邦目录 s3tablescatalog 不是 CDK 资源,原来只有「同步任务写 S3 Tables」的启动路径懒创建
+  // 联邦目录 s3tablescatalog 不是 CDK 资源,原来只有「同步任务写 S3 Tables」的启动路径懒创建
   //   ⇒ 全新账号没跑过那样一次同步,直查 / 问数一律 CATALOG_NOT_FOUND(…7698 页面驱动 p43c 坐实)。打到联邦目录的查询
   //   先确保目录在(GetCatalog 一次,幂等;建不成如实上抛成本次查询的错);别的 Athena 查询(S3 外表库等)不碰 Glue。
   if (touchesS3TablesCatalog(query, context)) {
@@ -144,7 +144,7 @@ export async function startQuery(
   return out.QueryExecutionId;
 }
 
-// @kf-batch 50-WP4ter-coverage —— 🔴 取状态 / 取结果 / 取消**必须打到发起它的那个区**:
+// 🔴 取状态 / 取结果 / 取消**必须打到发起它的那个区**:
 // QueryExecutionId 只在它自己的 region 里存在,拿主控区的客户端去查会得到「不存在」——
 // 症状是「查询提交成功、状态永远查不到」,而不是一句明确的报错。⇒ 三个函数都收 region。
 export async function getExecution(id: string, atRegion?: string): Promise<AthenaExecutionStatus> {

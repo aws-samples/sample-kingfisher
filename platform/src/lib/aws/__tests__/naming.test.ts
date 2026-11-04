@@ -1,9 +1,8 @@
-// @kf-batch 50-P50.1a-naming-ssot
-// 命名 SSOT 合同级单测(50 DESIGN §3.2 + SPEC §6.5 Q-2 / SPEC §1.1a / ACCEPTANCE E-15)。
+// 命名 SSOT 合同级单测(50 DESIGN §3.2 + SPEC §6.5 Q-2 / SPEC §1.1a / ACCEPTANCE)。
 //
 // 【本文件的四条承重】
 // ① **home 豁免 = infra 现网实名**:每个 kind 的 home 名必须在 infra/lib 的真源码里找得到。
-//    这条是最要紧的 —— 若 naming.json 写的 home 名与 CDK 实际建的名字不一致,P50.2 给 home
+//    这条是最要紧的 —— 若 naming.json 写的 home 名与 CDK 实际建的名字不一致,给 home
 //    seed 出来的描述符会指向**不存在的资源**,而且报错发生在很远的地方(读桶 404 / workgroup not found)。
 // ② **non-home 必带 target 维**:同 region 两 target(蓝绿/主备)不许撞名 —— 这是 SPEC §6.5 Q-2
 //    "允许同 region 多 target" 的直接推论,也是本批把派生键从 region 改成 targetSlug 的原因。
@@ -77,13 +76,13 @@ const GOLDEN_HOME: Record<string, string> = {
   emrServerlessRole: "bgp-emr-serverless-role",
   redshiftCopyRole: "bgp-redshift-copy-role",
   dmsKinesisRole: "bgp-dms-kinesis-role",
-  // @kf-batch 50-WP13-mwaa-region:per-target MWAA 执行角色(home 的 MWAA 角色是 CDK 自动名,home 模板永不建,只为 SSOT 完整)
+  // per-target MWAA 执行角色(home 的 MWAA 角色是 CDK 自动名,home 模板永不建,只为 SSOT 完整)
   mwaaRole: "bgp-mwaa-role",
-  // @kf-batch 50-WP15-airflow-serverless:MWAA Serverless 入口(定义桶 + 执行角色;home 模板由施工序 2b 建)
+  // MWAA Serverless 入口(定义桶 + 执行角色;home 模板由b 建)
   workflowBucket: `bgp-airflow-sls-${ACCOUNT}`,
   airflowServerlessRole: "bgp-airflow-sls-role",
   airflowServerlessSg: "bgp-airflow-sls-sg",
-  // @kf-batch 50-W5-seg1-WP10a:residency-api 片 1 三样(home 法域永不建,home 模板只为 SSOT 完整)
+  // residency-api 片 1 三样(home 法域永不建,home 模板只为 SSOT 完整)
   residencyAuditTable: "bgp-region-audit-home",
   residencyResultsTable: "bgp-region-results-home",
   residencyBucket: `bgp-region-results-${ACCOUNT}-home`,
@@ -91,7 +90,7 @@ const GOLDEN_HOME: Record<string, string> = {
   logsKeyAlias: "alias/bgp-logs",
   redshiftAdminSecretName: "redshift!bgp-namespace-admin",
   stackName: "BgpExecEnv-tgt-home-core",
-  // @kf-batch 50-WP31-seq5-dataplane-role:主控区平台数据面角色(新建,不是存量;建在平台栈)
+  // 主控区平台数据面角色(新建,不是存量;建在平台栈)
   platformDataRole: "bgp-platform-data-role",
 };
 
@@ -115,14 +114,11 @@ const GOLDEN_TARGET: Record<string, string> = {
   emrServerlessRole: "BgpExecEnv-tgt-usw2-a-emr-role",
   redshiftCopyRole: "BgpExecEnv-tgt-usw2-a-redshift-copy-role",
   dmsKinesisRole: "BgpExecEnv-tgt-usw2-a-dms-kinesis-role",
-  // @kf-batch 50-WP13-mwaa-region
   mwaaRole: "BgpExecEnv-tgt-usw2-a-mwaa-role",
   platformDataRole: "BgpExecEnv-tgt-usw2-a-platform-data-role",
-  // @kf-batch 50-WP15-airflow-serverless
   workflowBucket: `bgp-airflow-sls-${ACCOUNT}-tgt-usw2-a`,
   airflowServerlessRole: "BgpExecEnv-tgt-usw2-a-airflow-sls-role",
   airflowServerlessSg: "bgp-airflow-sls-sg-tgt-usw2-a",
-  // @kf-batch 50-W5-seg1-WP10a
   residencyAuditTable: "bgp-region-audit-tgt-usw2-a",
   residencyResultsTable: "bgp-region-results-tgt-usw2-a",
   residencyBucket: `bgp-region-results-${ACCOUNT}-tgt-usw2-a`,
@@ -147,7 +143,7 @@ const SCOPE_LIMIT: Record<string, number> = {
   "kms-alias": 256, // KMS 别名 alias/ + 250
 };
 const KIND_LIMIT: Record<string, number> = {
-  // @kf-batch 50-W5-seg1-WP10a:DynamoDB 表名上限 255(区域审计表 / 结果表)
+  // DynamoDB 表名上限 255(区域审计表 / 结果表)
   residencyAuditTable: 255,
   residencyResultsTable: 255,
   tableBucket: 63, // S3 Tables 表桶名 3–63
@@ -233,7 +229,7 @@ describe("命名 SSOT 表本身(加载期自检已在 import 时跑过)", () => 
 // ══════════════════════════════════════════════════════════════════════════════
 // 承重 ① home 豁免 = infra 现网实名(不是"理论上该叫什么")
 // ══════════════════════════════════════════════════════════════════════════════
-describe("🔴 home 豁免逐个对上 infra/lib 真源码(对不上 ⇒ P50.2 seed 出指向不存在资源的描述符)", () => {
+describe("🔴 home 豁免逐个对上 infra/lib 真源码(对不上 ⇒ seed 出指向不存在资源的描述符)", () => {
   // homeSource 里的**行号只作人工导航用**,断言只看文件内容 —— 行号漂移不该让门禁变红。
   const cases = RESOURCE_KINDS.filter((k) => (homeSourceOf(k) ?? "").startsWith("infra/"));
 
@@ -249,7 +245,6 @@ describe("🔴 home 豁免逐个对上 infra/lib 真源码(对不上 ⇒ P50.2 s
       const rule = KINDS[kind];
       const homeName = resourceName(kind, varsFor(kind, HOME_TARGET_ID));
 
-      // @kf-batch 50-P50.1-workgroup-ssot
       // 🔴 **第三种形态:infra 侧改为从命名 SSOT 派生**(`resourceName("<kind>", …)`)。
       // 这不是把门禁放宽,而是比原判据**更强**:原判据只是"两边的文本恰好一样",
       // 派生则是**同一个真值源**,结构上不可能漂移。所以先认派生,再退回字面量比对。
@@ -394,7 +389,7 @@ describe("execEnvStackName 出口", () => {
   it("home / 非 home 都是 BgpExecEnv-<slug>-<component>,且与控制面存量栈名零相交", () => {
     expect(execEnvStackName(HOME_TARGET_ID, "core")).toBe(`BgpExecEnv-${HOME_TARGET_SLUG}-core`);
     expect(execEnvStackName(T_A, "redshift")).toBe(`BgpExecEnv-${toTargetSlug(T_A)}-redshift`);
-    // 存量 21 栈都是 Bgp<Name>Stack 形态,不带 `BgpExecEnv-` 前缀 ⇒ 天然不相交(synth 门禁在 P50.2 补真扫)。
+    // 存量 21 栈都是 Bgp<Name>Stack 形态,不带 `BgpExecEnv-` 前缀 ⇒ 天然不相交(synth 门禁在补真扫)。
     expect(execEnvStackName(T_A, "core").startsWith("BgpExecEnv-")).toBe(true);
   });
 

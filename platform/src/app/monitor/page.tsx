@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-// @kf-batch 50-WP4-o1-scope —— 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)。
+// 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)。
 // 🔴 护栏 1 的数字来自**列表响应自己的** `countsByTarget`(同一时间窗、同一筛选),
 // 不走 `/api/scope/counts` —— 那是不带窗口的全表计数,与本页口径必然对不上(SPEC v3.35 §2.6.6)。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -12,9 +12,9 @@ import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, ClockCircleOutl
 import dayjs from "dayjs";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
 import SchedulePanel from "@/components/monitor/SchedulePanel";
-// @kf-batch 50-SEQ47b-backfill-observability —— 「运行日志」弹窗抽成唯一作者(补数中心实例抽屉同用)
+// 「运行日志」弹窗抽成唯一作者(补数中心实例抽屉同用)
 import RunLogModal from "@/components/monitor/RunLogModal";
-// @kf-batch 50-SEQ47b-backfill-observability —— 「触发」列与「触发方式」筛选的文案同一作者:补数 / 试运行 / 重跑不再冒称「手动」
+// 「触发」列与「触发方式」筛选的文案同一作者:补数 / 试运行 / 重跑不再冒称「手动」
 import { triggeredByMeta, TRIGGERED_BY_FILTER_OPTIONS } from "@/lib/monitor/triggered-by";
 import { useT } from "@/lib/i18n/useT";
 import { useBrowserInitialState } from "@/lib/hydration/use-browser-initial-state";
@@ -22,27 +22,26 @@ import { useBrowserInitialState } from "@/lib/hydration/use-browser-initial-stat
 // 2026-07-13 调度运维收敛:原 /schedule 页并入本页「调度配置」Tab(看运行↔改调度一页完成),
 // 旧 /schedule URL 重定向到 /monitor?tab=schedule。
 export default function MonitorPage() {
-  // @kf-batch 50-WP4-o1-scope —— 当前执行范围(URL 权威)
+  // 当前执行范围(URL 权威)
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const [countsByTarget, setCountsByTarget] = useState<Record<string, number>>({});
   const t = useT();
-  // B-138:首帧固定 runs(= 服务端),挂载后按 ?tab=schedule 切换
+  // 首帧固定 runs(= 服务端),挂载后按 ?tab=schedule 切换
   const [topTab, setTopTab] = useBrowserInitialState<string>("runs", () =>
     new URLSearchParams(window.location.search).get("tab") === "schedule" ? "schedule" : "runs"
   );
   const [runs, setRuns] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [loading, setLoading] = useState(false);
-  // 序 47b:弹窗本体抽到 components/monitor/RunLogModal(补数中心同用);这里只记「看哪条 run」
+  // 弹窗本体抽到 components/monitor/RunLogModal(补数中心同用);这里只记「看哪条 run」
   const [logFor, setLogFor] = useState<{ taskId: string; runId: string } | null>(null);
   const [refreshInterval, setRefreshInterval] = useState(10);
   const timerRef = useRef<NodeJS.Timeout>(undefined);
-  // @kf-batch 52-P52.2-W2a-run-stamp
   // 🆕 region 筛选(50 INTERACTION §3.3):照本页既有惯例加一个 Select allowClear,与 status/taskType 并列。
-  // @kf-batch 50-SEQ47b-backfill-observability —— 初始筛选可由地址栏带入(`?name=&triggeredBy=`):补数实例抽屉「去监控页定位」
+  // 初始筛选可由地址栏带入(`?name=&triggeredBy=`):补数实例抽屉「去监控页定位」
   //   就是带着任务名 + backfill 跳过来的;没带参数时初值与改动前逐字节相同。
-  //   B-138:首帧按空筛选渲染(= 服务端),挂载后再从地址栏取 name / triggeredBy
+  //   首帧按空筛选渲染(= 服务端),挂载后再从地址栏取 name / triggeredBy
   const [filters, setFilters] = useBrowserInitialState(
     { name: "", status: "", taskType: "", triggeredBy: "", startDate: "", endDate: "", region: "" },
     () => {
@@ -63,7 +62,7 @@ export default function MonitorPage() {
     if (f.startDate) params.set("startDate", f.startDate);
     if (f.endDate) params.set("endDate", f.endDate);
     if (f.region) params.set("region", f.region);
-    // 🔴 `global` 时 `toScopeParam` 回 null ⇒ **不带该参数**,请求 URL 与改动前逐字节相同(E-158 回滚点)
+    // 🔴 `global` 时 `toScopeParam` 回 null ⇒ **不带该参数**,请求 URL 与改动前逐字节相同(回滚点)
     if (scopeParam) params.set("scope", scopeParam);
     const qs = params.toString();
     return qs ? `?${qs}` : "";
@@ -120,12 +119,12 @@ export default function MonitorPage() {
       render: (v: string, r: any) => {
         // 跳转:workflow→编排页;EMR/ETL 作业(emr-serverless / etl-*)→「离线计算」(etl-jobs)页;其余(sync)→同步详情。
         const tt = r.taskType || "";
-        // @kf-batch 50-WP28-platform-action-node —— 治理定时任务 → 治理页;问数卡片 → 智能问数(卡片在「我的卡片」里)
+        // 治理定时任务 → 治理页;问数卡片 → 智能问数(卡片在「我的卡片」里)
         const href = tt === "workflow" ? `/workflow/${r.taskId}`
           : (tt === "emr-serverless" || tt.startsWith("etl")) ? `/etl-jobs`
           : tt === "governance" ? `/governance`
           : tt === "genbi-card" ? `/genbi`
-          // @kf-batch 50-CAPSEED-seed-dispatch —— 造数(手动 / 定时)→ 数据源页的「示范数据造数」卡片
+          // 造数(手动 / 定时)→ 数据源页的「示范数据造数」卡片
           : tt === "seed" ? `/datasources`
           : `/sync/${r.taskId}`;
         return <a href={href}><b>{v}</b></a>;
@@ -135,7 +134,7 @@ export default function MonitorPage() {
         const isSync = v === "sync";
         const isEmr = v === "emr-serverless";
         const isEtl = !isEmr && (v || "").startsWith("etl");
-        // @kf-batch 50-WP28-platform-action-node —— 两类平台动作的 run 行(治理定时 / 卡片定时刷新)
+        // 两类平台动作的 run 行(治理定时 / 卡片定时刷新)
         if (v === "governance") return <Tag color="cyan" data-testid="run-type-governance">{t("治理任务")}</Tag>;
         if (v === "genbi-card") return <Tag color="magenta" data-testid="run-type-genbi-card">{t("问数卡片")}</Tag>;
         if (v === "seed") return <Tag color="gold" data-testid="run-type-seed">{t("造数")}</Tag>;
@@ -143,12 +142,12 @@ export default function MonitorPage() {
         const label = isSync ? t("同步") : isEmr ? "EMR" : isEtl ? t("ETL作业") : t("工作流");
         return <Tag color={color}>{label}</Tag>;
       } },
-    // @kf-batch 52-P52.2-W2a-run-stamp — 🆕 region 列:客户痛点"怕漏 region 对不上"的一眼可辨面。
+    // 🆕 region 列:客户痛点"怕漏 region 对不上"的一眼可辨面。
     { title: t("区域"), dataIndex: "region", key: "region", width: 130,
       render: (v: string, r: any) => v
         ? <Tag color="geekblue" title={r.targetId || ""}>{v}</Tag>
         : <span style={{ color: "#bfbfbf" }} title={t("存量运行记录没有执行目标维度(视为主区域)")}>-</span> },
-    // @kf-batch 50-W5-seg2-WP10a —— 跨法域 run 的区域审计 ID(全量留在该区,中央只留摘要;home 为空)
+    // 跨法域 run 的区域审计 ID(全量留在该区,中央只留摘要;home 为空)
     { title: t("审计"), dataIndex: "residencyAuditId", key: "residencyAuditId", width: 110,
       render: (v: string) => v && !String(v).startsWith("pending#")
         ? <code data-testid="run-audit-id" style={{ fontSize: 11 }} title={v}>#{String(v).slice(-8)}</code>
@@ -165,7 +164,7 @@ export default function MonitorPage() {
         <Space>
           <Button size="small" type="link" icon={<FileTextOutlined />} onClick={() => viewLog(r.taskId, r.runId)}>{t("日志")}</Button>
           {["succeeded", "failed"].includes(r.status) && <DiagnosisButton taskId={r.taskId} runId={r.runId} label={r.status === "failed" ? t("AI 诊断") : t("AI 分析")} />}
-          {/* @kf-batch 50-WP28-platform-action-node —— 平台动作没有「从监控页重试」的入口(重试 = 下一次 cron,或去它自己的页面手动跑)⇒ 不给一个点了会打错接口的按钮 */}
+          {/* 平台动作没有「从监控页重试」的入口(重试 = 下一次 cron,或去它自己的页面手动跑)⇒ 不给一个点了会打错接口的按钮 */}
           {r.status === "failed" && r.taskType !== "governance" && r.taskType !== "genbi-card" && r.taskType !== "seed" && <Button size="small" type="link" danger icon={<RedoOutlined />} onClick={() => retryTask(r.taskId, r.taskType)}>{t("重试")}</Button>}
         </Space>
       ),
@@ -228,7 +227,7 @@ export default function MonitorPage() {
       <Tabs items={[
         { key: "all", label: t("全部运行 ({n})", { n: runs.length }),
           children: (
-            /* @kf-batch 50-WP4bis-p1-scope —— 无头验收要能只数「全部运行」这张表的行 */
+            /* 无头验收要能只数「全部运行」这张表的行 */
             <div data-testid="run-table">
               <Table columns={columns} dataSource={runs} rowKey={(r) => `${r.taskId}-${r.runId}`} loading={loading} pagination={{ pageSize: 20 }} size="small" />
             </div>
@@ -248,7 +247,7 @@ export default function MonitorPage() {
   return (
     <div>
       <h2 style={{ margin: "0 0 12px" }}>{t("任务监控")}</h2>
-      {/* @kf-batch 50-WP4-o1-scope —— 护栏 1:target 视角常驻「其他执行范围还有 N 条」。
+      {/* 护栏 1:target 视角常驻「其他执行范围还有 N 条」。
           数字来自列表响应自己的 countsByTarget(同一时间窗),不去问全表计数端点。 */}
       <ScopeCountsHint counts={countsByTarget} noun={t("运行")} />
       <Tabs

@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg2-WP10a
-// 直查提交层 × 可审计闭包(SPEC v3.23 §3.2;ACCEPTANCE E-185 / E-186 / E-187 的提交层单测面):
+// 直查提交层 × 可审计闭包(SPEC v3.23 §3.2;ACCEPTANCE 提交层单测面):
 //   · 跨法域 target:提交**之前**写区域审计,auditId 回到 submission,并作为 Redshift 语句的 StatementName(statement ↔ 审计关联);
 //   · 审计写不成 ⇒ **那一个 target 不提交**(errorKind=audit-unavailable),其它 target 照跑;
 //   · 缺同意(并发竞态)⇒ errorKind=ack-required,不提交;
@@ -102,7 +101,7 @@ describe("🔴 跨法域提交:审计在前、auditId 进 submission 与 Stateme
     // home 那条仍无 StatementName
     expect(h.sent.find((x) => x.WorkgroupName === "bgp-workgroup")!.StatementName).toBeUndefined();
   });
-  it("🔴 审计写不成 ⇒ 该 target **不提交**(errorKind=audit-unavailable、无 statementId),home 照跑(E-187 提交层)", async () => {
+  it("🔴 审计写不成 ⇒ 该 target **不提交**(errorKind=audit-unavailable、无 statementId),home 照跑(提交层)", async () => {
     h.auditMode = "unavailable";
     const subs = await submitToTargets({ sql: "select 1", targets: [HOME, EU], projectId: "p", identity: ID });
     const eu = subs.find((s) => s.targetId === EU)!;

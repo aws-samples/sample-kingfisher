@@ -1,4 +1,4 @@
-// 🔴🔴 执行区必须注入到 driver/executor 环境 —— 判据(B-21 第八层)。
+// 🔴🔴 执行区必须注入到 driver/executor 环境 —— 判据(第八层)。
 //
 // 【真实失败】2026-09-22:IAM 全部补齐之后,用户那个 copilot 生成的 ROI 作业仍然 ExitCode 1:
 //     botocore.exceptions.NoRegionError: You must specify a region.
@@ -33,7 +33,7 @@ describe("执行区注入", () => {
   });
 
   it("🔴🔴 ③ 手动提交与定时调度**两条路**都要经过同一个作者(漏一处 = 那条路仍然 NoRegionError)", () => {
-    // 手动提交(provider.submit)直接调 bgpLandingParameters;定时调度(schedule-fanout)自序 73 起经**再上一层**的单一作者
+    // 手动提交(provider.submit)直接调 bgpLandingParameters;定时调度(schedule-fanout)经**再上一层**的单一作者
     //   `job-spec.ts#emrSparkSubmitParametersFor`(工作流离线作业节点拼同一份)—— 判据跟着钉到那一跳:schedule-fanout 必须调它,它必须调 bgpLandingParameters。
     const provider = stripComments(SRC("lib/engines/emr/provider.ts"));
     const fanout = stripComments(SRC("lib/engines/emr/schedule-fanout.ts"));
@@ -81,7 +81,7 @@ describe("Redshift 连接事实注入(第九层:IAM 放行 ≠ 库内有授权)"
   });
 
   it("🔴🔴 ③ 手动提交与定时调度**两条路**都要解析该区的 Redshift 连接事实", () => {
-    // 定时调度自序 73 起经单一作者 `job-spec.ts#emrRedshiftFactsFor`(它调 resolveRedshiftBinding;工作流离线作业节点同一份)
+    // 定时调度经单一作者 `job-spec.ts#emrRedshiftFactsFor`(它调 resolveRedshiftBinding;工作流离线作业节点同一份)
     expect(stripComments(SRC("lib/engines/emr/provider.ts")), "provider.ts 必须调 resolveRedshiftBinding(漏一处 = 那条路仍 permission denied)").toMatch(/resolveRedshiftBinding\(/);
     expect(stripComments(SRC("lib/engines/emr/schedule-fanout.ts")), "schedule-fanout.ts 必须经 emrRedshiftFactsFor").toMatch(/emrRedshiftFactsFor\(/);
     expect(stripComments(SRC("lib/engines/emr/job-spec.ts")), "job-spec.ts 必须调 resolveRedshiftBinding").toMatch(/resolveRedshiftBinding\(/);

@@ -1,7 +1,6 @@
 "use client";
 
-// @kf-batch 50-WP30-decommission
-// 执行环境详情页「危险区」的路 B「下线销毁」(WORK-PACKAGES WP-30 ②原型 / INTERACTION §1.4 四道闸)。
+// 执行环境详情页「危险区」的「下线销毁」(②原型 / INTERACTION §1.4 四道闸)。
 //
 //   ① 停止承接(drain,要写原因)→ ② 影响预览(绑定 / 启用调度 / 运行中 run,三个数都为 0 才能申请)
 //   → 第一道弹窗(影响清单 + 将保留的数据资源)→ 第二道弹窗(**手输 region 名**才激活「确认删除」)
@@ -166,7 +165,7 @@ export default function DecommissionPanel({ target, onChanged }: { target: ExecE
   );
 
   const stage = preview.stage;
-  if (stage === "never-deployed") return null; // 路 A 的弃置区由父组件渲染
+  if (stage === "never-deployed") return null; // 弃置区由父组件渲染
 
   return (
     <div data-testid="exec-env-decommission-zone" data-stage={stage}>

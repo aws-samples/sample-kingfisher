@@ -1,4 +1,4 @@
-// 序 72 B-139 —— 预检扩展:信任策略不含服务主体 ⇒ 当场拒并指路;作业引用的外部桶 GetObject 被拒 ⇒ gap 点名桶 ARN(客户现网那条 403
+// 预检扩展:信任策略不含服务主体 ⇒ 当场拒并指路;作业引用的外部桶 GetObject 被拒 ⇒ gap 点名桶 ARN(客户现网那条 403
 // 在保存那一刻被量出来);模拟带 aws:RequestedRegion = 落点区;平台默认角色不量。只 mock 真外部(IAM)与落点解析器。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -51,7 +51,7 @@ const DEP = "s3://bigdata-pro-va-glue-assets/scripts/glue_sql_runner.zip";
 
 beforeEach(() => { h.trustDoc = trust("glue.amazonaws.com"); h.denied = new Set(); h.getRoleError = null; h.simulateCalls = []; process.env.AWS_ACCOUNT_ID = "123456789012"; });
 
-describe("序 72 预检扩展", () => {
+describe("预检扩展", () => {
   it("dependencyProbes:每个 URI ⇒ GetObject(对象)+ ListBucket(桶),去重,sid JobDependencyRead", () => {
     const p = dependencyProbes([DEP, "s3://bigdata-pro-va-glue-assets/scripts/other.zip", "nope"]);
     expect(p.map((x) => `${x.action} ${x.resource}`)).toEqual([

@@ -1,4 +1,3 @@
-// @kf-batch 50-P50.2c-control-api
 // deploy-control 单测(SPEC §2.1 deploy/build-status;DESIGN §12.4)。
 //
 // 【本文件的三条承重】
@@ -44,7 +43,7 @@ vi.mock("@aws-sdk/client-codebuild", () => ({
   },
 }));
 vi.mock("@aws-sdk/client-cloudformation", () => {
-  // P50.2f 起 deploy-control 改「按命名 SSOT 推定栈名、逐栈指名 DescribeStacks」(资源级授权下
+  // 起 deploy-control 改「按命名 SSOT 推定栈名、逐栈指名 DescribeStacks」(资源级授权下
   // 无参列举会被拒)。mock 语义随之:__cfnStacks = { 栈名 → StackStatus },指名查不存在 ⇒ 抛
   // "does not exist"(与真 CFN 一致);__cfnStacks 未设 ⇒ 一律抛通用错误(模拟 region 不可达)。
   class CloudFormationClient {
@@ -88,7 +87,7 @@ import {
   BUILD_STATUS_PLACE_VIA,
 } from "@/lib/exec-env/deploy-control";
 import type { ExecutionTarget } from "@/lib/exec-env/registry";
-// 序 31 第二刀 ②:账本走真实现(请求存储用最小替身)
+// 账本走真实现(请求存储用最小替身)
 import { __setRequestStoreProvider, decisionsOfCurrentRequest } from "@/lib/place/context";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -118,11 +117,11 @@ describe("🔴 契约:两侧字面量逐字一致(平台 ↔ infra 跨构建边�
     expect(plat).toContain(`project/${EXEC_ENV_PROJECT_NAME}`);
   });
 
-  // @kf-batch 50-WP15-airflow-serverless(T-7)—— 🔴 「代码用了的动作,角色必须给」跨构建边界钉死:
+  // 🔴 「代码用了的动作,角色必须给」跨构建边界钉死
   //   deploy-control.ts 每个 `XxxCommand`(client-codebuild)⇒ platform-stack.ts 必须出现 `codebuild:Xxx`。
   //   真环境撞过:verifyNoBuildForOperation 用 ListBuildsForProject、TaskRole 只给 BatchGet* ⇒ 查询失败被 fail-closed 吞成「无法查列表」,
   //   恢复照旧等 2h15m,页面上看不出是权限问题。同类教训见 memory cognito-taskrole-missing-disable-enable。
-  it("🔴 T-7:deploy-control 用到的每个 CodeBuild 命令都在 platform-stack.ts 的 TaskRole 授权里", () => {
+  it("🔴 deploy-control 用到的每个 CodeBuild 命令都在 platform-stack.ts 的 TaskRole 授权里", () => {
     const src = readFileSync(resolve(REPO, "platform/src/lib/exec-env/deploy-control.ts"), "utf8");
     const plat = readFileSync(resolve(REPO, "infra/lib/platform-stack.ts"), "utf8");
     const importBlock = src.match(/import \{([^}]*)\} from "@aws-sdk\/client-codebuild";/);
@@ -134,7 +133,7 @@ describe("🔴 契约:两侧字面量逐字一致(平台 ↔ infra 跨构建边�
     }
   });
 
-  it("🔴 P50.3b-2b:EXEC_ENV_BUILD_TIMEOUT_MS 与 infra 的 CodeBuild 项目超时逐字一致", () => {
+  it("🔴 2b:EXEC_ENV_BUILD_TIMEOUT_MS 与 infra 的 CodeBuild 项目超时逐字一致", () => {
     // 【为什么是承重】它是 `startUncertain`(无 buildId 可查)恢复窗的**结构性依据**:
     // CodeBuild 到 timeoutInMinutes 必杀 build ⇒ 超过它,那次会话不可能还有 build 在跑(SPEC §3.5b ③)。
     // 若 infra 把超时改大而这里没跟上,恢复窗就会**早于**build 真正被杀 ⇒ 清锁后可能撞上还在跑的部署。
@@ -144,7 +143,7 @@ describe("🔴 契约:两侧字面量逐字一致(平台 ↔ infra 跨构建边�
     expect(EXEC_ENV_BUILD_TIMEOUT_MS).toBe(Number(m![1]) * 60 * 60 * 1000);
   });
 
-  it("🔴 P50.3b-2b:broker LOCK_LEASE_MS ≥ 项目超时 + 裕度(诊断量不得比合法长 build 还短)", () => {
+  it("🔴 2b:broker LOCK_LEASE_MS ≥ 项目超时 + 裕度(诊断量不得比合法长 build 还短)", () => {
     // 90min < 2h 的原值正是隐患:合法的 100 分钟 build 会显示成"已过期",
     // 诱使后人把 `OR deployLockExpiresAt < :now` 那条 fail-open 条件加回来(DESIGN §20.25)。
     const broker = readFileSync(resolve(REPO, "infra/lambda/exec-env-broker/index.mjs"), "utf8");
@@ -154,7 +153,7 @@ describe("🔴 契约:两侧字面量逐字一致(平台 ↔ infra 跨构建边�
     expect(leaseMs).toBeGreaterThanOrEqual(EXEC_ENV_BUILD_TIMEOUT_MS + RECOVERY_NO_BUILD_MARGIN_MS);
   });
 
-  it("🔴 P50.3b-2b:TERMINAL_FAILED_BUILD_STATUSES = broker 终态集 去掉 SUCCEEDED(跨边界同源)", () => {
+  it("🔴 2b:TERMINAL_FAILED_BUILD_STATUSES = broker 终态集 去掉 SUCCEEDED(跨边界同源)", () => {
     const v = readFileSync(resolve(REPO, "infra/lambda/exec-env-broker/validate.mjs"), "utf8");
     const m = v.match(/TERMINAL_BUILD_STATUS\s*=\s*new Set\(\[([^\]]+)\]\)/);
     expect(m, "broker 里找不到 TERMINAL_BUILD_STATUS").not.toBeNull();
@@ -217,7 +216,6 @@ describe("invokeDeployBroker", () => {
     await expect(invokeDeployBroker("t", ["core"], "op_x")).rejects.toThrow(/没给 buildId/);
   });
 
-  // @kf-batch 50-init-deploy-mechanism
   it("🔴 broker Lambda 不存在(ResourceNotFoundException / Function not found)⇒ 抛「部署机制未就位」+ 修法(2026-09-06 新账号真撞)", async () => {
     const err = Object.assign(new Error("Function not found: arn:aws:lambda:us-east-1:123456789012:function:bgp-exec-env-broker"), { name: "ResourceNotFoundException" });
     lambdaSend.mockRejectedValueOnce(err);
@@ -322,7 +320,7 @@ describe("readBuildStatus(§12.4:phase 粗粒度 + 逐栈来自目标 region CFN
     expect(cbSend).not.toHaveBeenCalled();
   });
 
-  it("🔴 region 不可达(未 bootstrap / IAM 未扩)⇒ 候选栈标 UNKNOWN 留痕,phase 仍在(P50.2f:不再静默空)", async () => {
+  it("🔴 region 不可达(未 bootstrap / IAM 未扩)⇒ 候选栈标 UNKNOWN 留痕,phase 仍在(不再静默空)", async () => {
     cbSend.mockResolvedValueOnce({ builds: [{ buildStatus: "IN_PROGRESS" }] });
     // __cfnStacks 未设 ⇒ mock 一律抛通用错误(非 does not exist)
     const r = await readBuildStatus(TARGET);
@@ -350,7 +348,7 @@ describe("readBuildStatus(§12.4:phase 粗粒度 + 逐栈来自目标 region CFN
     expect(r.logsTail).toBe("");
   });
 
-  // @kf-batch 50-WP31-place-first-class —— 序 31 第二刀 ②:逐栈进度查**目标区** CloudFormation(控制面服务但客户端不在主控区
+  // 逐栈进度查**目标区** CloudFormation(控制面服务但客户端不在主控区
   //   ⇒ 观测器不豁免),GET build-status 路由原来一笔决策都没有 ⇒ 第四十轮 observe 未归因榜「cloudformation build-status」。
   it("🔴 readBuildStatus 在第一个 await 之前记落点决策 {targetId}(请求外调用无账本 ⇒ 不记不抛)", async () => {
     const store = { headers: new Headers() };

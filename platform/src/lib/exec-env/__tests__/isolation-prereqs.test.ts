@@ -1,5 +1,4 @@
-// @kf-batch 50-WP9a-durable-jobs
-// 进 isolated 的四项服务端前置(WP-9 ④-3 末句)—— 每一项都必须能**单独**把门关上,且「拿不准」一律算不满足。
+// 进 isolated 的四项服务端前置(④-3 末句)—— 每一项都必须能**单独**把门关上,且「拿不准」一律算不满足。
 // 只 mock 真外部(DDB 假表 / FakeAws / 项目台账);注册表真跑(描述符就是假表里的一行);供给层的在用项目口径、canary 最新结果、CloudWatch 求和都真跑。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { FakeDdb, DDB_SPECS } from "../../dataplane-jobs/__tests__/fake-ddb";
@@ -70,11 +69,11 @@ describe("🔴 进 isolated 的前置:四项都满足才放行", () => {
     expect(v.projects).toEqual([PID]);
   });
 
-  it("🔴 产物扫描用默认实现(9b 之前)⇒ 一定不满足,并说明归 WP-9b", async () => {
+  it("🔴 产物扫描用默认实现(9b 之前)⇒ 一定不满足,并说明另有归属", async () => {
     const v = await evaluateIsolationPrereqs(TID, 5, NOW);
     expect(v.ok).toBe(false);
     expect(v.failures.map((f) => f.key)).toEqual(["artifact-scan"]);
-    expect(v.failures[0].message).toMatch(/WP-9b/);
+    expect(v.failures[0].message).toMatch(/产物凭证扫描尚未实现/);
   });
 
   it("产物里还有 admin ARN ⇒ 不满足", async () => {

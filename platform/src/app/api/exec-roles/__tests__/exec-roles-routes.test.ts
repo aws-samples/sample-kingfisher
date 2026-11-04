@@ -1,4 +1,4 @@
-// 序 72 B-139 —— 两条接口的入口判据:登录即可用(401)· engine 闭合清单(400)· 落点点名(缺 ⇒ 400,不默认主控区)·
+// 两条接口的入口判据:登录即可用(401)· engine 闭合清单(400)· 落点点名(缺 ⇒ 400,不默认主控区)·
 //   IAM 没权限 ⇒ 502 UPSTREAM_ERROR 点名升级 · 预检接口形态错 400 / 平台默认不需要预检。只 mock 身份与 lib 单一作者(路由是薄封装)。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";

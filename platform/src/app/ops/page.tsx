@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 34 — 运维大屏 /ops。只读、深色投屏风格、自动刷新。复用自绘 SVG 图表
+// 运维大屏 /ops。只读、深色投屏风格、自动刷新。复用自绘 SVG 图表
 // (Donut/TrendArea/Gauge/GanttTimeline + 最近告警列表),数据来自 /api/ops/summary 一次聚合。
 // 全局 fetch 拦截器自动带 Authorization + x-bgp-project(见 AuthProvider)。
 
@@ -9,7 +9,7 @@ import { Card, Row, Col, Statistic, Tag, Select, Button, Spin, Empty, Space, Typ
 import { FundProjectionScreenOutlined, ReloadOutlined, BellOutlined, AlertOutlined } from "@ant-design/icons";
 import { Donut, TrendArea, Gauge, GanttTimeline, BarList, type Slice, type GanttRow } from "@/components/dashboard/charts";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-19):大屏按区。
+// 执行范围:大屏按区。
 // 🔴 大屏原来是全平台一锅端,而它恰恰最需要按区看:一个区成功率塌了,混进另一个区的健康数据后
 // 大屏上还是一片绿(与告警池化同一个病,只是这里表现为「看不出来」)。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -31,15 +31,14 @@ const RISK_COLOR: Record<string, string> = { green: "#2dd4bf", yellow: "#e0a23c"
 export default function OpsScreenPage() {
   const t = useT();
   const [data, setData] = useState<any>(null);
-  const [riskBoard, setRiskBoard] = useState<any>(null); // 43-B SLA 风险看板(独立 fetch,不改模块34聚合)
+  const [riskBoard, setRiskBoard] = useState<any>(null); // 43-B SLA 风险看板(独立 fetch,不改聚合)
   const [loading, setLoading] = useState(true);
   const [interval, setIntervalMs] = useState(0); // 0=手动;否则毫秒
   const timerRef = useRef<any>(null);
-  // @kf-batch 50-WP4ter-coverage
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
-  // @kf-batch 50-WP4quater-reads(工单 SC-15 已闭环)—— 两张 SLA 卡已按区,不再需要「全部区域」标注。
+  // (已闭环)—— 两张 SLA 卡已按区,不再需要「全部区域」标注。
   // 🔴 保留一个开关位:基线里仍可能有**落章之前学出来的行**(没有区维),那种行由接口回的
   // `legacy: true` 逐行标注 —— 整卡级的免责标注撤掉,免得把已经修好的事说成没修。
   const hasLegacyBaseline = (riskBoard?.baselineTop || []).some((b: any) => b?.legacy);
@@ -49,7 +48,7 @@ export default function OpsScreenPage() {
       const res = await fetch(`/api/ops/summary${scopeQs}`).then((x) => x.json());
       if (res?.success) setData(res.data);
       // 43-B:独立拉 SLA 风险看板(失败不影响主大屏)。
-      // @kf-batch 50-WP4quater-reads(工单 SC-15 已闭环)—— 风险看板与基线偏离 Top 现在都按区:
+      // (已闭环)—— 风险看板与基线偏离 Top 现在都按区
       // SLA 行的区维派生自绑定对象,基线摊平成「任务 × 区」后再排 Top(原来是跨区排序,
       // 同一个任务在 usw2 慢、在主控区快 ⇒ 合计 p90 落在中间,真正的慢链路两边都上不了榜)。
       fetch(`/api/sla/risk-board${scopeQs}`).then((x) => x.json()).then((r) => { if (r?.success) setRiskBoard(r.data); }).catch(() => {});
@@ -152,7 +151,7 @@ export default function OpsScreenPage() {
             </Col>
           </Row>
 
-          {/* 43-B SLA 风险看板(预测破线,破线前预警)——独立卡,不改模块34现有卡 */}
+          {/* 43-B SLA 风险看板(预测破线,破线前预警)——独立卡,不改现有卡 */}
           <Row gutter={16}>
             <Col span={14}>
               <Card size="small" title={<Space size={6}><AlertOutlined /> {t("SLA 风险看板")}

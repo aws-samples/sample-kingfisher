@@ -1,7 +1,6 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
 // run 的**归属判定**(读侧)—— 与写侧的 `resolveRunStamp` 成对:一个决定章怎么盖,一个决定谁看得见。
 //
-// 合同:52 SPEC §1(task-runs 加 projectId,读侧带 legacy 兜底)· P52.1 定下的
+// 合同:52 SPEC §1(task-runs 加 projectId,读侧带 legacy 兜底) 定下的
 //      「by-id 一律按**资源归属项目**判,不按调用方的 active project」。
 //
 // ── 为什么需要它(不是所有读路径都能用 projectFilter)────────────────────────────
@@ -9,7 +8,7 @@
 //  · **列表型**(monitor/runs)→ Scan + `projectFilter()` 就够;
 //  · **按 taskId 直取型**(Copilot `check_run_status`、诊断取证、日志)→ 主键 Query,
 //    此时**不能**加 `FilterExpression`:它会与 `Limit` 撞成"过滤在截断之后"的静默少报
-//    (P52.1 在 `redshift/history`、本批在 `monitor/runs` 都修过这个陷阱)。
+//    (在 `redshift/history`、本批在 `monitor/runs` 都修过这个陷阱)。
 //    ⇒ 正确做法是**先判任务归谁**,再原样取它的 run —— 与 `guardResourceAccess` 同一条判据。
 //
 // 🔴 现网实测缺口(本批逮到):`lib/copilot/plan/discovery-tools.ts` 的 `check_run_status`

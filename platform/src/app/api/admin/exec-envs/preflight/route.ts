@@ -1,7 +1,6 @@
-// @kf-batch 50-WP16-zero-egress
 // 🔴 **已下线**:GET /api/admin/exec-envs/preflight(EIP 配额预检)。
-// 执行环境自 WP-16 起零出网(SPEC §3.16):不建 NAT、不占 EIP ⇒ 预检没有对象。
-// 与 WP-1「数据服务下线」同一处置口径:**保留路由并回 410**,而不是删掉路由 —— 让还在调它的旧前端
+// 执行环境零出网(SPEC §3.16):不建 NAT、不占 EIP ⇒ 预检没有对象。
+// 与「数据服务下线」同一处置口径:**保留路由并回 410**,而不是删掉路由 —— 让还在调它的旧前端
 // 拿到一句能读懂的话,而不是一个 404(404 会被当成部署坏了)。
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";

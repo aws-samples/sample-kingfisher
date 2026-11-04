@@ -1,5 +1,4 @@
-// @kf-batch 50-WP15-airflow-serverless(施工序 6)
-// 页面〔触发一次〕(ACCEPTANCE S-7):对**已发布**的 target 立刻跑一次调度产物 —— 按台账 `deployments[targetId].scheduler` 分路:
+// 页面〔触发一次〕(ACCEPTANCE):对**已发布**的 target 立刻跑一次调度产物 —— 按台账 `deployments[targetId].scheduler` 分路
 //   serverless ⇒ StartWorkflowRun(RunType ON_DEMAND);经典 mwaa ⇒ 该区 Airflow `dags trigger <dag_id>`。
 // 🔴 触发 ≠ 发布:没发布过的 target 如实 skipped,不会顺手去建产物(那是〔发布到 MWAA 调度〕的地盘)。
 // 🔴 ETL / EMR 两条作业线共用本文件(唯一作者);路由只做取数 → 调这里 → 记审计。

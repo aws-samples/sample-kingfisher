@@ -1,5 +1,4 @@
-// @kf-batch 50-WP31-place-first-class
-// B-35 后一半(2026-10-11 真环境无头坐实):「缺 targetId ⇒ 400」对了,但「**不存在**的 targetId」仍静默回落主控区 ——
+// 后一半(2026-10-11 真环境无头坐实):「缺 targetId ⇒ 400」对了,但「**不存在**的 targetId」仍静默回落主控区
 //   `/api/flink/meta?targetId=tgt_nope_zz` ⇒ 200 + 主控区 region;模型目录 ⇒ 200 + 主控区 Bedrock 清单;
 //   治理规则 / 分级 / 直查任务 / 直查历史 ⇒ 写下 `tgt_nope_zz` 的孤儿记录;列库 ⇒ 回主控区默认库名 `dev`;生成建表语句 ⇒ 200 降级。
 // 根治 = 读 / 写元数据的入口点名一个**已注册且装好**的执行环境的唯一作者 `requestedRegisteredPlace`(不存在 ⇒ 409)。
@@ -110,7 +109,7 @@ describe("requestedRegisteredPlace:点名 + 已注册 + 装好(唯一作者)", (
   });
 });
 
-describe("🔴🔴 B-35 入口:不存在的 targetId ⇒ 409,不回主控区的值、不写孤儿记录", () => {
+describe("🔴🔴 入口:不存在的 targetId ⇒ 409,不回主控区的值、不写孤儿记录", () => {
   const NOPE = "tgt_nope_zz";
   const post = (path: string, body: unknown, method = "POST") =>
     new NextRequest(`http://x${path}`, { method, body: JSON.stringify(body), headers: { "Content-Type": "application/json" } });

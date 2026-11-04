@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 44 — 执行计划表卡片(唯一真实来源,两处复用:Copilot 抽屉内嵌 + /copilot/plans 独立页)。
+// 执行计划表卡片(唯一真实来源,两处复用:Copilot 抽屉内嵌 + /copilot/plans 独立页)。
 // 拍板①:同一组件,compact 控制形态——抽屉里紧凑 + "展开看大图"跳转;独立页里全展开步骤矩阵。
 // 绝不写两套 UI 逻辑(防漂移)。消费同一份计划数据(GET /api/copilot/plan/[planId]),同一套确认动作。
 //

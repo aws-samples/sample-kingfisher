@@ -1,4 +1,4 @@
-// 模块 44 → 45 迁移兼容层。配方注册表已提升为平台级 lib/cookbook/registry + retrieve。
+// → 45 迁移兼容层。配方注册表已提升为平台级 lib/cookbook/registry + retrieve。
 // 保留 Copilot 侧现有调用签名(planner 的 allDialectRulesForPrompt、discovery-tools 的 getCookbook/listRecipeEngines),
 // 委托平台级实现,行为等价。新代码请直接用 @/lib/cookbook 的 retrieve/dialectRulesFor 等。
 

@@ -1,6 +1,5 @@
-// @kf-batch 50-WP31-place-first-class
-// WP-31 L4 —— 唯一读区作者 lib/place/home-region.ts 的三态判据(+ 不回落版本 + 注入 env 版本)。
-// 🔴 「都没有」那一态现在钉的是 `us-east-1` 回落(本包行为不变);序 6 改成「缺即抛」时这一条要同笔改成 toThrow。
+// L4 —— 唯一读区作者 lib/place/home-region.ts 的三态判据(+ 不回落版本 + 注入 env 版本)。
+// 🔴 「都没有」那一态现在钉的是 `us-east-1` 回落(本包行为不变);改成「缺即抛」时这一条要同笔改成 toThrow。
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -34,7 +33,7 @@ describe("homeRegion():BGP_HOME_REGION → AWS_REGION → us-east-1", () => {
     expect(homeRegionOrEmpty()).toBe("eu-west-1");
   });
 
-  it("两者都有 ⇒ BGP_HOME_REGION 赢(序 6 把 AWS_REGION 设空串后仍拿得到主控区)", () => {
+  it("两者都有 ⇒ BGP_HOME_REGION 赢(把 AWS_REGION 设空串后仍拿得到主控区)", () => {
     process.env.BGP_HOME_REGION = "us-west-2";
     process.env.AWS_REGION = "us-east-1";
     expect(homeRegion()).toBe("us-west-2");
@@ -45,7 +44,7 @@ describe("homeRegion():BGP_HOME_REGION → AWS_REGION → us-east-1", () => {
     expect(homeRegionOrEmpty()).toBe("");
   });
 
-  it("空串当作没有(与迁移前 `process.env.AWS_REGION || …` 逐字节一致;序 6 的「设空串」正是靠这一点)", () => {
+  it("空串当作没有(与迁移前 `process.env.AWS_REGION || …` 逐字节一致;「设空串」正是靠这一点)", () => {
     process.env.BGP_HOME_REGION = "";
     process.env.AWS_REGION = "";
     expect(homeRegion()).toBe("us-east-1");

@@ -1,7 +1,6 @@
-// @kf-batch 52-P52.5a-supply
 // per-project 凭证的**供给层**(50 SPEC §3.9b「进 `isolated` 的前置」+ 52 SPEC §3.4)。
 //
-// 这一层是 P52.5a 的目的本身:把「target 上每个在用项目都有自己的 Redshift 身份」
+// 这一层是 目的本身:把「target 上每个在用项目都有自己的 Redshift 身份」
 // 从合同文字变成可执行的一串步骤,并给状态机的 `isolated` 前置提供**服务端能自证的那部分**证据。
 //
 // 🔴 **步骤顺序不是风格,是依赖**;而且这个顺序被**真环境改过两次**,两次都是真跑才发现:
@@ -38,7 +37,7 @@ import {
   type AdminDdlSubmission,
   type AuthenticatedActor,
 } from "@/lib/exec-env/admin-ddl-executor";
-// @kf-batch 50-WP9a-durable-jobs —— 供给作业化(handler 接口 + 入队;写表只经 store)
+// 供给作业化(handler 接口 + 入队;写表只经 store)
 import { pollWithin, type JobHandler, type StepContext, type StepResult } from "@/lib/dataplane-jobs/handler";
 import { createJob, getJob } from "@/lib/dataplane-jobs/store";
 import {
@@ -58,7 +57,7 @@ const RESOURCE_TABLES: readonly string[] = [
 ];
 const USER_ID = "default-user"; // 单租户分区键(与各 by-id 路由一致)
 
-// @kf-batch 50-WP9a-durable-jobs —— 🔴 原来这里是同步入口 `provisionProjectCredential`(一个请求里六步原地跑完)。
+// 🔴 原来这里是同步入口 `provisionProjectCredential`(一个请求里六步原地跑完)。
 //   它唯一的生产调用方 `POST .../provision-credentials` 已改成 202 + 作业 id(跨区 504 的根治),
 //   留着它 = 一份没有调用方、而且与作业 handler 各写一遍步骤序的代码(两个作者)。⇒ 删除;
 //   步骤序的唯一作者是下面的 `SUPPLY_STEPS`,执行体是 `supplyJobHandler`(门禁见 project-cred-supply.test.ts)。
@@ -80,7 +79,7 @@ export function isAlreadyExists(e: unknown): boolean {
  * 该 target 上「在用项目」的清单(§3.9b 进 `isolated` 的前置要按它逐个核凭证)。
  *
  * 🔴 **如实说明口径来源**:52/50 的项目台账里**没有** project→target 绑定字段
- * (`Project` 只有 id/name/owner/时间戳;绑定作为一等概念随 **P50.3** 落地)。
+ * (`Project` 只有 id/name/owner/时间戳;绑定作为一等概念落地)。
  * 所以这里的口径是从**现实**推的,而不是编一个字段:
  *   · **home**:当前架构下每个项目的默认执行落点就是 home ⇒ 全部项目都算在用。
  *     宁可**多算** —— 多算只会让 `isolated` 的门更严,少算才会放过没凭证的项目。
@@ -166,11 +165,11 @@ export async function verifyProjectCredentials(
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 50-WP9a-durable-jobs —— 供给**作业化**(WORK-PACKAGES WP-9 施工序 2)
+// 供给**作业化**
 // ══════════════════════════════════════════════════════════════════════════════
 //
 // 🔴 为什么:`provisionProjectCredential` 是同步的 —— 一个 HTTP 请求里 N 个项目 × ~10 条语句,
-//    每条原地轮询到终态。跨区时直接撞 ALB 504(WP-9 ② 第 2 行),而且**断在中间没有任何记录**:
+//    每条原地轮询到终态。跨区时直接撞 ALB 504(② 第 2 行),而且**断在中间没有任何记录**:
 //    重点一次就从头再来(口令再轮换一遍)。作业化之后:
 //    · 每个 (target, project) 一条作业,确定性 jobId ⇒ 双击 / 重放只入队一条;
 //    · 每一步做完就存档(步骤游标 + 已提交的 statementId),进程被杀后接着做**下一步**,
@@ -376,7 +375,7 @@ export interface SweepSummary {
 }
 
 /**
- * 「绑定即自动供给」(WP-9 ⑨-6,systemActor)。
+ * 「绑定即自动供给」(⑨-6,systemActor)。
  *
  * 🔴 为什么是周期补队、而不是在每个「建任务」的路由里各插一句入队:绑定没有一等概念 ——
  *    「在用项目」是从四张资源表推出来的(`listProjectsWithBindings` 是唯一口径)。在每个写入点插入队 =

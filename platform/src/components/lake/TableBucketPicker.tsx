@@ -1,10 +1,10 @@
 "use client";
-// 序 45(客户 2026-10-16 待改进项 B-93)—— S3 Tables 表桶下拉,唯一作者:
+// (客户 2026-10-16 待改进项)—— S3 Tables 表桶下拉,唯一作者
 //   同步任务「S3 Tables 数据湖配置 → Table Bucket」与系统设置「数据湖外部表桶 → 登记」共用。
 //   清单来自 GET /api/admin/lake-buckets/candidates?targetId=(只读 ListTableBuckets,lib/lake/table-bucket-candidates)。
 //   用 AutoComplete 而不是 Select:清单拉不到(SCP 拒 / 区不可达)时仍能手填,不把用户堵死;选项上标出「该区平台表桶」「已登记」。
 //   🔴 落点必须显式给(targetId 空 = 还不知道在哪个区,不拉、不猜主控区)。
-// @kf-batch 56-B127-exec-env-own-table-bucket —— 写意图(同步向导)下:既不是平台表桶也没登记的桶打「未登记」标;选中 / 手填了这样的桶
+// 写意图(同步向导)下:既不是平台表桶也没登记的桶打「未登记」标;选中 / 手填了这样的桶
 //   就在输入框下方给出可点提示(非主控区:保存 / 启动会被拒,去登记;主控区:能写但直查 / 治理 / 问数看不到,建议登记)。
 //   改动前用户要到「完成」/「启动」被 409 才知道,文案还只说「与执行环境的表桶不一致 ⇒ 拒绝」,没有下一步(客户 2026-10-27 反馈)。
 import React, { useEffect, useMemo, useState } from "react";
@@ -32,7 +32,7 @@ export interface TableBucketPickerProps {
    */
   writeIntent?: boolean;
   /** 🔴 Form.Item 经 cloneElement 注入的字段 id(如 `s3Config_tableBucket`)—— 必须原样落到输入框上:
-   *  标签 htmlFor 靠它聚焦、校验提示的 aria 关联靠它,换成本组件之前那个 Input 也一直带着它(序 45 首版漏传 ⇒ `#s3Config_tableBucket` 消失) */
+   *  标签 htmlFor 靠它聚焦、校验提示的 aria 关联靠它,换成本组件之前那个 Input 也一直带着它(首版漏传 ⇒ `#s3Config_tableBucket` 消失)*/
   id?: string;
   "data-testid"?: string;
 }

@@ -1,4 +1,3 @@
-// @kf-batch 50-G2
 // Redshift 统一执行身份（admin 超级用户密钥）。
 //
 // 平台所有 Redshift Data API 调用（ETL 作业、调度 DAG、Redshift 查询页、GenBI、指标、质量）
@@ -8,7 +7,7 @@
 //   2) 行为可预期。
 // 解析失败（无密钥）时回退到调用者的联邦身份（本地/无密钥环境）。
 //
-// ── 🔴 G6(模块 50)改造:进程级**单值**缓存 → **复合键**缓存 ───────────────────────
+// ── 🔴 G6改造:进程级**单值**缓存 → **复合键**缓存 ───────────────────────
 // 原状:`let _arn` 是一个进程级单值。单 region + 单 project 时它是对的;一旦多 target,
 // **第一个 target 解析出的 secret 会被所有 target 复用** —— 那是跨边界串值,
 // 而且不会报错、只会"看起来正常地连到别的区域"。
@@ -18,13 +17,13 @@
 // 🔴 **本次改造刻意不改函数签名、不改 home 行为**:既有的 **16 处调用表达式、分布 14 个文件** 一处未动(SPEC §S10 明确把
 // (🔴 数字口径:`node scripts/ast-count-callsites.mjs getRedshiftSecretArn`,**AST 计数、不含测试、不含定义文件自引用**。
 //  此处原写 17/15 是错的 —— 用 grep 数会把注释里出现的函数名也算进去,外部审核 v2 P2-3 已坐实。)
-// 「禁裸调 getRedshiftSecretArn」这条 lint 推迟到 P52.5a)。无参调用 == 从前的 home 路径,
+// 「禁裸调 getRedshiftSecretArn」这条 lint 推迟到)。无参调用 == 从前的 home 路径,
 // 逐字节等价:同一个 env、同一个 DescribeSecret、同样缓存负结果。
 // 非 home target **不在本函数职责内**(它不该从 env 猜别的区域的 secret)⇒ 显式抛错并指向
 // `getPrivilegedCred`(§3.9)。G 阶段无人传非 home,故行为变化为 0。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 import { credCacheKey, ProcessCache } from "@/lib/exec-env/cred-cache";
@@ -42,7 +41,7 @@ const arnCache = new ProcessCache<string>();
 const PURPOSE = "legacy-single-admin";
 
 // ══════════════════════════════════════════════════════════════════════════════
-// @kf-batch 52-P52.5a-supply —— per-project 身份的**接线开关**
+// per-project 身份的**接线开关**
 //
 // 用户 2026-09-03 拍板「一笔做完,用 env flag 兜」,并明确接受代价:
 // **flag 是永久分叉点,两条身份路径都要长期维护和测试**。所以这里有两条硬纪律:
@@ -56,7 +55,7 @@ const PURPOSE = "legacy-single-admin";
 // 「🔴 【绝不】走 lookupProjectSecretArn(它们本无 project ⇒ 会被误判 fail-closed)」)。
 //
 // 🔴 **flag=on 不等于"随时可以开"**:per-project 身份只看得见 `proj_<id>` 与 `shared`,
-// 而现网数据仍在 `public`(数据面搬迁是 **P52.5b**)。⇒ 开 flag 的正确前提是 P52.5b 已落。
+// 而现网数据仍在 `public`(数据面搬迁是)。⇒ 开 flag 的正确前提是已落。
 // 这条约束如实写在这里,不靠"验收时再发现"。
 // ══════════════════════════════════════════════════════════════════════════════
 

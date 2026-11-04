@@ -1,4 +1,4 @@
-// @kf-batch 37-emr-run-date —— 调度执行体(MWAA Serverless 运行时 / 经典 DAG)在 **Python 里**算业务日期参数的单一出口。
+// 调度执行体(MWAA Serverless 运行时 / 经典 DAG)在 **Python 里**算业务日期参数的单一出口。
 //
 // 取值表**不在这里**:只有 `bgp_sync_run_vars`(lib/sync/run-vars-py.ts)一份,这里只把它整形成两种参数形态
 // (与 TS 侧 lib/etl/run-params.ts 的 `runParamArguments` / `runParamArgv` 逐项同值,parity 判据用真 python3 逐日比对):
@@ -10,7 +10,7 @@ import { SYNC_RUN_VARS_PY } from "@/lib/sync/run-vars-py";
 
 export const RUN_PARAMS_PY = `${SYNC_RUN_VARS_PY}
 
-# ── 序 37:业务日期参数形态(平台生成;取值表 = 上面的 bgp_sync_run_vars,与平台 TS 侧 runParamArguments / runParamArgv 同源)──
+# ── 业务日期参数形态(平台生成;取值表 = 上面的 bgp_sync_run_vars,与平台 TS 侧 runParamArguments / runParamArgv 同源)──
 def bgp_run_param_args(ds):
     # Glue start_job_run 的 Arguments:{"--ds": "...", ...}(15 个键,顺序与取值表相同)
     if not isinstance(ds, str) or not re.match(r"^\\d{4}-\\d{2}-\\d{2}$", ds):

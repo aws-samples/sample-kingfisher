@@ -1,4 +1,4 @@
-// 模块 33-A — 引擎注册表（表驱动，照抄 lib/versions/version-service.ts:24-37）。
+// 引擎注册表（表驱动，照抄 lib/versions/version-service.ts:24-37）。
 // 加引擎 = 这张表加一行 + 独立目录纯增量；老代码零改动。
 
 import type { EngineProvider } from "./spi";

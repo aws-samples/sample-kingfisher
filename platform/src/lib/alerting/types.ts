@@ -1,4 +1,4 @@
-// 模块 34 — 智能运维 / 统一告警中心：类型单一事实源。
+// 智能运维 / 统一告警中心：类型单一事实源。
 //
 // 告警规则(AlertRule)+ 通知通道(AlertChannel)+ 告警事件(AlertEvent)。规则匹配的对象是
 // 共享运行台账 bgp-task-runs 的终态运行；命中后写事件(幂等)+ 分发到通道(钉钉/企微/邮件/通用)。
@@ -23,7 +23,7 @@ export interface AlertCondition {
   thresholdPercent?: number; // success-rate 用(低于则告警)
   windowMinutes?: number; // success-rate / no-run 的滚动窗口
   /**
-   * @kf-batch 50-WP4ter-coverage(工单 SC-10;合同 INTERACTION §4sexies「默认按区分别评估」)
+   * (合同 INTERACTION §4sexies「默认按区分别评估」)
    *
    * 聚合类条件(`success-rate` / `no-run`)的评估口径:
    * · `per-target`(**缺省**)= **每个执行环境各算一遍**,各自独立去重;
@@ -46,7 +46,6 @@ export interface AlertScope {
   taskType: ScopeTaskType;
   taskId?: string; // 留空=该类型全部；填=只盯这一个任务
   /**
-   * @kf-batch 50-WP4ter-coverage(工单 SC-10)
    * 只盯这几个执行环境(留空 = 全部)。🔴 与 `evaluation` 是两件事:
    * 本字段决定**看哪些区**,`evaluation` 决定**怎么算**(合起来 or 各算一遍)。
    */
@@ -64,7 +63,7 @@ export interface AlertRule {
   condition: AlertCondition;
   severity: Severity;
   channelIds: string[]; // 命中后通知哪些通道
-  enrichWithDiagnosis: boolean; // 失败类是否自动挂 AI 诊断(复用模块25)
+  enrichWithDiagnosis: boolean; // 失败类是否自动挂 AI 诊断(复用)
   silenced: boolean; // 静默开关(临时噤声,不删规则)
   lastEvaluatedAt?: string; // 水位：只评估此时间之后的终态运行
   createdBy: string;
@@ -119,7 +118,7 @@ export interface AlertEvent {
   projectId: string;
   status: EventStatus;
   dedupeKey: string; // "run#<runId>" | "win#<bucket>#<targetId>"(聚合类按区去重,见 AlertCondition.evaluation)
-  /** @kf-batch 50-WP4ter-coverage —— 这条告警属于哪个执行环境(池化评估的事件没有此字段) */
+  /** 这条告警属于哪个执行环境(池化评估的事件没有此字段) */
   targetId?: string;
   message: string; // 中文成品串(webhook 投递 + 兜底显示)
   msgKey?: string; // i18n 模板 key(前端按当前语种 t(msgKey, msgParams) 渲染)
@@ -130,7 +129,7 @@ export interface AlertEvent {
     runId?: string;
     taskType?: string;
     metricValue?: number; // 触发时的度量值(时长/成功率等)
-    /** @kf-batch 50-WP4ter-coverage —— 值班第一个问题是「哪个区挂了」⇒ 必须带 */
+    /** 值班第一个问题是「哪个区挂了」⇒ 必须带 */
     targetId?: string;
   };
   diagnosisId?: string; // 若挂了 AI 诊断

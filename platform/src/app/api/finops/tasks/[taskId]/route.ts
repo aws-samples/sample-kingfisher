@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { listCostRuns } from "@/lib/finops/store";
-// @kf-batch 50-WP6-cost-by-region —— 排行按 (task, target) 分行后,展开明细要只看**那一行**的执行环境:
+// 排行按 (task, target) 分行后,展开明细要只看**那一行**的执行环境
 // 每条 run 回带 `effectiveTargetId`(归属判定 = 范围过滤同一条规则 `scalarTargetOf`,存量无章行归主控区),
 // 前端按它等值筛 —— 不在前端再写一遍「缺章 ⇒ 主控区」的规则(那会成为第二个作者)。
 import { scalarTargetOf } from "@/lib/exec-env/scope";

@@ -31,7 +31,7 @@ describe("cookbook retrieve — 打分 + topK(控 token)", () => {
     expect(slice.recipes.every((r) => r.engine === "redshift")).toBe(true);
   });
 
-  // P45.2 后词表升级:留存/roi 从 aggregate 分出各自专属能力(有了专属配方)。
+  // 后词表升级:留存/roi 从 aggregate 分出各自专属能力(有了专属配方)。
   it("同义词归一到各自专属能力词", () => {
     expect(normalizeCapability("留存")).toBe("retention");   // 有 retention-funnel 配方
     expect(normalizeCapability("roi")).toBe("ctas-aggregate"); // ROI 归聚合建表

@@ -1,7 +1,6 @@
-// @kf-batch 50-WP28-platform-action-node
 // 🔴🔴 **「按时跑一次平台动作」的合同** —— 命令行形状 + 可下发动作的**白名单**(安全边界)。
 //
-// 【为什么需要它(WP-28 立包勘定)】造数 / 治理 / 问数三条「下发执行」缺口是**同一件事的三个实例**:
+// 【为什么需要它(立包勘定)】造数 / 治理 / 问数三条「下发执行」缺口是**同一件事的三个实例**:
 //   「按时跑一次**平台**动作」。而调度运行期(MWAA Serverless 里的 DAG)只有 boto3:
 //   `_exec_sql` 直连 Redshift Data API、`_exec_sync` 直接 `glue.start_job_run`。
 //   平台**没有任何机器身份入口**(`guardResourceAccess` 一律要一个登录身份)。
@@ -12,7 +11,7 @@
 // 【为什么传输是 DynamoDB,不是 SQS】用户 2026-09-20 拍的是「消费端 = 主控区的 Lambda」,这一点不变。
 //   而**传输**必须是 DDB:`infra/lib/exec-env/endpoints.ts` 写得很明确 ——
 //   「要经跨区私网通路回主控区的服务:目前**只有 home 的 DynamoDB**(运行台账回写)」,
-//   SPEC §3.14「控制面回写 = **唯一**跨区例外」。执行环境是**零出网**的(WP-16),
+//   SPEC §3.14「控制面回写 = **唯一**跨区例外」。执行环境是**零出网**的,
 //   用 SQS 就得给那条通路再加一个服务(home 侧接口端点 + 每个执行区一个 PHZ + SG)
 //   = 给一条用户在意的不变量**新开一个例外**。而 DDB 那条例外**已经存在、天天在用**
 //   (DAG 的 run 台账就是这么写回来的:`_mk` 里 `boto3.resource("dynamodb", region_name=ctrl_region)`)
@@ -53,12 +52,12 @@ export const ACTION_COMMAND_TERMINAL: readonly ActionCommandStatus[] = ["succeed
  * 每一条都要写清:手动入口是哪个产品路由 + 两条路共用的**库函数**(⇒ 动作永远只有一个作者)、
  * 它服务哪一类能力(⇒ 与三维矩阵对得上)、以及**为什么它可以被无人值守地触发**(有些动作天生不该定时跑,比如删除)。
  *
- * @kf-batch 50-WP28-platform-action-node(2026-10-10 序 33 施工)
+ * (2026-10-施工)
  * 🔴 原来三条治理动作的 `route` **写的是不存在的路由**(`metadata-sync` / `quality` / `classification/scan`),
  *    判据只断 `/api/` 前缀,于是谁也没发现。现在判据钉「路由文件真实存在」+「库函数真实导出」。
  * 🔴 `seed.run-once` 曾经删过一次:它当时指向的 `/api/admin/seed/run` 从来没有实现,造数也没有可共用的库函数
  *    (白名单里留一个「没有作者的动作」= 一条随时会被人接上、而接上那一刻就是第二个作者的口子)。
- * @kf-batch 50-CAPSEED-seed-dispatch(登记 CAP-SEED 交付)
+ * (登记 CAP-SEED 交付)
  *    现在**按同一形状加回来**:作者 = `lib/seed/run-once#runSeedOnce`(手动路由 `/api/seed/run` 与消费端共用),
  *    判据照样钉「路由文件真实存在 + 库函数真实导出 + 路由真调用它」。
  */

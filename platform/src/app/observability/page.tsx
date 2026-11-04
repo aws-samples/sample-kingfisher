@@ -6,7 +6,6 @@ import { DashboardOutlined, ReloadOutlined, ApiOutlined, RobotOutlined, Thunderb
 import { Donut, TrendArea, type Slice } from "@/components/dashboard/charts";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP4ter-coverage
 import { useScope } from "@/components/scope/ScopeProvider";
 import { toScopeParam } from "@/lib/scope/scope";
 
@@ -26,7 +25,7 @@ export default function ObservabilityPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-6)
+  // 执行范围
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
@@ -43,7 +42,7 @@ export default function ObservabilityPage() {
     } finally { setLoading(false); }
   };
 
-  // @kf-batch 50-WP4ter-coverage —— `scopeQs` 进 deps:切区不重载页面,靠这里重拉(护栏 4)
+  // `scopeQs` 进 deps:切区不重载页面,靠这里重拉(护栏 4)
   useEffect(() => { if (!authLoading && user) load(); /* eslint-disable-next-line */ }, [authLoading, user, scopeQs]);
 
   const ac = data?.agentcore;

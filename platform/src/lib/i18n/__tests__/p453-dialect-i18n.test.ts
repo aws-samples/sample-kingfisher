@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { translate } from "@/lib/i18n/translate";
-describe("P45.3 dialect回显 i18n", () => {
+describe("dialect回显 i18n", () => {
   it("已修正文案 en 有翻译(非回退中文)", () => {
     const en = translate("已按平台方言规则自动修正 {n} 处", "en", { n: 2 });
     expect(en).toContain("Auto-corrected");

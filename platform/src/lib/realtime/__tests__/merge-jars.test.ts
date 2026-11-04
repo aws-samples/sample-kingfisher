@@ -1,4 +1,4 @@
-// 模块 32-CR CR.3 — mergeJars 字节级冲突检测单测(§2.4 约束②分级)。
+// CR.3 — mergeJars 字节级冲突检测单测(§2.4 约束②分级)。
 //
 // 锁死:同名类字节相同→去重;字节不同+核心库→FAIL 抛错;字节不同+稳定门面(commons-logging)→WARN 放行;
 //       META-INF/services 合并去重;base MANIFEST 优先;strict=false 保持旧行为(自定义 sink 零回归)。

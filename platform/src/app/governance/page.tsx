@@ -6,20 +6,20 @@ import { SearchOutlined, DatabaseOutlined, ApartmentOutlined, ThunderboltOutline
 import { QUALITY_TEMPLATES_META, DIMENSION_LABELS } from "@/lib/quality/templates";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 50-WP2-directquery —— 治理三件(目录 / 质量 / 敏感扫描)按顶栏「执行范围」查那个区的数仓。
+// 治理三件(目录 / 质量 / 敏感扫描)按顶栏「执行范围」查那个区的数仓。
 // 🔴 读用 `?scope=`,执行(质量运行 / 敏感扫描)用 **body.targetId**(写路由不读 scope,SPEC §2.6.3)。
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
-// @kf-batch 50-SEQ47d-catalog-filters —— 目录筛选的事实(拆库·schema / 过滤 / 候选 / URL 往返)全在纯模块里,页面只渲染。
+// 目录筛选的事实(拆库·schema / 过滤 / 候选 / URL 往返)全在纯模块里,页面只渲染。
 import {
   applyCatalogFilter, catalogFilterOptions, catalogFilterFromSearch, catalogFilterToSearch,
   EMPTY_CATALOG_FILTER, isEmptyCatalogFilter, splitDatabase, SENSITIVITY_NONE, type CatalogFilter,
 } from "@/lib/governance/catalog-filters";
 import dynamic from "next/dynamic";
 import CrossTargetMirrorOverview from "@/components/governance/CrossTargetMirrorOverview";
-// @kf-batch 50-WP28-platform-action-node(WP-29 治理)—— 定时治理任务(质量检查 / 敏感扫描 / 目录同步按 cron 在该区跑)
+// (治理)—— 定时治理任务(质量检查 / 敏感扫描 / 目录同步按 cron 在该区跑)
 import GovernanceSchedules from "@/components/governance/GovernanceSchedules";
-// @kf-batch 50-SEQ47c-catalog-ddl —— 数据目录「新建表」向导 / 行操作「修改表结构」
+// 数据目录「新建表」向导 / 行操作「修改表结构」
 import CreateTableWizard from "@/components/governance/CreateTableWizard";
 import AlterTableDrawer, { type AlterTarget } from "@/components/governance/AlterTableDrawer";
 import "reactflow/dist/style.css";
@@ -36,7 +36,7 @@ const typeIcon: Record<string, string> = {
   rds: "🛢️", s3bucket: "🪣", rscluster: "🖥️", kinesis: "🌊", storage: "💾",
 };
 
-// 模块 18: sensitivity levels + mask strategies (display).
+// sensitivity levels + mask strategies (display).
 const LEVELS = ["L1", "L2", "L3", "L4"] as const;
 const LEVEL_META: Record<string, { label: string; color: string }> = {
   L1: { label: "L1 公开", color: "green" },
@@ -120,25 +120,24 @@ export default function GovernancePage() {
   const t = useT();
   const { scope, targets: scopeTargets } = useScope();
   const scopeParam = toScopeParam(scope);
-  // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 每一条治理请求都要带范围:治理记录的分区键
+  // 🔴 每一条治理请求都要带范围:治理记录的分区键
   // 现在是 `<targetId>::<fqn>`(home 裸 fqn)。不带范围 = 去主控区的分区上读写本区那张表的
   // 标签 / 规则 / 结果 ⇒ 两个区互相顶(用户的词:「串味」)。
   const scopeQs = scopeParam ? `&scope=${encodeURIComponent(scopeParam)}` : "";
   const runTargetId = scope.kind === "target" ? scope.targetId : undefined;
-  // @kf-batch 50-WP31-place-first-class —— 🔴 治理**写入 / 执行**的落点唯一作者(单区视角 = 该区;「全部 / 对比」= 显式主控区,
+  // 🔴 治理**写入 / 执行**的落点唯一作者(单区视角 = 该区;「全部 / 对比」= 显式主控区,
   //   与读侧 `governanceTargetFrom` 同一口径)。原来「添加规则」「保存分级」两样都不带 ⇒ 服务端回落主控区 ⇒
   //   us-west-2 视角加的规则 / 设的级别写进主控区那张表,而列表按本区读 ⇒「加了看不见」。服务端现在缺即 400。
   const govTargetId = landingOfScope(scope);
   const runRegion = runTargetId ? scopeTargets?.find((x) => x.targetId === runTargetId)?.region || runTargetId : "";
   // 该区未部署数仓时服务端回的说明(空串 = 正常)
   const [noWarehouse, setNoWarehouse] = useState("");
-  // @kf-batch 50-WP2-one-agentcore-one-om —— 目录的新鲜度(target 视角才有):目录来自**元数据同步**,
+  // 目录的新鲜度(target 视角才有):目录来自**元数据同步**,
   // 不是实时直查 ⇒ 必须把「同步于何时 / 什么状态」显示出来,否则用户不知道自己在看什么时候的目录。
   const [catalogFresh, setCatalogFresh] = useState<any>(null);
-  // @kf-batch 50-B18-catalog-state-two-meanings
   // 🔴🔴 `catalogData` 只有**一个**语义:**数据目录页签当前那次搜索的结果**。
   //   它**不是**「可选资产全集」—— 别的页签的资产选择器**绝不许**拿它当 `options`。
-  //   (B-18:原来血缘 / 影响分析 / 数据分级 / 数据质量**四处**都写着 `options={catalogData.map(...)}`,
+  //   (原来血缘 / 影响分析 / 数据分级 / 数据质量**四处**都写着 `options={catalogData.map(...)}`,
   //    于是用户在目录里搜过一次之后,那四个选择器就只剩搜到的那几张表 ——
   //    想给别的表跑质量检查,得先回目录把搜索框清空,而界面上没有任何线索。
   //    本仓已为「同一个集合被当成两件事用」立过记忆 one-set-two-meanings-deadlock。)
@@ -147,7 +146,7 @@ export default function GovernancePage() {
   // 🔴 资产全集(选择器候选)的**唯一**持有者:只由 `loadAllAssets()` 写,与搜索完全无关。
   const [allAssets, setAllAssets] = useState<any[]>([]);
   const [keyword, setKeyword] = useState("");
-  // @kf-batch 50-SEQ47d-catalog-filters(客户 2026-10-19:「数据目录缺少数据库类型、schema、bucket 等筛选条件」)
+  // (客户 2026-10-19:「数据目录缺少数据库类型、schema、bucket 等筛选条件」)
   // 🔴 筛选是**本地**过滤(目录数据已整份在手,pageSize 20 只是分页),不另打接口;初值来自地址栏、改动写回地址栏
   //   (只动自己的 5 个键,执行范围 `scope` 等原样保留),刷新 / 分享不丢。
   const [catalogFilter, setCatalogFilter] = useState<CatalogFilter>(EMPTY_CATALOG_FILTER);
@@ -171,7 +170,7 @@ export default function GovernancePage() {
   const [lineageData, setLineageData] = useState<any>(null);
   const [lineageLoading, setLineageLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("catalog");
-  // @kf-batch 50-P50.3-mirror —— 「当前 target」/「全部 target」两个视图(INTERACTION §4quater)。
+  // 「当前 target」/「全部 target」两个视图(INTERACTION §4quater)。
   // 🔴 缺省仍是 `current`:多区域是**增量能力**,不改任何既有用户的默认落地画面。
   const [scopeView, setScopeView] = useState<"current" | "all">("current");
   const [qualityData, setQualityData] = useState<any>(null);
@@ -180,7 +179,7 @@ export default function GovernancePage() {
   const [impactData, setImpactData] = useState<any>(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  // @kf-batch 50-SEQ47c-catalog-ddl —— 新建表向导 / 改表抽屉
+  // 新建表向导 / 改表抽屉
   const [createOpen, setCreateOpen] = useState(false);
   const [alterTarget, setAlterTarget] = useState<AlterTarget | null>(null);
   const [classFqn, setClassFqn] = useState("");
@@ -188,7 +187,7 @@ export default function GovernancePage() {
   const [classLoading, setClassLoading] = useState(false);
   const [myGrants, setMyGrants] = useState<any[]>([]);
   const [newCol, setNewCol] = useState("");
-  // 模块 19 数据质量
+  // 数据质量
   const [qFqn, setQFqn] = useState("");
   const [qRules, setQRules] = useState<any[]>([]);
   const [qResults, setQResults] = useState<any>(null);
@@ -200,7 +199,7 @@ export default function GovernancePage() {
   const [arParams, setArParams] = useState<Record<string, any>>({});
   const [arSeverity, setArSeverity] = useState<"error" | "warn">("error");
   const [arWeight, setArWeight] = useState<number>(1);
-  // 模块 36 (E5) 敏感数据识别扫描
+  // (E5) 敏感数据识别扫描
   const [scanDb, setScanDb] = useState("dev");
   const [scanSchema, setScanSchema] = useState("");
   const [scanResult, setScanResult] = useState<any>(null);
@@ -220,7 +219,6 @@ export default function GovernancePage() {
     return res;
   };
 
-  // @kf-batch 50-B10-stale-response-race
   // 🔴🔴 **并发请求的陈旧响应竞态:晚到的那份会赢**(本仓已经栽过一次 —— 那次的形态是
   //   「某区视角显示别的区的数仓」,真根同样是这个)。改动前本函数是
   //     `const d = await fetch(...); setCatalogData(...)`
@@ -230,9 +228,8 @@ export default function GovernancePage() {
   //   正在飞的那次的 loading 提前关掉)。
   const catalogSeqRef = useRef(0);
   const assetsSeqRef = useRef(0);
-  // @kf-batch 50-B19-stale-guards
-  // 🔴🔴 **B-19:这一页每一个「取数后写 state」的函数都要有序号闸**。
-  //   为什么不是「挑几个重要的修」:B-10 那个缺陷(晚到的陈旧响应赢)不挑对象 ——
+  // 🔴🔴 **这一页每一个「取数后写 state」的函数都要有序号闸**。
+  //   为什么不是「挑几个重要的修」:那个缺陷(晚到的陈旧响应赢)不挑对象
   //   任何一个「发请求 → 等回来 → 写共享 state」的函数,只要能被触发两次就有它。
   //   登记时我写的是「至少 5 个是真竞态」,细看**动作型也一样是真竞态**:
   //   `runQuality` 点两次、`addRule` 快速加两条,晚到的旧响应照样会盖掉新的。
@@ -241,7 +238,7 @@ export default function GovernancePage() {
   //   开头那些 `setXxxFqn(fqn)` / `setXxxLoading(true)` 是**用户动作直接决定**的,
   //   拦住它们会变成「点了没反应」(那是另一个 bug)。
   // 🔴 `finally` 里关 loading 也要过闸:否则**旧响应的 finally** 会把新请求的 loading 关掉
-  //   (与 B-18 `bootstrapCatalog` 同一处理)。
+  //   (与 `bootstrapCatalog` 同一处理)。
   const seqRefs = {
     lineage: useRef(0), impact: useRef(0), grants: useRef(0), classification: useRef(0),
     qRules: useRef(0), qResults: useRef(0), quality: useRef(0), qRun: useRef(0),
@@ -258,13 +255,12 @@ export default function GovernancePage() {
   /** 写「目录页签那次搜索的结果」的**唯一**一处(含该区没装数仓的说明与新鲜度)。 */
   const applyCatalogPayload = (d: any) => {
     setCatalogFresh(d?._meta?.catalogFreshness || null);
-    // @kf-batch 50-WP2-directquery —— 该区没装数仓 ⇒ 说清原因,别显示一张空目录
+    // 该区没装数仓 ⇒ 说清原因,别显示一张空目录
     const payload = d.success ? d.data : [];
-    // @kf-batch 50-E140b-catalog-no-warehouse
     // 🔴 **两条路都要认**:目录现在主要走 OpenMetadata(用户 2026-09-10 拍板「都走同一个 OM」),
     //   那条路上没有 `capability` 字段 ⇒ 服务端把「该区没装数仓」放在 `_meta.warehouse`。
     //   只认下面那个 `payload.capability` 的旧写法 ⇒ core-only 目标看到的是一张**不给原因的空目录**,
-    //   用户会以为同步坏了 / 表被删了(E-140b 就是这么被判据挖出来的)。
+    //   用户会以为同步坏了 / 表被删了(就是这么被判据挖出来的)。
     const metaNoWh = d?._meta?.warehouse?.reason ? String(d._meta.warehouse.reason) : "";
     if (payload && !Array.isArray(payload) && payload.capability === "unavailable") {
       setNoWarehouse(String(payload.reason || ""));
@@ -297,13 +293,12 @@ export default function GovernancePage() {
     }
   };
 
-  // @kf-batch 50-B18-catalog-state-two-meanings
   // 🔴🔴 **资产全集(选择器候选)的唯一作者。** 与 `searchCatalog` 彻底分开:
   //   它**永远不带 keyword**,所以用户在目录页签里搜什么都影响不到别的页签的候选清单。
-  //   —— 这就是 B-18 的根治点:缺陷不是「某个选择器坏了」,是**一份 state 被当成两件事用**,
+  //   这就是该缺陷的根治点:缺陷不是「某个选择器坏了」,是**一份 state 被当成两件事用**,
   //      所以修法必须是「把两个语义拆成两份 state」,而不是给那四处各打一个补丁。
   // 🔴 序号保护照抄 `searchCatalog`(切执行范围**不重载页面**,两次 scope 的响应会并发 ——
-  //   B-10 同一个根,这里是第二处;**口径不许另写一遍**)。
+  //   同一个根,这里是第二处;**口径不许另写一遍**)。
   const loadAllAssets = async () => {
     const seq = ++assetsSeqRef.current;
     const d = await fetchCatalogPayload("");
@@ -313,7 +308,7 @@ export default function GovernancePage() {
   };
 
   // ══════════════════════════════════════════════════════════════════════════
-  // @kf-batch 50-B18-catalog-state-two-meanings(**第二刀:修法订正**)
+  // (**第二刀:修法订正**)
   //
   // 🔴🔴 进页面 / 切范围时**只取一次数**,分别写两份 state。
   //
@@ -366,9 +361,9 @@ export default function GovernancePage() {
       if (!res) return;
       const d = await res.json();
       if (seq !== seqRefs.schemaSync.current) return; // 陈旧响应:丢掉
-      // 模块 55 第二批(序 50):同步列信息是长操作 —— 超过 45 秒服务端回 202(协议 long-op/1),全局 fetch 拦截器轮询到终态再交回
-      //   同形 200 / 500,页面右下「正在后台执行:同步列信息到数据目录(已 n 秒)」;序 38 那套治理专用 202 + GET 轮询在这里退役。
-      // 🔴 B-18:列信息回填会改变资产内容 ⇒ **两份 state 都要刷**(只刷一份就是新的漂移源)
+      // 同步列信息是长操作 —— 超过 45 秒服务端回 202(协议 long-op/1),全局 fetch 拦截器轮询到终态再交回
+      //   同形 200 / 500,页面右下「正在后台执行:同步列信息到数据目录(已 n 秒)」;那套治理专用 202 + GET 轮询在这里退役。
+      // 🔴 列信息回填会改变资产内容 ⇒ **两份 state 都要刷**(只刷一份就是新的漂移源)
       if (d.success) { message.success(d.data?.message || t("已同步 Redshift 列信息")); await searchCatalog(); await loadAllAssets(); }
       else message.error(d.error?.message || t("同步失败"));
     } finally { if (seq === seqRefs.schemaSync.current) setSyncingSchema(false); }
@@ -400,7 +395,7 @@ export default function GovernancePage() {
     } finally { if (seq === seqRefs.impact.current) setImpactLoading(false); }
   };
 
-  // 模块 18: detect platform-admin from the ID token's cognito:groups (server still enforces).
+  // detect platform-admin from the ID token's cognito:groups (server still enforces).
   useEffect(() => {
     (async () => {
       const token = await getToken();
@@ -468,7 +463,7 @@ export default function GovernancePage() {
     setNewCol("");
   };
 
-  // 模块 19 数据质量
+  // 数据质量
   const loadQRules = async (fqn: string) => {
     const seq = ++seqRefs.qRules.current;
     const res = await authedFetch(`/api/governance/quality-rules?fqn=${encodeURIComponent(fqn)}${scopeQs}`);
@@ -528,7 +523,7 @@ export default function GovernancePage() {
   const qParamSummary = (p: Record<string, any>) => Object.entries(p || {}).filter(([, v]) => v !== "" && v != null).map(([k, v]) => `${k}=${v}`).join(", ") || "—";
   const scoreColor = (s: number | null) => (s == null ? "#999" : s >= 90 ? "#52c41a" : s >= 70 ? "#faad14" : "#f5222d");
 
-  // 模块 36 (E5) 敏感数据识别扫描
+  // (E5) 敏感数据识别扫描
   const findingKey = (f: any) => `${f.fqn}#${f.column}`;
   const runSensitiveScan = async () => {
     setScanLoading(true);
@@ -623,11 +618,11 @@ export default function GovernancePage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) return; // 未登录由全局 layout 守卫处理,此处不硬跳避免清空 MultiTabs 页签
-    // @kf-batch 50-B18(第二刀)—— 🔴 **只取一次数,分别写两份 state**。
+    // (第二刀)—— 🔴 **只取一次数,分别写两份 state**。
     //   上一版在这里各调一次(`searchCatalog("")` + `loadAllAssets()`),实测两个**参数逐字节相同**
     //   的请求互相拖慢 4.2s、候选清单就绪从 +6.2s 推到 +11.1s。见 `bootstrapCatalog` 的文件头。
     bootstrapCatalog();
-    // @kf-batch 50-WP2-directquery —— 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重查(护栏 4)
+    // 🔴 `scopeQs` 进 deps:切范围**不重载页面**,靠这里重查(护栏 4)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user, scopeQs]);
 
@@ -679,7 +674,7 @@ export default function GovernancePage() {
       </Space>
     )},
     { title: t("来源"), dataIndex: "source", render: (v: string) => <Tag color={v === "Redshift" ? "purple" : "blue"}>{v}</Tag> },
-    // 序 47d:原来「数据库」一列是 `<db>.<schema>` 一个串;拆成两列 —— Redshift = 库 / schema,S3 Tables = 表桶 / 命名空间(FQN 约定 bgp-s3tables.<bucket>.<namespace>.<table>)。
+    // 原来「数据库」一列是 `<db>.<schema>` 一个串;拆成两列 —— Redshift = 库 / schema,S3 Tables = 表桶 / 命名空间(FQN 约定 bgp-s3tables.<bucket>.<namespace>.<table>)。
     { title: t("库 / 表桶"), key: "db", render: (_: any, r: any) => { const { db } = splitDatabase(r); return db ? <span data-testid="catalog-cell-db">{db}</span> : "-"; } },
     { title: t("Schema / 命名空间"), key: "schema", render: (_: any, r: any) => { const { schema } = splitDatabase(r); return schema ? <span data-testid="catalog-cell-schema">{schema}</span> : "-"; } },
     { title: t("格式"), dataIndex: "format", render: (v: string) => v ? <Tag>{v}</Tag> : "-" },
@@ -690,7 +685,7 @@ export default function GovernancePage() {
         <Button size="small" icon={<ApartmentOutlined />} onClick={() => { loadLineage(r.fqn); setActiveTab("lineage"); }}>{t("血缘")}</Button>
         <Button size="small" icon={<ThunderboltOutlined />} onClick={() => { loadImpact(r.fqn); setActiveTab("impact"); }}>{t("影响分析")}</Button>
         <Button size="small" icon={<SafetyCertificateOutlined />} onClick={() => { loadClassification(r.fqn); setActiveTab("classification"); }}>{t("分级")}</Button>
-        {/* 序 47c:图形化改表 —— 只有 Redshift 表有载体(ALTER / COMMENT);S3 Tables 的 Iceberg 模式演进要 Spark 引擎、Athena 对 s3tablescatalog 不支持 DDL ⇒ 不给假入口,按钮置灰并说明 */}
+        {/* 图形化改表 —— 只有 Redshift 表有载体(ALTER / COMMENT);S3 Tables 的 Iceberg 模式演进要 Spark 引擎、Athena 对 s3tablescatalog 不支持 DDL ⇒ 不给假入口,按钮置灰并说明 */}
         {isAdmin && (r.type === "redshift"
           ? <Button size="small" data-testid="catalog-alter-btn" onClick={() => { const { schema } = splitDatabase(r); setAlterTarget({ targetId: r.targetId || govTargetId, schema: schema || "public", table: r.name, fqn: r.fqn }); }}>{t("修改表结构")}</Button>
           : <Button size="small" data-testid="catalog-alter-btn" disabled title={t("S3 Tables 表的结构变更需经 Spark 作业做 Iceberg 模式演进,本版不提供图形化;可用离线作业跑 ALTER TABLE … ADD COLUMNS")}>{t("修改表结构")}</Button>)}
@@ -700,7 +695,7 @@ export default function GovernancePage() {
 
   return (
     <div>
-      {/* @kf-batch 50-P50.3-mirror —— 50 INTERACTION §4quater:数据地图/血缘/资产盘点顶部加「全部 target」视图。
+      {/* 50 INTERACTION §4quater:数据地图/血缘/资产盘点顶部加「全部 target」视图。
           🔴 两个视图**互斥**(不是并排):当前 target 视图下面那些 tab 全是**单地域**的读写面
           (点表看数据、跑质量检查、改分级),把它们和跨地域只读全景摆一起会让人以为
           "在全部 target 视图里也能点进去改分级" —— 而那要等治理页按 target 化(后续刀)。 */}
@@ -717,12 +712,12 @@ export default function GovernancePage() {
           ]}
         />
       </Space>
-      {/* @kf-batch 50-WP2-directquery —— 该区未部署数据仓库 ⇒ 整块说清(目录/质量/敏感三件都靠它取数)。
+      {/* 该区未部署数据仓库 ⇒ 整块说清(目录/质量/敏感三件都靠它取数)。
           🔴 不能只是"目录空着":空目录在界面上等于「这个区没有表」,而真相是「这个区没有数仓」。 */}
       {noWarehouse && (
         <Alert type="warning" showIcon style={{ marginBottom: 12 }} data-testid="governance-no-warehouse" message={noWarehouse} />
       )}
-      {/* @kf-batch 50-WP2-one-agentcore-one-om —— target 视角:把三件事一次说清(别让人靠猜)
+      {/* target 视角:把三件事一次说清(别让人靠猜)
           ① 目录来自**同一个 OpenMetadata**(按执行环境分 service),内容是**元数据同步时刻**的样子;
           ② 同步时间与状态(W3-e 的五态),以及去哪儿手动刷;
           ③ 质量检查 / 敏感扫描是**实时**在该区数仓上执行的(与目录不同)—— 两者混为一谈会让人
@@ -759,7 +754,7 @@ export default function GovernancePage() {
             ? t("数据目录 ({n} / {total})", { n: filteredCatalog.length, total: catalogData.length })
             : t("数据目录 ({n})", { n: catalogData.length }), children: (
           <div>
-            {/* 序 47d 筛选栏:候选来自当前目录数据本身;每个维度多选 / 单选,维度间取交集;「重置」清空并回到全量 */}
+            {/* 筛选栏:候选来自当前目录数据本身;每个维度多选 / 单选,维度间取交集;「重置」清空并回到全量 */}
             <div data-testid="catalog-filters" style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
               <Select data-testid="catalog-filter-source" mode="multiple" allowClear placeholder={t("来源")} style={{ minWidth: 180 }}
                 value={catalogFilter.sources} onChange={(v: string[]) => updateCatalogFilter({ sources: v })}
@@ -794,7 +789,7 @@ export default function GovernancePage() {
                 <Button size="large" icon={<ApartmentOutlined />} loading={syncingSchema} onClick={syncRedshiftSchema}
                   title={t("将 Redshift 真实列信息回填到数据目录（修正字段数）")}>{t("同步 Redshift 列")}</Button>
               )}
-              {/* 序 47c:图形化建表(Redshift 走建模落地通道;S3 Tables 走 s3tables CreateTable;prod 环境转审批) */}
+              {/* 图形化建表(Redshift 走建模落地通道;S3 Tables 走 s3tables CreateTable;prod 环境转审批) */}
               {isAdmin && (
                 <Button size="large" type="primary" icon={<PlusOutlined />} data-testid="catalog-new-table-btn" onClick={() => setCreateOpen(true)}>{t("新建表")}</Button>
               )}

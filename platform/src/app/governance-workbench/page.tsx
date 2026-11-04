@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 36 (E2) — 治理工作台 /governance-workbench。
+// (E2) — 治理工作台 /governance-workbench。
 // 治理总览入口 + 行动清单:治理健康总分(Gauge)+ 4 维度分 + 资产榜 + 待办工作台。
 // 纯聚合读,数据来自 /api/governance/health 一次聚合。全局 fetch 拦截器自动带 Authorization。
 
@@ -28,7 +28,7 @@ function dimColor(s: number): string {
 }
 
 export default function GovernanceWorkbenchPage() {
-  // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 当前执行范围
+  // 当前执行范围
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const t = useT();
@@ -39,7 +39,7 @@ export default function GovernanceWorkbenchPage() {
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
     try {
-      // @kf-batch 50-WP4quater-reads(工单 SC-8)—— 🔴 健康分按执行范围取:三路信号已按区分区,
+      // 🔴 健康分按执行范围取:三路信号已按区分区,
       // 表全集也从那个区的数仓探。不带范围 = 永远看主控区的分(而它看起来完全正常)。
       const qs = new URLSearchParams();
       if (refresh) qs.set("refresh", "1");

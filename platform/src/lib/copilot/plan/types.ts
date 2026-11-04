@@ -1,4 +1,4 @@
-// 模块 44 — Copilot 规划-执行引擎:类型定义(单一事实源 / 代码级顶层设计)。
+// Copilot 规划-执行引擎:类型定义(单一事实源 / 代码级顶层设计)。
 //
 // 语义:用户一句话诉求(「帮我把广告 ROI 算出来」)→ 规划大脑(Strands 只读 agent)发现现状 →
 // 产出一个「执行计划(plan)」,由 N 个「异构步骤(step)」组成(建同步 / 跑 EMR / 查仓 ...),
@@ -95,7 +95,7 @@ export interface CopilotPlanRow {
   // L2=false(只指引,引擎不代执行);L3=true(引擎代执行)。默认 false,翻开关是显式配置+用户批准。
   autoExecute: boolean;
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-17)—— 这个计划**面向哪个执行区**。
+   * 这个计划**面向哪个执行区**。
    * 🔴 计划最终会建出真作业(同步 / 离线 / Flink),那些作业要在某个区跑 ⇒
    * 「这个区有哪些计划要落地」是运维要看的东西,而计划行上原来一个区维都没有。
    * 缺省 = 主控区(与改动前逐字节等价);字段名对齐平台 B 类绑定 ⇒ `filterRowsByScope` 直接可用。
@@ -190,7 +190,7 @@ export const STEP_CEILING_MS: Record<StepType, number> = {
 };
 
 // 在线隔离标记:Copilot 执行落 run 打此标记(与补数 "backfill" 并列)。
-// 【硬约束·消费端排除已落地(模块47 P4.0,2026-07-24)】此值已同步排除于:
+// 【硬约束·消费端排除已落地(P4.0,2026-07-24)】此值已同步排除于
 //   · baseline/learn.ts(基线学习,SLA/时长预测)—— r.triggeredBy !== COPILOT_TRIGGERED_BY
 //   · finops/anomaly.ts(成本异常检测)—— r.triggeredBy === COPILOT_TRIGGERED_BY continue
 // 二者均 import 本常量(单一定义,零裸写字符串)。若未来新增其它消费端(如新监控口径),须同步排除。

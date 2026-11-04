@@ -1,4 +1,4 @@
-// 模块 22 — 前端角色判定（与后端 identity / middleware 一致）。
+// 前端角色判定（与后端 identity / middleware 一致）。
 // 仅用于 UI 呈现（菜单/跳转）；真正的权限在 API 层（middleware 白名单 + 各路由守卫）强制。
 
 export function groupsFromToken(token?: string | null): string[] {

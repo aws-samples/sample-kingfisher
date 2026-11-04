@@ -1,4 +1,3 @@
-// @kf-batch 50-CAPSEED-seed-dispatch
 // 🔴 平台「复用部署期那个造数作业」⇒ 作业名必须与部署脚本**逐字同名**。从两支脚本里把名字抽出来比
 //    (改一侧漏另一侧的症状:接口 409「该区没有造数作业」,而控制台里明明有)。
 import { describe, it, expect } from "vitest";

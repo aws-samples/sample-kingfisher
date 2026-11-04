@@ -1,11 +1,10 @@
-// 模块 25 — 故障证据构造：把一次失败运行的上下文（运行记录 + 作业/工作流定义 + 真实日志/错误）
+// 故障证据构造：把一次失败运行的上下文（运行记录 + 作业/工作流定义 + 真实日志/错误）
 // 组织成"证据充分"的中文 prompt，交给 AWS DevOps Agent 产出结构化诊断报告。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-// @kf-batch 50-P50.3-mrquery
 import { redshiftClientForTarget, stampedTargetOf } from "@/lib/exec-env/data-plane-target";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { GlueClient, GetJobRunCommand } from "@aws-sdk/client-glue";
@@ -13,7 +12,7 @@ import { CloudWatchLogsClient, GetLogEventsCommand } from "@aws-sdk/client-cloud
 import { DescribeStatementCommand } from "@aws-sdk/client-redshift-data";
 import { describeFlinkJob, readFlinkLogs, flinkHealthMetrics, flinkJobTarget } from "@/lib/realtime/flink-service";
 import { buildDiagnosisGrounding } from "@/lib/incidents/grounding";
-// 序 53:证据里的 Glue 运行环境来自单一作者(缺省版本 + 可选清单),具体这次运行用的版本从 Glue JobRun 真值读
+// 证据里的 Glue 运行环境来自单一作者(缺省版本 + 可选清单),具体这次运行用的版本从 Glue JobRun 真值读
 import { GLUE_VERSIONS, glueRuntimeSummary } from "@/lib/sync/glue-version";
 
 const region = homeRegion();
@@ -30,7 +29,7 @@ export interface IncidentContext {
   status: string;
   error?: string;
   prompt: string;
-  // 模块 43-A.2 — 本次证据是否注入了知识库中【人工已验证】的历史修复(落库 bgp-diagnostics)。
+  // 本次证据是否注入了知识库中【人工已验证】的历史修复(落库 bgp-diagnostics)。
   usedIncidentHistory?: boolean;
   // 命中的故障签名(关联知识库,供 UI/审计;未命中为空)。
   incidentSignature?: string;
@@ -126,7 +125,7 @@ export async function buildIncidentContext(taskId: string, runId: string, projec
     lines.push("");
     lines.push(`## Redshift 执行信息`);
     try {
-      // @kf-batch 50-P50.3-mrquery —— 同上:statementId 是 region 内的,取 run 的章去解 region。
+      // 同上:statementId 是 region 内的,取 run 的章去解 region。
       const rsForRun = await redshiftClientForTarget(stampedTargetOf(run));
       const desc = await rsForRun.send(new DescribeStatementCommand({ Id: run.statementId }));
       lines.push(`- 状态: ${desc.Status}`);
@@ -137,7 +136,7 @@ export async function buildIncidentContext(taskId: string, runId: string, projec
     } catch { /* best-effort */ }
   }
 
-  // 模块 43-A.2 — 注入运维知识库历史已验证修复 + 业务口径 grounding(仅失败诊断;best-effort)。
+  // 注入运维知识库历史已验证修复 + 业务口径 grounding(仅失败诊断;best-effort)。
   // errorText 用 run.error(与 recordIncident 沉淀时的签名来源一致 → 命中同一主档,历史可闭环)。
   let usedIncidentHistory = false;
   let incidentSignature = "";
@@ -163,7 +162,7 @@ export async function buildIncidentContext(taskId: string, runId: string, projec
   };
 }
 
-// 模块 32 — Flink(MSAF)流作业取证:Flink 作业无 TASK_RUNS 运行记录,按 jobId 直接取
+// Flink(MSAF)流作业取证:Flink 作业无 TASK_RUNS 运行记录,按 jobId 直接取
 // 作业定义 + MSAF 应用状态 + CloudWatch 运行日志,组装证据 prompt。覆盖所有 sinkType(尤其
 // 自定义 sink:用户自管连接定义/网络,出问题时由 DevOps Agent 诊断根因)。
 export async function buildFlinkIncidentContext(jobId: string, projectId?: string): Promise<IncidentContext> {
@@ -172,7 +171,7 @@ export async function buildFlinkIncidentContext(jobId: string, projectId?: strin
   const resourceName = job.name || jobId;
   const sinkType = job.sinkType || "s3";
 
-  // @kf-batch 50-WP27-9cap-matrix —— 🔴 **取证的三条路都要打作业自己那个区**。
+  // 🔴 **取证的三条路都要打作业自己那个区**。
   //   这三个函数都**接受** targetId,而这里三处都没传 ⇒ 非 home 的流作业,诊断拿到的是
   //   **主控区**的应用状态 / 指标 / 日志(大概率是「不存在 + 全 null + 空日志」)⇒ AI 会据此
   //   给出一份完全错的根因报告。与 `reconcileFlinkStatus` 同一族:落点参数在签名里,调用点没接上。
@@ -250,7 +249,7 @@ export async function buildFlinkIncidentContext(jobId: string, projectId?: strin
     lines.push(`或在作业停止而非删除的状态下重试诊断);③ 基于 Flink SQL 本身做静态检查(语法/连接器选项/占位符)给出可能的问题点,并标注为"待日志确认"。`);
   }
 
-  // 模块 43-A.2 — 注入知识库历史已验证修复 + 业务口径 grounding(best-effort)。
+  // 注入知识库历史已验证修复 + 业务口径 grounding(best-effort)。
   // Flink 错误源为 job.lastError(与 recordIncident 的 Flink 取数一致 → 命中同一主档)。
   let usedIncidentHistory = false;
   let incidentSignature = "";

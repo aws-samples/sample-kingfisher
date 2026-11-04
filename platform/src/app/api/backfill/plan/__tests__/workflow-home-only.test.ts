@@ -1,5 +1,4 @@
-// @kf-batch 50-B51-backfill-pump
-// 🔴 B-51b:工作流补数的执行合同是 home-only ⇒ 绑了非主控区的工作流**如实拒绝**(原来照绑定展开,
+// 🔴 工作流补数的执行合同是 home-only ⇒ 绑了非主控区的工作流**如实拒绝**(原来照绑定展开,
 //   非主控区实例实际在主控区执行、那个区一天没补,页面却成功)。只绑主控区的照常可预览。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
@@ -33,7 +32,7 @@ beforeEach(() => {
   h.wf = { workflowId: "wf-1", name: "wf", dagDefinition: dag, targets: ["tgt_home"] };
 });
 
-describe("🔴 B-51b 工作流补数只支持主控区", () => {
+describe("🔴 工作流补数只支持主控区", () => {
   it("只绑主控区 ⇒ 照常预览(2 天 × 1 节点 = 2 个实例,都在主控区)", async () => {
     const r = await call();
     expect(r.status).toBe(200);

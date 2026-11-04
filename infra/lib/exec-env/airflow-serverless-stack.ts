@@ -1,4 +1,3 @@
-// @kf-batch 50-WP15-airflow-serverless
 // 执行环境 **airflow-serverless 组件**栈(50 SPEC v3.27 §3.15;§1.1 资源袋:`workflowBucket` / `airflowServerlessRoleArn` / `airflowServerlessSgId`)。
 //
 // 【为什么有它】用户拍板(2026-09-06,DESIGN §18 决策 6septies):「原来的 MWAA 先保留着,新增一个 MWAA Serverless 的入口」;宗旨「服务层面尽量 serverless」。
@@ -8,12 +7,12 @@
 //   ③ 执行角色(信任 airflow-serverless.amazonaws.com;策略一律 boundStatement 绑本 region)。
 //   workflow 本身**不在这里建**:一个作业一个 workflow,由平台在发布调度时 CreateWorkflow / UpdateWorkflow(§3.15)。
 //
-// 【spike 七跑坐实的三条硬约束,全部落在本栈】(WORK-PACKAGES WP-15 ②)
+// 【spike 七跑坐实的三条硬约束,全部落在本栈】
 //   · 🔴 默认网络只通同区 AWS 端点 ⇒ 跨区回写 home 台账**必须 VPC 模式** ⇒ 本栈给出 SG(子网来自底座),平台 CreateWorkflow 必带 NetworkConfiguration;
 //   · GlueJobOperator 走幂等 CreateJob ⇒ 角色要 glue:CreateJob / UpdateJob(限 job/bgp-*);
 //   · 控制面回写 = 与 mwaa 栈**完全相同**的唯一跨区例外(home bgp-* 表 + kms via dynamodb.<home>)。
 //
-// 🔴 信任策略按官方样例(无 aws:SourceAccount 条件):该服务的 AssumeRole 是否带 SourceAccount 未经真环境验证,先不加条件 —— 加了要真测(S-2)。
+// 🔴 信任策略按官方样例(无 aws:SourceAccount 条件):该服务的 AssumeRole 是否带 SourceAccount 未经真环境验证,先不加条件 —— 加了要真测。
 // 🔴 数据保护:桶 RETAIN、不带 autoDeleteObjects(exec-env 纪律)。资源文案一律英文(IAM Latin-1 / SG ASCII)。
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
@@ -61,7 +60,7 @@ export class ExecEnvAirflowServerlessStack extends ExecEnvStack {
 
     // ── 执行角色(per-target 名;信任 airflow-serverless 服务主体)──────────────────────
     const role = new iam.Role(this, "ExecutionRole", {
-      // 🔴 字面调用 resourceName(命名门禁靠这条形状放行 home 模板;home 由施工序 2b 的 BgpAirflowServerlessStack 建)
+      // 🔴 字面调用 resourceName(命名门禁靠这条形状放行 home 模板;home 由b 的 BgpAirflowServerlessStack 建)
       roleName: resourceName("airflowServerlessRole", { targetId: ctx.targetId, account: ctx.account }),
       assumedBy: new iam.ServicePrincipal("airflow-serverless.amazonaws.com"),
       description: `BGP exec-env ${ctx.targetId} MWAA Serverless execution role (bound to this target; control-plane run ledger write-back is the only cross-region grant)`,

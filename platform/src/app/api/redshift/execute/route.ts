@@ -4,12 +4,11 @@ import { requireProject } from "@/lib/projects/guard";
 import { readOnlySelect } from "@/lib/genbi/core/sql-guard";
 import { apiError } from "@/lib/api-response";
 import { recordAudit } from "@/lib/audit";
-// @kf-batch 50-WP31-place-first-class
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
-// @kf-batch 50-P50.3-mrquery —— 多 region 并行提交的唯一作者(INTERACTION §4septies)。
+// 多 region 并行提交的唯一作者(INTERACTION §4septies)。
 import { submitToTargets, normalizeQueryTargets, MAX_QUERY_FANOUT } from "@/lib/redshift/multi-region-query";
-// @kf-batch 50-W5-seg2-WP10a —— 同意前置(409 带文案)+ 残留错误 → 响应映射(单作者)
+// 同意前置(409 带文案)+ 残留错误 → 响应映射(单作者)
 import { requireResidencyAckForTargets, residencyErrorResponse } from "@/lib/exec-env/residency-audit";
 
 export async function POST(req: NextRequest) {
@@ -28,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!sql || !String(sql).trim()) return NextResponse.json({ error: "SQL 为空" }, { status: 400 });
   // 🔴 生产上线批次 A:直查以数仓 admin 身份执行 ⇒ 非平台管理员只许**只读**(单条 SELECT / WITH)。
   //   原来任何项目 editor 都能在这里 DROP / DELETE 客户的表。判定与问数同一份(readOnlySelect)。
-  //   🔴 这只关掉「直查页随手执行写语句」这一条路:Redshift ETL 作业按设计要写库,项目级数据隔离要等 P52.5b。
+  //   🔴 这只关掉「直查页随手执行写语句」这一条路:Redshift ETL 作业按设计要写库,项目级数据隔离要等。
   if (!sctx.identity.isPlatformAdmin) {
     const ro = readOnlySelect(String(sql));
     if (!ro.ok) {
@@ -36,8 +35,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // @kf-batch 50-P50.3-mrquery
-  // 🔴 **多 region**:@kf-batch 50-WP31-place-first-class —— `targets` 必须点名(缺 / 空 / 非法 ⇒ 400 PLACE_UNDECIDABLE);
+  // 🔴 **多 region**:`targets` 必须点名(缺 / 空 / 非法 ⇒ 400 PLACE_UNDECIDABLE);
   //    原来缺省 = `["tgt_home"]` ⇒ 漏传就静默在主控区数仓上执行。
   // 落点/凭证/客户端全部由 `submitToTargets` 逐 target 解析(与离线计算同一个 `resolveRedshiftBinding`),
   // 所以"手动查有数据、作业跑没数据"这类分叉不会在这里重新长出来。
@@ -50,7 +48,6 @@ export async function POST(req: NextRequest) {
     throw e;
   }
 
-  // @kf-batch 50-W5-seg2-WP10a
   // 🔴 同意前置**先判全部 target 再提交任何一个**(SPEC v3.23 §3.2):任一跨法域 target 缺同意 ⇒ 整个请求 409,
   //    响应带当前文案与版本,前端弹免责告知、同意后重试同一请求;home / 同法域 target 这里是空操作。
   //    区域审计本身在 submitOne 里逐 target 写(提交之前),写不成只拒那一个 target。
@@ -102,7 +99,7 @@ export async function POST(req: NextRequest) {
     statementId: first?.statementId,
     handleId: first?.handleId,
     submissions,
-    // @kf-batch 50-W5-seg2-WP10a —— 跨法域 target 的区域审计 ID(SPEC §2.1:响应 += audit?: {[targetId]: auditId})
+    // 跨法域 target 的区域审计 ID(SPEC §2.1:响应 += audit?: {[targetId]: auditId})
     ...(submissions.some((s) => s.auditId)
       ? { audit: Object.fromEntries(submissions.filter((s) => s.auditId).map((s) => [s.targetId, s.auditId])) }
       : {}),

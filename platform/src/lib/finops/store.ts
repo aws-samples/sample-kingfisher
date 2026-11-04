@@ -1,4 +1,4 @@
-// 模块 40 — FinOps 3 表读写(照 lib/incidents/store.ts 风格;表名走模块内 FINOPS_TABLES)。
+// FinOps 3 表读写(照 lib/incidents/store.ts 风格;表名走模块内 FINOPS_TABLES)。
 
 import { GetCommand, PutCommand, QueryCommand, ScanCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";
@@ -25,8 +25,8 @@ export async function setWatermark(sk: string, value: string): Promise<void> {
 
 // ── L1 服务日成本 ─────────────────────────────────────────────
 
-// @kf-batch 50-WP6-cost-by-region —— 🔴 pk 前缀只认 `COST_DAILY_PK_PREFIX`(v2)。读写同一个作者,
-// 旧分区 `cost#<month>` 不在任何读路径上 ⇒ 旧格式行**结构上**进不了合计(E-173),也无需删除。
+// 🔴 pk 前缀只认 `COST_DAILY_PK_PREFIX`(v2)。读写同一个作者,
+// 旧分区 `cost#<month>` 不在任何读路径上 ⇒ 旧格式行**结构上**进不了合计,也无需删除。
 export const costDailyPk = (month: string) => `${COST_DAILY_PK_PREFIX}${month}`; // month = yyyy-MM
 
 export const costDailySk = (row: Pick<CostDailyRow, "date" | "service" | "region">) =>
@@ -51,7 +51,7 @@ export async function upsertCostDaily(row: Omit<CostDailyRow, "pk" | "sk">): Pro
 
 export async function listCostDaily(month: string): Promise<CostDailyRow[]> {
   // 🔴 必须翻页:一个月 × 服务数 × 区数可以过 1MB(两区 × 40 个服务 × 31 天 ≈ 2.5k 行)。
-  // 只读第一页 = 月末的天数静默丢失,大盘与 CE 对不上(E-170)。
+  // 只读第一页 = 月末的天数静默丢失,大盘与 CE 对不上。
   const out: CostDailyRow[] = [];
   let lastKey: Record<string, unknown> | undefined;
   do {

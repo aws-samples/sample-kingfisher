@@ -1,4 +1,3 @@
-// @kf-batch 50-WP16-zero-egress
 // 执行环境 **VPC 端点清单的唯一作者**(50 SPEC v3.33 §3.16-B)。
 //
 // 【为什么必须是单一作者】
@@ -12,13 +11,13 @@
 //   而是按**运行时真实 `boto3.client/resource` 调用**定 —— 2026-09-08 spike 就是这么定的,
 //   并且当场发现原设计清单漏了 `s3tables` 与 `redshift-serverless` 两个
 //   (前者数据湖落地必经;后者被 `lib/sync/glue-script-generator.ts` 的 COPY 角色发现逻辑真调)。
-//   台账见 WORK-PACKAGES WP-16 ②b 的 S-7。
+//   台账②b 的。
 
 import type { ExecEnvComponent } from "./context";
 
 /**
  * 同区接口端点 —— **恒建**。
- * 每一项都在 2026-09-08 的零出网 spike 里真调成功过(耗时见 ②b S-7)。
+ * 每一项都在 2026-09-08 的零出网 spike 里真调成功过(耗时)。
  */
 export const RUNTIME_INTERFACE_ENDPOINTS = [
   "sts",
@@ -48,14 +47,14 @@ export const AIRFLOW_SERVERLESS_INTERFACE_ENDPOINTS = ["airflow-serverless"] as 
 
 /**
  * 网关端点(**免费**,挂私有路由表)。
- * 🔴 网关端点**不改 DNS**(靠路由表里的前缀列表 `pl-…`)⇒ 探活不能断「解析到私网」(②b S-10)。
+ * 🔴 网关端点**不改 DNS**(靠路由表里的前缀列表 `pl-…`)⇒ 探活不能断「解析到私网」。
  */
 export const GATEWAY_ENDPOINTS = ["s3", "dynamodb"] as const;
 
 /**
  * 🔴 要**经跨区私网通路回主控区**的服务:目前只有 **home 的 DynamoDB**(运行台账回写)。
  *
- * 【语义在 WP-23 变了,名字也跟着换】WP-16 时这里叫 `CROSS_REGION_ENDPOINTS`,意思是
+ * 【语义在变了,名字也跟着换】时这里叫 `CROSS_REGION_ENDPOINTS`,意思是
  * 「在本区建哪些**跨区** VPC 端点」;而跨区端点被组织 SCP 拦死(`vpce:AllowMultiRegion`)⇒
  * 承载方式换成 **跨区 peering + 主控区那一侧的同区接口端点 + 本区私有托管域**(SPEC §3.14ter)。
  * 现在这个清单的意思是「**哪些服务名要被本区的私有托管域劫到主控区端点上**」。
@@ -63,7 +62,7 @@ export const GATEWAY_ENDPOINTS = ["s3", "dynamodb"] as const;
  *
  * 为什么只有它:唯一的跨区调用就是把 run 台账写回控制面的 `bgp-*` 表(SPEC §3.14「控制面回写 = 唯一跨区例外」)。
  * 🔴 为什么**没有** KMS:靶表虽是 CMK 加密,但 SSE-KMS 由 DynamoDB 服务侧代调 KMS,
- *    调用方无需网络可达 —— spike 未建任何跨区 KMS 端点而条件写照样成功(②b S-6)。
+ *    调用方无需网络可达 —— spike 未建任何跨区 KMS 端点而条件写照样成功。
  */
 export const HOME_LINK_SERVICES = ["dynamodb"] as const;
 

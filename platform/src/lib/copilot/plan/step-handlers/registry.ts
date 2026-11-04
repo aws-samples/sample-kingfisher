@@ -1,4 +1,4 @@
-// 模块 44 — StepHandler 注册表(表驱动 SPI,照抄 lib/engines/registry.ts)。
+// StepHandler 注册表(表驱动 SPI,照抄 lib/engines/registry.ts)。
 // 加步骤类型 = STEP_HANDLERS 加一行 + 独立 handler 纯增量;推进器(executor)零改动。
 
 import type { StepHandler } from "./spi";

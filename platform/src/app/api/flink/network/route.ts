@@ -2,13 +2,12 @@ export const dynamic = "force-dynamic";
 import { NextRequest } from "next/server";
 import { DescribeVpcsCommand, DescribeSubnetsCommand, DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
 import { apiOk, apiError } from "@/lib/api-response";
-// @kf-batch 50-WP4quater-reads(工单 SC-30)
 // 🔴 原来这里是一个模块级主控区 EC2 客户端 ⇒ 在 us-west-2 视角建 CDC / EMR 作业时,网络下拉里列的是
 // **主控区的 VPC / 子网 / 安全组**。这不是「少个功能」,是给了一份看着正常、其实属于另一个区的清单:
 // 选中就写进 MSAF VpcConfigurations / EMR 网络配置,提交时才炸,而报错指向网络配置本身。
 // ⇒ 客户端按 `?targetId=` 解出的 region 建,并把 region 回给前端(护栏 2:落点必须一眼可见)。
 import { resolveGlueBinding } from "@/lib/exec-env/data-plane-target";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 ⇒ 400,不默认主控区)
+// 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { ec2ClientFor } from "@/lib/exec-env/target-clients";

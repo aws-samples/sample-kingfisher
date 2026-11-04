@@ -1,6 +1,6 @@
-// B-120 守卫 —— core-dist(三个 AgentCore 容器 + genbi 技能 Lambda **入库**的 CJS 产物)必须与它的 TS 源同步。
+// 守卫 —— core-dist(三个 AgentCore 容器 + genbi 技能 Lambda **入库**的 CJS 产物)必须与它的 TS 源同步。
 //
-// 【缺陷原形(2026-10-24,台账 B-120)】序 46 给厂商档案 vendors.ts 加的 probeTimeoutMs 从没回写进入库的 core-dist/ai/vendors.js ⇒
+// 【缺陷原形(2026-10-24,台账)】给厂商档案 vendors.ts 加的 probeTimeoutMs 从没回写进入库的 core-dist/ai/vendors.js ⇒
 //   用入库副本部署的智能体按旧档案探测模型;tsc / vitest / 红线全绿 —— 产物是构建快照,此前没有任何「与源同步」的守卫
 //   (10-24 三条全新安装链起跑前 deploy-all 的 core-prebuild 重生成才在 git status 里看到 6 个文件有差)。
 // 【守卫】scripts/core-prebuild.sh 每次生成时把 tsc **真正吃进去**的源(--listFilesOnly 的 platform/src 子集)及 sha256 写进
@@ -63,7 +63,7 @@ const readManifest = (dest: string) => JSON.parse(fs.readFileSync(path.join(dest
   sources: Record<string, string>;
 };
 
-describe("🔴 B-120 core-dist 与源同步守卫(能力注册表 = scripts/core-prebuild.sh)", () => {
+describe("🔴 core-dist 与源同步守卫(能力注册表 = scripts/core-prebuild.sh)", () => {
   it("注册表抽取没失效:5 个能力 / 8 个 core-dist 目标(加能力时同步改这里 —— 这是防抽取空转,不是上限)", () => {
     expect(Object.keys(CAP_TSCONFIG).sort()).toEqual(["ai", "cookbook", "genbi", "netadvisor", "paramadvisor"]);
     expect(cases.length).toBe(8);
@@ -83,7 +83,7 @@ describe("🔴 B-120 core-dist 与源同步守卫(能力注册表 = scripts/core
       if (!fs.existsSync(abs)) stale.push(`${src}(源已不存在)`);
       else if (sha256(abs) !== recorded) stale.push(src);
     }
-    expect(stale, `🔴 B-120:下列源改了但 ${rel(dest)} 没重生成 —— 跑 bash scripts/core-prebuild.sh ${cap} 并把产物一起提交:\n  ${stale.join("\n  ")}`).toEqual([]);
+    expect(stale, `🔴 下列源改了但 ${rel(dest)} 没重生成 —— 跑 bash scripts/core-prebuild.sh ${cap} 并把产物一起提交:\n  ${stale.join("\n  ")}`).toEqual([]);
   });
 
   it.each(cases)("$name:include 展开的每个源都在清单里;rootDir 下的源与 .js 产物一一对应", ({ cap, dest }) => {
@@ -92,7 +92,7 @@ describe("🔴 B-120 core-dist 与源同步守卫(能力注册表 = scripts/core
     const { files, rootDir } = includedSources(CAP_TSCONFIG[cap]);
     expect(files.length).toBeGreaterThan(0);
     const missing = files.map(rel).filter((file) => !sources.has(file));
-    expect(missing, `🔴 B-120:新增源没进 ${rel(dest)} —— 跑 bash scripts/core-prebuild.sh ${cap}:\n  ${missing.join("\n  ")}`).toEqual([]);
+    expect(missing, `🔴 新增源没进 ${rel(dest)} —— 跑 bash scripts/core-prebuild.sh ${cap}:\n  ${missing.join("\n  ")}`).toEqual([]);
     // 子能力的 core-dist 是本目录的子目录(genbi/core-dist/{cookbook,ai} 等)⇒ 那些 .js 属于别的能力,跳过
     const childDests = cases.filter((other) => other.dest !== dest && other.dest.startsWith(dest + path.sep)).map((other) => other.dest);
     const jsFiles = walk(dest, ".js").filter((file) => !childDests.some((child) => file.startsWith(child + path.sep)));

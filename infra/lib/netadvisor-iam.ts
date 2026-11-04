@@ -11,7 +11,7 @@
 
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
-// @kf-batch 52-P52.5a-supply — regionalStatement:资源 ARN 的 region 段唯一出口 + 显式轴声明。
+// regionalStatement:资源 ARN 的 region 段唯一出口 + 显式轴声明。
 import { requestedRegionCondition, regionalStatement } from "./shared/execution-regions";
 
 // environment-probe.ts 实际调用的 EC2 只读 API(每个 Describe 见该文件对应行)。

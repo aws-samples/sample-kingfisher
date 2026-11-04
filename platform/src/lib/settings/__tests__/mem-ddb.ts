@@ -1,7 +1,6 @@
-// @kf-batch 50-W5-seg2-WP8
 // 单测用的内存 DynamoDB(DocumentClient 语义子集)。
 //
-// 🔴 为什么不用「按 UpdateExpression 前缀分派」的桩(run-lock.test.ts 那种):模块 51 的 store
+// 🔴 为什么不用「按 UpdateExpression 前缀分派」的桩(run-lock.test.ts 那种): store
 // 走 **TransactWriteCommand(条件写 + ADD + Put 三项一事务)**,桩若只回 `{}` 就测不出
 // 「事务任一项失败 ⇒ 全部不落」「条件失败 ⇒ 409」「事务里的审计 item 与 writeAuditRecord 同形」——
 // 这些正是 51 SPEC §6.1③④ 的承重断言。所以这里真的解释表达式、真的做全有全无。

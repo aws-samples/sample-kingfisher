@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP9a-durable-jobs
-// POST /api/internal/dataplane-jobs/sweep —— 「绑定即自动供给」的补队(WORK-PACKAGES WP-9 ⑨-6;systemActor)。
+// POST /api/internal/dataplane-jobs/sweep —— 「绑定即自动供给」的补队(⑨-6;systemActor)。
 //
 // 唯一调用方:本进程的推进泵(每 10 分钟一次,只在持 leader 租约的副本上)。
 // 做的事:对凭证状态在 provisioning / isolated 的每个执行环境,按**唯一口径** `listProjectsWithBindings`
@@ -10,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeAuditRecord } from "@/lib/audit";
 import { verifyInternalCaller, DATAPLANE_JOB_PUMP_PRINCIPAL, INTERNAL_SOURCE_DATAPLANE_JOB_PUMP } from "@/lib/scheduler/internal-guard";
 import { sweepAutoSupply } from "@/lib/exec-env/project-cred-supply";
-// 序 61 B-133 —— 同一 tick 顺带巡检数据源外部网络对象(平台自建组 / 连接被平台外删除 ⇒ 在没人用之前自愈;覆盖不经 TS 启动核心的调度运行时路径)
+// 同一 tick 顺带巡检数据源外部网络对象(平台自建组 / 连接被平台外删除 ⇒ 在没人用之前自愈;覆盖不经 TS 启动核心的调度运行时路径)
 import { sweepDatasourceNetwork, type NetworkSweepSummary } from "@/lib/datasource/network-sweep";
 import { SWEEP_ENDPOINT_PATH, dataplaneJobsPaused } from "@/lib/dataplane-jobs/schema";
 
@@ -39,7 +38,7 @@ export async function POST(req: NextRequest) {
     if (s.enqueued > 0 || s.errors.length > 0) {
       await audit("dataplane-job.auto-supply.sweep", { targets: s.targets, enqueued: s.enqueued, existing: s.existing, errors: s.errors.slice(0, 20) });
     }
-    // 序 61 B-133:数据源网络对象巡检(自愈的写审计 / 告警由核对作者自己做;这里只在有自愈或读写错误时记一条汇总,broken 首次已由核对作者记过)
+    // 数据源网络对象巡检(自愈的写审计 / 告警由核对作者自己做;这里只在有自愈或读写错误时记一条汇总,broken 首次已由核对作者记过)
     const net: NetworkSweepSummary = await sweepDatasourceNetwork().catch((e) => ({
       scanned: 0, intact: 0, healed: [], broken: [], unverifiable: 0,
       errors: [{ datasourceId: "*", error: String((e as Error)?.message ?? e).slice(0, 300) }],

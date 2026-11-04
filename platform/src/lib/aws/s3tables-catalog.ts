@@ -1,4 +1,4 @@
-// @kf-batch 43-page-sweep(B-91)—— S3 Tables 联邦目录 `s3tablescatalog` 的**运行时唯一作者**。
+// S3 Tables 联邦目录 `s3tablescatalog` 的**运行时唯一作者**。
 //
 // 事实:Athena 直查 / 问数靠 Glue Data Catalog 里的 FederatedCatalog(ConnectionName=aws:s3tables)把本区所有 S3 Tables 表桶
 //   暴露成 `"s3tablescatalog/<表桶>"."<命名空间>"."<表>"`。它不是 CDK 能建的资源(CloudFormation 没有对应类型);原来只有

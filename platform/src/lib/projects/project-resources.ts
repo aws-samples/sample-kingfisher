@@ -1,13 +1,12 @@
-// @kf-batch 52-P52.1-D4
 // 🔴 **删项目空间的前置校验:该项目下还有什么**(52 DESIGN §D4 最后一条,R9 深审补的设计缺口)。
 //
 // 【为什么必须有】改动前 `DELETE /api/projects/[id]` 只删 project 行 + 成员行,**不看资源**。
 // 于是删一个还有资源的项目会留下:
 //   · 悬空 `projectId` 的数据源/同步/作业/工作流…(列表里按项目过滤 ⇒ 谁也再看不到,
 //     但它们的 Glue job / MWAA DAG / DMS 任务**还在真跑、还在计费**);
-//   · 数据面孤儿 schema `proj_<id>`(P52.5b 建的表还在,占存储、还带着业务数据);
+//   · 数据面孤儿 schema `proj_<id>`(建的表还在,占存储、还带着业务数据);
 //   · 成员行虽然被删了,用户却再也没有入口去处置自己的东西。
-// ⇒ 对齐**模块 50 删执行环境**的同款策略(50 §4.4:绑定资源/调度/run 全为 0 才可删):
+// ⇒ 对齐**删执行环境**的同款策略(50 §4.4:绑定资源/调度/run 全为 0 才可删):
 //   **默认禁止 + 400 列明细**,不级联删除(级联删数据风险过高,列二期)。
 //
 // 【口径:什么算"资源"】只数**资源定义**(用户创建、会真的去跑/被引用的东西),
@@ -24,17 +23,17 @@ import { listReports } from "@/lib/bi/reports";
 import { listContextOwnedByProject } from "@/lib/genbi/context";
 import { listSkillsOwnedByProject } from "@/lib/genbi/skills";
 import { listRules } from "@/lib/alerting/rules";
-// @kf-batch 50-project-delete-orphans — 三类「项目删了还在 / 还在跑」的孤儿(真环境清理 128 个夹具项目时抓到)
+// 三类「项目删了还在 / 还在跑」的孤儿(真环境清理 128 个夹具项目时抓到)
 import { listOpenPlansOwnedByProject } from "@/lib/copilot/plan/plan-service";
 import { listOpenPlansOwnedByProject as listOpenBackfillPlansOwnedByProject } from "@/lib/backfill/service";
 import { listActionSchedulesOwnedByProject } from "@/lib/scheduler/action-schedules";
 import { ACTION_SCHEDULE_TASK_TYPES, type ActionScheduleTaskType } from "@/lib/scheduler/carrier-ledger";
 import { listMembers, getProject } from "./project-service";
-// 模块 55 第二批:等 Redshift Data 终态的唯一原语(本函数只能在长操作 project-delete 的执行上下文里被调;请求路径直接调 ⇒ 抛)
+// 等 Redshift Data 终态的唯一原语(本函数只能在长操作 project-delete 的执行上下文里被调;请求路径直接调 ⇒ 抛)
 import { awaitTerminal, LongOpWaitBudgetExceeded } from "@/lib/long-ops/await-terminal";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
-// @kf-batch 54-genbi-session-cards — 「看不清 ⇒ 视为不安全」那一条的既有实现(含账号号脱敏),
+// 「看不清 ⇒ 视为不安全」那一条的既有实现(含账号号脱敏),
 //   blockers 会经 HTTP 响应 + 审计外泄 ⇒ 绝不把 AWS 原文直接拼进去。
 import { sanitizeAwsErrorMessage } from "@/lib/exec-env/deploy-control";
 
@@ -52,7 +51,7 @@ export interface ResourceCount {
 
 /**
  * 数据面 schema 表数核实结果(`null` 表数永远只配 unavailable)。
- * B-95 曾加过第三态 `pending`(45s 预算到期仍排队 ⇒ 路由 202「正在唤醒数仓」+ 页面自动重发);模块 55 第二批把删项目改成长操作后,
+ * 曾加过第三态 `pending`(45s 预算到期仍排队 ⇒ 路由 202「正在唤醒数仓」+ 页面自动重发);把删项目改成长操作后,
  * 盘点语句在执行体里等到终态,专用协议退役 ⇒ 两态。
  */
 export type SchemaCheck = "ok" | "unavailable";
@@ -104,12 +103,10 @@ const ATTR_TABLES: ReadonlyArray<{ kind: string; label: string; table: string }>
  * ⚠️ `quota#` 那一行没有 `projectId` 属性 ⇒ 不会被 `projectId = :pid` 过滤命中,不虚增计数。
  */
 const USER_OWNED_TABLES: ReadonlyArray<{ kind: string; label: string; table: string }> = [
-  // @kf-batch 54-genbi-session-cards
   { kind: "genbi-card", label: "问数会话卡片(属个人,需本人删除)", table: TABLES.GENBI_CARDS },
 ];
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 平台动作调度对象(`bgp-action-schedules`)按种类进清单 —— 🔴 **从闭合词表 `ACTION_SCHEDULE_TASK_TYPES` 派生**,
  * 不手写三行:将来新增一种调度对象(第四种),它**自动**进删项目的前置校验;而标签表是
  * `Record<ActionScheduleTaskType, string>` ⇒ 新种类不给标签 `tsc` 就不过(类型堵死「加了种类、忘了数它」)。
@@ -134,9 +131,8 @@ const OWN_LIST_KINDS: ReadonlyArray<{
   list: (projectId: string) => Promise<unknown[]>;
 }> = [
   { kind: "bi-report", label: "BI 报表/看板", list: listReports },
-  // @kf-batch 50-W5-seg2-WP1 — 「数据服务 API」一类已随能力下线去掉(2026-09-05,50 SPEC §3.9c):代码不再认识 bgp-data-apis 表,
+  // 「数据服务 API」一类已随能力下线去掉(2026-09-05,50 SPEC §3.9c):代码不再认识 bgp-data-apis 表,
   //   留着会让删项目去查一张代码不再认识的表。表实测 0 条、infra 保留,不构成孤儿资源。
-  // @kf-batch 50-WP23-project-delete-own-only
   // 🔴🔴 这两行必须用 **owned-only** 的版本:模块自己的 `listContext` / `listSkills` 为了问数可用性
   //    **合并 `global` 作用域**,拿它当「归属」判据 ⇒ 刚建的空项目被全局共享条目挡住、删不掉,
   //    而拒因让用户去删**别人也在用**的东西(真环境 GC-15 抓到:13 条全局口径)。
@@ -144,7 +140,6 @@ const OWN_LIST_KINDS: ReadonlyArray<{
   { kind: "genbi-context", label: "问数业务口径", list: listContextOwnedByProject },
   { kind: "genbi-skill", label: "问数技能", list: listSkillsOwnedByProject },
   { kind: "alert-rule", label: "告警规则", list: listRules },
-  // @kf-batch 50-project-delete-orphans
   // 🔴 Copilot 执行计划:只数**未收口**的(还会被确认 / 被 L3 推进 / 还会建出作业)。已收口的是历史记录,
   //    且计划没有删除入口 —— 连它也算 ⇒ 跑过一次 Copilot 的项目永远删不掉。口径的唯一作者是 `isPlanOpen`。
   { kind: "copilot-plan", label: "Copilot 执行计划(未收口;可在计划中心取消)", list: listOpenPlansOwnedByProject },
@@ -168,7 +163,6 @@ export const PROJECT_RESOURCE_LABELS: Readonly<Record<string, string>> = Object.
 );
 
 /**
- * @kf-batch 50-project-delete-orphans
  * 🔴 **按项目存、但刻意不数**的类型 —— 把「为什么不数」写成数据,门禁钉住(不许悄悄从清单里消失,也不许没理由地漏)。
  * 判据:只数**资源定义**(用户建的、会跑 / 被引用 / 有处置入口的东西);下面这些要么是历史 / 派生知识,
  * 要么是系统代管(由产品自己回收),阻断删除只会让项目永远删不掉而管理员无从处置。
@@ -269,7 +263,7 @@ export const SCHEMA_COUNT_MAX_POLLS = 150;
  * 盘点语句提交之后的等待(抽成可注入的纯逻辑,与 `countAllPages` 同一个理由:必须被可执行断言钉住)。
  *
  * 两态:FINISHED ⇒ `ok`(拿结果);FAILED / ABORTED / 结果不是数 / 等到轮数上限 ⇒ `unavailable`(fail-closed)。
- * 🔴 模块 55 第二批:原 B-95 的「45s 预算到期 ⇒ pending ⇒ 202 warming ⇒ 页面重发」退役 —— 等待经唯一原语 awaitTerminal,
+ * 🔴 原该缺陷的「45s 预算到期 ⇒ pending ⇒ 202 warming ⇒ 页面重发」退役 —— 等待经唯一原语 awaitTerminal,
  *    数仓冷恢复期间整条删除由 submitLongOp 转 202,页面右下「正在后台执行:删除项目空间」;这里只管等到终态。
  * 轮询间隔 500ms 起、每次 ×1.5、顶 2s:冷启动 30–90s 的等待不该每半秒打一次 DescribeStatement。
  */
@@ -317,17 +311,17 @@ export async function awaitSchemaCountStatement(
  *
  * 🔴 **查不到就是查不到,绝不当 0**:返回 `unavailable` 由调用方 fail-closed
  *    (把"没核实"当成"没有表"就是拿孤儿表换一次痛快)。
- * P52.5b 落地前 `proj_<id>` schema 通常并不存在 ⇒ 正常返回 0(不是错误)。
+ * 落地前 `proj_<id>` schema 通常并不存在 ⇒ 正常返回 0(不是错误)。
  * 数仓冷恢复时语句会排队几十秒到几分钟:在长操作 project-delete 里经 awaitTerminal 等到终态(见 awaitSchemaCountStatement)。
  */
 async function countSchemaTables(schemaName: string): Promise<SchemaCount> {
   try {
     const [{ ExecuteStatementCommand, DescribeStatementCommand, GetStatementResultCommand }, { getRedshiftSecretArn }] =
       await Promise.all([import("@aws-sdk/client-redshift-data"), import("@/lib/redshift/admin-secret")]);
-    // @kf-batch 50-WP2-directquery —— 合同 home-only(盘的是主控区控制面资源;跨区残留归 52 删项目项)
+    // 合同 home-only(盘的是主控区控制面资源;跨区残留归 52 删项目项)
     const { redshiftClientForHomeOnly } = await import("@/lib/exec-env/target-clients");
     const rs = redshiftClientForHomeOnly("project-inventory");
-    // @kf-batch 52-P52.5a-supply — 静态归类:**admin / 清点**(删项目前盘点 `proj_<id>` 里的表数)。
+    // 静态归类:**admin / 清点**(删项目前盘点 `proj_<id>` 里的表数)。
     // 🔴 **刻意不传 project**:这条路径在项目**正在被删**时跑,用它自己的身份去数它自己的表,
     //    会在凭证已回收/项目已消失时把盘点变成"无法核实"⇒ fail-closed ⇒ **项目永远删不掉**
     //    (memory `unwired-code-is-unverified` 记的正是这一类:assertProjectId 拒掉真 projectId
@@ -394,7 +388,7 @@ export function buildBlockers(input: {
 /**
  * 盘点一个项目空间下的一切,并给出**阻断删除的原因**。
  *
- * 判据(全为 0 才可删,与模块 50 §4.4 同款):资源定义 0 · 其它成员 0 · 数据面 schema 内表 0。
+ * 判据(全为 0 才可删,与§4.4 同款):资源定义 0 · 其它成员 0 · 数据面 schema 内表 0。
  * 数据面那一项若**没能核实**,同样阻断(fail-closed)。
  */
 export async function inventoryProject(projectId: string): Promise<ProjectInventory> {

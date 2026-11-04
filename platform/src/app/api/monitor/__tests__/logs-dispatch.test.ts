@@ -1,4 +1,3 @@
-// @kf-batch 50-WP23-monitor-logs-dispatch
 // 监控页的「日志」按钮必须**按任务类型分派**,不许把不认识的 id 一律说成「暂无日志」。
 //
 // 【用户 2026-09-15 原话】「我发现跑完的任务都没有日志,点击日志,显示暂无日志,我特意点击的是
@@ -35,7 +34,7 @@ vi.mock("@/lib/projects/guard", () => ({
 // 🔴 只 mock **被委派的那两个路由**(它们是本判据的「外部」),不 mock 兄弟逻辑
 vi.mock("@/app/api/etl-jobs/[id]/logs/route", () => ({
   GET: vi.fn(async (_req: unknown, ctx: { params: Promise<{ id: string }> }) => {
-    const params = await ctx.params; // Next 15(序 68):委托调用传的是 Promise
+    const params = await ctx.params; // Next 15:委托调用传的是 Promise
     const { NextResponse } = await import("next/server");
     return NextResponse.json({ success: true, data: { engine: "glue", logs: [`ETL 真日志 for ${params.id}`, "第二行"] } });
   }),

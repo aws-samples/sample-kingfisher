@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-WP30-decommission
-// POST /api/admin/exec-envs/[targetId]/destroy-observe —— 观测销毁并收口(WP-30 施工序 5;详情页销毁中时轮询,周期 reconciler 也调同一个函数)。
+// POST /api/admin/exec-envs/[targetId]/destroy-observe —— 观测销毁并收口(详情页销毁中时轮询,周期 reconciler 也调同一个函数)。
 // build 还在跑 ⇒ 只读回报;build 结束 ⇒ 平台**自己真查目标区**:本 slug 无栈 ∧ 无本 target 的 VPC ∧ 托管服务不在 ⇒ `deleted`;
 // 否则留 `decommissioning` 并把卡住的那个资源 + 真因写进 lastError(页面原样显示;不许假装删完)。
 // 是 POST 不是 GET:它会写注册表(收口),GET 不许有副作用。

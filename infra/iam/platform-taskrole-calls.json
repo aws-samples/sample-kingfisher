@@ -1,5 +1,5 @@
 {
-  "$comment": "@kf-batch 50-WP15-airflow-serverless(T-8)。平台 ECS TaskRole **真实会发出**的控制面调用清单(动作 × 资源形态 × 条件上下文),供 scripts/iam-simulate-gate.py 在每次平台栈部署后用 IAM SimulatePrincipalPolicy 离线模拟:任何一条不是 allowed 就红。为什么存在:WP-15 一刀内同一类 IAM 缺陷三次(T-2 缺 iam:GetRole / T-7 缺 codebuild:ListBuildsForProject / T-8 CreateWorkflow 资源模式 bgp* 永不匹配 workflow/*),动作名守卫抓不到资源模式错,只有按真实 ARN 形态模拟才抓得到。占位:{acct} 账号、{region} 执行 region(axis=execution 逐区模拟)、{home} 控制面 region(axis=home 只模拟 home)。单测 iam-call-manifest.test.ts 钉:代码 import 的每个 XxxCommand ⇒ 本清单有 <service>:Xxx ⇒ platform-stack.ts 有该字面。 🔴 资源形态口径:只写**服务自己报出的 ARN 形态**(get-workflow.WorkflowArn / describe-log-groups.arn / AccessDenied 消息里的 on resource),不要自己拼:模拟器按动作声明的资源类型校验 ARN,形态不对(如给 GetLogEvents 写 log-stream、日志组裸名以 / 结尾)会被判 implicitDeny 而与策略无关(2026-09-07 实测)。 🔴 不支持资源级权限的动作(服务报错写 <type>/*,如 CreateWorkflow)清单资源写 *,模拟器对它给任何 ARN(含字面 <type>/*)都判 implicitDeny。 🔴 服务以调用者身份代做的 FAS 调用(CloudTrail userIdentity.invokedBy=<service>)也必须进清单 —— 代码 import 里看不到它(T-9:CreateWorkflow 代建日志组)。 🔴 2026-09-08 WP-16:EIP 预检两条 any-region 调用**已删除**(功能随零出网下线),改为零出网探活五条;axis=any-region 的机制保留备用 —— 原说明:axis=any-region(K-7,2026-09-08):这条调用必须在**任何** region 都 allowed(含尚未放行给控制面的),模拟门用一个故意不在 --regions 里的探测 region 打它;这类「只在新区失效」的洞用 execution 轴模拟永远抓不到。",
+  "$comment": "平台 ECS TaskRole **真实会发出**的控制面调用清单(动作 × 资源形态 × 条件上下文),供 scripts/iam-simulate-gate.py 在每次平台栈部署后用 IAM SimulatePrincipalPolicy 离线模拟:任何一条不是 allowed 就红。为什么存在:一刀内同一类 IAM 缺陷三次(缺 iam:GetRole 缺 codebuild:ListBuildsForProject CreateWorkflow 资源模式 bgp* 永不匹配 workflow/*),动作名守卫抓不到资源模式错,只有按真实 ARN 形态模拟才抓得到。占位:{acct} 账号、{region} 执行 region(axis=execution 逐区模拟)、{home} 控制面 region(axis=home 只模拟 home)。单测 iam-call-manifest.test.ts 钉:代码 import 的每个 XxxCommand ⇒ 本清单有 <service>:Xxx ⇒ platform-stack.ts 有该字面。 🔴 资源形态口径:只写**服务自己报出的 ARN 形态**(get-workflow.WorkflowArn / describe-log-groups.arn / AccessDenied 消息里的 on resource),不要自己拼:模拟器按动作声明的资源类型校验 ARN,形态不对(如给 GetLogEvents 写 log-stream、日志组裸名以 / 结尾)会被判 implicitDeny 而与策略无关(2026-09-07 实测)。 🔴 不支持资源级权限的动作(服务报错写 <type>/*,如 CreateWorkflow)清单资源写 *,模拟器对它给任何 ARN(含字面 <type>/*)都判 implicitDeny。 🔴 服务以调用者身份代做的 FAS 调用(CloudTrail userIdentity.invokedBy=<service>)也必须进清单 —— 代码 import 里看不到它(CreateWorkflow 代建日志组)。 🔴 2026-09-:EIP 预检两条 any-region 调用**已删除**(功能随零出网下线),改为零出网探活五条;axis=any-region 的机制保留备用 —— 原说明:axis=any-region(K-7,2026-09-08):这条调用必须在**任何** region 都 allowed(含尚未放行给控制面的),模拟门用一个故意不在 --regions 里的探测 region 打它;这类「只在新区失效」的洞用 execution 轴模拟永远抓不到。",
   "principal": {
     "discover": "ecs-task-role",
     "cluster": "bgp-cluster"
@@ -9,7 +9,7 @@
       "action": "airflow-serverless:CreateWorkflow",
       "axis": "execution",
       "resource": "*",
-      "why": "首发 workflow;动作不支持资源级权限(服务报 workflow/*),策略只能 Resource *;模拟也只能用 *(T-8)",
+      "why": "首发 workflow;动作不支持资源级权限(服务报 workflow/*),策略只能 Resource *;模拟也只能用 *",
       "source": "platform/src/lib/scheduler/serverless/workflow-client.ts"
     },
     {
@@ -96,7 +96,7 @@
       "action": "iam:GetRole",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/bgp-airflow-sls-role",
-      "why": "seed-home / 探活 airflow-serverless:role(T-2)",
+      "why": "seed-home / 探活 airflow-serverless:role",
       "source": "platform/src/lib/exec-env/seed-home.ts"
     },
     {
@@ -113,21 +113,21 @@
       "context": {
         "iam:AWSServiceName": "airflow-serverless.amazonaws.com"
       },
-      "why": "FAS:CreateWorkflow 每次都以调用者身份调 CreateServiceLinkedRole(SLR 已存在也照调;CloudTrail invokedBy=airflow-serverless.amazonaws.com;T-10)",
+      "why": "FAS:CreateWorkflow 每次都以调用者身份调 CreateServiceLinkedRole(SLR 已存在也照调;CloudTrail invokedBy=airflow-serverless.amazonaws.com)",
       "source": "platform/src/lib/scheduler/serverless/workflow-client.ts"
     },
     {
       "action": "logs:CreateLogGroup",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/mwaa-serverless/bgp_etl_01EXAMPLE__tgt_usw2_a-AbCdEfGhIj/:*",
-      "why": "FAS:CreateWorkflow 时服务以调用者身份代建默认日志组(CloudTrail invokedBy=airflow-serverless.amazonaws.com;T-9)。代码里看不见,按 CloudTrail 登记",
+      "why": "FAS:CreateWorkflow 时服务以调用者身份代建默认日志组(CloudTrail invokedBy=airflow-serverless.amazonaws.com)。代码里看不见,按 CloudTrail 登记",
       "source": "platform/src/lib/scheduler/serverless/workflow-client.ts"
     },
     {
       "action": "logs:GetLogEvents",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/mwaa-serverless/bgp_etl_01EXAMPLE__tgt_usw2_a-AbCdEfGhIj/:*",
-      "why": "运行日志 Modal 读任务实例日志流(S-11);资源类型 = 日志组,ARN 用 describe-log-groups 报出的形态(名以 / 结尾 + :*)",
+      "why": "运行日志 Modal 读任务实例日志流;资源类型 = 日志组,ARN 用 describe-log-groups 报出的形态(名以 / 结尾 + :*)",
       "source": "platform/src/lib/scheduler/serverless/task-logs.ts"
     },
     {
@@ -162,7 +162,7 @@
       "action": "codebuild:ListBuildsForProject",
       "axis": "home",
       "resource": "arn:aws:codebuild:{home}:{acct}:project/bgp-exec-env-deploy",
-      "why": "恢复分类第二证据(T-6 / T-7)",
+      "why": "恢复分类第二证据",
       "source": "platform/src/lib/exec-env/deploy-control.ts"
     },
     {
@@ -181,14 +181,14 @@
       "action": "ec2:DescribeVpcs",
       "axis": "execution",
       "resource": "*",
-      "why": "建数据源时要读**该区 VPC 自己的** CIDR 来放行源库端口(WP-23 起非 home 的 VPC 从地址池取段,写死 10.0.0.0/16 会一条也放行不到 ⇒ 浏览表 0 张)",
+      "why": "建数据源时要读**该区 VPC 自己的** CIDR 来放行源库端口(非 home 的 VPC 从地址池取段,写死 10.0.0.0/16 会一条也放行不到 ⇒ 浏览表 0 张)",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "ec2:DescribeNetworkInterfaces",
       "axis": "execution",
       "resource": "*",
-      "why": "序 58 B-130:删数据源后平台自建安全组 bgp-ds-* 的持久清理作业按**网卡事实**收口 —— 该组还被网卡引用就等,为 0 才 DeleteSecurityGroup(原来 10 × 30 秒拍脑袋重试耗尽即永久遗留)",
+      "why": "删数据源后平台自建安全组 bgp-ds-* 的持久清理作业按**网卡事实**收口 —— 该组还被网卡引用就等,为 0 才 DeleteSecurityGroup(原来 10 × 30 秒拍脑袋重试耗尽即永久遗留)",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
@@ -202,7 +202,7 @@
       "action": "ec2:DeleteSecurityGroup",
       "axis": "execution",
       "resource": "*",
-      "why": "删数据源 / 建源失败清理时删平台自建的 bgp-ds-* 组(序 58 起网卡未释放时由持久清理作业在网卡为 0 后执行)",
+      "why": "删数据源 / 建源失败清理时删平台自建的 bgp-ds-* 组(网卡未释放时由持久清理作业在网卡为 0 后执行)",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
@@ -223,7 +223,7 @@
       "action": "ec2:DescribeVpcPeeringConnections",
       "axis": "execution",
       "resource": "*",
-      "why": "零出网探活 network:home-link —— 跨区 peering 必须 active,且对端网段从它身上读(WP-23 起取代原来的跨区端点:那个形态被组织 SCP 拦死)",
+      "why": "零出网探活 network:home-link —— 跨区 peering 必须 active,且对端网段从它身上读(取代原来的跨区端点:那个形态被组织 SCP 拦死)",
       "source": "platform/src/lib/exec-env/probe-runner.ts"
     },
     {
@@ -258,7 +258,7 @@
       "action": "secretsmanager:CreateSecret",
       "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/datasource/01EXAMPLE-AbCdEf",
-      "why": "序 31 三刀 IAM 侧(2026-10-21,…9435 observe 第四十四轮 place.creds.denied 量出):数据源凭证的建 / 改 / 删一直走源所属区的数据面客户端(secret 建在该区,与 Glue 连接读侧同区),此前只登记了读的一半 ⇒ 「能读不能建」是上一轮「能建不能读」的镜像(非对称授权);数据面角色 OwnRegionCredentialSecretsWrite 同笔补 bgp/datasource/*",
+      "why": "IAM 侧(2026-10-21,…9435 observe 第四十四轮 place.creds.denied 量出):数据源凭证的建 / 改 / 删一直走源所属区的数据面客户端(secret 建在该区,与 Glue 连接读侧同区),此前只登记了读的一半 ⇒ 「能读不能建」是上一轮「能建不能读」的镜像(非对称授权);数据面角色 OwnRegionCredentialSecretsWrite 同笔补 bgp/datasource/*",
       "source": "platform/src/lib/datasource-spi/secrets.ts"
     },
     {
@@ -279,14 +279,14 @@
       "action": "secretsmanager:ListSecrets",
       "axis": "execution",
       "resource": "*",
-      "why": "序 31 三刀 IAM 侧:「从 RDS 发现建源」按区列托管密钥给实例配对(discoverRdsInstances);动作不支持资源级权限 ⇒ 只能 *,靠区域条件关在本区;数据面角色同笔加进 REGIONAL_DATA_PLANE_ACTIONS",
+      "why": "IAM 侧:「从 RDS 发现建源」按区列托管密钥给实例配对(discoverRdsInstances);动作不支持资源级权限 ⇒ 只能 *,靠区域条件关在本区;数据面角色同笔加进 REGIONAL_DATA_PLANE_ACTIONS",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "secretsmanager:CreateSecret",
       "axis": "home",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/dms/redshift-target-AbCdEf",
-      "why": "序 31 三刀 IAM 侧:实时链建 Redshift 专用用户 dms_ingest 后写完整字段密钥给 DMS(bgp/dms/redshift-target,主控区);observe 量到 PutSecretValue 被拒;数据面角色写语句同笔补 bgp/dms/*",
+      "why": "IAM 侧:实时链建 Redshift 专用用户 dms_ingest 后写完整字段密钥给 DMS(bgp/dms/redshift-target,主控区);observe 量到 PutSecretValue 被拒;数据面角色写语句同笔补 bgp/dms/*",
       "source": "platform/src/lib/realtime/redshift-target.ts"
     },
     {
@@ -300,21 +300,21 @@
       "action": "s3:ListAllMyBuckets",
       "axis": "home",
       "resource": "*",
-      "why": "序 31 三刀 IAM 侧:系统设置「服务状态」数账号里有几个桶 —— 账号级清点(全球命名空间、不含数据),控制面调用;原挂数据面轴被主控区数据面角色拒 20 次,改走控制面轴;动作不支持资源级 ⇒ *",
+      "why": "IAM 侧:系统设置「服务状态」数账号里有几个桶 —— 账号级清点(全球命名空间、不含数据),控制面调用;原挂数据面轴被主控区数据面角色拒 20 次,改走控制面轴;动作不支持资源级 ⇒ *",
       "source": "platform/src/app/api/s3/buckets/route.ts"
     },
     {
       "action": "secretsmanager:GetSecretValue",
       "axis": "home",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:rds!db-01EXAMPLE-AbCdEf",
-      "why": "序 31 三刀 IAM 侧:「从 RDS 发现建源」把实例托管主密钥(rds!db-… / 演示库 CDK 命名)的账密复制进平台 bgp/datasource/<id>,是建源时的一次性控制面读(getAccountSecretViaControlPlane);数据面角色刻意不放宽到 secret:*;observe 量到 3 次被拒",
+      "why": "IAM 侧:「从 RDS 发现建源」把实例托管主密钥(rds!db-… / 演示库 CDK 命名)的账密复制进平台 bgp/datasource/<id>,是建源时的一次性控制面读(getAccountSecretViaControlPlane);数据面角色刻意不放宽到 secret:*;observe 量到 3 次被拒",
       "source": "platform/src/app/api/datasources/route.ts"
     },
     {
       "action": "secretsmanager:CreateSecret",
       "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/shared-writer/usw2-a-AbCdEf",
-      "why": "WP-11b:非 home 建模落地首次在该区供给窄权写者 shared_writer,secret bgp/shared-writer/<targetSlug> 建在该 target 所在 region(写语句 ProjectCredentialSecretWrite 的 bgp/*)",
+      "why": "非 home 建模落地首次在该区供给窄权写者 shared_writer,secret bgp/shared-writer/<targetSlug> 建在该 target 所在 region(写语句 ProjectCredentialSecretWrite 的 bgp/*)",
       "source": "platform/src/lib/exec-env/admin-ddl-executor.ts"
     },
     {
@@ -352,371 +352,371 @@
       "action": "dms:StopReplicationTask",
       "axis": "execution",
       "resource": "*",
-      "why": "WP-24 同步通道真下线:停复制任务(DMS 控制面动作不支持资源级限定,策略与模拟都只能 *)(函数:teardownReplicationTask)",
+      "why": "同步通道真下线:停复制任务(DMS 控制面动作不支持资源级限定,策略与模拟都只能 *)(函数:teardownReplicationTask)",
       "source": "platform/src/lib/realtime/dms-service.ts"
     },
     {
       "action": "dms:DeleteReplicationTask",
       "axis": "execution",
       "resource": "*",
-      "why": "WP-24 删同步任务时撤掉复制任务;缺它的真实下场:502「没能真正停下来」+ 行保留(2026-09-17 真环境实测)(函数:teardownReplicationTask)",
+      "why": "删同步任务时撤掉复制任务;缺它的真实下场:502「没能真正停下来」+ 行保留(2026-09-17 真环境实测)(函数:teardownReplicationTask)",
       "source": "platform/src/lib/realtime/dms-service.ts"
     },
     {
       "action": "glue:GetJobRuns",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-sync-01EXAMPLE",
-      "why": "WP-24 停 Glue 通道前先取**非终态**的真实 runId(原来传空数组 = 什么都没停)",
+      "why": "停 Glue 通道前先取**非终态**的真实 runId(原来传空数组 = 什么都没停)",
       "source": "platform/src/lib/sync/teardown.ts"
     },
     {
       "action": "glue:GetJobRuns",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "B-97 发现作业 StartJobRun 撞 ConcurrentRunsExceeded 时先找这个作业的在途运行认领(Glue 并发计数在上一次刚结束后滞后几十秒;原来直接 502 给用户)(函数:startRunAdoptingConcurrent)",
+      "why": "发现作业 StartJobRun 撞 ConcurrentRunsExceeded 时先找这个作业的在途运行认领(Glue 并发计数在上一次刚结束后滞后几十秒;原来直接 502 给用户)(函数:startRunAdoptingConcurrent)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "glue:BatchStopJobRun",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-sync-01EXAMPLE",
-      "why": "WP-24 真停 Glue 同步作业的在跑 run",
+      "why": "真停 Glue 同步作业的在跑 run",
       "source": "platform/src/lib/sync/teardown.ts"
     },
     {
       "action": "glue:DeleteJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-sync-01EXAMPLE",
-      "why": "WP-24 删同步任务时连 Glue 作业一起删(否则 Glue 里留一个没人管的作业)",
+      "why": "删同步任务时连 Glue 作业一起删(否则 Glue 里留一个没人管的作业)",
       "source": "platform/src/lib/sync/teardown.ts"
     },
     {
       "action": "glue:GetJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-sync-01EXAMPLE",
-      "why": "序 38 B-68 建 / 更新同步作业前先 GetJob 判存在(存在 ⇒ UpdateJob;原来靠 CreateJob 报 already exists 判,定义有变时 Glue 回幂等不匹配 ⇒ 保存 502 / 启动 500)(函数:ensureGlueSyncJob)",
+      "why": "建 / 更新同步作业前先 GetJob 判存在(存在 ⇒ UpdateJob;原来靠 CreateJob 报 already exists 判,定义有变时 Glue 回幂等不匹配 ⇒ 保存 502 / 启动 500)(函数:ensureGlueSyncJob)",
       "source": "platform/src/lib/sync/start-run.ts"
     },
     {
       "action": "glue:GetCatalog",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:catalog/s3tablescatalog",
-      "why": "序 43 B-91:S3 Tables 联邦目录 s3tablescatalog 是否已开通 —— 同步启动(写 S3 Tables)与数据湖直查两处都先问一次。原来只有同步启动问,且这三条调用从没进过清单(门禁覆盖面就是判据本身)。资源形态按 Glue 文档的 catalog 子资源写,现网未拿到 AccessDenied 原话(函数:ensureS3TablesFederatedCatalog)",
+      "why": "S3 Tables 联邦目录 s3tablescatalog 是否已开通 —— 同步启动(写 S3 Tables)与数据湖直查两处都先问一次。原来只有同步启动问,且这三条调用从没进过清单(门禁覆盖面就是判据本身)。资源形态按 Glue 文档的 catalog 子资源写,现网未拿到 AccessDenied 原话(函数:ensureS3TablesFederatedCatalog)",
       "source": "platform/src/lib/aws/s3tables-catalog.ts"
     },
     {
       "action": "glue:CreateCatalog",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:catalog",
-      "why": "序 43 B-91:联邦目录不存在就开通(FederatedCatalog ConnectionName=aws:s3tables,Identifier=本区全部表桶)。全新账号直查 CATALOG_NOT_FOUND 的根因 = 这步原来只挂在同步启动路径上(函数:ensureS3TablesFederatedCatalog)",
+      "why": "联邦目录不存在就开通(FederatedCatalog ConnectionName=aws:s3tables,Identifier=本区全部表桶)。全新账号直查 CATALOG_NOT_FOUND 的根因 = 这步原来只挂在同步启动路径上(函数:ensureS3TablesFederatedCatalog)",
       "source": "platform/src/lib/aws/s3tables-catalog.ts"
     },
     {
       "action": "glue:PassConnection",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:connection/aws:s3tables",
-      "why": "序 43 B-91:CreateCatalog 联邦到 AWS 托管连接 aws:s3tables 时必须能传递该连接(缺它同步到 S3 Tables 启动即 500「glue:PassConnection on connection/aws:s3tables is not authorized」,platform-stack.ts 早已放行但从未进清单)(函数:ensureS3TablesFederatedCatalog)",
+      "why": "CreateCatalog 联邦到 AWS 托管连接 aws:s3tables 时必须能传递该连接(缺它同步到 S3 Tables 启动即 500「glue:PassConnection on connection/aws:s3tables is not authorized」,platform-stack.ts 早已放行但从未进清单)(函数:ensureS3TablesFederatedCatalog)",
       "source": "platform/src/lib/aws/s3tables-catalog.ts"
     },
     {
       "action": "glue:GetConnection",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:connection/bgp-conn-EXAMPLE",
-      "why": "建源 DS-16 / 「测试连接(按 id)」校验 Glue 连接已建成且带 JDBC URL / 子网(函数:testConnection,打该源所在区)。序 49 ② B-73:这只是配置核对,**不再**拿它写 status=active,连通性结论交给 lib/datasource/reachability-probe(控制面直连或发现作业)。序 38 B-70 曾在这里登记 glue:TestConnection,2026-10-13 实测平台建的传统 JDBC 连接不支持它 ⇒ 探测改用发现作业,TestConnection 已撤",
+      "why": "建源 DS-16 / 「测试连接(按 id)」校验 Glue 连接已建成且带 JDBC URL / 子网(函数:testConnection,打该源所在区)。:这只是配置核对,**不再**拿它写 status=active,连通性结论交给 lib/datasource/reachability-probe(控制面直连或发现作业)。曾在这里登记 glue:TestConnection,2026-10-13 实测平台建的传统 JDBC 连接不支持它 ⇒ 探测改用发现作业,TestConnection 已撤",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "glue:GetJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "序 38 B-70 数据源经 Glue 连接发现表:一次性作业 bgp-ds-discover-<源 id 尾 12 位>,建 / 更新前先判存在(函数:startDiscovery → upsertGlueJob)",
+      "why": "数据源经 Glue 连接发现表:一次性作业 bgp-ds-discover-<源 id 尾 12 位>,建 / 更新前先判存在(函数:startDiscovery → upsertGlueJob)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "glue:CreateJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "序 38 B-70 建发现作业(Glue 5.1,2×G.1X,挂数据源的 Glue 连接)(函数:startDiscovery → upsertGlueJob)",
+      "why": "建发现作业(Glue 5.1,2×G.1X,挂数据源的 Glue 连接)(函数:startDiscovery → upsertGlueJob)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "glue:UpdateJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "序 38 B-70 发现作业已存在时更新定义(脚本 / 连接以最新为准)(函数:startDiscovery → upsertGlueJob)",
+      "why": "发现作业已存在时更新定义(脚本 / 连接以最新为准)(函数:startDiscovery → upsertGlueJob)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "glue:StartJobRun",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "序 38 B-70 起一次发现(--result_uri / --database)(函数:startDiscovery)",
+      "why": "一次发现(--result_uri / --database)(函数:startDiscovery)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "glue:GetJobRun",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-ds-discover-EXAMPLE",
-      "why": "序 38 B-70 轮询发现作业状态;SUCCEEDED 才去读结果 JSON(函数:readDiscovery)",
+      "why": "轮询发现作业状态;SUCCEEDED 才去读结果 JSON(函数:readDiscovery)",
       "source": "platform/src/lib/datasource/glue-reach.ts"
     },
     {
       "action": "s3tables:GetTableBucket",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/customer-own-tables-example",
-      "why": "序 38 B-71 登记外部表桶前核该区真有这个表桶(客户自有表桶,平台只读它:表树 / 目录 / 问数要能看见)(函数:registerExternalTableBucket)",
+      "why": "登记外部表桶前核该区真有这个表桶(客户自有表桶,平台只读它:表树 / 目录 / 问数要能看见)(函数:registerExternalTableBucket)",
       "source": "platform/src/lib/lake/external-table-buckets.ts"
     },
     {
       "action": "s3tables:ListNamespaces",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/customer-own-tables-example",
-      "why": "序 38 B-71 外部表桶的命名空间进表树 / 问数按命名空间找桶(函数:listNamespaceTreeAll / resolveS3TablesPlaceForNamespace)",
+      "why": "外部表桶的命名空间进表树 / 问数按命名空间找桶(函数:listNamespaceTreeAll / resolveS3TablesPlaceForNamespace)",
       "source": "platform/src/lib/athena/s3tables.ts"
     },
     {
       "action": "s3tables:ListTables",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/customer-own-tables-example",
-      "why": "序 38 B-71 外部表桶的表进表树(函数:listNamespaceTreeAll)",
+      "why": "外部表桶的表进表树(函数:listNamespaceTreeAll)",
       "source": "platform/src/lib/athena/s3tables.ts"
     },
     {
       "action": "glue:GetJob",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-game-seed-tgt_usw2_a",
-      "why": "@kf-batch 50-CAPSEED-seed-dispatch —— 「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:启动前确认该区真有造数作业(没有 ⇒ 409「该区没有造数作业」,生产模式部署就是这个形态)",
+      "why": "「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:启动前确认该区真有造数作业(没有 ⇒ 409「该区没有造数作业」,生产模式部署就是这个形态)",
       "source": "platform/src/lib/seed/run-once.ts"
     },
     {
       "action": "glue:StartJobRun",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-game-seed-tgt_usw2_a",
-      "why": "@kf-batch 50-CAPSEED-seed-dispatch —— 「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:启动一轮(非主控区显式带 --datalake = 描述符里该区的湖桶)",
+      "why": "「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:启动一轮(非主控区显式带 --datalake = 描述符里该区的湖桶)",
       "source": "platform/src/lib/seed/run-once.ts"
     },
     {
       "action": "glue:GetJobRun",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-game-seed",
-      "why": "@kf-batch 50-CAPSEED-seed-dispatch —— 「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:轮询到终态(手动 = 后台收口写 run 台账;定时 = 等终态,失败就让命令 failed)",
+      "why": "「在该区下发一次造数」(登记 CAP-SEED):复用部署期建在**该区**的造数作业(主控区 bgp-game-seed / 其它区 bgp-game-seed-<targetId>,22/23-seed-* 建)。 本条:轮询到终态(手动 = 后台收口写 run 台账;定时 = 等终态,失败就让命令 failed)",
       "source": "platform/src/lib/seed/run-once.ts"
     },
     {
       "action": "logs:GetLogEvents",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws-glue/jobs/output:*",
-      "why": "@kf-batch 50-CAPSEED-seed-dispatch —— 任务监控里点开手动造数那条 run 的日志:读**该区**的 /aws-glue/jobs/{error,output}(流 = JobRunId);授权来自 TaskRole 的 CloudWatchLogsReadOnlyAccess",
+      "why": "任务监控里点开手动造数那条 run 的日志:读**该区**的 /aws-glue/jobs/{error,output}(流 = JobRunId);授权来自 TaskRole 的 CloudWatchLogsReadOnlyAccess",
       "source": "platform/src/lib/seed/seed-logs.ts"
     },
     {
       "action": "kinesis:CreateStream",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:「数据源」页 provision **按需新建该区的源流**(平台刻意不建固定流)⇒ 只放 home 则第二个区一条流都建不出来,实时计算从第一步就废。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:「数据源」页 provision **按需新建该区的源流**(平台刻意不建固定流)⇒ 只放 home 则第二个区一条流都建不出来,实时计算从第一步就废。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesis:AddTagsToStream",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:「数据源」页 provision **按需新建该区的源流**(平台刻意不建固定流)⇒ 只放 home 则第二个区一条流都建不出来,实时计算从第一步就废。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:「数据源」页 provision **按需新建该区的源流**(平台刻意不建固定流)⇒ 只放 home 则第二个区一条流都建不出来,实时计算从第一步就废。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesis:DescribeStream",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesis:DescribeStreamSummary",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesis:ListShards",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:建流后轮询等 ACTIVE / introspect 报 shard 数与保留期 / 探活。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesis:GetShardIterator",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:实时作业详情页读流里的样本记录(演示/排查)。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:实时作业详情页读流里的样本记录(演示/排查)。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesis:GetRecords",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:实时作业详情页读流里的样本记录(演示/排查)。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:实时作业详情页读流里的样本记录(演示/排查)。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesis:PutRecord",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:详情页「造数」往**该区的**源流写测试记录 —— 没有它那个区的实时作业永远等不到数据。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:详情页「造数」往**该区的**源流写测试记录 —— 没有它那个区的实时作业永远等不到数据。",
       "source": "platform/src/app/api/flink/jobs/[id]/produce/route.ts"
     },
     {
       "action": "kinesis:PutRecords",
       "axis": "execution",
       "resource": "arn:aws:kinesis:{region}:{acct}:stream/bgp-rt-example",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:详情页「造数」往**该区的**源流写测试记录 —— 没有它那个区的实时作业永远等不到数据。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:详情页「造数」往**该区的**源流写测试记录 —— 没有它那个区的实时作业永远等不到数据。",
       "source": "platform/src/app/api/flink/jobs/[id]/produce/route.ts"
     },
     {
       "action": "kinesis:ListStreams",
       "axis": "execution",
       "resource": "*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:账号级动作(不关联具体 stream ARN)⇒ 资源必须 *,用区域条件收窄;「使用已有流」下拉靠它。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:账号级动作(不关联具体 stream ARN)⇒ 资源必须 *,用区域条件收窄;「使用已有流」下拉靠它。",
       "source": "platform/src/lib/datasource-spi/stream/kinesis.ts"
     },
     {
       "action": "kinesisanalytics:CreateApplication",
       "axis": "execution",
       "resource": "*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 🔴 与 airflow-serverless:CreateWorkflow 同形:**创建时不支持资源级权限** —— 2026-09-19 实测给 `application/bgp-flink-01EXAMPLE` 或 `application/*` 都判 implicitDeny,只有 `*` 才 allowed ⇒ 清单资源写 *。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 🔴 与 airflow-serverless:CreateWorkflow 同形:**创建时不支持资源级权限** —— 2026-09-19 实测给 `application/bgp-flink-01EXAMPLE` 或 `application/*` 都判 implicitDeny,只有 `*` 才 allowed ⇒ 清单资源写 *。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:StartApplication",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:StopApplication",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:DescribeApplication",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:DeleteApplication",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:UpdateApplication",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:AddApplicationCloudWatchLoggingOption",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:CreateApplicationPresignedUrl",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:ListApplicationSnapshots",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:CreateApplicationSnapshot",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:DescribeApplicationSnapshot",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:DeleteApplicationSnapshot",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:TagResource",
       "axis": "execution",
       "resource": "arn:aws:kinesisanalytics:{region}:{acct}:application/bgp-flink-01EXAMPLE",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用是**该区**的资源(一个流作业一个应用),启停/对账/快照/销毁都发生在那个区。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "kinesisanalytics:ListApplications",
       "axis": "execution",
       "resource": "*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:账号级列举(状态对账用)⇒ 资源 *,区域条件收窄。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:账号级列举(状态对账用)⇒ 资源 *,区域条件收窄。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:CreateLogGroup",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:CreateLogStream",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:DeleteLogGroup",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:PutRetentionPolicy",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:DescribeLogStreams",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "logs:FilterLogEvents",
       "axis": "execution",
       "resource": "arn:aws:logs:{region}:{acct}:log-group:/aws/kinesis-analytics/bgp-flink-01EXAMPLE:*",
-      "why": "@kf-batch 50-WP27-9cap-matrix —— 🔴 实时计算(模块 32)那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
+      "why": "🔴 实时计算那一族**从来没进过本清单** ⇒ IAM 模拟门 95 条里一条都没探过它,而它的资源 ARN 又钉死在部署区 ⇒ 第二个区静默无权。2026-09-19 SimulatePrincipalPolicy 坐实:us-west-2 全 implicitDeny、us-east-1 allowed。覆盖面就是判据本身 —— 矩阵里没有的那一类 = 默认豁免。 本条:MSAF 应用的日志组在**应用所在那个区**;只放 home ⇒ 非 home 流作业「起来了但看不到日志」,而崩溃循环 / CDC 位点过期只在日志里看得见。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
@@ -751,210 +751,210 @@
       "action": "secretsmanager:GetSecretValue",
       "axis": "home",
       "resource": "arn:aws:secretsmanager:{home}:{acct}:secret:bgp/internal/action-dispatch-key-AbCdEf",
-      "why": "WP-28 内部端点守卫读共享密钥(分发 Lambda ↔ 平台)",
+      "why": "内部端点守卫读共享密钥(分发 Lambda ↔ 平台)",
       "source": "platform/src/lib/scheduler/internal-guard.ts"
     },
     {
       "action": "dynamodb:GetItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-action-commands",
-      "why": "WP-28 消费端读命令行(动作 / 参数只从这里来)",
+      "why": "消费端读命令行(动作 / 参数只从这里来)",
       "source": "platform/src/lib/scheduler/action-dispatch.ts"
     },
     {
       "action": "dynamodb:UpdateItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-action-commands",
-      "why": "WP-28 抢单 pending→running + 写终态(条件写)",
+      "why": "抢单 pending→running + 写终态(条件写)",
       "source": "platform/src/lib/scheduler/action-dispatch.ts"
     },
     {
       "action": "dynamodb:PutItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-action-schedules",
-      "why": "WP-28/29 建平台动作的调度对象(治理定时任务 / 卡片定时刷新)",
+      "why": "建平台动作的调度对象(治理定时任务 / 卡片定时刷新)",
       "source": "platform/src/lib/scheduler/action-schedules.ts"
     },
     {
       "action": "dynamodb:UpdateItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-action-schedules",
-      "why": "WP-28/29 启停 + 发布台账 deployments[targetId](CarrierLedger)",
+      "why": "启停 + 发布台账 deployments[targetId](CarrierLedger)",
       "source": "platform/src/lib/scheduler/action-schedules.ts"
     },
     {
       "action": "dynamodb:PutItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-dataplane-jobs",
-      "why": "@kf-batch 50-WP9a-durable-jobs:入队(确定性 jobId + attribute_not_exists)",
+      "why": "入队(确定性 jobId + attribute_not_exists)",
       "source": "platform/src/lib/dataplane-jobs/store.ts"
     },
     {
       "action": "dynamodb:GetItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-dataplane-jobs",
-      "why": "@kf-batch 50-WP9a-durable-jobs:抢占前强一致读前态",
+      "why": "抢占前强一致读前态",
       "source": "platform/src/lib/dataplane-jobs/store.ts"
     },
     {
       "action": "dynamodb:UpdateItem",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-dataplane-jobs",
-      "why": "@kf-batch 50-WP9a-durable-jobs:claim / commit 的 CAS 条件写",
+      "why": "claim / commit 的 CAS 条件写",
       "source": "platform/src/lib/dataplane-jobs/store.ts"
     },
     {
       "action": "dynamodb:Query",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-dataplane-jobs/index/byDue",
-      "why": "@kf-batch 50-WP9a-durable-jobs:推进泵取到期作业(稀疏 GSI)",
+      "why": "推进泵取到期作业(稀疏 GSI)",
       "source": "platform/src/lib/dataplane-jobs/due.ts"
     },
     {
       "action": "dynamodb:Query",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-dataplane-jobs/index/byTarget",
-      "why": "@kf-batch 50-WP9a-durable-jobs:某环境的作业清单 / 在途数 / 最新 canary",
+      "why": "某环境的作业清单 / 在途数 / 最新 canary",
       "source": "platform/src/lib/dataplane-jobs/store.ts"
     },
     {
       "action": "cloudwatch:GetMetricData",
       "axis": "home",
       "resource": "*",
-      "why": "@kf-batch 50-WP9a-durable-jobs:isolated 前置 ④ 近 7 天 CredentialFallback 求和(GetMetricData 不支持资源级权限)",
+      "why": "isolated 前置 ④ 近 7 天 CredentialFallback 求和(GetMetricData 不支持资源级权限)",
       "source": "platform/src/lib/exec-env/isolation-prereqs.ts"
     },
     {
       "action": "secretsmanager:GetSecretValue",
       "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/project/usw2-a/proj-01EXAMPLE-AbCdEf",
-      "why": "@kf-batch 50-WP9a-durable-jobs:permission canary 用**该项目自己的** secret 经 Data API 执行(Data API 以调用者身份读 SecretArn)",
+      "why": "permission canary 用**该项目自己的** secret 经 Data API 执行(Data API 以调用者身份读 SecretArn)",
       "source": "platform/src/lib/exec-env/permission-canary.ts"
     },
     {
       "action": "secretsmanager:DeleteSecret",
       "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/project/usw2-a/proj-01EXAMPLE-AbCdEf",
-      "why": "@kf-batch 50-project-delete-orphans:删项目空间后,回收作业删掉该项目在该区的 per-project 凭证 secret(ForceDeleteWithoutRecovery;系统代管、可再生)",
+      "why": "删项目空间后,回收作业删掉该项目在该区的 per-project 凭证 secret(ForceDeleteWithoutRecovery;系统代管、可再生)",
       "source": "platform/src/lib/exec-env/target-clients.ts"
     },
     {
       "action": "redshift-serverless:GetSnapshot",
       "axis": "execution",
       "resource": "arn:aws:redshift-serverless:{region}:{acct}:snapshot/00000000-0000-4000-8000-000000000000",
-      "why": "WP-30 删除执行环境收口:平台自己真查该区「最终快照在不在」(删命名空间时拍的,数仓数据的唯一留存)—— 不信构建报告。只读。",
+      "why": "删除执行环境收口:平台自己真查该区「最终快照在不在」(删命名空间时拍的,数仓数据的唯一留存)—— 不信构建报告。只读。",
       "source": "platform/src/lib/exec-env/decommission.ts"
     },
     {
       "action": "iam:SimulatePrincipalPolicy",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/BgpExecEnvDeployStack-ExecEnvBuildRoleA1B2C3D4-AbCdEfGhIjKl",
-      "why": "B-40 新建执行环境的候选区:拿部署真正的身份(CodeBuild build 角色)模拟部署必需动作,读 OrganizationsDecisionDetail.AllowedByOrganizations,把被组织 SCP 拦住的区标成 blocked(列出但禁用)。只读、零副作用。",
+      "why": "新建执行环境的候选区:拿部署真正的身份(CodeBuild build 角色)模拟部署必需动作,读 OrganizationsDecisionDetail.AllowedByOrganizations,把被组织 SCP 拦住的区标成 blocked(列出但禁用)。只读、零副作用。",
       "source": "platform/src/lib/exec-env/region-org-block.ts"
     },
     {
       "action": "sts:AssumeRole",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/bgp-platform-data-role",
-      "why": "WP-31 序 5:数据面客户端代入该区平台数据面角色(唯一注入点 lib/aws/clients.ts#buildDataPlane;BGP_DATAPLANE_CREDS=observe/enforce 时发)",
+      "why": "数据面客户端代入该区平台数据面角色(唯一注入点 lib/aws/clients.ts#buildDataPlane;BGP_DATAPLANE_CREDS=observe/enforce 时发)",
       "source": "platform/src/lib/aws/clients.ts"
     },
     {
       "action": "sts:AssumeRole",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/BgpExecEnv-tgt-usw2-a-platform-data-role",
-      "why": "WP-31 序 5:数据面客户端代入该区平台数据面角色(唯一注入点 lib/aws/clients.ts#buildDataPlane;BGP_DATAPLANE_CREDS=observe/enforce 时发)",
+      "why": "数据面客户端代入该区平台数据面角色(唯一注入点 lib/aws/clients.ts#buildDataPlane;BGP_DATAPLANE_CREDS=observe/enforce 时发)",
       "source": "platform/src/lib/aws/clients.ts"
     },
     {
       "action": "dynamodb:Scan",
       "axis": "home",
       "resource": "arn:aws:dynamodb:{home}:{acct}:table/bgp-backfill-plans",
-      "why": "B-51c 补数后台推进泵列未收口计划(只投影键与状态)",
+      "why": "补数后台推进泵列未收口计划(只投影键与状态)",
       "source": "platform/src/lib/backfill/due.ts"
     },
     {
       "action": "s3tables:ListTableBuckets",
       "axis": "execution",
       "resource": "*",
-      "why": "序 37 B-60:建 / 改同步任务时提前告知「会被整表清空的非平台 S3 Tables 表」—— 先按表桶名找 ARN(List 动作不支持资源级权限)",
+      "why": "建 / 改同步任务时提前告知「会被整表清空的非平台 S3 Tables 表」—— 先按表桶名找 ARN(List 动作不支持资源级权限)",
       "source": "platform/src/lib/sync/target-table-guard.ts"
     },
     {
       "action": "s3tables:ListTableBuckets",
       "axis": "execution",
       "resource": "*",
-      "why": "序 45 B-93(客户待改进项):同步任务 Table Bucket / 系统设置登记外部表桶的下拉清单 —— 只读列该执行环境所在区账号内全部 S3 Tables 表桶(List 动作不支持资源级权限)",
+      "why": "(客户待改进项):同步任务 Table Bucket / 系统设置登记外部表桶的下拉清单 —— 只读列该执行环境所在区账号内全部 S3 Tables 表桶(List 动作不支持资源级权限)",
       "source": "platform/src/lib/lake/table-bucket-candidates.ts"
     },
     {
       "action": "s3tables:GetTable",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/bgp-table-bucket/table/0123abcd-0000-4000-8000-0123456789ab",
-      "why": "序 37 B-60:探目标表在不在 + 取 metadataLocation;表 ARN 形态 = bucket/<桶名>/table/<表 id>(服务报出的形态)",
+      "why": "探目标表在不在 + 取 metadataLocation;表 ARN 形态 = bucket/<桶名>/table/<表 id>(服务报出的形态)",
       "source": "platform/src/lib/sync/target-table-guard.ts"
     },
     {
       "action": "s3tables:CreateNamespace",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/bgp-table-bucket",
-      "why": "序 47c:数据目录「新建表」建 S3 Tables(Iceberg)表前确保命名空间存在(该执行区自己的表桶;同步作业启动路径早已调同一动作)",
+      "why": "数据目录「新建表」建 S3 Tables(Iceberg)表前确保命名空间存在(该执行区自己的表桶;同步作业启动路径早已调同一动作)",
       "source": "platform/src/lib/governance/catalog-ddl.ts"
     },
     {
       "action": "s3tables:CreateTable",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/bgp-table-bucket",
-      "why": "序 47c:数据目录「新建表」在该执行区的表桶里按 Iceberg schema 建表(控制面 CreateTable,不经 Spark CTAS)",
+      "why": "数据目录「新建表」在该执行区的表桶里按 Iceberg schema 建表(控制面 CreateTable,不经 Spark CTAS)",
       "source": "platform/src/lib/governance/catalog-ddl.ts"
     },
     {
       "action": "s3tables:GetTableData",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/bgp-table-bucket/table/0123abcd-0000-4000-8000-0123456789ab",
-      "why": "序 37 B-60:读 metadataLocation 指向的 Iceberg 元数据 JSON(S3 API 打表桶内部存储位置,由 s3tables:GetTableData 背书)看 properties 里的平台标记。🔴 现网未实测这条 IAM 口径,模拟门若判红优先怀疑这里",
+      "why": "读 metadataLocation 指向的 Iceberg 元数据 JSON(S3 API 打表桶内部存储位置,由 s3tables:GetTableData 背书)看 properties 里的平台标记。🔴 现网未实测这条 IAM 口径,模拟门若判红优先怀疑这里",
       "source": "platform/src/lib/sync/target-table-guard.ts"
     },
     {
       "action": "ec2:CreateSecurityGroup",
       "axis": "execution",
       "resource": "*",
-      "why": "建 JDBC 数据源时在该区 VPC 建平台安全组 bgp-ds-*(自动探测路径;用户指定了组则一个不建)。序 61 B-133 起**核对自愈**也调它:平台组被平台外删除 ⇒ 按源行重建并接回 Glue 连接(CreateSecurityGroup 带 TagSpecifications,所以不另发 CreateTags)",
+      "why": "建 JDBC 数据源时在该区 VPC 建平台安全组 bgp-ds-*(自动探测路径;用户指定了组则一个不建)。起**核对自愈**也调它:平台组被平台外删除 ⇒ 按源行重建并接回 Glue 连接(CreateSecurityGroup 带 TagSpecifications,所以不另发 CreateTags)",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "ec2:AuthorizeSecurityGroupIngress",
       "axis": "execution",
       "resource": "*",
-      "why": "新建的平台安全组放行源库端口(来自该区 VPC 自己的 CIDR,见 ec2:DescribeVpcs)+ 组内自引用;序 61 B-133 自愈重建同一条",
+      "why": "新建的平台安全组放行源库端口(来自该区 VPC 自己的 CIDR,见 ec2:DescribeVpcs)+ 组内自引用;自愈重建同一条",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "ec2:CreateTags",
       "axis": "execution",
       "resource": "*",
-      "why": "序 61 B-133:存量平台安全组(2.1.2 及之前建的,没有归属标签)在首次核对时补 bgp:managed / bgp:datasourceId / bgp:targetId —— 标签是「这是平台的对象,别删」的唯一机器可读凭据,系统设置「数据源网络对象」清单与孤儿清理按它判归属",
+      "why": "存量平台安全组(2.1.2 及之前建的,没有归属标签)在首次核对时补 bgp:managed / bgp:datasourceId / bgp:targetId —— 标签是「这是平台的对象,别删」的唯一机器可读凭据,系统设置「数据源网络对象」清单与孤儿清理按它判归属",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "ec2:DescribeSubnets",
       "axis": "execution",
       "resource": "*",
-      "why": "建源探测时读候选子网 AZ;序 61 B-133 核对自愈时核源行记的子网是否还在(用户指定的子网不在 ⇒ 如实 broken 指路,平台探测选的 ⇒ 重选);B-133 第二刀起建 / 改 Glue 连接前都按子网事实取 AvailabilityZone(连接缺 AZ ⇒ Glue 作业「Unable to resolve any valid connection」)",
+      "why": "建源探测时读候选子网 AZ;核对自愈时核源行记的子网是否还在(用户指定的子网不在 ⇒ 如实 broken 指路,平台探测选的 ⇒ 重选);第二刀起建 / 改 Glue 连接前都按子网事实取 AvailabilityZone(连接缺 AZ ⇒ Glue 作业「Unable to resolve any valid connection」)",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "glue:CreateConnection",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:connection/bgp-conn-EXAMPLE",
-      "why": "建 JDBC 数据源时建该区的 Glue 连接(JDBC URL / 凭证密钥 / 子网 / 安全组);序 61 B-133 起连接被平台外删除 ⇒ 由源行 + 密钥按同一函数重建",
+      "why": "建 JDBC 数据源时建该区的 Glue 连接(JDBC URL / 凭证密钥 / 子网 / 安全组);连接被平台外删除 ⇒ 由源行 + 密钥按同一函数重建",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
       "action": "glue:UpdateConnection",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:connection/bgp-conn-EXAMPLE",
-      "why": "编辑数据源改 host / 口令 / 网络时同步 Glue 连接(序 42 B-83);序 61 B-133 起自愈重建安全组或重选子网后把连接的物理要求接回新对象",
+      "why": "编辑数据源改 host / 口令 / 网络时同步 Glue 连接;自愈重建安全组或重选子网后把连接的物理要求接回新对象",
       "source": "platform/src/lib/aws/datasource-service.ts"
     },
     {
@@ -964,7 +964,7 @@
       "context": {
         "iam:PassedToService": "glue.amazonaws.com"
       },
-      "why": "序 72 B-139(模块 56):任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 Glue CreateJob / UpdateJob(Role)。",
+      "why": "任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 Glue CreateJob / UpdateJob(Role)。",
       "source": "platform/src/lib/etl/job-service.ts"
     },
     {
@@ -974,7 +974,7 @@
       "context": {
         "iam:PassedToService": "emr-serverless.amazonaws.com"
       },
-      "why": "序 72 B-139(模块 56):任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 EMR Serverless StartJobRun(executionRoleArn)。",
+      "why": "任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 EMR Serverless StartJobRun(executionRoleArn)。",
       "source": "platform/src/lib/engines/emr/provider.ts"
     },
     {
@@ -984,28 +984,28 @@
       "context": {
         "iam:PassedToService": "kinesisanalytics.amazonaws.com"
       },
-      "why": "序 72 B-139(模块 56):任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 MSAF CreateApplication(ServiceExecutionRole)。",
+      "why": "任务执行角色可选 —— 用户在作业 / 同步任务 / 流作业上绑定**账号内自建**的角色(与 AWS 控制台同口径,任何该服务可承担的角色),平台把它传给作业服务。资源 role/*,条件 iam:PassedToService 锁死服务;示例角色名只是形态,真名由客户决定。 MSAF CreateApplication(ServiceExecutionRole)。",
       "source": "platform/src/lib/realtime/flink-service.ts"
     },
     {
       "action": "iam:ListRoles",
       "axis": "home",
       "resource": "*",
-      "why": "序 72 B-139:页面「执行角色」下拉的候选来源(分页全量读账号角色,按信任策略含该引擎服务主体者入选,分组 平台默认 / 顾问生成 / 自建),「刷新」按钮重拉。只读。",
+      "why": "页面「执行角色」下拉的候选来源(分页全量读账号角色,按信任策略含该引擎服务主体者入选,分组 平台默认 / 顾问生成 / 自建),「刷新」按钮重拉。只读。",
       "source": "platform/src/lib/execution-role/candidates.ts"
     },
     {
       "action": "iam:GetRole",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/customer-owned-glue-job-role",
-      "why": "序 72 B-139:保存 / 启动前预检 ① 角色存在 ② 信任策略含该引擎服务主体(自建角色不信任 glue.amazonaws.com 时当场指路,而不是运行到 assume-role 失败)。任意角色名。",
+      "why": "保存 / 启动前预检 ① 角色存在 ② 信任策略含该引擎服务主体(自建角色不信任 glue.amazonaws.com 时当场指路,而不是运行到 assume-role 失败)。任意角色名。",
       "source": "platform/src/lib/role-advisor/preflight.ts"
     },
     {
       "action": "iam:SimulatePrincipalPolicy",
       "axis": "home",
       "resource": "arn:aws:iam::{acct}:role/customer-owned-glue-job-role",
-      "why": "序 72 B-139:保存 / 启动前预检 ③ 对作业**实际引用面**逐条模拟 —— 引擎基线 + 脚本桶 + --extra-py-files / --extra-jars 每个 URI + 脚本里的 s3:// 字面(客户现网 403 = 角色读不到依赖库所在的桶,这一条就是在保存那一刻把它量出来)。任意角色名,带 aws:RequestedRegion = 落点区。",
+      "why": "保存 / 启动前预检 ③ 对作业**实际引用面**逐条模拟 —— 引擎基线 + 脚本桶 + --extra-py-files / --extra-jars 每个 URI + 脚本里的 s3:// 字面(客户现网 403 = 角色读不到依赖库所在的桶,这一条就是在保存那一刻把它量出来)。任意角色名,带 aws:RequestedRegion = 落点区。",
       "source": "platform/src/lib/role-advisor/preflight.ts"
     }
   ]

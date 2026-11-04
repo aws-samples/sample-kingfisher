@@ -1,5 +1,4 @@
-// @kf-batch 50-WP7-sync-pushdown(施工序 2)
-// 钉两件事(WP-7 合同 ④-2 的「home 等价单测 + 变异验红」):
+// 钉两件事(合同 ④-2 的「home 等价单测 + 变异验红」):
 //   ① **home 逐字节等价**:注入进脚本的每个落点值 == 改造前的字面量/表达式,逐项相等
 //      (region=env / staging=bgp-datalake-<acct> / 表桶=bgp-table-bucket / 库=x||dev);
 //   ② **判别力**(第十五段教训:现网数据让对错两种实现同结果 ⇒ 必须造判别夹具):
@@ -38,7 +37,7 @@ beforeEach(() => {
 });
 
 /**
- * @kf-batch 50-WP31-place-first-class —— 序 4(L6):数仓四样以 PlaceWire 进脚本(`_BGP_PLACE = bgp_read_place("<json>")`)。
+ * 数仓四样以 PlaceWire 进脚本(`_BGP_PLACE = bgp_read_place("<json>")`)。
  * 抠出那段 JSON 解析成对象再比值;读取方式另由下面的接线断言钉(rs_client / rs_workgroup / … 都必须从它取)。
  */
 function rsPlaceOf(script: string): { targetId: string; region: string; redshift?: { workgroup: string; database: string; secretArn?: string } } {
@@ -93,7 +92,7 @@ async function homeBindings(secretArn?: string | null): Promise<GlueScriptBindin
   };
 }
 
-describe("WP-7 施工序2:home 注入值 == 改造前字面量,逐项相等", () => {
+describe("home 注入值 == 改造前字面量,逐项相等", () => {
   it("home landing 三样与旧字面量逐字相等(staging 桶 / 表桶 / region)", async () => {
     const { landing } = await homeBindings();
     // 改造前:secretsmanager/redshift-data 客户端 region = process.env.AWS_REGION || "us-east-1"
@@ -150,7 +149,7 @@ const usw2: GlueScriptBindings = {
   },
 };
 
-describe("WP-7 施工序2:非 home binding 的判别力(双向)", () => {
+describe("非 home binding 的判别力(双向)", () => {
   it("正向:脚本里的六个落点全是 usw2 的值", () => {
     const script = generateGlueScript(baseTask, jdbcDs, usw2);
     expect(script).toContain('sm = boto3.client("secretsmanager", region_name="us-west-2")');

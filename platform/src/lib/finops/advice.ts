@@ -1,4 +1,4 @@
-// 模块 40 — 确定性优化建议引擎(照模块36 检测器 SPI 注册表:新增规则只在 RULES 追加一行)。
+// 确定性优化建议引擎(照检测器 SPI 注册表:新增规则只在 RULES 追加一行)。
 // 铁律:建议值恒由确定性规则产出,AI 不参与取值(AI 解读留二期)。全部只读探测。
 
 import { homeRegion } from "@/lib/place/home-region";
@@ -12,7 +12,6 @@ import { listCostDaily, scanAllCostRuns } from "./store";
 import { UNIT_PRICES } from "./pricing";
 import type { Advice } from "./types";
 
-// @kf-batch 50-WP4quater-reads(工单 SC-24)
 // 🔴 这里原来是一个模块级主控区 DMS 客户端 ⇒ **别的区的空转实例永远不会被建议出来**,
 // 而它一直在按小时计费。成本建议漏一个区,等于那个区的浪费永远看不见 —— 比没有建议更坏,
 // 因为界面上写着「无优化建议」。
@@ -144,7 +143,6 @@ const RULES: AdviceRule[] = [
 ];
 
 /**
- * @kf-batch 50-WP4quater-reads(工单 SC-24)
  * @param regions 要探的区(缺省 = 只探主控区 ⇒ 与改动前逐字节等价,是回滚点)。
  * 🔴 只有真探 AWS 的规则用得到它;读 DDB 的规则(成本行 / 同步任务)本来就是全平台一份数据。
  */

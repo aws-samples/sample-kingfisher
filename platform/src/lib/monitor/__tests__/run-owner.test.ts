@@ -1,4 +1,3 @@
-// @kf-batch 52-P52.2-W2a-run-stamp
 // run 读侧归属判定的门禁。配套 `run-owner.ts`;并钉住 Copilot `check_run_status` 这个越权面。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

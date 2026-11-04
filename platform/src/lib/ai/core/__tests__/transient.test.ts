@@ -1,4 +1,3 @@
-// @kf-batch 51-v2-multi-vendor
 // 瞬态模型错误判定单测(51 SPEC §7.2b;DESIGN §12 D17)。夹具用 2026-10-14 …7698 真环境原话。
 // 钉三件事:① 清单内的原话 / 错误名 / 状态码判 transient,清单外(含 ValidationException 字段被拒、账号级被拒)判 false;
 // ② 退避有界且全幅抖动(rand=0 ⇒ 0,rand=1 ⇒ 顶到 cap);③ describeModelError 不吞字段、message 截 400。

@@ -1,15 +1,14 @@
 """
-@kf-batch 50-WP7pre-region-seed
 **在某个执行环境所在的 region 就地生成**游戏广告转化分析数据集(与 scripts/seed_game.py 同一套业务模型),
 写成 Parquet 落该区**自己的数据湖桶** + 注册进**该区的** Glue Catalog(库 `gamedata`)。
 
 🔴 为什么要「就地生成」而不是「从主控区同步过去」:
   源库(MySQL)只在主控区,跨区去读它=数据出境;而「多 region 用真实数据跑完全流程」要求那个区
-  **自己有数据**。同步搬运的逐区下推是 WP-7(产品 fail-closed:章不是 home 就 409,绝不偷偷在 home 跑)
+  **自己有数据**。同步搬运的逐区下推是(产品 fail-closed:章不是 home 就 409,绝不偷偷在 home 跑)
   —— 「真实数据」必须**生在本区**才符合驻留。数据是**确定性生成**的(seed 固定 + 行数由 scale 决定),
   所以两个区可以造出**同构可比**的数据。
 
-🔴 @kf-batch 50-WP7-sync-pushdown —— **schema 必须与 seed_game.py 逐列相同**(2026-09-18 真环境抓到的缺陷):
+🔴 **schema 必须与 seed_game.py 逐列相同**(2026-09-18 真环境抓到的缺陷):
   此前这里的列名是另一套(spend_usd / install_ts / is_payer / started_at / max_level / item_sku / paid_at /
   event_ts,事件名集合也不同),于是「同一个 ETL 作业在每个区都跑」在第二个区当场 `column does not exist`
   —— 而文件头写的正是「同构可比」。两套 schema 就是两套业务模型,任何跨区可比的分析都写不出来。

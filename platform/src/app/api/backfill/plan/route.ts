@@ -4,14 +4,13 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
-// @kf-batch 50-P50.3-mrquery
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { recordAudit } from "@/lib/audit";
 import { previewInstances, createPlan } from "@/lib/backfill/service";
-// @kf-batch 37-wf-sync-backfill —— 「强制并发」唯一判定出口(同步任务 = 1;含同步节点的工作流同理)
+// 「强制并发」唯一判定出口(同步任务 = 1;含同步节点的工作流同理)
 import { BACKFILL_TARGET_KINDS, forcedBackfillConcurrency } from "@/lib/backfill/types";
 import type { BackfillGranularity, BackfillScope, BackfillTargetKind, CreatePlanInput } from "@/lib/backfill/types";
-// @kf-batch 37-sync-backfill —— 同步任务「能不能补」的唯一作者
+// 同步任务「能不能补」的唯一作者
 import { syncTaskBackfillRejection } from "@/lib/backfill/sync-task";
 import { DEFAULT_PROJECT_ID } from "@/lib/projects/constants";
 
@@ -34,7 +33,7 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
   const cascade = !!body?.cascade;
   if (cascade && scope !== "workflow") return "仅 workflow 作用域支持级联下游(cascade)";
   // 客户端要的并发(1..10,缺省 2);有强制并发的目标(同步任务 / 含同步节点的工作流 = 1)在取到 DAG 之后由
-  // `forcedBackfillConcurrency` 一处判定并覆盖(@kf-batch 37-sync-backfill / 37-wf-sync-backfill)。
+  // `forcedBackfillConcurrency` 一处判定并覆盖(37-wf-sync-backfill)。
   const requestedConcurrency = Math.max(1, Math.min(10, parseInt(body?.concurrency, 10) || 2));
   const maxInstances = Math.max(1, Math.min(MAX_INSTANCES_HARD, parseInt(body?.maxInstances, 10) || 100));
 
@@ -42,7 +41,6 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
   let name = "";
   let taskType: string | undefined;
   let dag: any;
-  // @kf-batch 50-P50.3-mrquery
   // 🔴 **执行目标从资源行解析,绝不接受客户端指定** —— 客户端能挑"补到哪个区"就等于绕过绑定。
   // 单绑(存量全部)时展开结果与改动前**逐字节相同**。
   let execTargets: string[] = ["tgt_home"];
@@ -58,7 +56,7 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
     // 引擎作业(EMR)本期没有 target 绑定写入路径 ⇒ 归一到 home(与它的执行路径一致)。
     execTargets = bindingTargets(Item);
   } else if (kind === "sync-task") {
-    // @kf-batch 37-sync-backfill —— 序 37 ⑦:同步任务补数(glue 通道 + 用到了日期变量;每个业务日期一个实例)。
+    // 同步任务补数(glue 通道 + 用到了日期变量;每个业务日期一个实例)。
     if (granularity === "hour") return "同步任务按业务日期补数,只支持按天 / 按周";
     const { Item } = await docClient.send(new GetCommand({ TableName: TABLES.SYNC_TASKS, Key: { userId: USER_ID, taskId: id } }));
     // 跨项目的任务按「不存在」回(与目标下拉的项目过滤同一口径:存量无 projectId 的行属默认工作区)
@@ -73,7 +71,7 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
     if (!Item) return "工作流不存在";
     name = Item.name; dag = Item.dagDefinition;
     execTargets = bindingTargets(Item);
-    // @kf-batch 50-B51-backfill-pump —— 🔴 B-51b:工作流补数的执行合同是 **home-only**
+    // 🔴 工作流补数的执行合同是 **home-only**
     // (`backfill/execute.ts` 的 SQL 节点走 `redshiftClientForHomeOnly("workflow-no-target-dim")` + 主控区工作组)。
     // 原来照绑定区展开 ⇒ 非主控区的实例**实际在主控区执行**(主控区跑两遍、那个区一天没补),页面却显示成功。
     // ⇒ 绑了非主控区就**如实拒绝**(不静默只补主控区那一半),给出路。
@@ -83,7 +81,7 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
     }
   }
 
-  // @kf-batch 37-wf-sync-backfill —— 强制并发只有这一个判定出口;客户端传值在这里被覆盖(同步任务与改动前逐字节同值 = 1)。
+  // 强制并发只有这一个判定出口;客户端传值在这里被覆盖(同步任务与改动前逐字节同值 = 1)。
   const concurrency = forcedBackfillConcurrency({ kind, dag }) ?? requestedConcurrency;
 
   const input: CreatePlanInput = {

@@ -1,6 +1,6 @@
 "use client";
 
-// 模块 14 — 通用「版本历史」抽屉：列出某资源的版本，支持查看快照与一键回滚。
+// 通用「版本历史」抽屉：列出某资源的版本，支持查看快照与一键回滚。
 // 用法：<VersionHistoryDrawer type="workflow" id={id} open={open} onClose={...} onRolledBack={refetch} />
 
 import React, { useCallback, useEffect, useState } from "react";

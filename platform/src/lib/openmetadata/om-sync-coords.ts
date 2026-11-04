@@ -1,4 +1,3 @@
-// @kf-batch 50-o4REG-sync-om-per-target
 // 🔴🔴 **同步任务在 OpenMetadata 里的坐标** —— service / 库 / schema / 表 FQN 的**单一作者**。
 //
 // 【为什么要它(登记 o4-REG 的根)】同步启动推送(`pushSyncToOpenMetadata`)、物理端点富化

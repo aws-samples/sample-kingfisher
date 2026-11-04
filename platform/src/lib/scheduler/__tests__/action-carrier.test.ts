@@ -1,5 +1,4 @@
-// @kf-batch 50-WP28-platform-action-node
-// 🔴🔴 平台动作调度对象的**载体**(照抄 WP-26):单节点 platform-action 工作流 → 该区 MWAA Serverless。
+// 🔴🔴 平台动作调度对象的**载体**(照抄):单节点 platform-action 工作流 → 该区 MWAA Serverless。
 //
 //   ① 形状:恰好一个节点、类型 platform-action、带动作 + 参数;DAG id 一眼可追溯;
 //   ② 归属的**值**真从 ledger 进 YAML(taskType = governance / genbi-card,不回写 workflow 行);
@@ -45,7 +44,7 @@ const ROW: ActionScheduleRow = {
   updatedAt: "2026-10-10T00:00:00Z",
 };
 
-describe("平台动作调度对象的载体(WP-28 序 5 + WP-29)", () => {
+describe("平台动作调度对象的载体", () => {
   it("① 载体 = 单节点 platform-action 工作流,带动作与参数;DAG id 带 act_ 段", () => {
     const wf = buildActionCarrierWorkflow(ROW, "0 3 * * *");
     expect(wf.dagDefinition.nodes).toHaveLength(1);

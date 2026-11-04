@@ -1,4 +1,3 @@
-// @kf-batch 50-WP2-one-agentcore-one-om
 // **元数据镜像 → OpenMetadata**:让「一个 OM」真的能回答「某个区有哪些表」。
 //
 // 🔴🔴 **用户 2026-09-10 拍板(逐字)**:「治理目录必须走同一个 OpenMetaData,不然又多维护一套东西,
@@ -76,7 +75,7 @@ function columnsOf(payload: Record<string, unknown>): Array<{ name: string; type
  * 🔴 **只处理 `kind === "table"`**:库/schema 由表的坐标顺带 ensure(OM 要求父实体先在),
  * 而镜像的 `db` 条目只是给总览数数用的,没有额外信息。
  * 🔴 本函数**只推不删**;「本轮没看见的表」由 `om-reconcile.ts` 在采集**确知完整**时软删
- *   (B-42 根治:原来这里写「留到 OM 侧清理」,而 OM 侧根本没有清理者 ⇒ 删掉的表永远留在目录里)。
+ *   (根治:原来这里写「留到 OM 侧清理」,而 OM 侧根本没有清理者 ⇒ 删掉的表永远留在目录里)。
  */
 export async function pushMirrorToOpenMetadata(args: {
   targetId: string;

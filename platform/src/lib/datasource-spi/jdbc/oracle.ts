@@ -1,9 +1,9 @@
-// 模块 42 — Oracle provider(JDBC 范式,P42.3)。
+// Oracle provider(JDBC 范式)。
 //
-// 【驱动】oracledb@6(P42.0 实证:6.x thin 模式默认,免 Oracle Instant Client native lib,alpine 可用)。
+// 【驱动】oracledb@6(实证:6.x thin 模式默认,免 Oracle Instant Client native lib,alpine 可用)。
 // 按需 dynamic import——oracledb 未装进 platform 依赖前,introspect/ping 优雅降级(返回 [] / reachable:false)。
-// P42.3 验证阶段再决定是否加依赖真跑;未装时该源仍可建、可走 Glue 同步(driver 走 Glue 内置 jar)。
-// 【方言差异】统一用 Service Name 语义(P42.3 根治):Node 侧 oracledb EZConnect connectString=
+// 验证阶段再决定是否加依赖真跑;未装时该源仍可建、可走 Glue 同步(driver 走 Glue 内置 jar)。
+// 【方言差异】统一用 Service Name 语义(根治):Node 侧 oracledb EZConnect connectString=
 //   "host:port/service",Glue/JDBC thin URL=jdbc:oracle:thin:@//host:port/service —— 两侧把
 //   `database` 字段一致地当 service name(此前 JDBC URL 误用 SID 冒号格式 @host:port:SID,与
 //   connectString 的斜杠 service 语义打架,非 RDS 默认库/RAC/PDB 会连错)。RDS Oracle 的 service

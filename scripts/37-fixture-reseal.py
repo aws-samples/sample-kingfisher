@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# @kf-batch 50-B09-carrier-drift
 """37-fixture-reseal.py —— **示范对象的载体收口**(幂等,可反复跑)。
 
     python3 scripts/37-fixture-reseal.py [--profile temp-account]

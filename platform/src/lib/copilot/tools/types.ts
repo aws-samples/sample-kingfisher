@@ -1,10 +1,10 @@
-// 模块 44 — Copilot 工具注册表类型(抽象核心)。
+// Copilot 工具注册表类型(抽象核心)。
 // 设计原则 3(见 docs/design/44):Copilot 的可用动作抽象成声明式"能力注册表",
 // 新增能力 = 加一行,不改分发核心。工具只有两类 kind,**永不存在 "execute"**——
 // 执行/运行/发布/删除类动作在类型层面就不可表达(安全契约,见 [[module44-unified-copilot]])。
 
 // 工具类别:read(只读,无副作用)| create(创建/生成/建议,回调平台"创建类"API)。
-// 刻意不定义 "execute" —— 这是模块 44 的恒定安全边界(闸 1:能力面根除)。
+// 刻意不定义 "execute" —— 这是恒定安全边界(闸 1:能力面根除)。
 export type CopilotToolKind = "read" | "create";
 
 // 调用者上下文:透传当前登录身份 + 项目 + 环境,供工具回调平台 API 时复用现有 RBAC(闸 3)。
@@ -13,7 +13,7 @@ export interface CopilotCaller {
   projectId: string; // x-bgp-project
   env: string; // x-bgp-env
   /**
-   * @kf-batch 50-WP4quater-reads(工单 SC-17)—— 这次计划**面向哪个执行区**。
+   * 这次计划**面向哪个执行区**。
    *
    * 🔴 为什么必须有:Copilot 建出来的 draft(同步任务 / 离线作业 / Flink 作业)最终要在某个区跑。
    * 而 `create-service.ts` 的三个 createXxxDraft **绕过了平台的落点作者**

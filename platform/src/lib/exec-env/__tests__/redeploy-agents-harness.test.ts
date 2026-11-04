@@ -1,5 +1,5 @@
 /**
- * 序 39 B-76(2026-10-14):`scripts/redeploy-agents.sh` 的离线替身必须**真的在门禁里跑**(「写了」≠「接上了」)。
+ * `scripts/redeploy-agents.sh` 的离线替身必须**真的在门禁里跑**(「写了」≠「接上了」)。
  *
  * 🔴 为什么:它是升级客户环境前要跑的那条路(`--check` 决定要不要刷智能体镜像),而它只在真部署机上执行;
  *   台账 infra/prod-only-layers.json 指向 infra/test/redeploy-agents/test_redeploy_agents.sh —— 指针对不等于替身在跑。

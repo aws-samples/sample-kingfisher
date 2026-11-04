@@ -1,5 +1,5 @@
 "use client";
-// 序 41 B-118 —— 「启动 / 停止」判别的唯一作者(与列表页共用)
+// 「启动 / 停止」判别的唯一作者(与列表页共用)
 import { syncTaskCanStop, syncToggleAction } from "@/lib/sync/row-action";
 
 import React, { useEffect, useState } from "react";
@@ -7,13 +7,13 @@ import { Button, Card, Descriptions, Space, Table, Tabs, Tag, Spin, message, Bad
 import { ArrowLeftOutlined, PlayCircleOutlined, PauseCircleOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useParams, useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/useT";
-// @kf-batch 37-sync-backfill —— 序 37 ⑥:指定业务日期运行(不用它 = 直接「启动」= 改动前的行为)
+// 指定业务日期运行(不用它 = 直接「启动」= 改动前的行为)
 import RunWithDateModal from "@/components/sync/RunWithDateModal";
-// @kf-batch 50-SEQ47a-promote-ux —— 同步任务也是可发布到环境的配置资源(后端 ResourceType 早含 "sync"),页面此前没有入口
+// 同步任务也是可发布到环境的配置资源(后端 ResourceType 早含 "sync"),页面此前没有入口
 import PromoteButton from "@/components/common/PromoteButton";
 import EnvTag from "@/components/common/EnvTag";
 import EnvPromotionStatus from "@/components/common/EnvPromotionStatus";
-// 序 73 模块 57(R8 ③):工作流里的同步节点写进本任务运行历史的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者)
+// 工作流里的同步节点写进本任务运行历史的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者)
 import RunTriggerCell from "@/components/monitor/RunTriggerCell";
 
 const channelLabel: Record<string, string> = { "zero-etl": "Zero-ETL", glue: "Glue ETL", dms: "DMS" };
@@ -30,7 +30,7 @@ export default function SyncDetailPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [s3Files, setS3Files] = useState<any[]>([]);
-  const [rt, setRt] = useState<any>(null); // 模块 31 (R6): 实时(CDC)运行态监控
+  const [rt, setRt] = useState<any>(null); // 实时(CDC)运行态监控
   const [ze, setZe] = useState<any>(null); // Zero-ETL 增量(CDC)运行态:集成状态 + 已复制行数
   const [runLogModal, setRunLogModal] = useState<{ open: boolean; runId: string; logs: string[]; loading: boolean }>({ open: false, runId: "", logs: [], loading: false });
   const [runDateOpen, setRunDateOpen] = useState(false);
@@ -89,7 +89,7 @@ export default function SyncDetailPage() {
     } catch {}
   };
 
-  // 模块 31 (R6): 拉取实时(CDC)运行态(全量进度/状态/各表已复制行数)。
+  // 拉取实时(CDC)运行态(全量进度/状态/各表已复制行数)。
   const fetchRealtime = async () => {
     try {
       const res = await fetch(`/api/sync/${id}/realtime-status`);
@@ -115,7 +115,7 @@ export default function SyncDetailPage() {
     if (task?.glueJobName) { fetchGlueStatus(task.glueJobName); fetchLogs(); fetchS3Output(); }
   }, [task?.glueJobName]);
 
-  // 模块 31 + DMS:DMS 通道任务(全量/增量/实时)首次加载即拉一次运行态 + 编排日志。
+  // + DMS:DMS 通道任务(全量/增量/实时)首次加载即拉一次运行态 + 编排日志。
   useEffect(() => {
     if (task?.channel === "dms") { fetchRealtime(); fetchLogs(); }
   }, [task?.channel, task?.lastRunId]);
@@ -142,8 +142,8 @@ export default function SyncDetailPage() {
   }, [task?.status, task?.syncMode, task?.channel]);
 
   const handleToggle = async () => {
-    // 模块 31 + DMS:DMS 通道任务(全量/增量/实时)走 DMS 启动入口 start-realtime,与 Glue 批同步解耦。
-    // 序 41 B-118:唯一作者判「停 / 启」(provisioning 也可停)
+    // + DMS:DMS 通道任务(全量/增量/实时)走 DMS 启动入口 start-realtime,与 Glue 批同步解耦。
+    // 唯一作者判「停 / 启」(provisioning 也可停)
     const action = syncToggleAction(task.status, task.channel);
     if (action === "start-realtime") {
       const res = await fetch(`/api/sync/${id}/start-realtime`, { method: "POST" });
@@ -168,7 +168,7 @@ export default function SyncDetailPage() {
   if (loading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
   if (!task) return <div>{t("任务不存在")}</div>;
 
-  // @kf-batch 50-WP7-sync-pushdown —— 🔴「是不是 S3 Tables 落点」的真值是 `targetType`,不是
+  // 🔴「是不是 S3 Tables 落点」的真值是 `targetType`,不是
   // 「表桶字段填了没有」。向导已改为**留空 = 按执行环境解析**(不再预填 home 桶名),旧写法
   // `!!s3Config.tableBucket` 会让新建任务在首次运行前整块落点信息消失。留 `||` 那半兼容
   // 早期没有 targetType 的存量任务;桶名未定则如实写「按执行环境解析」,不猜一个名字。
@@ -181,7 +181,7 @@ export default function SyncDetailPage() {
   const viewRunLog = async (runId: string) => {
     setRunLogModal({ open: true, runId, logs: [], loading: true });
     try {
-      // 🔴 runId 要编码:定时同步 run 的 id 由 ETL DAG 写成 `<run_id>#<targetId>`(T-12),`#` 会截断 URL
+      // 🔴 runId 要编码:定时同步 run 的 id 由 ETL DAG 写成 `<run_id>#<targetId>`,`#` 会截断 URL
       const res = await fetch(`/api/sync/${id}/runs/${encodeURIComponent(runId)}/logs`);
       const d = await res.json();
       const logs = d.success ? (d.data?.logs || []) : [t("加载失败")];
@@ -259,7 +259,7 @@ export default function SyncDetailPage() {
         </Card>
       )}
 
-      {/* 模块 31 + DMS:DMS 通道(全量/增量/实时)运行态监控 */}
+      {/* + DMS:DMS 通道(全量/增量/实时)运行态监控 */}
       {task.channel === "dms" && (
         <Card size="small" style={{ marginBottom: 16 }} title={t("DMS 同步监控")}>
           <Descriptions column={4} size="small" style={{ marginBottom: rt?.tables?.length ? 12 : 0 }}>

@@ -1,4 +1,4 @@
-// 模块 31 (R5) — DMS→Redshift 目标侧准备(固化踩坑 ④⑤⑥ 的解法)。
+// DMS→Redshift 目标侧准备(固化踩坑 ④⑤⑥ 的解法)。
 //
 // DMS 直连 Redshift 做 COPY 有三个隐蔽前置,本模块用 Redshift Data API(admin 身份)+
 // redshift-serverless SDK 幂等完成:
@@ -8,11 +8,11 @@
 //  ⑥ 把 DMS COPY 角色关联到 Redshift namespace(否则 COPY 报 role not associated to cluster)。
 
 import { homeRegion } from "@/lib/place/home-region";
-// @kf-batch 50-WP31-place-first-class —— 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
+// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
 import { sdkClient } from "@/lib/aws/clients";
 import { randomBytes } from "crypto";
 import { logger } from "@/lib/observability/logger";
-// @kf-batch 50-P50.1-workgroup-ssot — 数仓落点唯一出口(收编兜底字面量)。
+// 数仓落点唯一出口(收编兜底字面量)。
 import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
 
 const region = homeRegion();
@@ -34,13 +34,13 @@ async function execAdminSql(sql: string): Promise<void> {
   );
   const { redshiftClientForHomeOnly } = await import("@/lib/exec-env/target-clients");
   const { getRedshiftSecretArn } = await import("@/lib/redshift/admin-secret");
-  // @kf-batch 50-WP2-directquery —— 合同 home-only(正确归宿是闭合执行器的 dms-ingest-bootstrap,归 P50.3 DMS 批次)
+  // 合同 home-only(正确归宿是闭合执行器的 dms-ingest-bootstrap,DMS 批次)
   const client = redshiftClientForHomeOnly("dms-bootstrap-home");
-  // @kf-batch 52-P52.5a-supply — 静态归类:**admin-DDL / bootstrap**(建 dms_ingest 用户与 schema)。
+  // 静态归类:**admin-DDL / bootstrap**(建 dms_ingest 用户与 schema)。
   // 🔴 **不传 project**:它建的是 target 级的固定摄入身份,不属任何项目。
   // 🔴 **正确归宿是 `executeAdminDdl({operation:"dms-ingest-bootstrap"})`** —— 那条 operation 已经
   //    落地(模板 + 执行器都在),但把 realtime 整条链切过去要连 `ensureRedshiftDmsUser` 的口令路径
-  //    一起改(它自己也在 `CREATE USER … PASSWORD` 里拼字面量),属 P50.3 的 DMS 组件批次。
+  //    一起改(它自己也在 `CREATE USER … PASSWORD` 里拼字面量),的 DMS 组件批次。
   //    在此之前这里维持现状,**不假装已收口**。
   const SecretArn = await getRedshiftSecretArn();
   const { Id } = await client.send(

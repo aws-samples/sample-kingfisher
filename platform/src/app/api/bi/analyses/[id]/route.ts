@@ -1,4 +1,4 @@
-// 模块 37 v4 — 分析看板单资源路由:GET / PUT(乐观锁)/ DELETE。
+// 分析看板单资源路由:GET / PUT(乐观锁)/ DELETE。
 // 按资源自身 projectId 鉴权(guardResourceAccess),防越权改别项目的分析看板。照抄 reports 单资源路由。
 export const dynamic = "force-dynamic";
 

@@ -1,21 +1,21 @@
-// 序 61 B-133 —— 数据源依赖的**外部网络对象**(平台自建安全组 / 平台探测选的子网 / Glue 连接 / 凭证密钥)的漂移核对与自愈(唯一作者)。
+// 数据源依赖的**外部网络对象**(平台自建安全组 / 平台探测选的子网 / Glue 连接 / 凭证密钥)的漂移核对与自愈(唯一作者)。
 //
 // 【缺陷原形(2026-10-28 测试账号真撞)】平台为数据源自建的组 `bgp-ds-*` 只在 Glue 作业跑时才挂网卡,其余时间零网卡;任何按
 //   「无网卡即孤儿」清理的人或工具都会删它(这次是操作者按 Description 猜归属删错)。删掉之后:该源每次同步 / 定时运行都失败,
-//   运行行写的是 AWS 原话「Security Group Not Found …」;数据源列表仍显示「已连接」;编辑不重建组,删了重建会让任务成孤儿(B-131);
+//   运行行写的是 AWS 原话「Security Group Not Found …」;数据源列表仍显示「已连接」;编辑不重建组,删了重建会让任务成孤儿;
 //   产品里没有任何修复入口。同步作业定义与脚本早已是「每次启动按当前定义重建」,数据源这一层是唯一例外。
 // 【模型】按**归属**分两类,调用方只认闭合结果:
 //   · 平台拥有(自建组 / Glue 连接 / 平台探测选的子网):可由源行 + 密钥完整重建 ⇒ **在使用时刻**按原规则重建并接回(`healed`),
 //     写审计 `datasource.network.healed` + 告警中心事件 + 源行 `healCount / lastHealedAt` —— 自愈必须响亮,否则账号里那个清理工具
 //     一直删、平台一直补,没人知道根子在哪;
-//   · 用户拥有(B-54 指定的组 / 子网)、密钥内容、VPC:一个不碰 ⇒ `broken`,源行 status=error + networkIssue,运行拒绝(409
+//   · 用户拥有(指定的组 / 子网)、密钥内容、VPC:一个不碰 ⇒ `broken`,源行 status=error + networkIssue,运行拒绝(409
 //     `DATASOURCE_NETWORK_BROKEN`),文案点名对象并指到「编辑数据源 → 网络配置 / 重填口令」。
 //   · 事实读不到(限流 / 权限)⇒ `unverifiable`,**不拦业务**,只记日志(Glue 自己会报;读失败不该阻断同步)。
 // 【调用点】`lib/sync/start-run.ts ensureGlueSyncJob`(启动 / 保存 / 补数共用,任何副作用之前)· `lib/datasource/glue-reach.ts startDiscovery`
 //   (探测 / 浏览表)· `lib/scheduler/dependency.ts startDownstreamSync`(上游成功扇出)· `lib/datasource/network-sweep.ts`(泵每 10 分钟
 //   巡检一轮,覆盖不经 TS 启动核心的调度运行时路径,并在没人用之前就发现漂移)。棘轮:`lib/sync/__tests__/start-job-run-preflight-ratchet.test.ts`。
 // 【幂等 / 并发】建组复用 `createPlatformDsSecurityGroup` 的 InvalidGroup.Duplicate 分支(同名已有 ⇒ 复用);UpdateConnection 幂等;
-//   源行写用 `patchDataSourceRow` 条件写(源已删即丢弃,B-132)。两路同时自愈最多多一次 Describe,不会建出两个组。
+//   源行写用 `patchDataSourceRow` 条件写(源已删即丢弃)。两路同时自愈最多多一次 Describe,不会建出两个组。
 // 【多区】按源的落点(`ownerTargetId`)在该区做,凭证经落点取得,不回落主控区。读路径(列表 / 详情)不调本模块(零 EC2 调用)。
 import type { DataSource } from "@/types/datasource";
 import { targetOfStamp } from "@/lib/exec-env/target-id";
@@ -223,7 +223,7 @@ export async function reconcileDatasourceNetwork(ds: ReconcileDs, opts: Reconcil
 
   const healed: HealedItem[] = [];
   const subnetOk = subnetFact !== null;
-  // 🔴 B-133 第二刀:源行的 networkConfig 不存可用区(建源落库从没写过)⇒ 重建 / 接回连接时 AZ 以**子网事实**为准;
+  // 🔴 第二刀:源行的 networkConfig 不存可用区(建源落库从没写过)⇒ 重建 / 接回连接时 AZ 以**子网事实**为准;
   //   这里只是让落回源行的 networkConfig 也带上它,真正的写连接作者(createGlueConnection / updateGlueConnectionNetwork)自己再按子网核一次
   let next: Nc = { ...nc, ...(subnetFact ? { availabilityZone: subnetFact.availabilityZone } : {}) };
 
@@ -242,7 +242,7 @@ export async function reconcileDatasourceNetwork(ds: ReconcileDs, opts: Reconcil
     }
   }
 
-  // ③ 安全组:缺 ⇒ 平台的按源行在(可能已换的)VPC 里重建;在但 VPC 换了 ⇒ 同样重建(旧组留给 B-130 的清理路径不在本模块职责内);
+  // ③ 安全组:缺 ⇒ 平台的按源行在(可能已换的)VPC 里重建;在但 VPC 换了 ⇒ 同样重建(旧组留给该缺陷的清理路径不在本模块职责内);
   //   在且 VPC 没换 ⇒ 存量平台组无归属标签时顺手补上
   const missingSgs = expectedSgs.filter((id) => !sgFacts.has(id));
   const vpcChanged = next.vpcId !== nc.vpcId;

@@ -1,4 +1,4 @@
-// @kf-batch 37-sync-backfill —— 序 37 ⑦:补数中心支持同步任务(kind = "sync-task",task 作用域)。
+// 补数中心支持同步任务(kind = "sync-task",task 作用域)。
 //
 // 「能不能补」的判定只有这一个作者:建计划(`app/api/backfill/plan`)、目标下拉(`app/api/backfill/targets`)、
 // 执行实例(`execute.ts`,任务在建计划之后可能被改过)三处都调 `syncTaskBackfillRejection`。
@@ -68,7 +68,7 @@ export async function runSyncTaskBackfillInstance(
       `禁止跨区取数:数据源在执行环境 ${dsOwner},而任务绑定在 ${bound.join(" / ")} —— 源与任务必须在同一执行环境`
     );
   }
-  // B-123:「从哪读」按数据源范式判(S3 / DynamoDB 源没有库名)⇒ 数据源行一起交给单一作者
+  // 「从哪读」按数据源范式判(S3 / DynamoDB 源没有库名)⇒ 数据源行一起交给单一作者
   const workReject = syncWorkRejection(task as { sourceDatabase?: unknown; sourceTables?: unknown }, ds);
   if (workReject) throw new Error(workReject);
 

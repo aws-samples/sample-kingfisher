@@ -1,5 +1,4 @@
-// @kf-batch 50-WP5-rungroup
-// §2.7 四个端点的**形状门禁**(50 SPEC v3.44 §2.7;判据 E-160/E-162/E-163/E-166)。
+// §2.7 四个端点的**形状门禁**(50 SPEC v3.44 §2.7;判据)。
 //
 // 🔴 为什么是文本门禁而不是跑起来:这些 route 要 mock 掉 guard / Cognito / DDB / 审计一整串才能跑,
 //    mock 一多就在测 mock;而「有没有走守卫」「有没有把已终态也送去取消」「有没有自己扇出」
@@ -40,7 +39,7 @@ describe("🔴 §2.7 四个端点:权限一律回落既有守卫,不许自己发
     expect(strip(read(GROUP_ROUTES[2]))).toContain('params.id, "editor"');
   });
 
-  it("`loadRunGroupForRequest` 自己:表名靠模块 14 的 getResourceMeta(不写 switch)+ 定义被删也如实回 404", () => {
+  it("`loadRunGroupForRequest` 自己:表名靠 getResourceMeta(不写 switch)+ 定义被删也如实回 404", () => {
     const src = strip(read("lib/monitor/run-group-http.ts"));
     expect(src).toContain("getResourceMeta(kind)");
     expect(src, "definitionKind 必须先校验值域,非法就不去读表").toContain("isResourceType(kind)");
@@ -97,7 +96,7 @@ describe("🔴 POST retry-failed:服务端算失败区、**不自己扇出**、�
   });
   it("🔴 原组只读:整个文件不许出现任何写组行的调用", () => {
     for (const w of ["recordAccepted", "recordSkipped", "UpdateCommand", "PutCommand"]) {
-      expect(src, `retry-failed 出现了 ${w} ⇒ 可能就地改写了原组(E-162 明确要求原组不变)`).not.toContain(w);
+      expect(src, `retry-failed 出现了 ${w} ⇒ 可能就地改写了原组(验收合同明确要求原组不变)`).not.toContain(w);
     }
   });
 });

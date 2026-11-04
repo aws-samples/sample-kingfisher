@@ -1,8 +1,8 @@
-// 序 72 B-139 / B-140 —— 作业实际引用的 S3 URI(纯函数)+ 平台依赖按落点换桶。
+// 作业实际引用的 S3 URI(纯函数)+ 平台依赖按落点换桶。
 import { describe, it, expect } from "vitest";
 import { parseS3Uri, splitS3UriList, s3UrisFromGlueConfig, s3UrisFromScript, localizePlatformDepUri, localizePlatformDepUris, PLATFORM_DEP_KEY_PREFIX } from "../s3-uris";
 
-describe("序 72 s3-uris", () => {
+describe("s3-uris", () => {
   it("parseS3Uri:s3:// 与 s3a:// 都认并归一;桶名非法 / 没 key / 非 S3 ⇒ null", () => {
     expect(parseS3Uri("s3://bigdata-pro-va-glue-assets/scripts/glue_sql_runner.zip")).toEqual({
       bucket: "bigdata-pro-va-glue-assets", key: "scripts/glue_sql_runner.zip", uri: "s3://bigdata-pro-va-glue-assets/scripts/glue_sql_runner.zip",
@@ -36,7 +36,7 @@ describe("序 72 s3-uris", () => {
     expect(s3UrisFromScript(undefined)).toEqual([]);
   });
 
-  it("B-140 localizePlatformDepUri:平台脚本桶(命名 SSOT 形态)下 glue-deps/ 的对象换成落点的脚本桶;客户桶 / 其它 key / 同桶一字不动", () => {
+  it("localizePlatformDepUri:平台脚本桶(命名 SSOT 形态)下 glue-deps/ 的对象换成落点的脚本桶;客户桶 / 其它 key / 同桶一字不动", () => {
     const landing = { scriptsBucket: "bgp-glue-scripts-123456789012-tgt-usw2-a" };
     expect(localizePlatformDepUri(`s3://bgp-glue-scripts-123456789012/${PLATFORM_DEP_KEY_PREFIX}J1/utils.py`, landing))
       .toBe(`s3://bgp-glue-scripts-123456789012-tgt-usw2-a/${PLATFORM_DEP_KEY_PREFIX}J1/utils.py`);

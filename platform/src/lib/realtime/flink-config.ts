@@ -1,4 +1,4 @@
-// 模块 32 — 实时计算 Flink 统一配置(单一事实来源)。
+// 实时计算 Flink 统一配置(单一事实来源)。
 //
 // 生产原则:版本/资源标识全部走配置(CDK 注入的环境变量),**不在代码里写死**。
 // 升级 Flink 只需:① 改 CDK 的 FLINK_RUNTIME_ENVIRONMENT(如 FLINK-1_21)并重部署平台;
@@ -38,7 +38,7 @@ export const FLINK = {
   connectorsPrefix: process.env.FLINK_CONNECTORS_PREFIX || "flink/connectors/",
   jobsPrefix: process.env.FLINK_JOBS_PREFIX || "flink/jobs/",
 
-  // 模块 32-CR 连接器运行时(模块化按需拼装)。CR.2 构建产物上传到 modulesPrefix;
+  // 连接器运行时(模块化按需拼装)。CR.2 构建产物上传到 modulesPrefix;
   //  薄基础 runner(modularBaseKey)+ 各连接器模块(<modulesPrefix><id>.jar)运行期按 resolveModules 拼装,
   //  内容哈希缓存到 uberCachePrefix。🔴 与现有 codeKey/s3tableCodeKey(胖包 fallback)并存,CR.4 才切默认。
   modulesPrefix: process.env.FLINK_MODULES_PREFIX || "flink/modules/",
@@ -57,7 +57,7 @@ export function runnerFor(sinkType?: string): FlinkRunner {
 }
 
 /** S3 Tables 表桶 ARN:arn:aws:s3tables:<region>:<account>:bucket/<bucket>。
- *  🔴🔴 B-26(2026-10-01):原来是零参函数、恒拼**主控区**那只表桶 ⇒ 建在 us-west-2 的 Flink 作业,Iceberg sink 的
+ *  🔴🔴 原来是零参函数、恒拼**主控区**那只表桶 ⇒ 建在 us-west-2 的 Flink 作业,Iceberg sink 的
  *    `warehouse` 被填成主控区表桶(落点作者 `resolveFlinkPlace` 早就给了该区的 `s3tablesBucket`,只是这里没接)。
  *    ⇒ 改成只接受**已解析的落点**,不给就编译不过。 */
 export function tableBucketArn(place: { region: string; account: string; s3tablesBucket: string }): string {

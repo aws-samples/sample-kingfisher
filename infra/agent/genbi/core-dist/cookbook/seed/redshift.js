@@ -1,5 +1,5 @@
 "use strict";
-// 模块 44 — Redshift 工程配方 + 方言规则(平台验证过的范式)。
+// Redshift 工程配方 + 方言规则(平台验证过的范式)。
 // 方言规则(DialectRule)是【配方库 与 dialect-guard 的共享事实源】——AI 生成前照它写,guard 落库前照它纠。
 // 每条规则/配方都基于真实 Redshift 行为(已用 redshift-data API 实测,非凭记忆)。
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -7,7 +7,7 @@ exports.REDSHIFT_RECIPES = exports.REDSHIFT_DIALECT_RULES = void 0;
 const shared_rules_1 = require("./shared-rules");
 // ── Redshift 方言硬规则(命中 antiPattern = 违规;error 级由 guard 纠正/拦截)──
 exports.REDSHIFT_DIALECT_RULES = [
-    // 🔴 L1(52 P52.1):禁止授权给 PUBLIC。规则文本与正则的唯一作者在 seed/shared-rules.ts
+    // 🔴 L1:禁止授权给 PUBLIC。规则文本与正则的唯一作者在 seed/shared-rules.ts
     // (三引擎共用一份,避免抄三份漂移)。放数组首位:它是安全类硬规则,不参与配方检索排序。
     (0, shared_rules_1.noGrantToPublicRule)("redshift"),
     {
@@ -169,7 +169,7 @@ exports.REDSHIFT_RECIPES = [
         dialectNotes: ["整数相除要 *1.0 转浮点(否则整除截断)。"],
         tags: ["window", "rank", "占比", "环比", "同比", "累计", "analytics"],
     },
-    // ── 以下 4 条为模块45 P45.2 高频配方,均在临时环境用真实表(players/payments/ad_events/game_sessions)
+    // ── 以下 4 条为高频配方,均在临时环境用真实表(players/payments/ad_events/game_sessions)
     //    通过 redshift-data API【真跑 FINISHED 验证过】才入库(verifiedAt),非凭大模型记忆。──
     {
         id: "redshift.scd2-history",

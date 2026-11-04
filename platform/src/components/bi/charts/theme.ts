@@ -1,4 +1,4 @@
-// 模块 37 v2 — ECharts 换肤适配(R5:颜色恒由 --bgp-* 驱动,与全站 12 款皮肤一致)。
+// ECharts 换肤适配(R5:颜色恒由 --bgp-* 驱动,与全站 12 款皮肤一致)。
 // 在客户端读 document.documentElement 上的 CSS 变量(ThemeProvider 注入),编译成 ECharts theme 对象。
 // 换肤时 CSS 变量变 → 组件监听 localStorage `bgp-skin` 变化重新 buildTheme + setOption。
 

@@ -1,5 +1,4 @@
 export const dynamic = "force-dynamic";
-// @kf-batch 50-P50.3-mirror
 // POST /api/admin/metadata-mirror —— 手动触发一个 target 的元数据采集(〔立即同步〕/〔采集数仓目录〕)。
 //
 // 🔴 **写在 /api/admin 下是有意的**:采集会真去那个 region 打 API,数仓目录那一路还会
@@ -9,7 +8,7 @@ export const dynamic = "force-dynamic";
 // 🔴 **`sources` 是允许列表**:客户端只能从 `glue` / `redshift` 里挑,不认识的一律 400。
 // 缺省只采 `glue`(与定时同口径),要采数仓必须显式点 —— 免得一个"刷新"按钮悄悄把两个区的数仓都唤醒。
 import { NextRequest, NextResponse } from "next/server";
-// @kf-batch 50-WP31-place-first-class —— 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
+// 落点只认点名(缺 / 非法 ⇒ 400 PLACE_UNDECIDABLE)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -73,7 +72,7 @@ export async function POST(req: NextRequest) {
     // 🔴 逐来源结果原样回:一个来源失败 ⇒ HTTP 仍是 200,但 `facet.sources[].error` 有值。
     //    界面必须据此显示"部分失败",不许把 200 读成"全好了"(HTTP 200 ≠ 那一格是绿的,
     //    这条教训在矩阵一键处置那里已经吃过一次)。
-    // @kf-batch 50-WP2-one-agentcore-one-om —— 🔴 把「推进 OM 的结果」一起回:
+    // 🔴 把「推进 OM 的结果」一起回
     //    目录页只读 OM ⇒ 推不进去 = 那个区的目录停在上一次的样子,而页面上**看不出来**。
     //    回出来,管理面与验收才能发现(errors > 0 / truncated 都必须可见)。
     return apiOk({ facet: r.facet, sources: r.sources, ...(r.om ? { om: r.om } : {}) });

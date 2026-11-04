@@ -1,6 +1,6 @@
-// 序 49 ② B-73 —— 「已连接」只许来自真正连上的结论(装配层判据 + 调用点判据)。
+// 「已连接」只许来自真正连上的结论(装配层判据 + 调用点判据)。
 //
-// 【缺陷原形(B-73,s38 负向源 10.255.255.1)】建源收口与「测试连接(按 id)」都拿 `testConnection(glueConnectionName)`
+// 【缺陷原形(s38 负向源 10.255.255.1)】建源收口与「测试连接(按 id)」都拿 `testConnection(glueConnectionName)`
 //   (只核 Glue 连接存在 + JDBC URL + 子网,不登录源库)的结论写 status=active ⇒ host 不可达的源建完就显示「已连接 (115ms)」。
 // 【规则】配置核对只回答「配好了没」:没配好 ⇒ error;配好了 ⇒ 不写 status,交给与「检测」同一作者的连通性检测
 //   (直连可达 ⇒ active;直连不到且有 Glue 连接 ⇒ testing + 发现作业;探测发不起来 ⇒ error 写明原因,不停在「测试中」)。
@@ -100,7 +100,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 
-describe("🔴 B-73 配置核对之后的收口 settleAfterConfigCheck(建源 / 测试连接共用)", () => {
+describe("🔴 配置核对之后的收口 settleAfterConfigCheck(建源 / 测试连接共用)", () => {
   const settle = async (result: any) => {
     const m: any = await import("@/lib/datasource/reachability-probe");
     return m.settleAfterConfigCheck(h.ds, result);
@@ -146,15 +146,15 @@ describe("🔴 B-73 配置核对之后的收口 settleAfterConfigCheck(建源 / 
   });
 });
 
-describe("🔴 B-73 调用点判据:三条路都经唯一作者,配置核对写 active 的旧写法一处不留", () => {
+describe("🔴 调用点判据:三条路都经唯一作者,配置核对写 active 的旧写法一处不留", () => {
   const read = (p: string) => fs.readFileSync(path.join(process.cwd(), "src", p), "utf8");
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
-  it("建源 POST(JDBC 路径;序 57 / B-129 起主体在执行体 lib/datasource/long-ops.ts):testConnection 的 then 里是 settleAfterConfigCheck,JDBC 块里不再自己拿配置核对写 active", () => {
+  it("建源 POST(JDBC 路径;主体在执行体 lib/datasource/long-ops.ts):testConnection 的 then 里是 settleAfterConfigCheck,JDBC 块里不再自己拿配置核对写 active", () => {
     const src = strip(read("lib/datasource/long-ops.ts"));
     expect(src).toMatch(/testConnection\(glueConnectionName, dsPlace\.region\)\s*\.then\(\(result\) => settleAfterConfigCheck\(/);
     // 只盯 JDBC 块(从 Glue 连接建成到该路径的 apiOk):非 JDBC 范式的 provider.testConnection 是**真探测**(HeadBucket / DescribeTable /
-    //   DescribeStream),它写 active 合法,不在 B-73 之列。
+    //   DescribeStream),它写 active 合法,不在之列。
     const jdbcStart = src.indexOf("createGlueConnection(datasourceId");
     const jdbcEnd = src.indexOf("provisionedResources:", jdbcStart);
     expect(jdbcStart).toBeGreaterThan(0); expect(jdbcEnd).toBeGreaterThan(jdbcStart);

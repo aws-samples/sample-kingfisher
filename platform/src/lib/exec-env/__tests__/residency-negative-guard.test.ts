@@ -1,5 +1,4 @@
-// @kf-batch 50-W5-seg1-WP10a
-// 🔴 删除态负向门禁(ACCEPTANCE E-195):`residency-blocked` / `crossJurisdiction` / `cross-jurisdiction` 在**产品代码**里零命中。
+// 🔴 删除态负向门禁(ACCEPTANCE):`residency-blocked` / `crossJurisdiction` / `cross-jurisdiction` 在**产品代码**里零命中。
 // 为什么必须是门禁而不是一次性删除:这三个标识符是「不设法务门」之前的设计残骸,任何一处回流都会让跨法域 target 重新被当成「本就不该有」。
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";

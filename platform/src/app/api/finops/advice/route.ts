@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject } from "@/lib/projects/guard";
 import { listAdvice } from "@/lib/finops/advice";
-// @kf-batch 50-WP4quater-reads(工单 SC-24)—— 🔴 优化建议按范围内的**每个区**探。
+// 🔴 优化建议按范围内的**每个区**探。
 // 只探主控区的后果:别的区的空转实例永远不被建议,而界面上写着「无优化建议」——
 // 比没有建议更坏(用户会以为已经没有可省的了)。
 import { requireScope } from "@/lib/exec-env/scope";
-// @kf-batch 50-WP6-cost-by-region —— 「全部已装区」与「视角 → 区集合」都改由 cost-region.ts 单一作者给出
+// 「全部已装区」与「视角 → 区集合」都改由 cost-region.ts 单一作者给出
 // (原为本文件私有副本;且原写法在全部视角下 `readScope` 回 global 真值 ⇒ 一个区都不探)
 import { listActiveTargetsForScope, allInstalledTargetIds, regionsInViewOf } from "@/lib/finops/cost-region";
 

@@ -1,9 +1,8 @@
-// @kf-batch 50-WP17-serverless-workflow
 // 「台账行 ↔ 服务侧 run」的对法(判据 ACCEPTANCE v1.43 段 `slsw` SW-10c / SW-10d / SW-12 的读侧一半)。
 //
 // 🔴 为什么值得单独一组:服务侧**不给**「台账 runId → 服务 RunId」的映射,只能自己对。
 // 原来只有时间窗一种(±2 min),而一次手动 + 一次 cron 完全可能落在同 2 分钟里 ⇒ 对错了就把
-// A 次运行的日志/状态显示成 B 次的(而且看不出错)。T-12 之后台账 runId 的 raw 段就是服务侧
+// A 次运行的日志/状态显示成 B 次的(而且看不出错)。此后台账 runId 的 raw 段就是服务侧
 // per-run dag_id(`ex_<uuid>`),任务实例 id 又实测是 `<ex_uuid>_<task_id>_<attempt>` ⇒ 可以**精确**对。
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -69,7 +68,7 @@ describe("SW-10c 台账 runId 的 raw 段 ↔ 任务实例前缀", () => {
     expect(listTaskInstances).toHaveBeenCalledTimes(2);
   });
 
-  it("存量行(T-12 之前,没有 raw 段)⇒ 退回时间窗,并如实标 `time-window`", async () => {
+  it("存量行(此前,没有 raw 段)⇒ 退回时间窗,并如实标 `time-window`", async () => {
     listWorkflowRuns.mockResolvedValue([
       { RunId: "runA", RunDetailSummary: { StartedAt: "2026-09-11T13:14:00Z", EndedAt: "2026-09-11T13:17:20Z" } },
     ]);

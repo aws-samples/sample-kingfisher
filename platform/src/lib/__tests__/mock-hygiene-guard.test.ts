@@ -1,4 +1,3 @@
-// @kf-batch 54-genbi-session-cards
 // 🔴🔴 **Mock 卫生棘轮(2026-09-13 立)** —— 用户当天的原话是「那么多 hook 都不生效吗?拦不住你写bug」。
 //
 // 【为什么现有门禁一个都拦不住那一类】同一天我自己埋了 4 个缺陷,**全部长在两个模块的接缝上**,
@@ -32,9 +31,9 @@ const CROSS_MOCK_LIMIT = 36;
  * `lib/exec-env` 2026-10-01 已补(`discard-assembly.test.ts`:弃置 ↔ CFN 处置 ↔ 会话收口 ↔ 唯一写通道,只 mock DDB/CFN/CodeBuild)。
  */
 // `lib/modeling` 2026-10-10 已补(`shared-writer-assembly.test.ts`:建模落地 ↔ admin 执行器 ↔ 模板 ↔ 落点 SSOT ↔ 台账,
-//   只 mock DDB / 注册表 / Data API + Secrets Manager / 审计;@kf-batch 50-WP11b-shared-writer)。
+//   只 mock DDB / 注册表 / Data API + Secrets Manager / 审计)。
 // `lib/finops` 2026-10-11 已补(`cost-by-region-assembly.test.ts`:CE 采集 ↔ v2 存储 ↔ 区卡片 / 对账 ↔ 异常 ↔ 签名 ↔ 读路由,
-//   只 mock DDB / CE / 注册表 / 项目守卫 / 告警与知识库写入;@kf-batch 50-WP6-cost-by-region)。
+//   只 mock DDB / CE / 注册表 / 项目守卫 / 告警与知识库写入)。
 const ASSEMBLY_DEBT: readonly string[] = [
   "lib/scheduler/serverless",
 ];

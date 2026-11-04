@@ -8,9 +8,9 @@ import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
 import type { ColumnsType } from "antd/es/table";
 
-/** 序 38 B-71:外部表桶登记行(与 /api/admin/lake-buckets 的应答同形) */
+/** 外部表桶登记行(与 /api/admin/lake-buckets 的应答同形) */
 type ExtBucketRow = { bucket: string; label?: string; addedBy: string; addedAt: string; region: string };
-/** 序 61 B-133:平台为数据源自建的安全组一行(与 /api/admin/datasource-network-objects 的应答同形) */
+/** 平台为数据源自建的安全组一行(与 /api/admin/datasource-network-objects 的应答同形) */
 type NetObjectRow = {
   sgId: string; groupName: string; region: string; targetId: string; vpcId?: string; tagged: boolean; taggedDatasourceId?: string;
   owner: { datasourceId: string; name: string; role: string } | null;
@@ -19,11 +19,11 @@ type NetObjectRow = {
   cleanupJob?: { jobId: string; phase: string; createdAt: string; lastError?: string };
 };
 type NetObjectsView = { generatedAt: string; objects: NetObjectRow[]; unreadableRegions: Array<{ targetId: string; region: string; error: string }> };
-// @kf-batch 50-W5-seg2-WP8 — 模块 51「AI 模型」卡(51 INTERACTION §2/§3;不新建页面、routes.tsx 零改)。
+// 「AI 模型」卡(51 INTERACTION §2/§3;不新建页面、routes.tsx 零改)。
 import AiModelCard from "@/components/settings/AiModelCard";
-import BuildInfoCard from "@/components/common/BuildInfo"; // 序 39 第二刀:平台版本(发版 tag / 产品提交)
-import TableBucketPicker from "@/components/lake/TableBucketPicker"; // 序 45 B-93:S3 Tables 表桶下拉(唯一作者)
-// @kf-batch 50-WP4ter-coverage —— 执行范围(工单 SC-22)。🔴🔴 原来这一页声明「不受执行范围影响」,
+import BuildInfoCard from "@/components/common/BuildInfo"; // 平台版本(发版 tag / 产品提交)
+import TableBucketPicker from "@/components/lake/TableBucketPicker"; // S3 Tables 表桶下拉(唯一作者)
+// 执行范围。🔴🔴 原来这一页声明「不受执行范围影响」,
 // 却把主控区的工作组 / 桶 / VPC 当「平台配置」给所有区看 —— 那是本平台唯一一处明确否认自己与区
 // 有关的撒谎。现在逐项显示**当前执行范围那个区自己的**资源,并把真正与区无关的项单独标出来。
 import { useScope } from "@/components/scope/ScopeProvider";
@@ -35,10 +35,9 @@ export default function SettingsPage() {
   const [config, setConfig] = useState<any>(null);
   const [health, setHealth] = useState<any>(null);
   const [wiring, setWiring] = useState<any>(null);
-  // 序 58 B-130 —— 后台清理任务(平台自建安全组按网卡事实收口;平台管理员可见;全平台清单,不按区拆)
+  // 后台清理任务(平台自建安全组按网卡事实收口;平台管理员可见;全平台清单,不按区拆)
   const [cleanups, setCleanups] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
-  // @kf-batch 50-WP4ter-coverage
   const { scope } = useScope();
   const scopeParam = toScopeParam(scope);
   const scopeQs = scopeParam ? `?scope=${encodeURIComponent(scopeParam)}` : "";
@@ -49,7 +48,7 @@ export default function SettingsPage() {
     setConfig(d.success ? d.data : d);
   };
 
-  // 序 38 B-71 —— 数据湖外部表桶登记(该执行环境):登记后直查表树 / 治理目录同步 / 问数都能看见那个桶里的表;平台只读它。
+  // 数据湖外部表桶登记(该执行环境):登记后直查表树 / 治理目录同步 / 问数都能看见那个桶里的表;平台只读它。
   const lakeTargetId = landingOfScope(scope);
   const [extBuckets, setExtBuckets] = useState<ExtBucketRow[]>([]);
   const [extBucketInput, setExtBucketInput] = useState("");
@@ -96,7 +95,7 @@ export default function SettingsPage() {
       setCleanups(res.ok && d.success ? (d.data?.jobs ?? []) : []);
     } catch { setCleanups([]); }
   };
-  // 序 61 B-133 —— 数据源网络对象清单(全平台;孤儿一键清理走 B-130 的持久清理作业)
+  // 数据源网络对象清单(全平台;孤儿一键清理走该缺陷的持久清理作业)
   const [netObjects, setNetObjects] = useState<NetObjectsView | null>(null);
   const [netObjectsError, setNetObjectsError] = useState<string>("");
   const [netCleanupBusy, setNetCleanupBusy] = useState<string>("");
@@ -130,7 +129,7 @@ export default function SettingsPage() {
     } catch (e: any) { checks.dynamodb = { status: "error", message: e.message }; }
 
     try {
-      // @kf-batch 50-WP4ter-coverage —— 按当前执行范围查那个区的工作组(缺省 = 主控区)
+      // 按当前执行范围查那个区的工作组(缺省 = 主控区)
       const res = await fetch(`/api/redshift/connections?targetId=${encodeURIComponent(landingOfScope(scope))}`);
       const d = await res.json();
       const list = Array.isArray(d) ? d : d.data || [];
@@ -163,7 +162,7 @@ export default function SettingsPage() {
     setLoading(false);
   };
 
-  // @kf-batch 50-WP4ter-coverage —— 切区不重载页面,靠 deps 重拉(护栏 4)
+  // 切区不重载页面,靠 deps 重拉(护栏 4)
   useEffect(() => { fetchConfig(); checkHealth(); fetchExtBuckets(); /* eslint-disable-next-line */ }, [scopeQs]);
   useEffect(() => { if (isPlatformAdmin) { loadCleanups(); loadNetObjects(); } /* eslint-disable-next-line */ }, [isPlatformAdmin]);
 
@@ -176,7 +175,7 @@ export default function SettingsPage() {
         <Button icon={<ReloadOutlined />} onClick={checkHealth} loading={loading}>{t("刷新状态")}</Button>
       </div>
 
-      {/* @kf-batch 50-WP4ter-coverage —— 标题与提示条都必须点名「这是哪个区的」*/}
+      {/* 标题与提示条都必须点名「这是哪个区的」*/}
       <Card
         title={
           config
@@ -237,8 +236,8 @@ export default function SettingsPage() {
         ) : <Spin />}
       </Card>
 
-      {/* 序 38 B-71 —— 数据湖外部表桶(该执行环境):客户自有的 S3 Tables 表桶登记进来,直查 / 目录 / 问数才看得见;
-          B-127 —— 登记同时也是该执行环境**可写**的事实源:非主控区的同步任务选自有表桶必须先登记(id 锚点供向导里的「去登记 →」直达) */}
+      {/* 数据湖外部表桶(该执行环境):客户自有的 S3 Tables 表桶登记进来,直查 / 目录 / 问数才看得见;
+          登记同时也是该执行环境**可写**的事实源:非主控区的同步任务选自有表桶必须先登记(id 锚点供向导里的「去登记 →」直达)*/}
       <Card
         id="lake-ext-buckets"
         title={`${t("数据湖外部表桶")} · ${config?.displayName || lakeTargetId}${config?.region ? ` (${config.region})` : ""}`}
@@ -262,7 +261,7 @@ export default function SettingsPage() {
           ] as ColumnsType<ExtBucketRow>)} />
         {isPlatformAdmin ? (
           <Space style={{ marginTop: 12 }} wrap>
-            {/* 序 45 B-93(客户待改进项):原来只能手填 ⇒ 下拉列出该区账号内的 S3 Tables 表桶(去掉平台表桶与已登记的,选了也只会 409),仍可手填 */}
+            {/* (客户待改进项):原来只能手填 ⇒ 下拉列出该区账号内的 S3 Tables 表桶(去掉平台表桶与已登记的,选了也只会 409),仍可手填 */}
             <TableBucketPicker targetId={lakeTargetId} value={extBucketInput} onChange={(v) => setExtBucketInput(v || "")} excludePlatform excludeRegistered reloadToken={extBuckets.length}
               placeholder={t("表桶名,如 bigdata-test-sg-tables")} style={{ width: 300 }} data-testid="lake-ext-bucket-input" />
             <Input placeholder={t("备注(可选)")} value={extLabelInput} onChange={(e) => setExtLabelInput(e.target.value)} style={{ width: 220 }} data-testid="lake-ext-bucket-label" />
@@ -308,7 +307,7 @@ export default function SettingsPage() {
         ) : <Spin />}
       </Card>
 
-      {/* 序 58 B-130 —— 后台清理任务:平台自建安全组按网卡事实收口;failed = 30 分钟仍被占用 ⇒ 需人工 */}
+      {/* 后台清理任务:平台自建安全组按网卡事实收口;failed = 30 分钟仍被占用 ⇒ 需人工 */}
       {isPlatformAdmin && (
         <Card title={t("后台清理任务")} size="small" style={{ marginTop: 16 }} data-testid="pending-cleanups-card"
           extra={<Button size="small" icon={<ReloadOutlined />} onClick={loadCleanups}>{t("刷新")}</Button>}>
@@ -326,8 +325,8 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {/* 序 61 B-133 —— 数据源网络对象:平台为数据源自建的安全组只在作业跑时才挂网卡,零网卡是常态 ⇒ 任何「无网卡即孤儿」的清理都会误删在用的组;
-          这里把事实摆出来(归属源 / 在用 / 孤儿 / 待清理 / 网卡数),真孤儿一键交给 B-130 的持久清理作业(服务端重核三条件),不在页面直接删 */}
+      {/* 数据源网络对象:平台为数据源自建的安全组只在作业跑时才挂网卡,零网卡是常态 ⇒ 任何「无网卡即孤儿」的清理都会误删在用的组;
+          这里把事实摆出来(归属源 / 在用 / 孤儿 / 待清理 / 网卡数),真孤儿一键交给该缺陷的持久清理作业(服务端重核三条件),不在页面直接删*/}
       {isPlatformAdmin && (
         <Card title={t("数据源网络对象")} size="small" style={{ marginTop: 16 }} data-testid="datasource-network-card"
           extra={<Button size="small" icon={<ReloadOutlined />} onClick={loadNetObjects}>{t("刷新")}</Button>}>
@@ -358,10 +357,10 @@ export default function SettingsPage() {
         </Card>
       )}
 
-      {/* 序 39 第二刀 —— 平台版本:与执行区无关;发版 tag 为准,未发版构建给产品提交。两轮冷启动演练的新手第一缺口。 */}
+      {/* 平台版本:与执行区无关;发版 tag 为准,未发版构建给产品提交。两轮冷启动演练的新手第一缺口。 */}
       <BuildInfoCard style={{ marginTop: 16 }} />
 
-      {/* @kf-batch 50-W5-seg2-WP8 — 模块 51:AI 模型运行时配置(admin 可改;非 admin 只读展示 /api/settings 的 aiModel)。 */}
+      {/* AI 模型运行时配置(admin 可改;非 admin 只读展示 /api/settings 的 aiModel)。 */}
       <AiModelCard readonlyModel={config?.aiModel ?? null} />
 
       <Card

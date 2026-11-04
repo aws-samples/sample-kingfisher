@@ -15,11 +15,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 通用 Flink SQL 流作业 runner —— 模块 32-CR 薄基础统一主类。
+ * 通用 Flink SQL 流作业 runner —— 薄基础统一主类。
  *
  * 平台把用户编写的多语句 Flink SQL 通过 MSAF 运行时属性(property group "bgp", key "sql")注入;
  * 本 runner 解析并执行:DDL/SET 即时执行,INSERT 收集进 StatementSet 一次提交(支持多 sink)。
- * 连接器 JAR 不打进本基础包,而由平台运行期按 resolveModules 结果 mergeJars 拼入(模块 32-CR)。
+ * 连接器 JAR 不打进本基础包,而由平台运行期按 resolveModules 结果 mergeJars 拼入。
  *
  * 【统一主类 + iceberg 反射延迟加载】(DESIGN §2.5):
  *  本主类保留 CREATE CATALOG(Iceberg/S3 Tables)拦截逻辑,但对 iceberg/hadoop 类【反射加载】,

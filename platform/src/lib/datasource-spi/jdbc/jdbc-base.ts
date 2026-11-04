@@ -1,15 +1,15 @@
-// 模块 42 — JDBC 范式共享基座(JDBC 四兄弟 mysql/postgresql/oracle/sqlserver 共用)。
+// JDBC 范式共享基座(JDBC 四兄弟 mysql/postgresql/oracle/sqlserver 共用)。
 //
 // 【收编而非重写】把散落的现有 MySQL 实现(schema-reader/heartbeat/datasource-service 的 JDBC_URL)
 // 收敛到这里,行为逐字保持;各 provider 只声明「方言差异」(JDBC_URL 模板 / driver / 默认端口 /
 // introspect 查询与驱动),base 处理共性(建连/超时/凭证读取/结果归一)。
 //
-// 【驱动可得性(P42.0 实证)】node:20-alpine(musl) 下真实验证:mysql2✅ / pg✅(纯JS) /
+// 【驱动可得性】node:20-alpine(musl) 下真实验证:mysql2✅ / pg✅(纯JS) /
 // tedious✅(纯JS,SQLServer) / oracledb 6.x✅(thin 模式默认,免 Instant Client native lib)。
 // 故四兄弟的 Node 侧 introspect/ping 均可跑;驱动按需 dynamic import(避免未装驱动时顶层 import 崩)。
 
 import { getSecret } from "../secrets"; // 独立底层(断循环依赖:不经 datasource-service)
-// @kf-batch 44-jdbc-params —— 附加 JDBC 参数(用户填的)+ 方言默认参数(如 MySQL 零值日期按 NULL 读入)的唯一作者
+// 附加 JDBC 参数(用户填的)+ 方言默认参数(如 MySQL 零值日期按 NULL 读入)的唯一作者
 import { buildJdbcUrlWithParams, parseJdbcParams, type JdbcParamStyle } from "./jdbc-params";
 import type { SourceRef, DataSourceProvider } from "../spi";
 import type {
@@ -28,7 +28,7 @@ export interface JdbcDialect {
   defaultPort: number;
   // JDBC URL 模板(host/port/database → url,**不含参数**)。各库格式不同(Oracle thin 用 :,SQLServer 用 ;databaseName=)。
   jdbcUrl: (host: string, port: number, database: string) => string;
-  // @kf-batch 44-jdbc-params —— 参数拼接风格:query = `?k=v&k=v`(mysql / postgresql / oracle),semicolon = `;k=v;k=v`(sqlserver)。
+  // 参数拼接风格:query = `?k=v&k=v`(mysql / postgresql / oracle),semicolon = `;k=v;k=v`(sqlserver)。
   paramStyle: JdbcParamStyle;
   // 方言默认连接参数(用户填了同名键以用户为准)。MySQL:zeroDateTimeBehavior=CONVERT_TO_NULL(零值日期 / 时间戳按 NULL 读入,
   // 不让整个同步作业因一行 `0000-00-00 00:00:00` 失败;Glue 4 / 5 内置 Connector/J 8.0.x 认这个写法)。
@@ -71,7 +71,7 @@ async function resolveJdbcConn(ref: SourceRef, defaultPort: number): Promise<Jdb
   return { host, port, database, username, password };
 }
 
-// @kf-batch 44-jdbc-params —— 完整 JDBC URL(模板 + 方言默认参数 + 用户附加参数)的唯一出口;
+// 完整 JDBC URL(模板 + 方言默认参数 + 用户附加参数)的唯一出口;
 //   用户参数不合法会抛(路由层建 / 改源时必须先 parseJdbcParams 拦成 400,这里抛只兜「落库数据被绕过校验」的情形,不静默丢参数)。
 export function jdbcUrlOf(dialect: JdbcDialect, host: string, port: number, database: string, jdbcParams?: unknown): string {
   return buildJdbcUrlWithParams(dialect.jdbcUrl(host, port, database), dialect.paramStyle, dialect.defaultParams, jdbcParams);
@@ -97,14 +97,14 @@ export function makeJdbcProvider(
       else if (!(host.includes(".") || /^[\d.]+$/.test(host))) errors.push("主机地址格式无效");
       if (!port || port <= 0 || port >= 65536) errors.push(`端口无效: ${conn.port ?? "(空)"}`);
       if (!database) errors.push("缺少数据库名(database)");
-      // @kf-batch 44-jdbc-params —— 附加参数形态也在这里校验(建源 / 测连同一份错误文案)
+      // 附加参数形态也在这里校验(建源 / 测连同一份错误文案)
       const jp = parseJdbcParams(conn.jdbcParams);
       if (!jp.ok) errors.push(jp.error);
       return { ok: errors.length === 0, errors };
     },
 
     // JDBC URL + driver(取代 3 份 JDBC_URL 副本 + glue-script 写死 mysql driver)。
-    // @kf-batch 44-jdbc-params —— URL = 模板 + 方言默认参数 + 用户附加参数(connection.jdbcParams;normalize 从扁平字段归一进袋)。
+    // URL = 模板 + 方言默认参数 + 用户附加参数(connection.jdbcParams;normalize 从扁平字段归一进袋)。
     buildConnection(ref: SourceRef): ConnectionModel {
       const c = ref.connection || {};
       const port = Number(c.port) || dialect.defaultPort;
