@@ -83,6 +83,8 @@ CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the C
 - Releases follow Semantic Versioning and are tagged `vX.Y.Z`. The tag, the `VERSION` file and the CHANGELOG heading must agree.
 - `scripts/cut-release.sh <version>` performs the cut: it bumps `VERSION`, closes the `[Unreleased]` section of `CHANGELOG.md`,
   creates the `release/X.Y.Z` branch and the annotated tag, and pushes them. Without `--yes` it only prints the plan.
+- `--github-release` additionally packages the tag with `scripts/package-release.sh` and creates the GitHub Release: title `Kingfisher vX.Y.Z`,
+  body taken verbatim from the CHANGELOG section plus the archive SHA-256, assets `kingfisher-vX.Y.Z.tar.gz` and `.sha256`. It needs an authenticated `gh`.
 - Release branches receive documentation and hotfixes only. A hotfix bumps the patch number, is fixed on the release branch
   and cherry-picked back to `main`.
 - Deployments always use a tag, never a branch head.

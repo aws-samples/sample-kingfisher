@@ -233,7 +233,7 @@ The pinned version of every component is maintained in [`docs/supported-versions
 
 - **Latest release**: `VERSION` 2.1.2, in customer production since 2026-10-29. The trunk of this repository is the **2.2.0 candidate**
   (Next.js 15 / React 19, optional Glue 6.0, the data-source external-object lifecycle fixes, the stream-compute sample-data and EMR run-submission fixes,
-  the security-scan remediation); at release time `scripts/cut-release.sh` bumps `VERSION` and creates the tag.
+  the security-scan remediation); at release time `scripts/cut-release.sh` bumps `VERSION`, creates the tag and, with `--github-release`, publishes the GitHub Release with the delivery archive and its SHA-256 attached.
 - **Tag naming**: from 2.2.0 on, every release is tagged `v<version>` (`v2.2.0`) and a hotfix increments the patch number; earlier releases were tagged
   `release-<date>` and remain checkable in the engineering history. Customer deployments and upgrades always use a tag, never a branch head.
 - Increments and upgrade notes are in [`CHANGELOG.md`](CHANGELOG.md); every release is accepted by a full headless-browser run against a test account before the tag is cut

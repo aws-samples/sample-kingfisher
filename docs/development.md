@@ -154,6 +154,12 @@ Each recipe lists the places that must change together. Missing one of them prod
 - A commit changes either product code or documentation, not both.
 - Releases are tagged `vX.Y.Z` following Semantic Versioning. The tag, the `VERSION` file and the CHANGELOG heading must agree.
 - `scripts/cut-release.sh <version>` performs the release cut: it bumps `VERSION`, closes the `[Unreleased]` section of `CHANGELOG.md`, creates the release branch and the annotated tag, and pushes them. Without `--yes` it only prints the plan.
+- `scripts/cut-release.sh <version> --yes --github-release` additionally publishes the GitHub Release for the new tag:
+  - It runs `scripts/package-release.sh v<version>` first, so the Release carries the delivery archive `kingfisher-v<version>.tar.gz` and its `.sha256` file as assets.
+  - The Release title is `Kingfisher v<version>`. The body is the `[<version>]` section of `CHANGELOG.md` verbatim, followed by a table with the SHA-256 of the archive and the verification command.
+  - It needs an authenticated GitHub CLI (`gh auth login`). A missing or unauthenticated `gh`, an existing Release with the same tag, or an empty `[Unreleased]` section is refused before anything is changed.
+  - If packaging or the Release call fails after the tag was pushed, the script says so and prints the exact command to retry; the body is kept as `kingfisher-v<version>.release-notes.md` next to the assets.
+  - The first GitHub Release is `v2.2.0`. Intermediate tags get no Release.
 - Release branches are named `release/X.Y.Z`. After the tag is cut they receive documentation and hotfixes only.
 - `scripts/package-release.sh <tag> [--out <dir>] [--verify]` produces the customer delivery archive `kingfisher-<tag>.tar.gz` with a `.sha256` file:
   - It reads bytes only from `git archive <tag>` and removes the paths listed in `scripts/package-release.exclude`: unit tests, acceptance orchestration, developer tooling and repository configuration.

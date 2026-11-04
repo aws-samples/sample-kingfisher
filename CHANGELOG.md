@@ -13,6 +13,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Added
 
+- Release cut with GitHub Release: `scripts/cut-release.sh <version> --yes --github-release` packages the tag and creates the Release (body = the CHANGELOG section, assets = archive + SHA-256); it refuses to start without an authenticated `gh` or with an empty `[Unreleased]` section.
 - Release packaging: `scripts/package-release.sh <tag>` builds a deterministic customer delivery archive from a git tag without tests or developer tooling, with a SHA-256 file and a `BUILD-INFO.json` that keeps the release tag visible in deployments made from the archive.
 - Per-job execution role selection: offline Spark, EMR Serverless, sync, and Flink jobs can run under any IAM role the engine service may assume, as in the AWS console.
 - Execution role picker groups roles into platform default, advisor-generated, and custom, refreshes inside the page, and keeps a manual ARN entry as fallback.
@@ -37,6 +38,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Fixed
 
+- Release packaging wrote an empty tag list into `BUILD-INFO.json` and exited with code 141 when the packaged commit carried a tag, which is exactly the release case; the tag list is now passed as an argument and the offline judge covers a tagged ref.
 - Deleting a data source that is still referenced by sync or real-time tasks is refused with a list of the referencing tasks instead of orphaning them.
 - Deleting a data source no longer leaves orphaned `bgp-ds-*` security groups; cleanup is persisted and completes once network interfaces are released.
 - Connectivity probes that finish after a data source was deleted no longer create nameless "unreachable" ghost rows.
