@@ -236,7 +236,7 @@ One standard applies to every repository of this project, regardless of audience
 | Area | Rule | Enforced by |
 |---|---|---|
 | Language | Documentation in English; source comments, test titles and deployment-script output in Chinese (the engineering team's working language); UI strings in both locale files | `repo-standards-guard.test.ts` |
-| Format | Lines up to 300 characters, table cells up to 200, tables up to five columns | `docs-format-guard.test.ts` |
+| Format | Lines up to 300 characters, table cells up to 200, tables up to five columns; `README.md` keeps complete sentences and cells and is exempt from the length limits | `docs-format-guard.test.ts` |
 | Structure | One record per section; version history in its own section | `docs-format-guard.test.ts` |
 | Links | Every relative link resolves to a tracked file | `repo-standards-guard.test.ts` |
 | Figures | Static PNG or WebP only; every figure is referenced; every Mermaid source is rendered | `repo-standards-guard.test.ts` |

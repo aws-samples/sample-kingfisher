@@ -48,14 +48,8 @@ switch the "execution scope" in the top bar and you are working in another regio
 ![Kingfisher architecture overview: entry chain CloudFront → WAF → ALB → ECS Fargate; control plane (home region) and data planes (one per region)](docs/diagrams/aws-overview.png)
 
 - **Entry chain**: CloudFront is the only public entry point → WAF → ALB (accepts the CloudFront prefix list only) → Next.js full stack on ECS Fargate (pages + API acting as the BFF); Cognito validates the ID token of every `/api/*` call.
-- **Control plane (home region, one per platform)**:
-  - Cognito · 72 DynamoDB control tables · Secrets Manager · KMS · OpenMetadata (ECS + RDS MySQL + OpenSearch);
-  - Bedrock + three AgentCore agents (ask-your-data / network advisor / parameter advisor);
-  - CodeBuild as the execution-environment deployment broker · CloudWatch / CloudTrail · AWS DevOps Agent.
-- **Data plane (one per region, `tgt_*`)**:
-  - a VPC with zero internet egress (interface endpoints only) · S3 data lake + S3 Tables (Iceberg) · Glue · EMR Serverless · Athena · Redshift Serverless;
-  - MWAA Serverless (autonomous in-region scheduling) · DMS · Managed Flink · MSK;
-  - a per-region execution role (locked to the region with `aws:RequestedRegion`).
+- **Control plane (home region, one per platform)**: Cognito · 72 DynamoDB control tables · Secrets Manager · KMS · OpenMetadata (ECS + RDS MySQL + OpenSearch) · Bedrock + three AgentCore agents (ask-your-data / network advisor / parameter advisor) · CodeBuild as the execution-environment deployment broker · CloudWatch / CloudTrail · AWS DevOps Agent.
+- **Data plane (one per region, `tgt_*`)**: a VPC with zero internet egress (interface endpoints only) · S3 data lake + S3 Tables (Iceberg) · Glue · EMR Serverless · Athena · Redshift Serverless · MWAA Serverless (autonomous in-region scheduling) · DMS · Managed Flink · MSK · a per-region execution role (locked to the region with `aws:RequestedRegion`).
 - **Two cross-region channels, zero cross-region data**: control plane → data plane carries only definitions / deployments / health probes; data plane → control plane carries only run metadata (over private cross-region VPC peering). The platform never replicates data across regions.
 - **Figures show components, never versions**: the supported versions of every runtime / AWS service engine / data-source driver are maintained in one place, [`docs/supported-versions.md`](docs/supported-versions.md).
 
@@ -73,7 +67,7 @@ switch the "execution scope" in the top bar and you are working in another regio
 
 | Mechanism | In one sentence |
 |---|---|
-| Execution scope is a first-class citizen | Top bar has three levels: workspace → environment → execution scope; read APIs honour only URL `?scope=`; the server never falls back (invalid 400 · unknown 404 · not visible 403 · not ready 409) |
+| Execution scope is a first-class citizen | Three levels in the top bar: workspace → environment → execution scope; read APIs honour only the URL `?scope=`, and the server never falls back (invalid 400 · unknown 404 · not visible 403 · not ready 409) |
 | The target must be explicit | Every object / every run carries a `targetId`; an entry point without a target is a 400, never a silent default to the home region; credentials are obtained only through the target |
 | No cross-region reads | A source and a task in different regions ⇒ permanent 409; each region's execution role is region-locked; execution VPCs have zero egress |
 | Autonomous scheduling per region | One MWAA Serverless per region; DAGs / triggers / logs all stay in the region; only run metadata is written back to the home region |
@@ -188,10 +182,7 @@ BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>
 ```
 
 Key points:
-- **The customer chooses the home region** and it never changes afterwards; it must offer Bedrock, Redshift Serverless, S3 Tables, AgentCore and MWAA Serverless.
-  - Bedrock: the factory default is Claude Opus 4.5; the deployment script walks a candidate chain with real calls and picks the first available model,
-    or you specify `BEDROCK_MODEL_ID=<id>`; after go-live it can be hot-switched under "System Settings → AI Model".
-  - Organisation SCPs must not block `us-east-1` (the WAF for CloudFront is created there).
+- **The customer chooses the home region** and it never changes afterwards; it must offer Bedrock (the factory default is Claude Opus 4.5; the deployment script walks a candidate chain with real calls and picks the first available model, or you specify `BEDROCK_MODEL_ID=<id>`; after go-live it can be hot-switched under "System Settings → AI Model"), Redshift Serverless, S3 Tables, AgentCore and MWAA Serverless. Organisation SCPs must not block `us-east-1` (the WAF for CloudFront is created there).
 - 🔴 **Multi-region production cannot "import an existing VPC"**; one region allows exactly one execution environment, and the component set cannot be trimmed.
 - Always pass `--profile` explicitly to AWS; never run `cdk deploy` by hand (the deployment scripts handle wiring, the mode, the IAM simulation gate and the agent images).
 - Upgrading to a new version / rollback / decommissioning an execution region: guide sections 6 / 7 / 8; read the upgrade notes of that version in `CHANGELOG.md`.
@@ -225,25 +216,11 @@ locales: the language is suggested from the visitor's location and can be switch
 
 | Path | Contents |
 |---|---|
-| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs … (see below) |
-| `infra/` | AWS CDK v2 (TypeScript): 23 control-plane stacks `lib/*.ts` (entry `bin/app.ts`) + execution-environment stack group `lib/exec-env/` + … (see below) |
-| `scripts/` | Deployment and operations scripts (`01-preflight-account.sh` pre-flight · `deploy-all.sh` first install · `02-postdeploy-truth.sh` truth check · …, see below) and gates |
+| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (51 groups / 309 files), business libraries `src/lib/`, components `src/components/`; unit tests with vitest |
+| `infra/` | AWS CDK v2 (TypeScript): 23 control-plane stacks `lib/*.ts` (entry `bin/app.ts`) + execution-environment stack group `lib/exec-env/` + execution-environment deployment buildspec + IAM call manifest `iam/` + Lambda (`lambda/`) + three AgentCore agent containers (`agent/`) |
+| `scripts/` | Deployment and operations scripts (`01-preflight-account.sh` pre-flight · `deploy-all.sh` first install · `02-postdeploy-truth.sh` truth check · `redeploy-platform.sh` upgrade / authorise a new region · `redeploy-agents.sh` refresh agents · `cut-release.sh` cut a release) and the offline gates |
 | `flink-sql-runner*/`, `flink-connector-modules/` | Managed Flink 1.20 SQL runners (generic / + S3 Tables Iceberg / + Kafka) and connector Maven modules |
 | `docs/` | Guides, feature tour and screenshots, design documents, figures |
-
-Full text of the long cells (the table keeps only their beginning):
-
-- **`platform/`** · Contents:
-  - The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript;
-  - pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (51 groups / 309 files), business libraries `src/lib/`, components `src/components/`;
-  - unit tests with vitest
-- **`infra/`** · Contents:
-  - AWS CDK v2 (TypeScript): 23 control-plane stacks `lib/*.ts` (entry `bin/app.ts`) + execution-environment stack group `lib/exec-env/`;
-  - execution-environment deployment buildspec + IAM call manifest `iam/` + Lambda (`lambda/`) + three AgentCore agent containers (`agent/`)
-- **`scripts/`** · Contents:
-  - Deployment and operations scripts: `01-preflight-account.sh` pre-flight · `deploy-all.sh` first install · `02-postdeploy-truth.sh` truth check ·
-    `redeploy-platform.sh` upgrade / authorise a new region · `redeploy-agents.sh` refresh agents · `cut-release.sh` cut a release;
-  - and the offline gates
 
 Tech stack: Next.js 15 · React 19 · TypeScript 5 · antd 6 · Node 20 · AWS CDK v2 · Python 3 · OpenMetadata 1.6.1 ·
 Amazon Bedrock (four model families: Claude Opus / GPT / GLM / Kimi, switchable at runtime) · Bedrock AgentCore · MWAA Serverless · Redshift Serverless ·
