@@ -5,8 +5,8 @@
 //  · task/etl-job   → runEtlJob(job, {runDate, 'backfill'})           (Glue/Redshift SQL 作业,自轮询)
 //  · task/engine-job→ getProvider(taskType).submit(job, {runDate,...}) (EMR Serverless,自轮询)
 //  · task/sync-task → startGlueSyncRun({triggeredBy:"backfill", runDate, ...})(同步任务 glue 通道,与手动运行同一启动核心,自轮询)
-//  · workflow/sql   → 直接跑该节点 SQL(Redshift Data API + 自建 run 记录 + 自轮询)
-//  · workflow/sync  → 节点关联的同步任务走 task/sync-task 同一入口
+//  · workflow/sql   → 按**实例自带的区**解析数仓绑定(resolveRedshiftBinding),直接跑该节点 SQL(该区 Redshift Data API + 自建 run 记录 + 自轮询)
+//  · workflow/sync  → 节点关联的同步任务走 task/sync-task 同一入口()
 //  · workflow/其它  → 明确失败(honest,不静默跳过):python 等节点补数本期不支持
 //
 // 返回 { runTaskId, runId, statementId?, glueJobName?, glueJobRunId? } —— runner 据此在
@@ -17,14 +17,15 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { BatchExecuteStatementCommand, DescribeStatementCommand } from "@aws-sdk/client-redshift-data";
 // SQL 语句切分的唯一作者(与工作流发布 buildDagSpec / 离线 Redshift 作业同源)
 import { splitSql } from "@/lib/etl/dag-generator";
-import { redshiftClientForHomeOnly } from "@/lib/exec-env/target-clients";
-// task-runs 唯一写通道(50 SPEC §6 S10)。
+// 2026-11-04 —— Redshift Data 客户端按绑定解析出的 region 取(唯一工厂出口);home-only 出口 `redshiftClientForHomeOnly("workflow-no-target-dim")` 已退役
+import { redshiftDataClientFor } from "@/lib/exec-env/target-clients";
+// task-runs 唯一写通道(多区域规格 §6 S10)。
 import { putRunRecord, updateRunRecord, resolveRunStamp, type RunOwner } from "@/lib/monitor/run-records";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { runEtlJob } from "@/lib/etl/job-service";
-import { bindingTargets } from "@/lib/exec-env/data-plane-target";
-import { getRedshiftSecretArn } from "@/lib/redshift/admin-secret";
+// 2026-11-04:数仓落点(region / workgroup / database / 凭证)四样一起走唯一作者 resolveRedshiftBinding
+import { bindingTargets, resolveRedshiftBinding } from "@/lib/exec-env/data-plane-target";
 import { renderTemplate, paramSet, todayDs } from "@/lib/etl/run-params";
 import { isEngineType, getProvider } from "@/lib/engines/registry";
 import { nodeSupportsBackfill } from "@/lib/workflow/node-registry";
@@ -36,16 +37,15 @@ import { runSyncTaskBackfillInstance } from "./sync-task";
 // 离线作业节点:作业行的读取与三道判定(存在 / 本项目 / 绑定含该区)与发布期同一作者;补数标记字段的唯一作者
 import { loadJobNodeRow } from "@/lib/workflow/job-node-spec";
 import { backfillRunExtra } from "./run-extra";
-// 数仓落点唯一出口(收编兜底字面量)。
-import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
 // 工作流 SQL 节点补数把受影响行数写进 run 行 `metrics.rowsAffected`(唯一作者)
 import { affectedRowsMetrics } from "@/lib/redshift/affected-rows";
 
 const USER_ID = "default-user";
-// 合同 home-only:**编排表没有区域维**(实测 bgp-workflows 无 target 字段)
-// ⇒ workflow SQL 节点的补数只能在主控区跑;给它加维 =。锁属性那边已经按 `wf.targetId` 算,
-// 那是**为预留的参数位**,不代表这条执行路径已经能跨区。
-const rsData = redshiftClientForHomeOnly("workflow-no-target-dim");
+// 2026-11-04(2026-11-04,工作流离线作业节点设计 §4「usw2 工作流:补数计划勾该工作流 ⇒ 节点按日期跑」)—— 原来这里有一个模块级
+//   `redshiftClientForHomeOnly("workflow-no-target-dim")` + 主控区工作组:写于编排表还没有区域维的年代。
+//   如今编排行带绑定区(`targets[]`,bindingTargets)、补数实例自带 `targetId`(plan.ts 按 日期 × 节点 × 区展开)、
+//   运行时 SQL 节点(node-exec-py `_exec_sql`)早已在实例的区执行 ⇒ 补数 SQL 节点也按实例的区解析绑定(runWorkflowSqlNode)。
+//   那道「绑了非主控区就 400」的守卫(api/backfill/plan)随之删除。
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface ExecResult {
@@ -102,10 +102,12 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
   if (nodeSupportsBackfill(node.type) && node.type === "sql") {
     const sql = node.data?.sql;
     if (!sql || !String(sql).trim()) throw new Error("SQL 节点脚本为空");
-    // ⚠️ 本函数里的局部变量 `targetId` 是**补数目标的 id**(工作流/作业 id),
-    // 与执行目标 `targetId`(`tgt_*`)**同名不同物**。盖章要的是后者,
-    // 它在工作流行 `wf.targetId` 上 ⇒ 把整行传下去,别传这个局部变量。
-    return runWorkflowSqlNode(wf as RunOwner & { workflowId: string }, inst, String(sql), runDate);
+    // 2026-11-04:SQL 节点在**实例自带的区**跑 —— 实例的 targetId 就是这一格该落的区;存量实例没有 ⇒ 回落工作流绑定的第一个
+    //   (与下面 job 分支、task 作用域 etl / engine 分支同口径),**绝不**静默回主控区。
+    // ⚠️ 本函数里的局部变量 `targetId` 是**补数目标的 id**(工作流/作业 id),与多区域执行的执行目标 `targetId`(`tgt_*`)
+    //   **同名不同物**;下面传的是后者(sqlTarget),盖章 / 锁名 / 数仓绑定都按它。
+    const sqlTarget = inst.targetId || bindingTargets(wf as { targets?: unknown; targetId?: unknown })[0];
+    return runWorkflowSqlNode(wf as RunOwner & { workflowId: string }, inst, String(sql), runDate, sqlTarget);
   }
   if (nodeSupportsBackfill(node.type) && node.type === "sync") {
     // 工作流里的数据同步节点 = 用实例日期跑一次它关联的同步任务。
@@ -114,7 +116,7 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
     const syncTaskId = String(node.data?.syncTaskId || "").trim();
     if (!syncTaskId) throw new Error(`数据同步节点「${node.data?.label || inst.nodeId}」未关联同步任务`);
     // 走 task 作用域同一个入口(能不能补 / 章反向卡 / 跨区取数 / 空活 → 启动核心,唯一作者在 sync-task.ts)。
-    // 🔴 实例的 targetId 是**工作流**的章(工作流补数目前 home-only):同步任务若绑在别的区,反向卡会如实拒绝 ——
+    // 🔴 实例的 targetId 是**工作流**在这一格的区(计划按绑定区逐区展开):同步任务若不绑在这个区,反向卡会如实拒绝 ——
     //    那样的工作流本来就跨区引用了任务,定时跑也到不了那个区的 Glue 作业;不替它挑一个区去跑。
     // run 记录落在**同步任务**名下(taskType=sync,triggeredBy=backfill,带 runDate / backfillPlanId),
     // 返回的 runTaskId = 同步任务 id ⇒ runner 按 (runTaskId, runId) 回收终态,与 task 作用域的 sync-task 完全同构。
@@ -142,49 +144,60 @@ export async function executeInstance(plan: BackfillPlanRow, inst: BackfillInsta
 }
 
 // ── 直接执行 workflow SQL 节点:自建 run 记录(triggeredBy=backfill)+ 后台轮询到终态 ──
-// run 记录挂在 workflowId 名下(taskType=workflow),带 backfill 标记 → 监控/基线天然排除。
+// run 记录挂在 workflowId 名下(taskType=workflow),带 backfill 标记 → 监控/基线天然排除;章 = 实例的区(任务监控按它显示区)。
 async function runWorkflowSqlNode(
   wf: RunOwner & { workflowId: string },
   inst: BackfillInstanceRow,
   sql: string,
-  runDate: string
+  runDate: string,
+  targetId: string
 ): Promise<ExecResult> {
   const workflowId = wf.workflowId;
   const rendered = renderTemplate(sql, paramSet(runDate || todayDs()));
   // 语句切分改走唯一作者 splitSql(与工作流发布 / 离线作业同一把刀;规则逐字相同,行为不变)
   const statements = splitSql(rendered);
   if (statements.length === 0) throw new Error("SQL 为空");
-  const workgroup = homeWorkgroup();
-  const database = process.env.REDSHIFT_DATABASE || "dev";
+  // 2026-11-04:region / workgroup / database / 凭证 **四样一起**按实例的区解析(唯一作者 resolveRedshiftBinding;与发布期
+  //   publish-dag 给运行时 SQL 节点算落点同一调用形:工作流的 projectId、无 workgroup / database 覆盖)。
+  //   home 逐字节等价(workgroup = REDSHIFT_WORKGROUP 兜底 · database = REDSHIFT_DATABASE 兜底 · 密钥 = 项目密钥);
+  //   非 home 走准入 + 组件 + 描述符 + 凭证工厂,解析不到就抛 —— 不回落主控区(回落 = 在主控区把那个区的表重算一遍而页面显示成功)。
+  //   解析排在抢锁之前:绑定拒绝时还没有锁要放。
+  const binding = await resolveRedshiftBinding({ targetId, projectId: (wf as { projectId?: string }).projectId });
+  // 🔴 提交与轮询必须用**同一个区**的客户端:Redshift Data API 的 statementId 是 region 内的,
+  //    拿别的区的客户端 Describe 会一直查不到 ⇒ run 永远 running、轮询耗尽后保持持锁 = 该节点彻底卡死。
+  const rs = redshiftDataClientFor(binding.region);
 
   // 根治·裂缝C:补数中心对 workflow SQL 节点补数走本独立路径(不过 job-service),同样直接 DROP+CTAS →
   // 同一 workflow 同一 node 的多个业务日期并发会撞同表 OID。加【节点级运行锁】:锁存 WORKFLOWS 行的
   // runLock_<nodeId> 属性,同节点不同日期串行、不同节点仍并行。补数场景排队等前序终态(waitMs 大)。
   // 改走**唯一作者** `lockAttrFor`(SPEC §3.6 的 4 家之④)。
   // 🔴 workflow 的 nodeId 必用**原始 node.id**(370cd0c 教训);home 时产出与存量逐字节同名。
+  // 2026-11-04:target 维 = **实例的区**(binding.targetId),与 python 侧 `_lock_attr_for(env.get("target_id"), node_id)` 用的
+  //   「这条 DAG 发在哪个区」同一事实 ⇒ 同区同节点互斥、不同区同节点并行;原来读 `wf.targetId`(多绑行上没有这个字段)恒为空
+  //   ⇒ 两个区的同一节点串成一条队、且与 usw2 运行时抢的不是同一把锁。
   const lockAttr = lockAttrFor({
-    targetId: (wf as { targetId?: string }).targetId,
+    targetId: binding.targetId,
     nodeId: String(inst.nodeId),
   });
   const lock = await acquireRunLock(TABLES.WORKFLOWS, { userId: USER_ID, workflowId }, 45 * 60 * 1000, lockAttr);
   if (!lock) throw new RunLockBusy(`节点 ${inst.nodeId} 正在运行中,已跳过本次并发提交(避免并发重建同一结果表)。`);
   try {
-    // 静态归类:**project-context**(补数跑的是某项目工作流的节点;
-    // 归属取工作流行 `wf.projectId`,与该 workflow 的其它路径同一权威)。
-    const SecretArn = await getRedshiftSecretArn({
-      project: (wf as { projectId?: string }).projectId,
-    });
-    const { Id } = await rsData.send(new BatchExecuteStatementCommand({ Sqls: statements, WorkgroupName: workgroup, Database: database, ...(SecretArn ? { SecretArn } : {}) }));
+    // 凭证已在 binding 里按 project-context 解析好(home = 项目密钥 / 共享 admin 的既有三元语义;
+    //   非 home 恒非空)。归属取工作流行 `wf.projectId`,与该 workflow 的其它路径同一权威。
+    const SecretArn = binding.secretArn;
+    const { Id } = await rs.send(new BatchExecuteStatementCommand({ Sqls: statements, WorkgroupName: binding.workgroup, Database: binding.database, ...(SecretArn ? { SecretArn } : {}) }));
     const runId = ulid();
+    // 2026-11-04:章的 target = **本次生效的区**(多绑行上没有 `wf.targetId`,不显式传就回落主控区 ⇒ 任务监控把
+    //   usw2 的补数运行显示成主控区)。`extra` 里绝不带 targetId(assertStampable 会拒)。
     await putRunRecord({
       taskId: workflowId,
       runId,
       taskType: "workflow",
       triggeredBy: "backfill",
-      stamp: resolveRunStamp(wf),
+      stamp: resolveRunStamp(wf, binding.targetId),
       extra: { runDate, statementId: Id, ...backfillRunExtra({ planId: inst.planId, nodeId: inst.nodeId }) },
     });
-    pollRedshiftRun(wf, runId, Id!, lock).catch(() => {});
+    pollRedshiftRun(wf, runId, Id!, lock, rs, binding.targetId).catch(() => {});
     return { runTaskId: workflowId, runId };
   } catch (e) {
     await releaseRunLock(lock); // 提交阶段失败→立即释放,不留僵尸锁
@@ -196,7 +209,9 @@ async function pollRedshiftRun(
   wf: RunOwner & { workflowId: string },
   runId: string,
   statementId: string,
-  lock?: any
+  lock: any,
+  rs: ReturnType<typeof redshiftDataClientFor>,
+  targetId: string
 ) {
   const taskId = wf.workflowId;
   // 🔴 P0-6 订正(2026-08-29 外部审核):轮询窗口 150×2s = **5 分钟**,补数的 SQL 常远超此值
@@ -212,7 +227,7 @@ async function pollRedshiftRun(
         return;
       }
       try {
-        const desc = await rsData.send(new DescribeStatementCommand({ Id: statementId }));
+        const desc = await rs.send(new DescribeStatementCommand({ Id: statementId }));
         if (desc.Status && ["FINISHED", "FAILED", "ABORTED"].includes(desc.Status)) {
           const status = desc.Status === "FINISHED" ? "succeeded" : "failed";
           await updateRunRecord({
@@ -226,7 +241,7 @@ async function pollRedshiftRun(
               // 成功时记受影响行数(补数页据它标「成功(0 行)」;失败 / 取消不写,免得把 0 当成事实)
               ...(status === "succeeded" ? affectedRowsMetrics(desc) : {}),
             },
-            stamp: resolveRunStamp(wf),
+            stamp: resolveRunStamp(wf, targetId),
           });
           reachedTerminal = true;
           return;

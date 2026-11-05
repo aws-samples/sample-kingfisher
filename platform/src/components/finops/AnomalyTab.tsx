@@ -6,6 +6,8 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Alert, Button, Space, Table, Tag, message } from "antd";
 import { ReloadOutlined, BellOutlined, LinkOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(原 `d?.error || …` 把信封对象递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 // 执行范围:任务级异常按区检测。
 // 服务级(来自账单)也已按区检测(账单 v2 带 region),不再有 `unscoped`;
 // 每条异常都显示它「属于哪里」:任务级 = 执行环境,服务级 = AWS region。
@@ -64,7 +66,7 @@ export default function AnomalyTab() {
         message.success(t("检测完成:{n} 条异常已处理(推送+沉淀知识库,幂等去重)", { n }));
         setItems(d?.data?.anomalies || []);
       } else {
-        message.error(d?.error || t("检测失败"));
+        message.error(errorMessageOf(d, t("检测失败")));
       }
     } finally {
       setDetecting(false);

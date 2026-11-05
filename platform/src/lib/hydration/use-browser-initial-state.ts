@@ -9,9 +9,15 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 /**
  * 水合安全的「浏览器初值」:首帧 = `serverDefault`(服务端与客户端一致),挂载后用 `readOnClient()` 的结果覆盖一次。
  * `readOnClient` 抛错 / 返回 undefined ⇒ 保持缺省。只在挂载时读一次(与原来「初值函数读一次」的语义相同)。
+ *
+ * 第三个元素 `resolved`:挂载后已经读过一次浏览器状态(不论读到没读到)。🔴 **按这个值发请求的 effect 必须等它为 true**
+ *   (2026-11-05 任务监控页页面驱动真撞:补数抽屉「去监控页定位」带 `?name=&triggeredBy=backfill` 跳过来,首个 `/api/monitor/runs`
+ *   请求与本 hook 的挂载 effect 在同一次提交里跑、拿的还是服务端缺省筛选 ⇒ 列表先按空筛选渲染,要等 10 秒自动刷新才对上;
+ *   关掉自动刷新就永远对不上)。
  */
-export function useBrowserInitialState<T>(serverDefault: T, readOnClient: () => T | undefined): [T, Dispatch<SetStateAction<T>>] {
+export function useBrowserInitialState<T>(serverDefault: T, readOnClient: () => T | undefined): [T, Dispatch<SetStateAction<T>>, boolean] {
   const [value, setValue] = useState<T>(serverDefault);
+  const [resolved, setResolved] = useState(false);
   useEffect(() => {
     try {
       const v = readOnClient();
@@ -19,7 +25,8 @@ export function useBrowserInitialState<T>(serverDefault: T, readOnClient: () => 
     } catch {
       /* 浏览器状态读不到就保持缺省 */
     }
+    setResolved(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return [value, setValue];
+  return [value, setValue, resolved];
 }

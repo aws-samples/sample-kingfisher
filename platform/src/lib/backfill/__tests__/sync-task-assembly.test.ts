@@ -160,7 +160,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
     s3ClientFor: async () => quiet,
     s3tablesClientFor: async () => quiet,
     logsClientFor: async () => quiet,
-    redshiftClientForHomeOnly: () => ({ send: async () => ({}) }),
+    redshiftDataClientFor: () => ({ send: async () => ({}) }),
   };
 });
 vi.mock("@/lib/exec-env/data-plane-target", async (orig) => {

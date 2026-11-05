@@ -43,6 +43,7 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
   let dag: any;
   // 🔴 **执行目标从资源行解析,绝不接受客户端指定** —— 客户端能挑"补到哪个区"就等于绕过绑定。
   // 单绑(存量全部)时展开结果与改动前**逐字节相同**。
+  // 2026-11-04:四类目标(ETL / EMR / 同步任务 / 工作流)都按绑定区逐区展开,实例在**自己的区**执行(execute.ts 四条分支都按 inst.targetId 落点)。
   let execTargets: string[] = ["tgt_home"];
   if (kind === "etl-job") {
     const { Item } = await docClient.send(new GetCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: id } }));
@@ -70,15 +71,10 @@ async function build(req: NextRequest, projectId: string, createdBy: string, bod
     const { Item } = await docClient.send(new GetCommand({ TableName: TABLES.WORKFLOWS, Key: { userId: USER_ID, workflowId: id } }));
     if (!Item) return "工作流不存在";
     name = Item.name; dag = Item.dagDefinition;
+    // 2026-11-04(工作流离线作业节点设计 §4):工作流按绑定区逐区展开实例,每个实例在自己的区执行 —— SQL 节点按实例的区解析数仓绑定、
+    //   同步 / 离线作业节点按实例的区取任务 / 作业(execute.ts)。「只支持主控区」守卫 时代那道「绑了非主控区就 400」的守卫
+    //   (当时 SQL 节点还是 home-only 客户端,照绑定展开会让非主控区实例在主控区跑)随 SQL 节点下推一起删除。
     execTargets = bindingTargets(Item);
-    // 🔴 工作流补数的执行合同是 **home-only**
-    // (`backfill/execute.ts` 的 SQL 节点走 `redshiftClientForHomeOnly("workflow-no-target-dim")` + 主控区工作组)。
-    // 原来照绑定区展开 ⇒ 非主控区的实例**实际在主控区执行**(主控区跑两遍、那个区一天没补),页面却显示成功。
-    // ⇒ 绑了非主控区就**如实拒绝**(不静默只补主控区那一半),给出路。
-    const nonHome = execTargets.filter((t) => t !== "tgt_home");
-    if (nonHome.length > 0) {
-      return `工作流补数目前只支持主控区:该工作流绑定了 ${nonHome.join(", ")}。请对单个离线作业做补数,或改为只绑定主控区后再补`;
-    }
   }
 
   // 强制并发只有这一个判定出口;客户端传值在这里被覆盖(同步任务与改动前逐字节同值 = 1)。

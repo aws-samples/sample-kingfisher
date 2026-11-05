@@ -154,7 +154,8 @@ function fakeGlue() {
     },
   };
 }
-// 主控区 Data API 假客户端:SQL 节点的 BatchExecuteStatement 立即受理,DescribeStatement 一次到终态
+// Data API 假客户端(2026-11-04 起 SQL 节点按实例的区取 redshiftDataClientFor(region),这里对任何 region 都回同一个假客户端):
+//   BatchExecuteStatement 立即受理,DescribeStatement 一次到终态
 const fakeRedshift = {
   send: async (cmd: { constructor: { name: string }; input: Item }) => {
     const n = cmd.constructor.name;
@@ -184,7 +185,7 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
     s3ClientFor: async () => quiet,
     s3tablesClientFor: async () => quiet,
     logsClientFor: async () => quiet,
-    redshiftClientForHomeOnly: () => fakeRedshift,
+    redshiftDataClientFor: () => fakeRedshift,
   };
 });
 vi.mock("@/lib/exec-env/data-plane-target", async (orig) => {

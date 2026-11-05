@@ -8,6 +8,8 @@ import { Alert, Button, Card, Col, Dropdown, Empty, Row, Space, Spin, Tag, Typog
 import { ReloadOutlined, CloudDownloadOutlined } from "@ant-design/icons";
 import { Donut, TrendArea, BarList, MetricCard } from "@/components/dashboard/charts";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(原 `d?.error || …` 把信封对象递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 import { useScope } from "@/components/scope/ScopeProvider";
 import { toScopeParam } from "@/lib/scope/scope";
 
@@ -150,7 +152,7 @@ export default function OverviewTab() {
         message.success(t("采集完成:账单 {rows} 行,归因 {n} 条", { rows: d?.data?.ce?.rows ?? 0, n: d?.data?.sweep?.attributed ?? 0 }));
         load();
       } else {
-        message.error(d?.error || t("采集失败"));
+        message.error(errorMessageOf(d, t("采集失败")));
       }
     } finally {
       setCollecting(false);

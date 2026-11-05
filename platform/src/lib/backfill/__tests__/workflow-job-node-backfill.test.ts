@@ -16,7 +16,7 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
   const real = (await orig()) as Record<string, unknown>;
   return { ...real, docClient: { send: async (cmd: { input: { TableName: string } }) => ({ Item: h.rows[cmd.input.TableName] }) } };
 });
-vi.mock("@/lib/exec-env/target-clients", () => ({ redshiftClientForHomeOnly: () => ({ send: async () => ({}) }) }));
+vi.mock("@/lib/exec-env/target-clients", () => ({ redshiftDataClientFor: () => ({ send: async () => ({}) }) }));
 vi.mock("@/lib/etl/job-service", () => ({
   runEtlJob: async (job: Record<string, unknown>, opts: Record<string, unknown>) => { h.etlRuns.push({ job, opts }); return { runId: `etl-run-${h.etlRuns.length}` }; },
 }));

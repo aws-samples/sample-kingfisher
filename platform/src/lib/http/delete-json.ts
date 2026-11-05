@@ -8,6 +8,9 @@
 // 【根治】一个读法:读 JSON 信封(该缺陷的全局拦截器已把非 JSON 的 /api 错误页整形成 `{success:false,error:{message,code}}`);
 //   非 2xx / `success === false` / 带 error ⇒ 抛 `DeleteRejected`(服务端 message 原话 + code + HTTP 状态),页面只做
 //   `message.error(e.message)`;**成功才**提示「已删除」。2xx 无正文(204)视为成功。
+// 2026-11-04:信封文案 / 错误码的读法只有一个作者(error-envelope.ts),这里不再内联第二份判断。
+import { errorCodeOf, errorMessageOf } from "./error-envelope";
+
 export class DeleteRejected extends Error {
   constructor(
     message: string,
@@ -31,10 +34,8 @@ export async function deleteJson<T extends Record<string, unknown> = Record<stri
     body = null;
   }
   const err = body?.error;
-  const errMsg = err && typeof err === "object" ? err.message : typeof err === "string" ? err : undefined;
-  const errCode = err && typeof err === "object" ? err.code : undefined;
   if (!res.ok || (body !== null && (body.success === false || (err !== undefined && body.success !== true)))) {
-    throw new DeleteRejected(String(errMsg || `删除失败(HTTP ${res.status})`), res.status, errCode);
+    throw new DeleteRejected(errorMessageOf(body, `删除失败(HTTP ${res.status})`), res.status, errorCodeOf(body));
   }
   return (body ?? {}) as T;
 }

@@ -8,7 +8,7 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
   const real = (await orig()) as Record<string, unknown>;
   return { ...real, docClient: { send: async () => ({ Item: h.job }) } };
 });
-vi.mock("@/lib/exec-env/target-clients", () => ({ redshiftClientForHomeOnly: () => ({ send: async () => ({}) }) }));
+vi.mock("@/lib/exec-env/target-clients", () => ({ redshiftDataClientFor: () => ({ send: async () => ({}) }) }));
 vi.mock("@/lib/engines/registry", () => ({
   isEngineType: () => true,
   getProvider: () => ({

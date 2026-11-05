@@ -17,6 +17,8 @@ import EnvTag from "@/components/common/EnvTag";
 import EnvPromotionStatus from "@/components/common/EnvPromotionStatus";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(`xxx.error` 可能是 apiError / 非 JSON 信封拦截器的对象信封,直接递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 import { NODE_REGISTRY, PALETTE_NODE_TYPES } from "@/lib/workflow/node-registry";
 // Airflow 控制台入口收成平台 admin 专用(服务端已硬拦,这里只是不让人白点)
 import { useAuth } from "@/lib/auth/AuthProvider";
@@ -278,7 +280,7 @@ export default function WorkflowEditorPage() {
     try {
       const res = await fetch(`/api/workflow/${id}/unpublish`, { method: "POST" });
       const data = await res.json();
-      if (data.error) message.error(data.error);
+      if (data.error) message.error(errorMessageOf(data, t("操作失败")));
       else {
         message.success(t("已从 MWAA 下线(DAG 已移除,调度停止)"));
         setWorkflow((w: any) => ({ ...w, cronExpression: "", scheduleEnabled: false, status: "draft", airflowDagId: undefined }));

@@ -54,4 +54,21 @@ describe("渲染期不读浏览器状态(水合安全)", () => {
     }
     expect(renderToString(createElement(Probe))).toContain(">server<");
   });
+
+  it("④ useBrowserInitialState 第三个元素 resolved 在服务端首帧为 false(挂载 effect 之后才 true)", () => {
+    function Probe() {
+      const [, , resolved] = useBrowserInitialState("server", () => "client");
+      return createElement("span", null, resolved ? "resolved" : "pending");
+    }
+    expect(renderToString(createElement(Probe))).toContain(">pending<");
+  });
+
+  it("🔴 ⑤ 任务监控页的首个运行列表请求要等地址栏筛选解析完(2026-11-05:带 ?name=&triggeredBy= 跳过来先显示全表、等 10 秒自动刷新才对上)", () => {
+    const src = readFileSync(join(SRC, "app/monitor/page.tsx"), "utf8");
+    expect(src).toMatch(/const \[filters, setFilters, filtersResolved\] = useBrowserInitialState\(/);
+    // 首拉 effect:只在 resolved 后发,且把 resolved 放进 deps(解析完那一帧触发一次)
+    expect(src).toMatch(/useEffect\(\(\) => \{ if \(filtersResolved\) fetchData\(\); \}, \[scopeParam, filtersResolved\]\);/);
+    // 不许再有不等解析就拉的首拉写法
+    expect(src).not.toMatch(/useEffect\(\(\) => \{ fetchData\(\); \}, \[scopeParam\]\);/);
+  });
 });

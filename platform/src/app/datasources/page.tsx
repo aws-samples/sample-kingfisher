@@ -12,6 +12,8 @@ import S3ExternalTableModal from "./S3ExternalTableModal";
 import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(`xxx.error` 可能是 apiError / 非 JSON 信封拦截器的对象信封,直接递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 // 执行范围接入(50 SPEC §2.6;交互 INTERACTION §9)
 import { useScope } from "@/components/scope/ScopeProvider";
 import OtherScopesHint, { ScopeEmptyHint } from "@/components/scope/OtherScopesHint";
@@ -165,10 +167,10 @@ export default function DatasourcesPage() {
             else message.error(t("经 Glue 连接不可达: {err}", { err: s.error || t("连接失败") }));
             break;
           }
-          if (s?.state === "unknown") { message.warning(s.error || t("Glue 连接验证没有给出结果")); break; }
+          if (s?.state === "unknown") { message.warning(errorMessageOf(s, t("Glue 连接验证没有给出结果"))); break; }
         }
       }
-      else message.info(d?.error || t("该类型暂不支持心跳检测"));
+      else message.info(errorMessageOf(d, t("该类型暂不支持心跳检测")));
       fetchData();
     } catch {
       message.error(t("心跳检测失败"));

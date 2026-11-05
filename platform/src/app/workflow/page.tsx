@@ -11,6 +11,8 @@ import { PlusOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons"
 import { useRouter } from "next/navigation";
 import type { Workflow } from "@/types/workflow";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(`xxx.error` 可能是 apiError / 非 JSON 信封拦截器的对象信封,直接递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 // 🔴 口径纠正:编排**不是**「中心一个 Airflow」。
 // 每区一套 MWAA Serverless、调度只在本区执行、只有元数据上报主控区(用户第三次提醒)。
 // 别把 [[one-agentcore-one-om-mandate]]「中心一份」那条纪律套到编排上 —— 那条只管 AgentCore / OM。
@@ -153,7 +155,7 @@ export default function WorkflowPage() {
     try {
       const res = await fetch(`/api/workflow/${id}/unpublish`, { method: "POST" });
       const data = await res.json();
-      data.error ? message.error(data.error) : message.success(t("已从 MWAA 下线(DAG 已移除)"));
+      data.error ? message.error(errorMessageOf(data, t("下线失败"))) : message.success(t("已从 MWAA 下线(DAG 已移除)"));
       fetchData();
     } finally { setBusyId(""); }
   };
@@ -170,7 +172,7 @@ export default function WorkflowPage() {
         body: JSON.stringify(targets && targets.length ? { targets } : {}),
       });
       const data = await res.json();
-      if (data.error) { message.error(data.error); return; }
+      if (data.error) { message.error(errorMessageOf(data, t("触发失败"))); return; }
       const n = Array.isArray(data.runs) ? data.runs.length : 1;
       message.success(n > 1 ? t("已在 {n} 个执行范围各触发一次", { n }) : t("已触发运行"));
       fetchData();

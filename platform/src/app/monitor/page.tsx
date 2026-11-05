@@ -42,7 +42,7 @@ export default function MonitorPage() {
   // 初始筛选可由地址栏带入(`?name=&triggeredBy=`):补数实例抽屉「去监控页定位」
   //   就是带着任务名 + backfill 跳过来的;没带参数时初值与改动前逐字节相同。
   //   首帧按空筛选渲染(= 服务端),挂载后再从地址栏取 name / triggeredBy
-  const [filters, setFilters] = useBrowserInitialState(
+  const [filters, setFilters, filtersResolved] = useBrowserInitialState(
     { name: "", status: "", taskType: "", triggeredBy: "", startDate: "", endDate: "", region: "" },
     () => {
       const qs = new URLSearchParams(window.location.search);
@@ -83,8 +83,10 @@ export default function MonitorPage() {
   };
 
   // 🔴 `scopeParam` 进 deps:切范围**不重载页面**,靠这里重拉(护栏 4)
+  // 🔴 首个请求要等地址栏筛选解析完(2026-11-05 页面驱动真撞):`filters` 的首帧是服务端缺省,挂载后才从 `?name=&triggeredBy=` 取值;
+  //    原来这里不等就拉 ⇒ 带筛选跳过来的页面先显示全表,要等下一次自动刷新(10 秒;关掉就永远)才对上。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, [scopeParam]);
+  useEffect(() => { if (filtersResolved) fetchData(); }, [scopeParam, filtersResolved]);
   useEffect(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (refreshInterval > 0) timerRef.current = setInterval(() => fetchData(), refreshInterval * 1000);

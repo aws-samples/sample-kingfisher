@@ -47,7 +47,8 @@ const BARE_ALLOWLIST: Record<string, number> = {};
 const HOME_ONLY_CENSUS: Record<string, string[]> = {
   // sync/execute-ddl 与 sync/generate-ddl 两行已删
   // 理由值 `sync-no-target-dim` 退役(两路由改走 resolveRedshiftBinding 按 targetId 落点)。棘轮只减。
-  "lib/backfill/execute.ts": ["workflow-no-target-dim"],
+  // 2026-11-04(2026-11-04)—— lib/backfill/execute.ts 一行已删:理由值 `workflow-no-target-dim` 退役(补数 SQL 节点按实例的区走
+  // resolveRedshiftBinding + redshiftDataClientFor(binding.region);「只支持主控区」守卫同笔删除)。棘轮只减:清单从 4 个文件 6 处 → 3 个文件 5 处。
   // lib/modeling/redshift.ts 一行已删(理由值退役:非 home 建模落地交付)。
   "lib/projects/project-resources.ts": ["project-inventory"],
   "lib/realtime/redshift-target.ts": ["dms-bootstrap-home"],

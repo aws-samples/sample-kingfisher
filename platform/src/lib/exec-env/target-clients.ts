@@ -221,8 +221,9 @@ export type HomeOnlyReason =
   // 原第一项 `sync-no-target-dim` 已**退役**:
   // 同步向导 DDL(execute-ddl / generate-ddl)按 body 的 targetId 走 resolveRedshiftBinding。
   // 🔴 这张表只减不增是设计(每删一个理由 = 一条路径完成下推);别把删掉的理由加回来。
-  /** 编排(bgp-workflows)**没有区域维** ⇒ workflow SQL 节点的补数只能在主控区跑。加维 =。 */
-  | "workflow-no-target-dim"
+  // 2026-11-04(2026-11-04)—— 原第二项 `workflow-no-target-dim`(「编排没有区域维 ⇒ workflow SQL 节点补数只能在主控区跑」)已**退役**:
+  // 编排行早有绑定区(`targets[]`)、补数实例自带 `targetId`、运行时 SQL 节点在实例的区执行,
+  // 补数 SQL 节点(lib/backfill/execute.ts runWorkflowSqlNode)改按实例的区走 resolveRedshiftBinding;「只支持主控区」的 400 守卫同笔删除。
   /** 删项目时的资源盘点:盘的是主控区那套控制面资源;跨区盘点归 52 的删项目跨区残留项。 */
   | "project-inventory"
   /** zero-ETL 集成是**主控区里的独立 namespace**,有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)。 */

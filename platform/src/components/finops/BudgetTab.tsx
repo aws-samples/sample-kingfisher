@@ -9,6 +9,8 @@ import {
 } from "antd";
 import { PlusOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, BulbOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(原 `d?.error || …` 把信封对象递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 import { useScope } from "@/components/scope/ScopeProvider";
 import { toScopeParam } from "@/lib/scope/scope";
 
@@ -112,7 +114,7 @@ export default function BudgetTab() {
       setModalOpen(false);
       load();
     } else {
-      message.error(d?.error || t("保存失败"));
+      message.error(errorMessageOf(d, t("保存失败")));
     }
   };
 

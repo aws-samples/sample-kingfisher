@@ -85,7 +85,9 @@ const BASELINE = {
   // 2026-11-03 30 → 29:依赖库上传路由不再手拼主控区脚本桶名,改按作业绑定的每个落点 resolveGlueBinding 取脚本桶
   homeLiterals: 29, // 2026-10-11 31 → 30(o4-REG):同步推 OM 的两份 `bgp-table-bucket` 缺省收成坐标作者 om-sync-coords 的一处(主控区分支)
   /** L1:落点签名里的可选 / undefined(`targetId?: string` / `targetId: string | undefined|null`) */
-  optionalTargetSigs: 66, // 2026-10-22 68 → 66:model-metrics compute 路由主体搬进执行体,路由里两处 `targetId?: string` 局部签名随之消失
+  // 2026-11-04 66 → 65:lib/backfill/execute.ts 工作流 SQL 节点补数的锁名不再从 `(wf as { targetId?: string }).targetId` 取
+  //   (多绑行上没有这个字段 ⇒ 恒为空 ⇒ 两个区的同节点串成一条队),改按实例的区解析出的 `binding.targetId`;那个局部可选签名随之消失
+  optionalTargetSigs: 65, // 2026-10-22 68 → 66:model-metrics compute 路由主体搬进执行体,路由里两处 `targetId?: string` 局部签名随之消失
   //   2026-10-11 72 → 68(合并 integ/seq35):计划落点必填(createPlanTask / createPlan)−2 + 后一半 fetchCatalog / probeModel 落点必填 −2
   // 2026-10-03 73 → 72:computeHealth 落点必填
   //  2026-10-03 76 → 73:resolveFlinkPlace / ctxFor / StartOptions.targetId 必填(观测器误报牵出)

@@ -13,6 +13,8 @@ import {
 } from "antd";
 import { PlusOutlined, ReloadOutlined, AlertOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
+// 2026-11-04(B):错误信封文案的唯一读法(原 `d?.error || …` 把信封对象递给 antd ⇒ React error #31 ⇒ 零提示)
+import { errorMessageOf } from "@/lib/http/error-envelope";
 import FeatureGuide from "@/components/common/FeatureGuide";
 // 「给哪个任务定 SLA」的候选必须按执行范围过滤。
 // 🔴 注意本文件里 `targetId` 是**表单字段名**(SLA 绑的任务/工作流 id),与执行目标不是一回事;
@@ -96,7 +98,7 @@ export default function SlaPanel({ active }: { active: boolean }) {
       res = await fetch("/api/sla", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     }
     const d = await res.json();
-    if (!res.ok) { message.error(d?.error || t("保存失败")); return; }
+    if (!res.ok) { message.error(errorMessageOf(d, t("保存失败"))); return; }
     message.success(editing ? t("已更新") : t("已创建"));
     setModalOpen(false);
     load();
@@ -112,7 +114,7 @@ export default function SlaPanel({ active }: { active: boolean }) {
     try {
       const res = await fetch("/api/baseline/learn", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({}) });
       const d = await res.json();
-      if (!res.ok) { message.error(d?.error || t("学习失败")); return; }
+      if (!res.ok) { message.error(errorMessageOf(d, t("学习失败"))); return; }
       message.success(t("已学习 {n} 个任务基线", { n: d?.data?.learned ?? 0 }));
       load();
     } finally { setLearning(false); }

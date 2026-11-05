@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Card, Table, Tag, Button, Space, Modal, Form, Select, DatePicker, InputNumber,
-  Input, Switch, message, Tooltip, Statistic, Row, Col, Alert, Segmented, Drawer, Descriptions,
+  Input, message, Tooltip, Statistic, Row, Col, Alert, Segmented, Drawer, Descriptions,
 } from "antd";
 import {
   PlusOutlined, ReloadOutlined, PauseCircleOutlined, PlayCircleOutlined,
@@ -23,6 +23,10 @@ import { toScopeParam } from "@/lib/scope/scope";
 import RunLogModal from "@/components/monitor/RunLogModal";
 import { resourcePath } from "@/lib/env/resource-path";
 import type { ResourceType } from "@/lib/versions/version-service";
+// 2026-11-04(B):错误信封文案的唯一读法 —— 原来 `message.error(d?.error || …)` 把信封**对象**递给 antd ⇒ React error #31 ⇒ 零提示
+import { errorMessageOf } from "@/lib/http/error-envelope";
+// 2026-11-04(C):随所选目标变化的派生块(级联开关 / 同步提示)+ 并发置灰判定的唯一作者;所选目标 id 进 React state(见 onValuesChange)
+import WizardTargetDerived, { isConcurrencyForced } from "@/components/backfill/WizardTargetDerived";
 
 type Granularity = "day" | "week" | "hour";
 const STATUS_COLORS: Record<string, string> = {
@@ -43,6 +47,10 @@ export default function BackfillPage() {
   const [form] = Form.useForm();
   const [preview, setPreview] = useState<{ count: number; input: any } | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  // 2026-11-04(C):向导里当前选中的目标 id。🔴 必须是 React state,不能渲染期 `form.getFieldValue("targetId")`:antd Form 的值仓
+  //   不在 state 里,改选目标不会让本组件重渲染(onValuesChange 原来只 setPreview(null),preview 本就是 null ⇒ React 跳过)
+  //   ⇒ 级联开关 / 同步提示 / 并发置灰在选中后**不出现**,直到点「预览实例」才补渲染(页面驱动真撞)。
+  const [selectedTargetId, setSelectedTargetId] = useState<string>("");
 
   const [detail, setDetail] = useState<any | null>(null); // {plan,instances,matrix}
   const [detailPlanId, setDetailPlanId] = useState<string>("");
@@ -74,6 +82,7 @@ export default function BackfillPage() {
   // 打开向导时拉目标。
   const openWizard = () => {
     setPreview(null);
+    setSelectedTargetId("");
     form.resetFields();
     setWizardOpen(true);
     // 目标下拉按执行范围过滤:否则在 us-west-2 视角
@@ -84,8 +93,6 @@ export default function BackfillPage() {
     tq.set("include", "sync-task");
     fetch(`/api/backfill/targets?${tq.toString()}`).then((r) => r.json()).then((d) => setTargets(d?.data?.targets || d?.targets || []));
   };
-
-  const selectedTarget = () => targets.find((x) => x.id === form.getFieldValue("targetId"));
 
   // dry-run 预览。
   const doPreview = async () => {
@@ -105,7 +112,7 @@ export default function BackfillPage() {
       };
       const res = await fetch("/api/backfill/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const d = await res.json();
-      if (!res.ok) { message.error(d?.error || t("预览失败")); setPreview(null); return; }
+      if (!res.ok) { message.error(errorMessageOf(d, t("预览失败"))); setPreview(null); return; }
       setPreview({ count: d.data.count, input: d.data.input });
     } finally { setPreviewing(false); }
   };
@@ -126,7 +133,7 @@ export default function BackfillPage() {
     };
     const res = await fetch("/api/backfill/plan", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     const d = await res.json();
-    if (!res.ok) { message.error(d?.error || t("创建失败")); return; }
+    if (!res.ok) { message.error(errorMessageOf(d, t("创建失败"))); return; }
     message.success(t("补数计划已创建"));
     setWizardOpen(false);
     // 护栏 1:计划的执行区来自**所选作业自己的绑定**(服务端 `execTargets`),
@@ -171,7 +178,7 @@ export default function BackfillPage() {
     if (!detailPlanId) return;
     const res = await fetch(`/api/backfill/${detailPlanId}/control`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
     const d = await res.json();
-    if (!res.ok) { message.error(d?.error || t("操作失败")); return; }
+    if (!res.ok) { message.error(errorMessageOf(d, t("操作失败"))); return; }
     message.success(t("操作成功"));
     loadDetail(detailPlanId);
     fetchPlans();
@@ -194,11 +201,11 @@ export default function BackfillPage() {
     { title: t("操作"), key: "op", render: (_: any, r: any) => <Button size="small" onClick={() => openDetail(r.planId)}>{t("查看进度")}</Button> },
   ];
 
-  const tgtSel = selectedTarget();
-  // 含数据同步节点的工作流:服务端会把并发强制成 1(lib/backfill/types.ts forcedBackfillConcurrency),
-  //   这里提前说明并锁住并发框(与同步任务目标同一套 UX);`nodeTypes` 来自 /api/backfill/targets。
-  const wfHasSyncNode = tgtSel?.scope === "workflow" && Array.isArray(tgtSel?.nodeTypes) && tgtSel.nodeTypes.includes("sync");
-  const concurrencyForced = tgtSel?.kind === "sync-task" || wfHasSyncNode;
+  // 2026-11-04(C):所选目标从 React state 派生(不是 Form 值仓),选中即重渲染。
+  const tgtSel = targets.find((x) => x.id === selectedTargetId);
+  // 含数据同步节点的工作流 / 同步任务:服务端会把并发强制成 1(lib/backfill/types.ts forcedBackfillConcurrency),
+  //   这里提前锁住并发框;判定的唯一作者在 WizardTargetDerived(提示块与置灰同口径);`nodeTypes` 来自 /api/backfill/targets。
+  const concurrencyForced = isConcurrencyForced(tgtSel);
 
   return (
     <div style={{ padding: 24 }}>
@@ -245,7 +252,8 @@ export default function BackfillPage() {
           <Button loading={previewing} onClick={doPreview}>{t("预览实例")}</Button>
           <Button type="primary" disabled={!preview} onClick={doConfirm}>{t("确认创建")}</Button>
         </Space>}>
-        <Form form={form} layout="vertical" initialValues={{ granularity: "day", concurrency: 2, maxInstances: 100, cascade: true }} onValuesChange={() => setPreview(null)}>
+        <Form form={form} layout="vertical" initialValues={{ granularity: "day", concurrency: 2, maxInstances: 100, cascade: true }}
+          onValuesChange={(_changed, all) => { setPreview(null); setSelectedTargetId(String(all?.targetId ?? "")); }}>
           <Form.Item name="targetId" label={t("补数目标")} rules={[{ required: true, message: t("请选择目标") }]}>
             <Select showSearch optionFilterProp="label" placeholder={t("选择任务或工作流")}
               options={targets.map((x) => ({
@@ -272,20 +280,8 @@ export default function BackfillPage() {
               </Form.Item>
             </Col>
           </Row>
-          {tgtSel?.kind === "sync-task" && (
-            <Alert style={{ marginBottom: 16 }} type="info" showIcon
-              message={t("同步任务按业务日期逐天补数:每个日期跑一次该任务(Glue 作业带上这个日期),并发固定为 1(同一个 Glue 作业不能同时跑两个日期);只支持按天 / 按周。")} />
-          )}
-          {wfHasSyncNode && (
-            <Alert style={{ marginBottom: 16 }} type="info" showIcon
-              message={t("该工作流含数据同步节点:每个业务日期会把节点关联的同步任务跑一次(Glue 作业带上这个日期),并发固定为 1(同一个 Glue 作业不能同时跑两个日期)。关联的同步任务须是 Glue 通道、全量且用到日期变量,否则该节点的实例会如实失败(级联时其下游跳过)。")} />
-          )}
-          {tgtSel?.scope === "workflow" && (
-            <Form.Item name="cascade" label={t("级联下游依赖")} valuePropName="checked"
-              tooltip={t("按 DAG 依赖顺序补数:同日期上游成功后下游才跑")}>
-              <Switch checkedChildren={t("级联")} unCheckedChildren={t("独立")} />
-            </Form.Item>
-          )}
+          {/* 2026-11-04(C):随所选目标变化的派生块(同步提示 / 含同步节点提示 / 级联开关),按 state 里的目标渲染 */}
+          <WizardTargetDerived target={tgtSel} />
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="concurrency" label={t("并发上限")} tooltip={t("同时运行的实例数上限,防打爆引擎")}>
