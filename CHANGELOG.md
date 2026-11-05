@@ -39,6 +39,9 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Fixed
 
+- Backfill of a workflow bound to a non-home region now runs its SQL nodes in that region's warehouse: the warehouse binding is resolved per instance, the statement is submitted and polled with a same-region client, and the node lock and run record carry that region. The former "workflow backfill only supports the home region" rejection is removed and plans expand once per bound region.
+- The backfill wizard renders the cascade switch, the sync-node notice and the forced-concurrency state as soon as a target is selected instead of only after "Preview instances", and a failed preview shows the server's message instead of nothing (the error envelope object was being passed to the toast).
+- The task monitor applies filters carried in the URL (`?name=&triggeredBy=`) on the first load instead of only after the next auto-refresh.
 - Unit tests and CI are hermetic: tests no longer depend on the developer machine's AWS credentials, temporary files or pre-installed infrastructure dependencies, and the infrastructure job installs the platform dependencies so the agent skills Lambda bundles at synth time. Product bytes are unchanged.
 - Release packaging wrote an empty tag list into `BUILD-INFO.json` and exited with code 141 when the packaged commit carried a tag, which is exactly the release case; the tag list is now passed as an argument and the offline judge covers a tagged ref.
 - Deleting a data source that is still referenced by sync or real-time tasks is refused with a list of the referencing tasks instead of orphaning them.
