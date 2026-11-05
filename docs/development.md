@@ -120,7 +120,7 @@ These rules exist because each of them was once violated and cost a release. The
 7. **Deletes leave no orphans.** Deleting a data source, task or execution target also removes the Glue connections, jobs, scripts, roles and security groups it created. If something cannot be removed, answer HTTP 502 and leave the record unchanged.
 8. **No secrets in the repository.** Commits must not contain account ids, ARNs, keys or passwords. The pre-commit hook and CI enforce it.
 9. **UI claims need a carrier.** A page may only show a capability that exists end to end, and a status may only come from a real conclusion. "Still running" is not "failed"; "configured" is not "connected".
-10. **Contracts first.** Before changing a feature, read its design contract under `docs/design/<module>/` and the multi-region contract `docs/design/50-multi-region-execution/SPEC.md`.
+10. **Contracts first.** Before changing a feature, read its design contract under `docs/design/` and the multi-region contracts: [`docs/design/multi-region-execution-spec.md`](design/multi-region-execution-spec.md), [`docs/design/multi-region-execution-design.md`](design/multi-region-execution-design.md) and [`docs/design/multi-region-execution-interaction.md`](design/multi-region-execution-interaction.md).
 
 ## 6. Testing rules
 
@@ -232,7 +232,7 @@ Conventions for writing acceptance steps:
 - Figures are static PNG files under `docs/diagrams/`. Sources are Mermaid files under `docs/diagrams/src/` or the Python renderer in the same directory. Markdown never embeds live Mermaid.
 - Figures and prose never state service or library versions. Versions live only in [`supported-versions.md`](supported-versions.md); a version change edits that file and `CHANGELOG.md` in the same commit.
 - Screenshots under `docs/screenshots/` are scrubbed of account ids, resource ids and URLs before they are committed.
-- Design contracts under `docs/design/<module>/` are the place for rationale and acceptance criteria; this guide and `architecture.md` describe only what exists.
+- Design contracts under `docs/design/` are the place for rationale and acceptance criteria; this guide and `architecture.md` describe only what exists.
 - Documentation has no line-length or cell-length limit (decision of 2026-11-04: GitHub wraps long lines and cells; sentences and table cells are never split or truncated to satisfy a tool). Keep tables to five columns or fewer.
 
 ## 14. Repository standards

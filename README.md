@@ -74,7 +74,7 @@ switch the "execution scope" in the top bar and you are working in another regio
 | One principle | No second system for non-home regions: one AgentCore, one OpenMetadata, one set of Cognito / DynamoDB / approvals / audit |
 
 Components, request chain, key flow sequences and data flow: [`docs/architecture.md`](docs/architecture.md) (with the flow / sequence diagrams);
-design contract: [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md); figure index: [`docs/diagrams/README.md`](docs/diagrams/README.md).
+design overview: [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md); full contracts: [specification](docs/design/multi-region-execution-spec.md) · [design](docs/design/multi-region-execution-design.md) · [interaction design](docs/design/multi-region-execution-interaction.md); figure index: [`docs/diagrams/README.md`](docs/diagrams/README.md).
 
 ---
 
@@ -202,7 +202,10 @@ Key points:
 | Technical deep dive into GenBI / AgentCore / observability (home-region internals, written in the single-region stage) | [`docs/deep-dive.md`](docs/deep-dive.md) · [`docs/deep-dive-brief.md`](docs/deep-dive-brief.md) |
 | Which versions are supported (Node / Next.js / CDK · Glue / EMR / Flink / DMS / OpenMetadata / MySQL / OpenSearch · data-source drivers · JDK / Maven · browsers · version policy) | [`docs/supported-versions.md`](docs/supported-versions.md) (figures never carry versions; this file is the single source of truth) |
 | Security scanning conclusions and accepted findings | [`docs/security.md`](docs/security.md) (section 6, secure development) |
-| Requirements, architecture, API contract, interaction design and acceptance for multi-region execution | [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md) |
+| Multi-region execution: overview of concepts, architecture, interfaces, key flows and acceptance (entry point, with the figures) | [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md) |
+| Multi-region execution: the full specification (table design, API contract, key-mechanism pseudocode, change list, decisions) | [`docs/design/multi-region-execution-spec.md`](docs/design/multi-region-execution-spec.md) |
+| Multi-region execution: the full design document (requirements, architecture D1–D8, lifecycle, IAM and network, acceptance, decision record, correction ledger) | [`docs/design/multi-region-execution-design.md`](docs/design/multi-region-execution-design.md) |
+| Multi-region execution: the full interaction design (nine scenarios, safety mechanisms, execution-scope rulings, friendliness design) | [`docs/design/multi-region-execution-interaction.md`](docs/design/multi-region-execution-interaction.md) |
 | Design documents of the other modules | [`docs/design/`](docs/design/) |
 | 🤖 Hand the project to an AI tool (Claude Code / Kiro / Codex …) | **[`AGENTS.md`](AGENTS.md)** |
 | Release history | [`CHANGELOG.md`](CHANGELOG.md) |

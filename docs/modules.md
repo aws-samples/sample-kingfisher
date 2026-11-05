@@ -431,7 +431,7 @@
   after a new region is enabled, **the control plane must be redeployed once to authorize it** (`EXECUTION_REGIONS` / `aws:RequestedRegion`); a non-home jurisdiction must install residency-api and keep the audit in two copies;
   three data-plane credential modes `taskrole` (production default) / `observe` / `enforce`.
 - **Known boundaries (this release)**: the data-plane credential mode defaults to `taskrole`, so the "IAM catches cross-region access" layer of defense in depth is not in effect (cross-region access is refused by the application-layer place check).
-- **Design note**: the [multi-region execution design](design/multi-region-execution.md) (current: architecture · specification · interaction design · acceptance · work packages).
+- **Design note**: the [multi-region execution overview](design/multi-region-execution.md) and the full contracts — [specification](design/multi-region-execution-spec.md) · [design document](design/multi-region-execution-design.md) · [interaction design](design/multi-region-execution-interaction.md).
 
 ### 7.3 Users · Audit Log · Settings
 

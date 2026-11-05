@@ -2,7 +2,7 @@
 
 This document describes how Kingfisher is deployed and how a request or a job travels through it.
 It covers the current shape of the product only. Design rationale, interface contracts, interaction design and acceptance criteria live in
-[`design/multi-region-execution.md`](design/multi-region-execution.md) and the other notes under `docs/design/`.
+[`design/multi-region-execution.md`](design/multi-region-execution.md) (overview) with the full contracts [`design/multi-region-execution-spec.md`](design/multi-region-execution-spec.md), [`design/multi-region-execution-design.md`](design/multi-region-execution-design.md) and [`design/multi-region-execution-interaction.md`](design/multi-region-execution-interaction.md), and the other notes under `docs/design/`.
 The pages and features are described one by one in [`features.md`](features.md); the entry point for AI coding tools is the root [`AGENTS.md`](../AGENTS.md).
 The architecture document and figure set of the single-region stage (2026-08) are historical only and are not part of this repository.
 
@@ -475,6 +475,6 @@ Development workflow, local gates and engineering rules are in [`development.md`
 - [`security.md`](security.md): security model and controls.
 - [`supported-versions.md`](supported-versions.md): every pinned runtime, engine and driver version.
 - [`features.md`](features.md): every page, what it does and how to use it.
-- [`design/multi-region-execution.md`](design/multi-region-execution.md): the multi-region contract, design, interaction design and acceptance criteria.
+- [`design/multi-region-execution.md`](design/multi-region-execution.md): the multi-region overview (concepts, architecture, interfaces, key flows, acceptance); the full contracts are [`design/multi-region-execution-spec.md`](design/multi-region-execution-spec.md) (specification), [`design/multi-region-execution-design.md`](design/multi-region-execution-design.md) (design document) and [`design/multi-region-execution-interaction.md`](design/multi-region-execution-interaction.md) (interaction design).
 - [`design/long-running-operations.md`](design/long-running-operations.md): the long-running-operation framework.
 - [`diagrams/README.md`](diagrams/README.md): all figures, their sources and the rendering commands.
