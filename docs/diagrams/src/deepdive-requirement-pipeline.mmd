@@ -1,0 +1,7 @@
+flowchart LR
+  A["Operations / analyst<br/>Ask-Your-Data → raise as a request"] --> B["Manager<br/>accept + assign a developer"]
+  B --> C["Developer<br/>AI-generated implementation (codegen) + create ETL job"]
+  C --> D["Run the job (succeeded)"]
+  D --> E["Submit the delivery"]
+  E --> F["Manager accepts → delivered"]
+  F --> G["Publish to MWAA scheduling"]

@@ -1,0 +1,23 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  autonumber
+  participant P as ask/route + agent
+  participant BR as Bedrock Converse (Claude Opus)
+  participant GD as sql-guard (read-only guard)
+  participant RS as Redshift Data API / Athena
+  P->>BR: Converse(system = catalog + hard rules, messages = [user: question], toolConfig = [run_sql])
+  loop until stopReason ≠ tool_use or maxIters (8) reached
+    BR-->>P: stopReason=tool_use, toolUse run_sql{sql}
+    P->>GD: sanitizeSelect(sql, maxRows=200)
+    alt not read-only / multiple statements / forbidden keyword
+      GD-->>P: {ok:false, error}
+      P-->>BR: toolResult{error} (the model reads the error and self-corrects)
+    else valid
+      GD-->>P: SELECT * FROM (sql) LIMIT 200
+      P->>RS: execute the read-only SQL
+      RS-->>P: columns + rows + rowCount
+      P-->>BR: toolResult{columns, rows (≤modelRows=50), row_count}
+    end
+  end
+  BR-->>P: stopReason=end_turn → final answer in Chinese
+  Note over P,RS: every run_sql round is recorded in steps[], the last successful result becomes the display data (last)

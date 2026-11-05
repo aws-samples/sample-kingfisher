@@ -1,5 +1,5 @@
 flowchart TD
-  IN["Input: targetId + one of<br/>alias / bucket / namespace"] --> LOAD["resolveLakeRoutes(targetId)<br/>platform route + registered rows<br/>15 s process cache"]
+  IN["Input: targetId + one of<br/>alias / bucket / namespace"] --> LOAD["resolveLakeRoutes(targetId)<br/>platform route<br/>+ registered rows<br/>15 s process cache"]
   LOAD --> KIND{"lookup kind"}
   KIND -->|"alias"| BA["routeByAlias"]
   KIND -->|"bucket"| BB["routeByBucket"]
@@ -7,18 +7,18 @@ flowchart TD
   BA --> HIT1{"found in set?"}
   BB --> HIT1
   HIT1 -->|"yes"| OK["LakeRoute returned<br/>caller injects / probes / renders"]
-  HIT1 -->|"no"| NF["400 LAKE_ROUTE_NOT_FOUND<br/>message names target and value<br/>fix: register the bucket as a route"]
+  HIT1 -->|"no"| NF["400 LAKE_ROUTE_NOT_FOUND<br/>message names<br/>target and value<br/>fix: register the<br/>bucket as a route"]
   BN --> ONE{"exactly one route<br/>in the set?"}
   ONE -->|"yes"| OK
   ONE -->|"no"| EXP{"a route declares this<br/>namespace in namespaces[]?"}
   EXP -->|"yes, exactly one"| OK
   EXP -->|"yes, two or more"| NSC["409 LAKE_ROUTE_NAMESPACE_CONFLICT<br/>(cannot happen after registration guard)"]
-  EXP -->|"none"| LIVE["live ListNamespaces per route<br/>via that region's client<br/>15 s cache per bucket"]
+  EXP -->|"none"| LIVE["live ListNamespaces<br/>per route<br/>via that region's client<br/>15 s cache per bucket"]
   LIVE --> CNT{"routes that contain<br/>the namespace"}
   CNT -->|"0"| NF
-  CNT -->|"1"| OK
-  CNT -->|"2 or more"| AMB["400 LAKE_ROUTE_AMBIGUOUS<br/>detail lists every bucket<br/>fix: declare ownership on one route"]
+  CNT --->|"1"| OK
+  CNT -->|"2 or more"| AMB["400 LAKE_ROUTE_AMBIGUOUS<br/>detail lists every bucket<br/>fix: declare ownership<br/>on one route"]
   OK --> WR{"caller needs write?"}
   WR -->|"no"| DONE["proceed"]
-  WR -->|"yes, route.writable"| DONE
-  WR -->|"yes, read-only route"| NW["400 / 409 LAKE_ROUTE_NOT_WRITABLE<br/>fix: pick a writable route or flip the flag"]
+  WR -->|"yes,<br/>route.writable"| DONE
+  WR -->|"yes, read-only route"| NW["400 / 409 LAKE_ROUTE_NOT_WRITABLE<br/>fix: pick a writable route<br/>or flip the flag"]

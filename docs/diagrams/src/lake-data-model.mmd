@@ -42,7 +42,7 @@ classDiagram
   }
   SettingsRow "1" --> "1" LakeRoute : stores external routes only
   LakeRoute <|-- PlatformRoute : implicit default
+  SyncTask_s3Config "1" --> "1" LakeRoute : writes
   EtlJob_glueConfig "1" --> "0..n" LakeRoute : declares by bucket
   EmrEngineJob "1" --> "0..n" LakeRoute : declares by bucket
-  SyncTask_s3Config "1" --> "1" LakeRoute : writes
   FlinkJob "1" --> "0..1" LakeRoute : writes

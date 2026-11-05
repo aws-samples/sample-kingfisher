@@ -1,0 +1,5 @@
+flowchart LR
+  ASK["ask/route.ts"] --> API["memory.ts uniform interface<br/>appendTurn / loadShortTerm / loadLongTerm / maybeSummarize"]
+  API --> SW{"GENBI_MEMORY_BACKEND&nbsp;?"}
+  SW -->|selfmanaged| SM["Self-managed: DynamoDB (short-term)<br/>+ S3 (long-term summaries)"]
+  SW -->|agentcore| AM["AgentCore Memory: events (short-term) + semantic strategy (long-term)"]

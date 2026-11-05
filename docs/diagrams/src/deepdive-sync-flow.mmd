@@ -1,0 +1,9 @@
+%%{init: {"flowchart": {"wrappingWidth": 300}}}%%
+flowchart TD
+  REC["recommendChannel<br/>(source type, target, mode)<br/>glue (general) / zero-etl (MySQL&nbsp;→&nbsp;Redshift) / dms (CDC)"] --> MAP["Type mapping MYSQL/PG_TO_REDSHIFT<br/>compatible / conversion / truncation"]
+  MAP --> DDL["generateDDL<br/>CREATE TABLE IF NOT EXISTS + DISTKEY / SORTKEY / DISTSTYLE"]
+  DDL --> GEN["glue-script-generator produces PySpark"]
+  GEN --> FULL["Full: overwrite the whole table"]
+  GEN --> INC["Incremental: WHERE<br/>watermark&nbsp;column&nbsp;&gt;&nbsp;last&nbsp;watermark<br/>→ append"]
+  FULL --> WRITE
+  INC --> WRITE["Write to S3 Tables (Iceberg) + Redshift (Data API)"]

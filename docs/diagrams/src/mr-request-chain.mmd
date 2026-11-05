@@ -1,22 +1,23 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
 sequenceDiagram
   autonumber
-  participant B as 浏览器
+  participant B as Browser
   participant CF as CloudFront + WAF
   participant ALB as ALB
   participant MW as Next.js middleware.ts
   participant R as API route.ts
-  participant G as 项目守卫 / 执行范围 / 落点
-  participant X as 该区 AWS 客户端
-  B->>CF: HTTPS(页面或 /api/*)
-  CF->>ALB: 回源(安全组只放行 CloudFront 前缀列表)
-  ALB->>MW: 请求
-  MW->>MW: 校 Cognito ID token(jose + 远程 JWKS)<br/>例外:/api/public/* · 内部端点校来源头
-  MW-->>B: 401 / 503(未配置鉴权时拒绝服务)
-  MW->>R: 通过 ⇒ 进入路由
-  R->>G: requireProject / guardResourceAccess(项目成员资格)
-  R->>G: 读接口 readScope(?scope=)· 写接口 placeOfRequest(targetId)
-  G-->>R: 400 InvalidScope / 409 跨区取数 / 落点不可用 ⇒ 拒绝
-  R->>X: 按落点取该区客户端(target-clients.ts)
+  participant G as Workspace guard /<br/>execution scope / place
+  participant X as Regional AWS client
+  B->>CF: HTTPS (page or /api/*)
+  CF->>ALB: origin request (security group allows only the CloudFront prefix list)
+  ALB->>MW: request
+  MW->>MW: verify Cognito ID token (jose + remote JWKS)<br/>exceptions: /api/public/* ·<br/>internal endpoints check the origin header<br/>
+  MW-->>B: 401 / 503 (service refused when auth is not configured)
+  MW->>R: pass ⇒ enter route
+  R->>G: requireProject / guardResourceAccess (workspace membership)
+  R->>G: read APIs readScope(?scope=) · write APIs placeOfRequest(targetId)
+  G-->>R: 400 InvalidScope / 409 cross-region read / place unavailable ⇒ reject
+  R->>X: client for that region by place (target-clients.ts)
   X-->>R: DynamoDB / Redshift Data API / Glue / Athena / S3 Tables …
-  R->>R: 写操作记审计 bgp-audit
-  R-->>B: apiOk / apiError 统一响应
+  R->>R: write operations<br/>recorded in bgp-audit<br/>
+  R-->>B: apiOk / apiError unified response

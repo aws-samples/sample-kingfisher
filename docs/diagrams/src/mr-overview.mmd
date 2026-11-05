@@ -1,21 +1,25 @@
+%%{init: {"layout": "elk"}}%%
 flowchart LR
-  U["用户浏览器"] -->|HTTPS| CF["CloudFront + WAF"]
-  subgraph HOME["主控区(客户自选 region)"]
-    CF --> ALB["ALB(只放行 CloudFront)"] --> ECS["平台 Next.js on ECS Fargate<br/>BgpPlatformStack"]
+  U["User browser"] -->|HTTPS| CF["CloudFront + WAF"]
+  subgraph HOME["Home region (customer-chosen region)"]
+    CF --> ALB["ALB<br/>(allows CloudFront only)"] --> ECS["Platform Next.js<br/>on ECS Fargate<br/>BgpPlatformStack"]
     ECS --> COG["Cognito"]
-    ECS --> DDB[("DynamoDB<br/>71 张 bgp-* 表")]
-    ECS --> OM["OpenMetadata<br/>ECS + RDS MySQL + OpenSearch"]
-    ECS --> AC["Bedrock AgentCore ×3<br/>问数 / 网络顾问 / 参数顾问"]
-    ECS -->|InvokeFunction| BK["broker Lambda → CodeBuild<br/>BgpExecEnvDeployStack"]
-    HX["主控区自己的执行环境 tgt_home<br/>Redshift Serverless · S3 Tables · Glue<br/>EMR Serverless · MWAA Serverless · DMS · Flink"]
+    ECS --> DDB[("DynamoDB<br/>72 bgp-* tables")]
+    ECS --> OM["OpenMetadata<br/>ECS + RDS MySQL<br/>+ OpenSearch"]
+    ECS --> AC["Bedrock AgentCore ×3<br/>Ask-Your-Data<br/>network advisor<br/>parameter advisor"]
+    ECS -->|InvokeFunction| BK["broker Lambda<br/>→ CodeBuild<br/>BgpExecEnvDeployStack"]
+    HX["Home region's own<br/>execution environment<br/>tgt_home<br/>Redshift Serverless<br/>S3 Tables · Glue<br/>EMR Serverless<br/>MWAA Serverless<br/>DMS · Flink"]
     ECS --> HX
   end
-  subgraph RA["执行区 A"]
-    EA["BgpExecEnv-&lt;slug&gt;-{base,core,redshift,dms,flink,airflow-serverless}<br/>本区 VPC 零出网 · 本区调度"]
+  subgraph RA["Execution region A"]
+    EA["BgpExecEnv-&lt;slug&gt;-<br/>{base,core,redshift,dms,flink,<br/>airflow-serverless}<br/>regional VPC, no egress<br/>regional scheduling"]
   end
-  subgraph RB["执行区 B(可为另一法域)"]
-    EB["同上 + residency-api<br/>区域审计 / 区域结果 / 驻留桶"]
+  subgraph RB["Execution region B (may be another jurisdiction)"]
+    EB["Same as A<br/>+ residency-api<br/>regional audit<br/>regional results<br/>residency bucket"]
   end
-  BK -->|"cdk deploy 栈组"| EA & EB
-  ECS -->|"按落点调用该区数据面 API"| EA & EB
-  EA & EB -->|"跨区 peering 私网:只回传运行记录 / 元数据摘要"| DDB
+  BK -->|"cdk deploy stack group"| EA
+  BK -->|"cdk deploy<br/>(same stack group)"| EB
+  ECS -->|"data-plane API calls<br/>to that region, by place"| EA
+  ECS -->|"data-plane calls by place"| EB
+  EA -->|"cross-region peering<br/>(private network)<br/>only run records and<br/>metadata digests return"| DDB
+  EB -->|"peering · run records back"| DDB

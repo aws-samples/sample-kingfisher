@@ -1,20 +1,21 @@
+%%{init: {"sequence": {"wrapPadding": 18, "noteMargin": 20}}}%%
 sequenceDiagram
   autonumber
-  participant U as 用户(工作流 / 任务页)
-  participant P as lib/workflow/publish-dag.ts
-  participant SL as lib/scheduler/serverless/publish.ts
-  participant MW as 该区 MWAA Serverless
-  participant CMD as bgp-action-commands(主控区)
-  participant DL as 分发 Lambda(action-dispatcher)
+  participant U as User<br/>(workflow / task page)
+  participant P as lib/workflow/<br/>publish-dag.ts
+  participant SL as lib/scheduler/serverless/<br/>publish.ts
+  participant MW as Regional MWAA Serverless
+  participant CMD as bgp-action-commands<br/>(home region)
+  participant DL as Dispatcher Lambda<br/>(action-dispatcher)
   participant IN as /api/internal/actions/run
-  U->>P: 发布工作流(或启用同步 / 作业 / 治理任务 / 卡片刷新的调度)
-  P->>P: buildCarrierArtifact:DAG 定义 YAML + 代码包
+  U->>P: Publish workflow (or enable the schedule<br/>of a sync / job / governance task / card refresh)
+  P->>P: buildCarrierArtifact:<br/>DAG definition YAML + code package<br/>
   P->>SL: publishServerlessWorkflow
-  SL->>MW: PutObject(DAG 桶)→ CreateWorkflow / UpdateWorkflow
-  Note over MW: 到点运行 · 节点类型 sql · python · sync · foreach · branch · join · setvar · external · platform-action
-  MW->>CMD: platform-action 节点 ⇒ 写命令
-  CMD->>DL: DynamoDB Stream 触发
-  DL->>IN: 调平台内部端点(来源头校验)
-  IN->>IN: 执行:治理任务 / 卡片刷新 / 同步启动
-  IN-->>MW: 结果回写
-  U->>MW: 监控页:ListWorkflowRuns · GetTaskInstance · GetLogEvents
+  SL->>MW: PutObject (DAG bucket) → CreateWorkflow / UpdateWorkflow
+  Note over MW: Runs on schedule<br/>node types: sql · python · sync<br/>foreach · branch · join · setvar<br/>external · platform-action
+  MW->>CMD: platform-action node ⇒ write command
+  CMD->>DL: DynamoDB Stream trigger
+  DL->>IN: call the platform's internal endpoint (origin header check)
+  IN->>IN: Execute: governance task /<br/>card refresh / sync start<br/>
+  IN-->>MW: write back result
+  U->>MW: Monitor page: ListWorkflowRuns · GetTaskInstance · GetLogEvents

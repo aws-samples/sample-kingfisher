@@ -1,0 +1,20 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  autonumber
+  participant FE as Frontend (/genbi multi-turn thread)
+  participant ASK as ask/route.ts
+  participant MEM as memory.ts
+  participant RT as AgentCore Runtime (agent.js)
+  participant BR as Bedrock Converse
+  FE->>ASK: {question, conversationId}
+  ASK->>MEM: loadShortTerm(conversationId, projectId) — short-term: most recent N turns
+  ASK->>MEM: loadLongTerm(projectId, question) — long-term: semantic recall
+  MEM-->>ASK: history[] + memory (string)
+  ASK->>RT: invokeGenBiAgent(sessionId, {prompt, history, memory, ...})
+  Note over RT: history → expanded into a prefix of<br/>alternating user/assistant messages (high-fidelity multi-turn)
+  Note over RT: memory → injected into the system prompt as the<br/>"Historical memory (long-term summaries)" section
+  RT->>BR: Converse(system = catalog + hard rules + long-term memory + definitions,<br/>messages = [past turns..., current question])
+  BR-->>RT: answer (builds on the earlier turns)
+  RT-->>ASK: output
+  ASK->>MEM: appendTurn(conversationId, {q, a, sql}, projectId) — write one turn
+  ASK->>MEM: maybeSummarize(conversationId, projectId)<br/>— self-managed: summary every 6 turns / managed: no-op

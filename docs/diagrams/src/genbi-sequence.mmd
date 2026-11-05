@@ -1,0 +1,23 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  actor U as User (operations)
+  participant P as Platform API<br/>(/api/genbi/ask)
+  participant SC as Schema introspection
+  participant BR as Bedrock<br/>(Claude Opus, Converse)
+  participant RS as Redshift (Data API)
+  participant DDB as DynamoDB<br/>(bgp-genbi-history)
+  U->>P: natural-language question
+  P->>SC: fetch Redshift tables / columns → data catalog
+  P->>BR: Converse(system prompt = catalog + read-only rules, tool = run_sql)
+  loop multi-step reasoning (≤ maxIters)
+    BR-->>P: tool_use: run_sql(SQL)
+    P->>P: sql-guard read-only check<br/>+ row cap
+    P->>RS: run read-only SQL
+    RS-->>P: columns + rows
+    P-->>BR: toolResult(data)
+  end
+  BR-->>P: final conclusion (in Chinese)
+  P->>P: recommend a chart from the result shape<br/>(metric / bar / line / table)
+  P->>DDB: best-effort record of the question history
+  P-->>U: conclusion + generated SQL + data table + chart + reasoning steps
+  Note over P,RS: Every number comes from a real query, all computation is done by Redshift

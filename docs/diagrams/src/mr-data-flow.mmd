@@ -1,30 +1,30 @@
 flowchart LR
-  subgraph SRC["数据源(落在某个执行区)"]
-    J["JDBC:MySQL · PostgreSQL · Oracle · SQL Server"]
+  subgraph SRC["Data sources (attached to an execution region)"]
+    J["JDBC<br/>MySQL · PostgreSQL<br/>Oracle · SQL Server"]
     N["DynamoDB"]
-    O["S3 / Athena 外表"]
-    ST["流:Kinesis · MSK"]
+    O["S3 / Athena external tables"]
+    ST["Streams: Kinesis · MSK"]
   end
-  subgraph ING["集成(该区执行)"]
-    GL["Glue 同步作业<br/>全量 / 增量 / 日期变量 / 覆盖 / 合并"]
+  subgraph ING["Integration (runs in that region)"]
+    GL["Glue sync job<br/>full / incremental<br/>date variables<br/>overwrite / merge"]
     DMS["DMS CDC"]
     ZE["zero-ETL"]
-    FL["Flink SQL(MSAF)"]
+    FL["Flink SQL (MSAF)"]
   end
-  subgraph STORE["存储(该区)"]
-    S3T[("S3 Tables 表桶<br/>bgp-table-bucket · Iceberg")]
+  subgraph STORE["Storage (that region)"]
+    S3T[("S3 Tables table bucket<br/>bgp-table-bucket · Iceberg")]
     RS[("Redshift Serverless")]
   end
-  subgraph META["元数据"]
-    GDC["Glue Data Catalog<br/>联邦目录 s3tablescatalog"]
-    OM["OpenMetadata(主控区,一份)<br/>定时采集 + 事件推送 + 列级血缘"]
-    MIR[("bgp-metadata-mirror<br/>跨区只读镜像")]
+  subgraph META["Metadata"]
+    GDC["Glue Data Catalog<br/>federated catalog s3tablescatalog"]
+    OM["OpenMetadata<br/>(home region, one instance)<br/>scheduled ingestion<br/>+ event push<br/>column-level lineage"]
+    MIR[("bgp-metadata-mirror<br/>cross-region<br/>read-only mirror")]
   end
-  subgraph USE["消费"]
-    ATH["Athena 直查"]
-    RSQ["Redshift 查询"]
-    GB["智能问数 / 报表 / 需求工作台"]
-    GOV["治理:目录 · 分级脱敏 · 质量 · 血缘 · 建模"]
+  subgraph USE["Consumption"]
+    ATH["Athena direct query"]
+    RSQ["Redshift query"]
+    GB["Ask-Your-Data · reports<br/>requests workbench"]
+    GOV["Governance: catalog<br/>classification and masking<br/>quality · lineage · modeling"]
   end
   J & N & O --> GL --> S3T & RS
   J --> DMS --> RS

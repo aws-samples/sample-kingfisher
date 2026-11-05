@@ -1,0 +1,12 @@
+flowchart LR
+  W["Wizard / API<br/>task definition<br/>bgp-sync-tasks"] --> S["start-run.ts<br/>resolve place →<br/>ensureGlueSyncJob"]
+  S --> SC["generateGlueScript<br/>PySpark with all regional<br/>values injected"] --> B["Scripts bucket<br/>of that region"]
+  S --> J["Glue job in that region<br/>CreateJob / UpdateJob<br/>→ StartJobRun<br/>(date variables)"]
+  J --> SRC["Source DB<br/>(via Glue connection ·<br/>subnet / security group)"]
+  J --> T1[("S3 Tables table bucket<br/>Iceberg, whole-table<br/>overwrite / merge / append")]
+  J --> T2[("Redshift Serverless")]
+  S --> R["bgp-task-runs<br/>status · row count ·<br/>triggeredBy"]
+  S --> OM["OpenMetadata<br/>source / target entities<br/>+ column-level lineage<br/>(per-region service)"]
+  R --> M["Task Monitor / Alerting /<br/>SLA / Backfill"]
+  SCH["MWAA Serverless<br/>of this region (scheduled)"] --> S
+  BF["Backfill Center<br/>(by business date)"] --> S

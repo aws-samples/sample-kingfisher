@@ -1,0 +1,23 @@
+%%{init: {"sequence": {"noteMargin": 25, "wrapPadding": 18}}}%%
+sequenceDiagram
+  autonumber
+  participant FE as Frontend genbi thread
+  participant ASK as ask route
+  participant MEM as memory.ts<br/>switchable backend
+  participant RT as AgentCore Runtime
+  participant BR as Bedrock Converse
+  FE->>ASK: question + conversationId
+  ASK->>MEM: loadShortTerm
+  Note over MEM: agentcore ListEvents by actorId+sessionId,<br/>selfmanaged DynamoDB last 6
+  ASK->>MEM: loadLongTerm
+  Note over MEM: agentcore RetrieveMemoryRecords semantic topK 3,<br/>selfmanaged S3 last 3 summaries
+  MEM-->>ASK: history array + memory string
+  ASK->>RT: invokeGenBiAgent with history and memory
+  Note over RT: history becomes alternating user/assistant messages,<br/>memory into system prompt
+  RT->>BR: Converse with history then current question
+  BR-->>RT: context-aware answer
+  RT-->>ASK: output
+  ASK->>MEM: appendTurn
+  Note over MEM: agentcore CreateEvent USER+ASSISTANT,<br/>selfmanaged PutItem TTL 24h
+  ASK->>MEM: maybeSummarize
+  Note over MEM: selfmanaged every 6 turns Bedrock summary to S3,<br/>agentcore no-op, semantic strategy async

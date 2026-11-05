@@ -1,0 +1,16 @@
+flowchart TD
+  Q["User question + conversationId + engine + projectId"] --> PUB["listPublishedDatasets(projectId)<br/>fetch published result tables (Redshift engine only)"]
+  PUB --> SW{"GENBI_BACKEND ?"}
+  SW -->|agentcore| M1["Inject memory: loadShortTerm + loadLongTerm"]
+  M1 --> ACI["invokeGenBiAgent(sessionId, {prompt, engine, db, projectId, published, history, memory})"]
+  SW -->|inprocess| INP["runGenBiAgent(question, workgroup, db, published, engine)<br/>(no conversation memory injected)"]
+  ACI --> POST
+  INP --> POST
+  subgraph POST["Post-processing shared by both backends"]
+    MK["maskRows (masking by identity / classification / grants)"] --> MT["parseSqlLineage (matched tables + published or not)"]
+    MT --> CH["suggestChart (recommend a chart from the result shape)"]
+  end
+  POST --> RESULT["GenBiResult{answer, sql, columns, rows (masked), chart, steps, usage, maskedColumns, matchedTables}"]
+  RESULT --> HIS["recordGenBiHistory<br/>(fire-and-forget)"]
+  RESULT --> MEM["if conversationId:<br/>appendTurn → maybeSummarize<br/>(fire-and-forget)"]
+  RESULT --> U["Return to the frontend: answer + SQL + data table + chart + reasoning steps"]

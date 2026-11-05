@@ -1,0 +1,5 @@
+flowchart LR
+  C1["① Build the semantic catalog<br/>table names + columns + OM business descriptions<br/>+ source questions of published tables"] --> C2["② Keyword pre-filter<br/>coarse filter when tables&nbsp;&gt;&nbsp;40<br/>(CJK / English tokenizing and scoring,<br/>published tables +2)"]
+  C2 --> C3["③ LLM re-ranking<br/>Converse temp=0, forced&nbsp;JSON<br/>pick Top-K ≤ 6, published tables first"]
+  C3 --> C4["④ Robust fallback<br/>parse failure / exception / 0&nbsp;hits<br/>→ all tables"]
+  C4 --> OUT["selected[] + matches[]<br/>(matched tables + reasons, explainable)"]

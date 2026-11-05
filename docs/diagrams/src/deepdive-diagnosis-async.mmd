@@ -1,0 +1,29 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  autonumber
+  participant FE as DiagnosisButton (frontend)
+  participant API as POST /api/diagnostics
+  participant SVC as service.startDiagnosis
+  participant EV as evidence.buildIncidentContext
+  participant DA as DevOps Agent (aidevops)
+  participant CW as CloudWatch / Glue / Data API
+  participant DDB as bgp-diagnostics
+  FE->>API: {taskId, runId}
+  API->>SVC: startDiagnosis()
+  SVC->>DDB: create running record (return diagnosticId immediately)
+  API-->>FE: {diagnosticId, status:running}
+  par background fire-and-forget
+    SVC->>EV: build the evidence prompt
+    EV->>CW: pull real logs / errors (Glue ErrorMessage + /aws-glue/jobs/error / DescribeStatement)
+    CW-->>EV: log excerpts
+    SVC->>DA: ensureAgentSpace → CreateChat(userType=IAM) → SendMessage(evidence prompt)
+    DA-->>SVC: event stream (contentBlockDelta.delta.textDelta.text accumulated)
+    Note over SVC,DA: Reply too short (<300 chars, no "root cause / fix") → one follow-up question to get the full report
+    SVC->>DDB: Update status=done + report (or failed + error)
+  and frontend polling
+    loop every 3 s, ≤100 times
+      FE->>API: GET /api/diagnostics/{id}
+      API-->>FE: {status, report?}
+    end
+  end
+  Note right of FE: status=done → show the structured report in a dialog

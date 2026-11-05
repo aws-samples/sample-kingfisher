@@ -1,0 +1,33 @@
+flowchart TD
+  Kms["BgpKmsStack<br/>(CMK encryption foundation)"]
+  Waf["BgpWafStack<br/>(WAF)"]
+  Vpc["BgpVpcStack<br/>(VPC / subnets / NAT)"]
+  Kms --> DB["BgpDatabaseStack<br/>(DynamoDB, 58 tables)"]
+  Kms --> FinOps["BgpFinOpsStack<br/>(3 cost tables)"]
+  Vpc --> Auth["BgpAuthStack<br/>(Cognito)"]
+  Vpc --> Redshift["BgpRedshiftStack<br/>(Redshift Serverless)"]
+  Vpc --> Rds["BgpRdsStack<br/>(source MySQL)"]
+  Vpc --> OmDb["BgpOmDatabaseStack<br/>(OM RDS MySQL)"]
+  Vpc --> OmSearch["BgpOmSearchStack<br/>(OpenSearch)"]
+  OmDb --> OmService["BgpOmServiceStack<br/>(OM ECS + CloudFront)"]
+  OmSearch --> OmService
+  Vpc --> Platform["BgpPlatformStack<br/>(ECS + ALB + CloudFront)"]
+  Auth --> Platform
+  Waf --> Platform
+  OmService -. "OM CloudFront URL<br/>(-c openmetadata-url)" .-> Platform
+  Platform --> Mwaa["BgpMwaaStack<br/>(MWAA)"]
+  Vpc --> Ac["BgpAgentCoreStack<br/>(GenBI: Gateway + gated Runtime + Memory)"]
+  Vpc --> NetAc["BgpNetAdvisorAgentCoreStack"]
+  Vpc --> ParamAc["BgpParamAdvisorAgentCoreStack"]
+  Platform --> Audit["BgpAuditStack<br/>(CloudTrail + audit)"]
+
+  subgraph Gated["Gated stacks (-c enable-*)"]
+    Realtime["BgpRealtimeStack<br/>(enable-realtime · DMS + Kinesis)"]
+    Flink["BgpFlinkStack<br/>(enable-flink · MSAF)"]
+    Emr["BgpEmrStack<br/>(enable-emr · EMR Serverless)"]
+    Ingestion["BgpOmIngestionStack<br/>(om-bot + rs-admin · EventBridge → ECS)"]
+  end
+  Vpc -.-> Realtime
+  Vpc -.-> Flink
+  Vpc -.-> Emr
+  Vpc -.-> Ingestion

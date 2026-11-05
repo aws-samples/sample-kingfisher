@@ -1,0 +1,26 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  actor U as User
+  participant P as Platform API (Next.js)
+  participant DDB as DynamoDB
+  participant SM as Secrets Manager
+  participant GL as AWS Glue
+  participant DATA as S3 Tables / Redshift
+  participant OM as OpenMetadata
+  U->>P: POST /api/sync/[id]/start
+  P->>DDB: read sync task + data source
+  Note over U,GL: This figure shows batch sync (Glue)<br/>Real-time CDC goes through /api/sync/[id]/start-realtime (DMS / Zero-ETL / Flink), see also deepdive-sync-flow
+  P->>DATA: ensure S3 table bucket + namespace
+  Note over P,GL: Full load: extract the whole table and rebuild it with overwrite<br/>Incremental: read only rows with incCol above the watermark, then append
+  P->>GL: CreateJob + StartJobRun (Iceberg)
+  P->>DDB: write run record (running)
+  P-->>U: 200 {jobRunId, runId}
+  par Glue job (asynchronous)
+    GL->>SM: fetch source DB credentials
+    GL->>DATA: extract from source → write S3 Tables / Redshift
+    P->>GL: poll status → update run record
+  and metadata push (fire-and-forget)
+    P->>SM: fetch ingestion-bot JWT
+    P->>OM: upsert source / S3 Tables / Redshift tables
+    P->>OM: PUT lineage (source → S3 → Redshift, column level)
+  end

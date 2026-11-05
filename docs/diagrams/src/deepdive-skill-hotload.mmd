@@ -1,0 +1,8 @@
+%%{init: {"flowchart": {"wrappingWidth": 300}}}%%
+flowchart TD
+  INIT["MCPClient.init() + listTools()"] --> PRE["Phase one (prefetch):<br/>introspect_* fetches the schema + lookup_business_context fetches business definitions"]
+  PRE --> EXPOSE["Expose tools to the model:<br/>modelTools = all tools − (introspect_* + SQL tools of other engines)"]
+  EXPOSE --> LOOP["Converse loop: the model calls any tool"]
+  LOOP --> FWD["Generic forwarding: callTool(name, {...input, projectId})<br/>(projectId injected uniformly, the model need not know the project)"]
+  FWD --> LOOP
+  LOOP --> ANS["Final answer in Chinese + steps + usage"]

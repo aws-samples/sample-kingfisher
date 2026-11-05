@@ -1,0 +1,21 @@
+sequenceDiagram
+  autonumber
+  participant AG as Agent (runAgent)
+  participant MC as MCPClient (mcp.js)
+  participant SIG as SignatureV4<br/>(service=bedrock-agentcore)
+  participant GW as Gateway (MCP, AWS_IAM)
+  participant LAM as Skills Lambda
+  AG->>MC: init()
+  MC->>SIG: sign POST (SigV4, default creds)
+  MC->>GW: POST initialize (Accept: json + text/event-stream)
+  GW-->>MC: result + header mcp-session-id (reused)
+  MC->>GW: POST notifications/initialized
+  AG->>MC: listTools()
+  MC->>GW: POST tools/list
+  GW-->>MC: tools[] (8 tool schemas)
+  AG->>MC: callTool(name, args)
+  MC->>GW: POST tools/call {name, arguments}
+  GW->>LAM: invoke (clientContext.Custom.bedrockAgentCoreToolName)
+  LAM-->>GW: tool result (JSON)
+  GW-->>MC: result (SSE: last data: line / JSON)
+  MC-->>AG: structuredContent or content[].text (parsed JSON)

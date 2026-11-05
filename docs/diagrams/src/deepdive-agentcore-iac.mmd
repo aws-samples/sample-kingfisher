@@ -1,0 +1,19 @@
+flowchart TD
+  subgraph STACK["BgpAgentCoreStack"]
+    ECR["ECR repository<br/>bgp-genbi-agent<br/>(ARM64 image)"]
+    LAMBDA["Skill Lambda<br/>bgp-genbi-skills<br/>(Node.js ARM64)"]
+    GWROLE["GatewayRole<br/>(bedrock-agentcore assume → invoke Lambda)"]
+    RTROLE["RuntimeRole<br/>(InvokeModel +<br/>bedrock-agentcore:* +<br/>ecr + logs + xray)"]
+    MEMROLE["MemoryRole<br/>(InvokeModel, used by semantic-strategy extraction)"]
+    GW["Gateway (MCP, AuthorizerType=AWS_IAM)"]
+    TGT["GatewayTarget genbiskills<br/>(Lambda + ToolSchema.InlinePayload: 8 tools)"]
+    RT["Runtime bgp_genbi_agent<br/>(ContainerConfiguration ECR:tag, NetworkMode PUBLIC, HTTP)"]
+    MEM["Memory bgp_genbi_memory<br/>(SemanticMemoryStrategy, EventExpiryDuration=90)"]
+  end
+  GWROLE --> GW
+  LAMBDA --> TGT
+  GW --> TGT
+  ECR --> RT
+  RTROLE --> RT
+  MEMROLE --> MEM
+  RT -. env GATEWAY_URL .-> GW

@@ -1,0 +1,20 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
+sequenceDiagram
+  actor U as User
+  participant P as Platform API
+  participant MWAA as MWAA / Airflow
+  participant DDB as DynamoDB<br/>(bgp-task-runs)
+  participant D as Downstream<br/>task / workflow
+  U->>P: Trigger workflow
+  P->>MWAA: dags trigger -r runId
+  P->>DDB: record run (running)
+  loop Run history (poll)
+    P->>MWAA: dags list-runs / tasks states-for-dag-run
+    MWAA-->>P: run state + per-node states
+    P->>DDB: backfill status + duration
+  end
+  U->>P: View node logs
+  P->>MWAA: InvokeRestApi → task instance logs
+  MWAA-->>U: logs
+  Note over P,D: On success, exactly-once (downstreamFired guard)
+  P->>D: Trigger downstream

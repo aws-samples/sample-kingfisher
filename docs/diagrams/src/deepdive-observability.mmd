@@ -1,0 +1,17 @@
+flowchart TD
+  OBS["GET /api/observability/genbi<br/>getGenBiObservability()"] --> S1
+  OBS --> S2
+  OBS --> S3
+  OBS --> S4
+  subgraph S1["① AgentCore control-plane status"]
+    A1["bedrock-agentcore-control:<br/>ListAgentRuntimes / ListGateways / ListGatewayTargets<br/>+ env backend / memoryBackend"]
+  end
+  subgraph S2["② GenBI usage"]
+    A2["scanGenBiHistory(1000)<br/>total / today / tokens / byEngine / byBackend<br/>7-day trend / last 20 records"]
+  end
+  subgraph S3["③ Skill Lambda metrics (24h)"]
+    A3["CloudWatch GetMetricStatistics<br/>AWS/Lambda<br/>bgp-genbi-skills<br/>Invocations / Errors / Duration"]
+  end
+  subgraph S4["④ Per-tool / per-skill call counts (24h)"]
+    A4["CloudWatch BGP/GenBI (EMF)<br/>perTool: GetMetricStatistics for each entry in TOOLS<br/>perSkill: ListMetrics discovers Skill dimension values, then queries them"]
+  end

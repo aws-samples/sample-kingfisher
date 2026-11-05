@@ -1,0 +1,12 @@
+%%{init: {"sequence": {"wrapPadding": 18, "noteMargin": 20}}}%%
+sequenceDiagram
+  participant EB as EventBridge Scheduler
+  participant ECS as ECS Fargate (ingestion)
+  participant SM as Secrets Manager
+  participant SRC as Redshift / Glue / S3 / S3 Tables /<br/>MySQL source DB
+  participant OM as OpenMetadata
+  EB->>ECS: RunTask (per connector, cron)
+  ECS->>SM: fetch ingestion-bot JWT
+  ECS->>SRC: read metadata, 6 connectors: Redshift + Profiler/DQ ·<br/>Glue · S3 · S3 Tables · MySQL source backfill
+  ECS->>OM: metadata-rest write (createOrUpdate)
+  Note over ECS,OM: Non-destructive, FQNs match the platform push so no duplicate entities are created

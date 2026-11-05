@@ -1,0 +1,7 @@
+%%{init: {"flowchart": {"wrappingWidth": 600}}}%%
+flowchart TD
+  L0["Layer 0 · Working memory within one inference<br/>Converse messages array (user / assistant / toolResult, multi-round tool use)<br/>Lifetime = one /ask call"]
+  L1["Layer 1 · Short-term memory across turns (same conversation)<br/>Most recent N Q/A turns → injected as a multi-turn messages prefix<br/>Lifetime = one conversationId"]
+  L2["Layer 2 · Long-term memory across sessions (same project)<br/>Semantic recall of past key points / preferences / definitions → injected into the system prompt<br/>Lifetime = persistent per projectId"]
+  L3["Layer 3 · Business glossary (quasi-memory / knowledge)<br/>Human-maintained definitions / terms / rules → injected into the system prompt<br/>Lifetime = long-term, governed"]
+  L0 --> L1 --> L2 --> L3

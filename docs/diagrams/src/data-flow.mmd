@@ -1,38 +1,38 @@
 flowchart LR
-  subgraph SRC["数据源(四范式 / 8 源)"]
+  subgraph SRC["Data sources (4 paradigms / 8 sources)"]
     JDBC[("JDBC ×4<br/>MySQL/PG/Oracle/MSSQL")]
-    OBJ[("对象存储<br/>S3")]
+    OBJ[("Object storage<br/>S3")]
     NOSQL[("NoSQL<br/>DynamoDB")]
-    STREAM[("流<br/>Kinesis / MSK")]
+    STREAM[("Streams<br/>Kinesis / MSK")]
   end
-  subgraph ING["数据集成"]
-    BATCH["Glue ETL(批)<br/>全量 overwrite / 增量 append(水位列)"]
-    CDC["实时 CDC<br/>DMS / Zero-ETL / Flink"]
+  subgraph ING["Data integration"]
+    BATCH["Glue ETL (batch)<br/>full overwrite /<br/>incremental append<br/>(watermark column)"]
+    CDC["Real-time CDC<br/>DMS / Zero-ETL / Flink"]
   end
   subgraph LAKE["Lakehouse"]
     S3T[("S3 Tables<br/>Iceberg")]
     RS[("Redshift<br/>Serverless")]
     DL[("S3 Data Lake")]
   end
-  subgraph ENG["多引擎计算(SPI)"]
+  subgraph ENG["Multi-engine compute (SPI)"]
     E["Glue · EMR Serverless<br/>Athena · Redshift SQL · Flink"]
   end
-  subgraph GOV["治理"]
-    OM["OpenMetadata<br/>目录 + 列级血缘"]
+  subgraph GOV["Governance"]
+    OM["OpenMetadata<br/>catalog + column-level lineage"]
   end
-  subgraph AI["生成式 AI 平面"]
-    BR["Bedrock Claude Opus<br/>GenBI / Copilot / 顾问"]
+  subgraph AI["Generative AI plane"]
+    BR["Bedrock Claude Opus<br/>GenBI / Copilot / advisors"]
   end
-  JDBC & OBJ & NOSQL & STREAM -->|批抽取| BATCH
-  JDBC -->|变更流| CDC
-  STREAM -->|实时| CDC
+  JDBC & OBJ & NOSQL & STREAM -->|batch extract| BATCH
+  JDBC -->|change stream| CDC
+  STREAM -->|real-time| CDC
   BATCH -->|write Iceberg| S3T
   BATCH -->|Data API load| RS
   BATCH --> DL
   CDC -->|apply| S3T
   CDC -->|apply| RS
   S3T & RS & DL --> E
-  E -->|只读 SQL / 结果| BR
-  JDBC & OBJ & NOSQL & STREAM -. 表/列元数据 .-> OM
-  S3T & RS -. 表/列元数据 .-> OM
-  BATCH & CDC & E -. 列级 + 计算血缘 .-> OM
+  E -->|read-only SQL / results| BR
+  JDBC & OBJ & NOSQL & STREAM -. table / column metadata .-> OM
+  S3T & RS -. table / column metadata .-> OM
+  BATCH & CDC & E -. column-level + compute lineage .-> OM

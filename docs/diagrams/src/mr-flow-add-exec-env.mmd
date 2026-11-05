@@ -1,21 +1,22 @@
+%%{init: {"sequence": {"wrapPadding": 18}}}%%
 sequenceDiagram
   autonumber
-  participant U as 管理员(页面 /exec-envs)
-  participant API as POST /api/admin/exec-envs/register
-  participant REG as registry / lifecycle(bgp-execution-envs)
+  participant U as Administrator<br/>(page /exec-envs)
+  participant API as POST<br/>/api/admin/exec-envs/register
+  participant REG as registry / lifecycle<br/>(bgp-execution-envs)
   participant BRK as broker Lambda
-  participant CB as CodeBuild(目标区)
+  participant CB as CodeBuild<br/>(target region)
   participant RP as redeploy-platform.sh
-  U->>API: 新建向导:选区(按账号真值列候选区,SCP 拦截区禁用)、法域、网段
-  API->>REG: 写描述符,phase = registered
+  U->>API: New wizard: pick region, jurisdiction, CIDR<br/>(candidates from account facts, SCP-blocked regions disabled)
+  API->>REG: write descriptor, phase = registered
   API->>BRK: invokeDeployBroker(targetId, operationId)
-  BRK->>BRK: 校三白名单(target / 操作 / 栈名前缀)
+  BRK->>BRK: check three allow-lists<br/>(target / operation / stack-name prefix)<br/>
   BRK->>CB: StartBuild(bgp-exec-env-deploy)
-  CB->>CB: pre_build:AZ 探测 · bootstrap · 读源包(控制面部署时的 CDK 资产)
-  CB->>CB: build:cdk deploy "BgpExecEnv-<slug>-*"
-  CB->>CB: post_build:栈输出回写
-  API->>CB: readBuildStatus 轮询(页面「部署进度」)
-  U->>API: 「检测初始化」⇒ probe-runner 逐组件探活
-  API->>REG: phase = initializing → active(ready)
-  U->>RP: 控制面重部署一次放行新区(EXECUTION_REGIONS / aws:RequestedRegion)
-  U->>API: 「启用」⇒ 开始承接作业
+  CB->>CB: pre_build: AZ probe · bootstrap<br/>read source package<br/>(CDK assets of the control-plane deployment)<br/>
+  CB->>CB: build: cdk deploy "BgpExecEnv-<slug>-*"<br/>
+  CB->>CB: post_build: write back stack outputs<br/>
+  API->>CB: readBuildStatus polling (page "Deployment progress")
+  U->>API: "Check initialization" ⇒ probe-runner probes each component
+  API->>REG: phase = initializing → active (ready)
+  U->>RP: redeploy the control plane once to authorize the new region<br/>(EXECUTION_REGIONS / aws:RequestedRegion)
+  U->>API: "Enable" ⇒ start accepting work

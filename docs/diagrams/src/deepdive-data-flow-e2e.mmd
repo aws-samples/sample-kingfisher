@@ -1,0 +1,30 @@
+flowchart LR
+  subgraph SRC["Data sources"]
+    MySQL[("Source RDS MySQL<br/>(ecommerce)")]
+  end
+  subgraph ETL["AWS Glue (PySpark + Iceberg)"]
+    G["Glue job<br/>Full: overwrite / Incremental: append (watermark column)"]
+  end
+  subgraph LAKE["Lakehouse"]
+    S3T[("S3 Tables<br/>Iceberg")]
+    RS[("Redshift<br/>Serverless")]
+  end
+  subgraph ORCH["Scheduling"]
+    MWAA["MWAA / Airflow"]
+  end
+  subgraph GOV["Governance"]
+    OM["OpenMetadata<br/>Catalog + lineage (single source of truth)"]
+  end
+  subgraph AI["Generative AI"]
+    BR["Bedrock Claude Opus"]
+    AC["AgentCore Runtime / Gateway / Memory"]
+  end
+  MySQL -->|Full: whole-table extract| G
+  MySQL -->|Incremental: WHERE watermark column &gt; last watermark| G
+  G -->|write Iceberg| S3T
+  G -->|Data API load| RS
+  MWAA -. triggers .-> G
+  RS -->|read-only SQL / results| AI
+  S3T -->|Athena read-only| AI
+  MySQL & S3T & RS -. table / column metadata .-> OM
+  G -. column-level lineage .-> OM

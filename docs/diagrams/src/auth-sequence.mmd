@@ -1,0 +1,15 @@
+sequenceDiagram
+  actor U as Browser
+  participant CF as CloudFront
+  participant MW as Next.js middleware
+  participant API as API route
+  participant COG as Cognito (JWKS)
+  U->>CF: /api/* with Bearer ID token
+  CF->>MW: forward request
+  MW->>COG: verify token (signature / iss / aud, cached JWKS)
+  alt token valid
+    MW->>API: allow (next)
+    API-->>U: 200 + data
+  else missing / invalid
+    MW-->>U: 401 → redirect to /login
+  end

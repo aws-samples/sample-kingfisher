@@ -1,0 +1,8 @@
+flowchart LR
+  Q["Question<br/>(workspace · place)"] --> E["execute.ts<br/>grounding: context ·<br/>published datasets · memory"]
+  E -->|"wired"| AC["AgentCore Runtime<br/>(genbi container)<br/>Strands tool loop"]
+  E -->|"fallback"| IP["In-process agent<br/>Bedrock Converse tool loop"]
+  AC & IP --> T["Tools: list / sample /<br/>run read-only SQL"] --> DP[("Redshift / Athena<br/>of that region")]
+  AC & IP --> P["Masking maskRows ·<br/>SQL lineage ·<br/>chart suggestion"]
+  P --> H[("bgp-genbi-history<br/>/ turns / cards")]
+  H --> C["Conversation cards<br/>follow-up questions ·<br/>scheduled refresh<br/>(MWAA Serverless of<br/>the card's region)"]
