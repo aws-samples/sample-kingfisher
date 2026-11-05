@@ -191,11 +191,21 @@ async function s3Exists(key: string, place: JarPlace): Promise<boolean> {
 /** 计算 uber-jar 内容哈希缓存 key(纯函数,可测)。§2.1 第4点:
  *  由 base key + 模块 id 有序列表 + 用户连接器 keys(排序)算 sha256 → 相同组合→同 key→缓存命中。
  *  🔴 modules 假定已稳定排序(resolveModules 保证);userKeys 此处再排序,确保与调用顺序无关。 */
-export function uberCacheKey(baseKey: string, modules: string[], userKeys: string[] = []): string {
+export function uberCacheKey(baseKey: string, modules: string[], userKeys: string[] = [], sourceIds: string[] = []): string {
+  // 🔴 sourceIds = 各源对象(薄基础 / 模块 / 用户连接器)在主控区桶里的身份(metadata sha256,退到 ETag);
+  //   不折进去的后果(2026-11-05 Flink 1.20.4 升级抓到):升级脚本重传了模块 JAR,组合没变 ⇒ key 没变 ⇒ 缓存命中 ⇒
+  //   执行区的作业永远拼旧包。身份变 ⇒ key 变 ⇒ 未命中 ⇒ 重新拼装。
   const hash = createHash("sha256")
-    .update([baseKey, ...modules, ...[...userKeys].sort()].join("|"))
+    .update([baseKey, ...modules, ...[...userKeys].sort(), ...sourceIds].join("|"))
     .digest("hex").slice(0, 32);
   return `${FLINK.uberCachePrefix}uber-${hash}.jar`;
+}
+
+/** 主控区桶里一个源对象的身份:安装 / 升级脚本写进 metadata 的 sha256;没有(老对象 / 用户上传)退到 ETag。读不到 ⇒ 抛(源缺了就不该启动)。 */
+async function s3SourceIdentity(key: string): Promise<string> {
+  const h = await homeS3.send(new HeadObjectCommand({ Bucket: FLINK.codeBucket, Key: key }));
+  const sha = h.Metadata?.sha256;
+  return sha ? `sha256:${sha}` : `etag:${(h.ETag || "").replace(/"/g, "")}`;
 }
 
 /** §2.1 第4点 — 模块化按需拼装 + 内容哈希缓存。
@@ -225,8 +235,11 @@ export async function assembleModularUberJar(finalSql: string, connectorS3Keys: 
     return { key, modules, cached: true, prebuilt: true };
   }
   const userKeys = [...connectorS3Keys].sort();          // 用户连接器(排序保证确定性)
-  // 内容哈希缓存 key(纯函数):base key + 模块 id 有序列表 + 用户连接器 keys。任一变→hash 变→不同缓存条目。
-  const cacheKey = uberCacheKey(FLINK.modularBaseKey, modules, userKeys);
+  const moduleKeys = modules.map((m) => `${FLINK.modulesPrefix}flink-module-${m}.jar`);
+  // 内容哈希缓存 key(纯函数):base key + 模块 id 有序列表 + 用户连接器 keys + **各源对象的身份**。
+  //   任一变 → hash 变 → 不同缓存条目;源对象被升级脚本重传(身份变)同样失效,不再永远复用旧拼装。
+  const sourceIds = await Promise.all([FLINK.modularBaseKey, ...moduleKeys, ...userKeys].map((k) => s3SourceIdentity(k)));
+  const cacheKey = uberCacheKey(FLINK.modularBaseKey, modules, userKeys, sourceIds);
 
   if (await s3Exists(cacheKey, place)) {
     return { key: cacheKey, modules, cached: true };     // 命中:零重建
@@ -234,7 +247,6 @@ export async function assembleModularUberJar(finalSql: string, connectorS3Keys: 
 
   // 未命中:取薄基础 + 各模块 jar + 用户连接器 → strict 合并。
   const base = await s3GetBuffer(FLINK.modularBaseKey);
-  const moduleKeys = modules.map((m) => `${FLINK.modulesPrefix}flink-module-${m}.jar`);
   const addBufs = await Promise.all([...moduleKeys, ...userKeys].map((k) => s3GetBuffer(k)));
   const merged = mergeJars(base, addBufs, { strict: true }); // §2.4 约束②冲突检测
   const cOut = await s3For(place);

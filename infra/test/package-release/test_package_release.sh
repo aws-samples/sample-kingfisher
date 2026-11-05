@@ -109,6 +109,7 @@ for rel in \
   scripts/lib/execution-regions.sh \
   scripts/lib/agentcore-agents.sh \
   scripts/lib/s3tables-catalog.sh \
+  scripts/lib/flink-jars.sh \
   scripts/20-seed-data.sh \
   flink-sql-runner \
   docs/deployment.md \

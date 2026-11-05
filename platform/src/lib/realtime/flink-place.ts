@@ -14,6 +14,7 @@
  * 收尾:主控区也读描述符(见 `resolveFlinkPlace` 的注释:值逐项不变的依据)。
  */
 import { FLINK } from "./flink-config";
+import { homeRegion } from "@/lib/place/home-region";
 // 落点唯一作者(主控区也读描述符)+ 资源唯一取法
 import { resolvePlace, placeResource } from "@/lib/place/resolve";
 import { PlaceUnavailable, type TargetRef } from "@/lib/place/types";
@@ -102,12 +103,28 @@ export async function flinkClients(p: FlinkPlace) {
   return { kda, s3, cwl, cw, sm };
 }
 
+/** 代码桶里一个 runner JAR 的**身份**:安装 / 升级脚本(scripts/lib/flink-jars.sh)上传时把 sha256 写进对象 metadata,
+ *  跨区 CopyObject 默认带着 metadata 走 ⇒ 两边同一字节就同一身份;老对象(没有 metadata)退到长度比对。
+ *  读不到对象 ⇒ null(调用方按「要复制」处理)。纯函数,可测。 */
+export function runnerJarIdentity(
+  head: { Metadata?: Record<string, string>; ContentLength?: number } | null | undefined,
+): string | null {
+  if (!head) return null;
+  const sha = head.Metadata?.sha256;
+  if (sha) return `sha256:${sha}`;
+  return typeof head.ContentLength === "number" ? `len:${head.ContentLength}` : "unknown";
+}
+
 /**
- * 确保 runner JAR 在**该落点的代码桶**里存在;不在就从主控区的桶跨区复制一份。
+ * 确保 runner JAR 在**该落点的代码桶**里,并且**与主控区桶里的源对象是同一字节**;缺或不同就从主控区跨区复制一份。
  *
  * 🔴 为什么在运行期做而不是加进 exec-env 部署流水线:那条链是 broker Lambda + CodeBuild + 源包 asset,
  * 改它的爆炸半径远大于本刀(而且每加一个制品都要动一次流水线)。跨区 `CopyObject` 在同账号内是
  * 一次服务端复制,幂等、无出网、与既有 `ensureLogGroup` 是同一种「ensure」模式。
+ *
+ * 🔴 为什么不是「有就跳过」(2026-11-05 Flink 1.20.4 安全升级抓到):原来 HeadObject 命中即 return,执行区的副本在第一次
+ * 复制之后就**永远不再刷新**—— 主控区桶升了 JAR、升级脚本也重传了,执行区的作业重启后仍然加载旧包。现在按源对象身份比对
+ * (sha256 metadata,老对象退到长度),不同才复制;主控区同桶时与以前一样直接返回。
  *
  * 🔴 复制失败**必须抛**:静默跳过的后果是 MSAF 在 CreateApplication 时报「取不到 fileKey」,
  * 而那条报错完全指不到「JAR 没送到这个区」这件事上(本仓第 4 条就是这个形状
@@ -117,14 +134,6 @@ export async function ensureRunnerJar(p: FlinkPlace, codeKey: string): Promise<v
   // 原来 `if (p.home) return`(按身份分支)。真正的条件是「本区代码桶**就是** JAR 的源桶」
   //   (deploy-all.sh 只往那一只桶传):按事实判,不按「是不是主控区」判 —— 主控区的描述符 scriptsBucket 与源桶同名 ⇒ 行为不变。
   if (FLINK.codeBucket && p.codeBucket === FLINK.codeBucket) return;
-  const { s3 } = await flinkClients(p);
-  const { HeadObjectCommand, CopyObjectCommand } = await import("@aws-sdk/client-s3");
-  try {
-    await s3.send(new HeadObjectCommand({ Bucket: p.codeBucket, Key: codeKey }));
-    return; // 已经有了
-  } catch {
-    /* 不存在 ⇒ 往下复制 */
-  }
   const homeBucket = FLINK.codeBucket;
   if (!homeBucket) {
     throw new Error(
@@ -132,6 +141,27 @@ export async function ensureRunnerJar(p: FlinkPlace, codeKey: string): Promise<v
         `🔴 刻意不让作业在缺 JAR 的情况下启动 —— MSAF 那时只会报「取不到 fileKey」,指不到真因`
     );
   }
+  const { HeadObjectCommand, CopyObjectCommand } = await import("@aws-sdk/client-s3");
+  // 主控区桶的客户端按控制面事实(主控区)取,不读 FLINK 的区域性常量(落点模块的结构性判据)。
+  const [{ s3 }, homeS3] = await Promise.all([flinkClients(p), s3ClientFor(homeRegion())]);
+  let homeHead: { Metadata?: Record<string, string>; ContentLength?: number };
+  try {
+    homeHead = await homeS3.send(new HeadObjectCommand({ Bucket: homeBucket, Key: codeKey }));
+  } catch (e) {
+    throw new Error(
+      `主控区代码桶里读不到 Flink runner(${homeBucket}/${codeKey}):${(e as Error)?.message}。` +
+        `🔴 先跑 deploy-all.sh / redeploy-platform.sh 把 runner 送上去;不让作业带着缺失的 JAR 启动`
+    );
+  }
+  let placeHead: { Metadata?: Record<string, string>; ContentLength?: number } | null = null;
+  try {
+    placeHead = await s3.send(new HeadObjectCommand({ Bucket: p.codeBucket, Key: codeKey }));
+  } catch {
+    placeHead = null; // 不存在 ⇒ 往下复制
+  }
+  const want = runnerJarIdentity(homeHead);
+  const have = runnerJarIdentity(placeHead);
+  if (have && have === want) return; // 已是同一字节(或老对象同长度)⇒ 不复制
   try {
     await s3.send(
       new CopyObjectCommand({

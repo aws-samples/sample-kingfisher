@@ -74,6 +74,7 @@ out()  { aws cloudformation describe-stacks --stack-name "$1" --profile "$PROFIL
 source "$HERE/lib/agentcore-agents.sh"
 source "$HERE/lib/s3tables-catalog.sh"   # S3 Tables 联邦目录 s3tablescatalog 的安装 / 升级期唯一作者(第 3c 步)
 source "$HERE/lib/execution-regions.sh"  # 放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 1b 步)
+source "$HERE/lib/flink-jars.sh"          # Flink 运行器 / 连接器模块 JAR 的唯一作者(第 2e 步;与 deploy-all 10.6 步同一函数)
 
 # 默认大模型按主控区账号真值选(与 deploy-all 同一个作者)
 if [ -z "${BEDROCK_MODEL_ID:-}" ]; then
@@ -194,6 +195,16 @@ cd "$ROOT/infra"
 #   CloudFormation 会试图给 RDS 降大版本 ⇒ 被拒「Cannot upgrade mysql from X to Y」⇒ 整条回滚在这一步中止、平台栈没回滚。
 #   RDS 不支持大版本降级是事实,回滚脚本就不该让 CDK 顺手去碰库栈。release-2026-10-13 的同一行已用热修补上。
 npx cdk deploy BgpWafStack BgpOmServiceStack --exclusively --require-approval never --profile "$PROFILE" || die "BgpWafStack / BgpOmServiceStack 部署失败"
+
+# ── 2e) Flink 运行器 / 连接器模块 JAR 随 HEAD 刷新(2026-11-05 起)────────────────────────────────────
+# 🔴 为什么要这一步:MSAF 应用的代码是脚本桶 flink/ 下的 JAR,不属于任何 CDK 栈 ⇒ 只部署栈永远送不上新 JAR;安装脚本又对
+#   「桶里已存在」的 key 一律跳过 ⇒ 依赖升级(如 Flink 1.20.0 → 1.20.4 的 SQL 代码生成 RCE 修复)到不了存量环境,仓库升了、现网没变。
+#   这里与安装脚本调同一个作者:本地 JAR 缺或比 pom / src 旧就 mvn 重建,再按 sha256 比对桶里对象的 metadata,变了才上传;缺 mvn 只 WARNING。
+#   🔴 运行中的流作业要在页面「停止 → 启动」一次才加载新包(MSAF 在 Create / UpdateApplication 时取当前对象)—— 手册 §7ter 升级须知。
+say "2e) Flink 运行器 / 连接器模块 JAR(按内容哈希幂等上传到脚本桶 flink/;缺 mvn 只 WARNING 不中止)"
+JARS_ACCOUNT=$(aws sts get-caller-identity --profile "$PROFILE" --query Account --output text 2>/dev/null) || JARS_ACCOUNT=""
+{ [ -n "$JARS_ACCOUNT" ] && [ "$JARS_ACCOUNT" != "None" ]; } || die "读不到账号号(凭证过期?)—— Flink JAR 同步无法定位脚本桶"
+sync_flink_jars "$ROOT" "bgp-glue-scripts-$JARS_ACCOUNT"
 
 say "3) 部署平台栈(完整 -c 接线)"
 cd "$ROOT/infra"

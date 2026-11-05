@@ -94,6 +94,7 @@ export BGP_DEPLOY_MODE
 source "$HERE/lib/agentcore-agents.sh"
 source "$HERE/lib/s3tables-catalog.sh"   # S3 Tables 联邦目录 s3tablescatalog 的安装期唯一作者(第 6.3 步)
 source "$HERE/lib/execution-regions.sh"  # 放行清单(home ∪ 注册表在用区 ∪ 候选区)的唯一作者(第 2.6 步)
+source "$HERE/lib/flink-jars.sh"          # Flink 运行器 / 连接器模块 JAR 清单 + 构建 + 按内容哈希上传的唯一作者(第 10.6 步;升级脚本 2e 步同一函数)
 
 say()  { printf '\n\033[1;36m== %s ==\033[0m\n' "$*"; }
 info() { printf '   %s\n' "$*"; }
@@ -585,60 +586,12 @@ else
     || info "WARNING: EMR S3Tables jar provisioning failed — EMR reading S3 Tables will error."
 fi
 
-# (b) Flink SQL runner jars —— MSAF 应用从脚本桶 flink/ 读 runner(基础 + s3table sink 用的 s3t 版)。
-# ⚠️ 根因治理: jar 是 mvn 构建产物,且 flink-sql-runner{,-s3t}/.gitignore 排除了 target/ 与 *.jar,
-#    所以【git clone 不带 jar】。此前注释误以为"jar 已随 repo 带来",全新账号从 GitHub 干净部署时
-#    走"not found"分支只 WARNING 不构建 → S3 无 jar → 所有 Flink 作业启动即 error(取不到 fileKey)。
-#    修法: 缺 jar 时若有 mvn 则【自动构建】再上传;无 mvn 才 WARNING。与从零部署对齐。
-# Bug#5:flink-sql-runner-s3t-kafka = Kafka/MSK 源 → S3Tables 组合包(s3t + kafka + msk-iam-auth + relocation)。
-# 装配路由对"kafka源+iceberg sink"选它(FLINK_S3T_KAFKA_CODE_KEY);同其它 runner 缺 jar 现构建再上传。
-for pair in "flink-sql-runner:flink/flink-sql-runner.jar" \
-            "flink-sql-runner-s3t:flink/flink-sql-runner-s3t.jar" \
-            "flink-sql-runner-s3t-kafka:flink/flink-sql-runner-s3t-kafka.jar"; do
-  MOD="${pair%%:*}"; KEY="${pair##*:}"; SRCDIR="$ROOT/$MOD"; SRC="$SRCDIR/target/$(basename "$KEY")"
-  if aws s3 ls "s3://$SCRIPTS_BUCKET/$KEY" --profile "$PROFILE" --region "$REGION" >/dev/null 2>&1; then
-    info "Flink jar already present ($KEY)."; continue
-  fi
-  if [ ! -f "$SRC" ] && [ -f "$SRCDIR/pom.xml" ] && command -v mvn >/dev/null 2>&1; then
-    info "Flink jar missing — building $MOD via mvn (git clone omits target/*.jar; ~2-5min)..."
-    ( cd "$SRCDIR" && mvn -q -B -DskipTests package ) \
-      || info "WARNING: mvn build failed ($MOD) — Flink $KEY unavailable."
-  fi
-  if [ -f "$SRC" ]; then
-    aws s3 cp "$SRC" "s3://$SCRIPTS_BUCKET/$KEY" --profile "$PROFILE" --region "$REGION" >/dev/null \
-      && info "Flink jar uploaded ($KEY)." \
-      || info "WARNING: Flink jar upload failed ($KEY)."
-  else
-    info "WARNING: Flink jar not found & not built ($SRC) — install Maven+JDK17 or Flink jobs will fail to start."
-  fi
-done
-
-# (c) Flink 连接器模块 jar(flink/modules/)—— MSK/Kafka 源【强制走模块化拼装】(两个胖包均未打 kafka
-#     connector),启动时 assembleModularUberJar 从 flink/modules/ 读 base + 按 SQL 解析的模块(kafka/
-#     msk-iam-auth/files/json/kinesis/iceberg-s3tables)合并成 uber jar。
-#     ⚠️ 根因治理(同 (b)):这些 jar 是 mvn 构建产物且 .gitignore 排除 target/*.jar,git clone 不带;
-#        此前 deploy 无上传步骤 → S3 flink/modules/ 为空 → 所有 MSK/Kafka 源作业启动即 error
-#        (assembleModularUberJar 的 s3GetBuffer 抛 "The specified key does not exist")。
-#        修法:遍历 flink-connector-modules/*,缺 jar 则 mvn 构建,幂等上传到 flink/modules/。
-for MDIR in "$ROOT"/flink-connector-modules/*/; do
-  [ -d "$MDIR" ] || continue
-  MID="$(basename "$MDIR")"; MJAR="flink-module-${MID}.jar"; MSRC="$MDIR/target/$MJAR"; MKEY="flink/modules/$MJAR"
-  if aws s3 ls "s3://$SCRIPTS_BUCKET/$MKEY" --profile "$PROFILE" --region "$REGION" >/dev/null 2>&1; then
-    info "Flink module jar already present ($MKEY)."; continue
-  fi
-  if [ ! -f "$MSRC" ] && [ -f "$MDIR/pom.xml" ] && command -v mvn >/dev/null 2>&1; then
-    info "Flink module jar missing — building $MID via mvn (~1-3min)..."
-    ( cd "$MDIR" && mvn -q -B -DskipTests package ) \
-      || info "WARNING: mvn build failed ($MID) — Flink module $MKEY unavailable."
-  fi
-  if [ -f "$MSRC" ]; then
-    aws s3 cp "$MSRC" "s3://$SCRIPTS_BUCKET/$MKEY" --profile "$PROFILE" --region "$REGION" >/dev/null \
-      && info "Flink module jar uploaded ($MKEY)." \
-      || info "WARNING: Flink module jar upload failed ($MKEY)."
-  else
-    info "WARNING: Flink module jar not found & not built ($MSRC) — MSK/Kafka source Flink jobs will fail to start."
-  fi
-done
+# (b)(c) Flink SQL runner jars + 连接器模块 jar —— MSAF 应用从脚本桶 flink/ 读 runner(基础 / s3table sink 的 s3t 版 / Kafka+S3Tables 组合包),
+#   MSK / Kafka 源作业启动时从 flink/modules/ 拼装 uber jar。它们是 mvn 构建产物(.gitignore 排除 target/ 与 *.jar,git clone 不带),
+#   所以缺 jar(或 jar 比 pom / src 旧)就现构建;上传按内容哈希幂等 —— sha256 写进对象 metadata,相同才跳过,老对象无 metadata 必重传一次。
+#   清单 / 构建 / 比对的唯一作者 scripts/lib/flink-jars.sh;升级脚本 redeploy-platform.sh 2e 步调同一个函数
+#   (2026-11-05 起;此前「桶里有就跳过」+ 升级不碰 JAR ⇒ 存量环境永远跑旧包,Flink 1.20.4 安全修复到不了现网)。缺 mvn 只 WARNING 不中止。
+sync_flink_jars "$ROOT" "$SCRIPTS_BUCKET"
 
 ###############################################################################
 say "11) Cognito groups + initial users"

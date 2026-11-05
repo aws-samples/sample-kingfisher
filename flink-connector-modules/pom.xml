@@ -37,7 +37,7 @@
     <maven.compiler.release>11</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- 🔴 统一版本源(与现有两 runner 逐一对齐,不动) -->
-    <flink.version>1.20.0</flink.version>
+    <flink.version>1.20.4</flink.version>
     <kinesis.connector.version>5.0.0-1.20</kinesis.connector.version>
     <kafka.connector.version>3.4.0-1.20</kafka.connector.version>
     <!-- 🔴 真跑实测(2026-07-27):2.3.7 是 Java 17 编译(class major 61),MSAF Flink 1.20 运行时是
