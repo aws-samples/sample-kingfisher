@@ -25,7 +25,7 @@ Declared ranges come from `package.json`; the Version column shows the lockfile-
 | React and react-dom | 19.3.1 | — | — | Declared `^19.3.1` |
 | antd | 6.3.4 | — | — | Declared `^6.3.4` |
 | TypeScript, platform | 5.9.3 | — | — | Declared `^5.9.3` |
-| vitest | 4.1.9 | — | — | Declared `^4.1.9`, unit tests only |
+| vitest | 4.1.12 | — | — | Declared `^4.1.12`, unit tests only |
 | Container port | — | 3000 | — | Runs as the non-root user `node` |
 
 ### 1.2 Serverless and agent runtimes

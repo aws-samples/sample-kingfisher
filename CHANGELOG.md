@@ -38,6 +38,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Fixed
 
+- Unit tests and CI are hermetic: tests no longer depend on the developer machine's AWS credentials, temporary files or pre-installed infrastructure dependencies, and the infrastructure job installs the platform dependencies so the agent skills Lambda bundles at synth time. Product bytes are unchanged.
 - Release packaging wrote an empty tag list into `BUILD-INFO.json` and exited with code 141 when the packaged commit carried a tag, which is exactly the release case; the tag list is now passed as an argument and the offline judge covers a tagged ref.
 - Deleting a data source that is still referenced by sync or real-time tasks is refused with a list of the referencing tasks instead of orphaning them.
 - Deleting a data source no longer leaves orphaned `bgp-ds-*` security groups; cleanup is persisted and completes once network interfaces are released.
@@ -51,6 +52,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Security
 
+- Vitest and its coverage package were upgraded to 4.1.12 (GHSA-82fw-gwwq-j7x9, GHSA-qxg6-89mg-rqv8). The three agent packages pin patched versions of optional transitive dependencies (simple-git, @simple-git/argv-parser, zod, @modelcontextprotocol/server) through `overrides`; the agent images never install them (`--omit=optional`), so runtime bytes are unchanged.
 - Dependency security updates for the platform and infrastructure packages, with explicit overrides for transitive packages that upstream does not fix.
 - The transitive `postcss` package bundled by the web framework is pinned to a patched release through `overrides`, and continuous integration now fails on high or critical advisories in production dependencies.
 - AI agent images are built from committed lockfiles with development and optional dependencies omitted.
