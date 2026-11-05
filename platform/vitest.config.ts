@@ -21,6 +21,11 @@ export default defineConfig({
     // 🔴 生产上线批次 A:「没配 Cognito」不再等于放开 ⇒ 单测显式声明「本进程关闭鉴权」
     //   (保持既有单测的演示身份语义;fail-closed 本身由 auth-mode 的专门判据删掉它来验)。
     env: { BGP_AUTH_DISABLED: "1" },
+    // 🔴 单测与运行机器的 AWS 凭证隔离(假静态凭证 + 关掉所有真凭证来源),见文件头注释。
+    setupFiles: ["./vitest.setup.ts"],
+    // 🔴 单测超时是安全网不是判据:全量并行跑时路由测试要 import 整条 Next 路由模块,满载机 / 2 vCPU 的 CI runner 上 5 秒缺省会被调度抖动抢跑
+    //   (2026-11-05 两次全量各随机红一例,单跑都 <1 秒)。真要钉时长的判据自己用 Date.now 断言。
+    testTimeout: 20_000,
     include: ["src/**/__tests__/**/*.test.ts"],
     coverage: {
       provider: "v8",

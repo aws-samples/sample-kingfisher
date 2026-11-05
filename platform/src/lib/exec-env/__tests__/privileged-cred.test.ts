@@ -12,6 +12,18 @@ vi.mock("@/lib/exec-env/registry", () => ({
   requireReadyTarget: (...a: unknown[]) => requireReadyTargetMock(...a),
 }));
 
+// 🔴 本文件碰到的唯一真外部是 Secrets Manager:project-context 路径按名 DescribeSecret 查 per-project 凭证
+// (`project-secret.ts` → `target-clients.describeSecretArnByName`)。以前没 mock ⇒ 在本机拿开发者的真凭证真打 AWS、
+// 靠真账号里「没有这个 secret」返回 ResourceNotFoundException 才绿;CI 上没有凭证就红(2026-11-05)。
+// 这里把它钉成「确认不存在」:正是这些判据要的前提(没有 per-project 凭证 ⇒ 看状态机决定回落还是拒)。
+const smSend = vi.fn(async () => {
+  throw Object.assign(new Error("Secrets Manager can't find the specified secret."), { name: "ResourceNotFoundException" });
+});
+vi.mock("@aws-sdk/client-secrets-manager", () => ({
+  SecretsManagerClient: class { send = smSend; },
+  DescribeSecretCommand: class { constructor(public input: unknown) {} },
+}));
+
 import {
   getPrivilegedCred,
   getCredDegradationCount,
@@ -121,6 +133,8 @@ describe("class① project-context", () => {
     expect(c.secretArn).toBe(SECRET);
     expect(c.degradedToLegacyAdmin).toBe(true);
     expect(c.isolation).toEqual({ state: "legacy-seeded", epoch: 0 });
+    // 回落的前提「没有 per-project 凭证」必须真的查过 Secrets Manager(不是跳过查找直接回落)
+    expect(smSend).toHaveBeenCalled();
   });
 
   it("provisioning 窗口内同样允许回落(否则供给期业务中断 = 砍功能)", async () => {

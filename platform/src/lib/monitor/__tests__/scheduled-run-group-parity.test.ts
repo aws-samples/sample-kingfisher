@@ -124,7 +124,7 @@ describe("🔴 两侧连「失败」也要一致:压根不存在的 cron", () =>
     const py = join(dir, "neg.py");
     writeFileSync(py, `import time, hashlib\n${pythonScheduledRunGroupSource()}\n\ntry:\n    _cron_slot_iso("0 0 30 2 *", 1789344000)\n    print("NO-RAISE")\nexcept Exception as e:\n    print("RAISED")\n`, "utf8");
     expect(execFileSync("python3", [py], { encoding: "utf8" }).trim()).toBe("RAISED");
-  });
+  }, 30_000); // 两侧各扫一遍到年底的分钟槽;慢机(CI 2 vCPU)上 5 秒缺省预算会抢跑成假红(2026-11-05)
 });
 
 describe("cron 解析:非法一律抛,不猜", () => {

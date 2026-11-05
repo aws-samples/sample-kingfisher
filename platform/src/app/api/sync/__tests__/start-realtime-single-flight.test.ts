@@ -256,7 +256,8 @@ describe("DMS 通道启动:立刻受理 + 单飞", () => {
     const t0 = Date.now();
     const r = await post();
     expect(r.status, JSON.stringify(r.body)).toBe(202);
-    expect(Date.now() - t0, "请求路径里出现了等待(改动前这里等 3–8 分钟 ⇒ 504)").toBeLessThan(2000);
+    // 要防的是「在请求里等复制实例 3–8 分钟」;阈值只需远小于 60 秒边缘墙。2 秒在满载全量跑 / 慢机 CI 上会被调度抖动抢跑(2026-11-05 实测 2328 ms,单跑 <1 s)。
+    expect(Date.now() - t0, "请求路径里出现了等待(改动前这里等 3–8 分钟 ⇒ 504)").toBeLessThan(10_000);
     expect(h.dmsCalls.filter((c) => c === "CreateReplicationInstanceCommand")).toHaveLength(1);
     expect(r.body.data.instanceCold).toBe(true);
     expect(r.body.data.message).toMatch(/复制实例/);

@@ -6,13 +6,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 🔴 vi.hoisted:seed-home.ts 在模块顶层构造 client,mock 工厂执行时普通顶层 const 还在 TDZ
 //    (deploy-control.test.ts 同款坑;单跑本文件侥幸通过、全量跑必挂 —— 顺序敏感的假绿要用 hoisted 根治)。
-const { ec2Send, smSend, dmsSend, iamSend, acSend, s3Send } = vi.hoisted(() => ({
+const { ec2Send, smSend, dmsSend, iamSend, acSend, s3Send, mwaaSend, } = vi.hoisted(() => ({
   ec2Send: vi.fn(),
   smSend: vi.fn(),
   dmsSend: vi.fn(),
   iamSend: vi.fn(),
   acSend: vi.fn(),
   s3Send: vi.fn(),
+  mwaaSend: vi.fn(async () => { throw Object.assign(new Error("Environment not found"), { name: "ResourceNotFoundException" }); }),
 }));
 vi.mock("@aws-sdk/client-ec2", () => ({
   EC2Client: class { send = ec2Send; },
@@ -34,6 +35,12 @@ vi.mock("@aws-sdk/client-iam", () => ({
 vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class { send = s3Send; },
   HeadBucketCommand: class { constructor(public input: unknown) {} },
+}));
+// 经典 MWAA 探测(GetEnvironment)也是真外部:以前没 mock ⇒ 本机拿真凭证真打 AWS、靠真账号「没有这个环境」返回
+// ResourceNotFoundException 才绿;CI 上没有凭证就红(2026-11-05)。这里钉成「不存在」—— 正是「探到才声称」判据要的前提。
+vi.mock("@aws-sdk/client-mwaa", () => ({
+  MWAAClient: class { send = mwaaSend; },
+  GetEnvironmentCommand: class { constructor(public input: unknown) {} },
 }));
 vi.mock("@aws-sdk/client-bedrock-agentcore-control", () => ({
   BedrockAgentCoreControlClient: class { send = acSend; },
