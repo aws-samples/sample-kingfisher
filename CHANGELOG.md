@@ -23,6 +23,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - Design specification for an offline job node in workflow orchestration, so sync tasks and offline jobs can form one DAG published to the serverless scheduler (implementation planned).
 - Design specification for lake table-bucket routing, letting one job read and write several S3 Tables buckets per region (core and read-side phases planned for the next release).
 - Supported versions matrix (`docs/supported-versions.md`), feature tour with screenshots, and architecture diagrams drawn with official AWS icons.
+- Complete English translations of all module design documents (71 files under `docs/design/`, index in `docs/design/README.md`); the six design pages that were previously condensed summaries are replaced by the full translations, and the modules overview links to every design document.
 
 ### Changed
 
@@ -49,6 +50,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - First start of a replication-based sync task waits long enough for the replication instance to be created; the UI text reflects the real duration.
 - Several pages no longer flicker or report hydration errors on first render.
 - Offline job page shows the full reason when a save is rejected, and run, dry run, backfill, preview, and publish stop instead of using the previous definition.
+- Installation and upgrade synchronize the Flink runner and connector-module JARs by content hash (sha256 stored in the S3 object metadata): a JAR that is missing or older than its sources is rebuilt with Maven, identical objects are skipped, and the upgrade script now ships new JARs (before, installation skipped any object that already existed and upgrade did not touch the JARs at all). Execution regions refresh their runner copy from the identity of the home-region object on the next start, and the cache key of the modular connector assembly includes the identity of every source JAR, so an upgraded module is reassembled instead of served from the cache. Running stream jobs load the new JAR after one stop and start; see `docs/deployment.md`, section 7ter.1i.
 
 ### Security
 
@@ -59,6 +61,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - All container images run as a non-root user.
 - Scanner configurations (`.bandit`, `.gitleaks.toml`, `.semgrepignore`) are committed with a written reason for every exclusion.
 - The Cognito bootstrap function accepts only HTTPS callback URLs and no longer silences callback failures.
+- Flink runner and connector-module JARs are built against Flink 1.20.4 (GHSA-2f54-v4hm-fx73, remote code execution in Flink SQL code generation). The planner itself is a `provided` dependency supplied by the Managed Service for Apache Flink `FLINK-1_20` runtime, whose patch level is maintained by AWS; the Flink artifacts bundled into the JARs move to the same patch level and the repository's dependency alert is cleared.
 
 ## [2.1.2] - 2026-10-29
 

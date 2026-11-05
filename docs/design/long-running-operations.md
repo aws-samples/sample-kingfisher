@@ -1,348 +1,538 @@
-# Long-Running Operations
+# Long-Running-Operation Framework (Design Overview · Data Model and Interface Contract · Interaction · Construction Sequence · Headless Acceptance Criteria — five in one)
 
-Status: implemented. Code lives under `platform/src/lib/long-ops/`.
+> Revision:
+> **1.8** (🆕 2026-10-30 00:3xZ **third batch, second kind `engine-run` ✅ verified and merged back to the development mainline** (root fix of the EMR run 504 of 2026-10-29): the install chains of two freshly installed demo accounts hit HTTP 504 (CloudFront HTML) on "Run" of an EMR job in the showcase execution region while the job run in us-west-2 was already SUCCESS —
+> the request path of `POST /api/engines/[engine]/[id]/run` ran `provider.submit` synchronously region by region (upload script → ensureApplication → `ensureStarted` waiting for the application to reach STARTED for up to ~60 s → StartJobRun → run ledger),
+> and one cold-start hop hit the 60-second wall (the same disease as the data-source creation 504 of 2026-10-27; section 6, row 12, had long listed it as "second batch", not yet migrated).
+> Integration shape in section 2.6c: the whole submission segment moves into the executor `lib/engines/long-ops.ts` (the tenth domain); the route keeps only fast validation + creation of the run-group row + the definition version;
+> lease family `engine-job:<jobId>` (the update / delete job routes gain the guard, section 2.8);
+> with zero runs the original 503 / 409 / 500 semantics are thrown unchanged;
+> the response is flattened + `runs` + `partial` / `groupLedgerIncomplete`, shape-identical byte for byte.
+> Gates ① ④ ⑬ migrate along (registry-wiring: ten domains / ROUTES gains the run route / leases-wiring `FAMILY_MUTATION_ROUTES["engine-job"]`); the five source-literal guards now point at the executor and still pin the same set of facts;
+> the `offline-before-delete` fake returns empty for `bgp-long-ops` (first run 1 red = the fake treated the job row as a lease).
+> 🔴 In the same change the platform API calls of `scripts/31-showcase-region.py` were connected to the long-operation protocol (on receiving a 202 with protocol long-op/1 ⇒ poll `GET /api/long-ops/<taskId>` ⇒ shape the result with the same semantics as follow.ts;
+> a GenBI-style 202 passes through unchanged) — otherwise the install chain would have judged "submitting in the background" as a failure.
+> Criteria, section 7c, new EMR-run segment: a test account (demo, two regions, upgraded to the product bytes plus the showcase script's follow-up for 202), page-driven: data-source security-group cleanup **7/7 ✅** · data-source network-object drift **8/8 ✅** (the first run 7/8 caught a second fix for the connection availability zone; the re-run of the failing item ✅) · new streaming sample-data segment **4/4 ✅** (150 generated events ⇒ the page's "Aggregated results" show the two latest windows 00:05 / 00:06 each with exactly 5 regions, identical to the full read side;
+> baseline 69 → 84 rows) · new EMR-run segment **4/4 ✅** ("Run now" returns synchronous 200 / run ledger exactly +1 succeeded / two concurrent clicks in the same millisecond ⇒ 200 + 409 LONG_OP_IN_PROGRESS "'Run engine job' is in progress") · showcase `--stage run --only realtime,emr` green in both regions (home-region aggregation 49 rows, execution region 24 rows;
+> the execution-region EMR run returns synchronous 200 ⇒ succeeded).
+> Under the default 45-second setting, EMR application creation + start measured 25 seconds ⇒ synchronous 200; the 202 cold-start path was confirmed separately in a knob environment (`-c long-ops-sync-wait-ms=500`, with the acceptance script's 202 assertion switched on): 2026-10-30 04:0xZ, test account, EMR-run segment with the 202 assertion 4/4 (item 1: first network response 202 protocol long-op/1 ⇒ page-level 200 with x-bgp-long-op + global hint "Running in background: Run engine job", 25.1 seconds;
+> item 3: two concurrent clicks ⇒ 202 + 409 LONG_OP_IN_PROGRESS) · same environment, framework segment with the 202 assertion 12/12 · data-source creation segment with the 202 assertion 5/5 (see section 7c).
+> The same change also fixed the data-source deletion / network-object defects and the streaming sample-data ordering defect, which are not part of this module; see [the data-source ecosystem design](./datasource-ecosystem.md), revision 0.7, section 14;
+> the rerun route `[id]/rerun` (single region) still submits synchronously,
+> the same class of risk is recorded for the next change (section 6)) · **1.7** (🆕 2026-10-28 07:4xZ **third batch, first kind `datasource-create` ✅ verified and merged back to the development mainline** (root fix of the data-source creation 504 of 2026-10-27): the first run of the network-advisor segment in the full acceptance round of 2026-10-27 forced out the data-source creation route that revision 1.4, section 6, had "deferred to the third batch" — the home-region creation request path synchronously chained Glue-role verification → network-segment probe / security-group creation → Glue connection creation → persistence, with no timeout budget; CloudTrail confirmed a 64-second gap after CreateSecret before IAM GetRole
+> ⇒ CloudFront 504 after 60 seconds while the server still created the source.
+> Integration shape in section 2.6b: the secret is still created synchronously in the route (the password never enters the task row; only the ARN goes to the executor);
+> lease `datasource:create:<workspace>:<name>` (the object has no id yet; the lease is exclusive on "a new source with this name in this workspace");
+> a failure midway cleans up in reverse order the Glue connection / platform security group / secret (a user-specified group is not touched), then returns 500 with the original semantics;
+> if the route created the secret but the executor never ran (lease 409 / the task-table write failed) ⇒ the route deletes the secret.
+> Two further fixes in the same change are outside the framework but treat the same disease: `ensureGlueRole` leaves the request path (one in-process verification cache; CreateRole only on NoSuchEntity) · `lib/aws/clients.ts`, the single author, gives **all** SDK clients an explicit network budget (connect 5 s / idle 60 s / 3 bounded retries;
+> model · agentcore have no idle timeout).
+> Criteria, section 7b, new data-source creation segment: one test account under the default 45-second setting 5/5 (synchronous 201 in one step) · another test account under the `-c long-ops-sync-wait-ms=500` knob setting 5/5 (first network response 202 protocol long-op/1 ⇒ global hint "Running in background: New data source" ⇒ page-level 201 with x-bgp-long-op;
+> two concurrent creations with the same name ⇒ 201 + 409 and the rejected one's secret is deleted;
+> a managed secret ARN that does not exist ⇒ 500 and nothing at all is created) + network advisor 7/7 + framework segment with the 202 assertion 12/12 regression;
+> gates ① ④ ⑬ migrate along (registry-wiring route list + leases-wiring `FAMILY_MUTATION_ROUTES.datasource` gains the creation route's longOps POST).
+> Found along the way (recorded 2026-10-28): after deleting a data source, the platform security group's 5-minute retry budget is shorter than Glue's network-interface release, so the group is left behind permanently;
+> not a defect of this framework; candidate root fix via the persisted background waiter of section 2.9) · **1.6** (2026-10-23 05:5xZ **second batch ✅ page-driven, verified and merged back to the development mainline** (a merge commit with two parents;
+> all eight gates green: tsc 0 · vitest 434 files / 5392 tests · naming parity · redline scan · infra tsc · synth-gate · shell-script tests 42 · classifier tests 32): a test account (observe mode, default 45 s), new segment (section 7a), 13 items **0 failures, 1 registered, × 3 runs** — governance column sync clicked simultaneously in a second tab ⇒ 409 "'Sync column information to the data catalog' is in progress (1s elapsed)" confirms the lease on a real page;
+> sync wizard generate DDL / execute create-table / create again ⇒ 409 "created by the platform";
+> metric card drawer "Current value 0" / model metric "Computation complete: 0";
+> Flink create → start (first response 202 without the protocol marker, "Starting" → "Running") → stop (200) → delete (200 "Deleted (and the MSAF application cleaned up)", the row disappears);
+> the only registered item (item 9) = `datasource-s3-external` has no page entry; an API cross-check POST against the demo CSV source ⇒ **400 JSON "Could not infer column definitions (CSV requires a header row…)", the original envelope handed back byte for byte** (a limitation of the demo fixture, not a product defect);
+> regression: eight segments all green, 15/15 · 6/6 · 7/7 · 7/7 · 7/7 · one further segment · 12/12 · 24/24 (1 registered = a known item);
+> under the default 45 s all nine kinds of the second batch returned synchronous 200 in the same shape, the 202 path was not hit in this segment (complementary to the first batch's run 2 under the 500 ms knob + the real cold-start hit of the real-cold criterion;
+> optional: re-run the segment in that account with `-c long-ops-sync-wait-ms=500`);
+> measurement lessons (the wizard's "Table name prefix" is in step 3 "Target configuration" / antd renders a two-character icon-less button label with a space inserted between the characters / antd 6 drawers are found with `get_by_role("dialog")`, not by class name / `?scope=` accepts only global · <targetId> · cmp:… and data sources are isolated per workspace so `x-bgp-project` must be named);
+> the same change merged back the root fix of the upgrade script's IAM probe region ([the multi-region design](./multi-region-execution-design.md), revision 3.26, section 12.1);
+> changes to this document: section 6 second-batch row ✅ · section 2.6a S3 external-table row gains the API cross-check conclusion · 🆕 section 7a criteria table) · **1.5** (2026-10-22 07:3xZ **second-batch criteria migrated and closed ⇒ landed on the second-batch feature branch (gates all green: tsc 0 · vitest 434 files / 5389 tests · naming parity · redline scan · infra synth-gate;**
+> **a test account upgrading, 14 kinds awaiting page-driven verification;**
+> **not yet merged back)**: the three gates extend with the second batch (① the domain-executor list is derived from the import / spread literals of registry.ts: 9 domains + 31 routes;
+> ⑬ b `FAMILY_MUTATION_ROUTES` generalized into guarded / longOps, the four families project / flink / workflow / datasource registered, the family list closed;
+> ② baseline 27 → 21 + reverse pins for the second batch;
+> ⑤ entry-point word list +7, baseline 15 → 7 + 14 reverse pins for the second batch) + new criterion: rawBody / resultRaw carried through (driver / follow / route);
+> 🔴 **gate ⑬ b caught a real bypass** (2026-10-22): the monitor page's "Enable / disable schedule" `app/api/schedule/enable` workflow branch re-publishes the DAG (the same artifact as publish / unpublish / delete) without passing the workflow lease ⇒ the same-family guard `resourceBusyResponse([resourceKey("workflow", taskId)])` was added (appended to the route-guard table in section 2.8;
+> connecting it as a long operation is left for the third batch);
+> **the real cold-start criterion hit ✅** (a test account, us-west-2 genuinely cold for 236 minutes: first response 202 → server side 73.5 s → page 200 + row ✓;
+> the framework segment re-run 12/12);
+> found that `datasource-s3-external` **has no page call site** (API-only;
+> note in section 2.6a; a page entry is left as a UX candidate; page-driven acceptance is replaced by an API cross-check)) · **1.4** (2026-10-22 05:2xZ the product code of the 14 second-batch kinds landed on the second-batch feature branch (tsc 0;
+> criteria migration not finished;
+> not merged back, not deployed): list in section 2.6a (governance column sync replaces the governance-specific 202 of 2026-10-13 · delete workspace replaces the warming protocol of 2026-10-18 · sync create-table / generate DDL · Flink start / stop / delete · workflow publish / unpublish / trigger / delete · S3 external table · model metric / metric computation);
+> framework extension 🆕 `rawBody` / `resultRaw` (the historical responses of the four workflow routes are flat shapes without the apiOk envelope; both the synchronous and the asynchronous branch hand them back unchanged);
+> new resource families `governance / project / flink / workflow / datasource`; update / delete route guards added to projects PUT · flink/jobs/[id] PUT · workflow/[id] PUT · datasources/[id] PUT + DELETE;
+> first wiring of a background waiter, `flink-deletion` (background destruction after a deletion has been accepted);
+> gate ② baseline minus 6 files (sync/execute-ddl route · workflow trigger route · modeling/redshift · athena-external · flink-service · projects/project-resources);
+> 🔴 this batch deliberately leaves three files unmigrated and states why (section 6): `target-table-guard.ts` (overwritePreflight is called by the synchronous create / update task routes) · `mwaa-endpoint.ts` (the etl / engines schedule routes unpause fire-and-forget) · `workflow-client.ts` (request-path callers action-schedules / trigger.ts / dependency.ts)
+> ⇒ left for the third batch, to be merged together with the corresponding routes) · **1.3** (2026-10-22 03:1xZ **first batch + object leases merged back to the development mainline**: a test account, third lane (default 45 s), page-driven: 9/9 · 7/7 · 24/24 · new framework segment 11/12 (the only red was the criterion's region parsing, fixed) · cold-start probe: us-west-2 compute scaled to zero for 55 minutes, then landing 20.4 s synchronous 200 (under 45 s is synchronous anyway, no 504);
+> first lane (500 ms knob) run 2 17/18 + a separate probe: all connected routes 202 ⇒ poll ⇒ page 200 / 400 original envelope + `x-bgp-long-op`;
+> run 1 genuinely cold 66.5 s (server `long-op.settled elapsedMs 66534`) via 202 ⇒ page 200 + header;
+> the new framework segment is part of the acceptance suite (runnable under the default 45 s; an environment variable adds the 202 assertions);
+> section 7 real-cold criterion wording corrected: the cold-recovery duration is not controllable (20 s after 55 minutes at zero / 66 s after several hours), "really > 45 s" is left for the background chain to hit again after a long idle; the modeling-landing 504 of 2026-10-21 is closed on the basis of the mechanism + the genuine 66-second cold start passing via 202) · **1.2** (2026-10-22 02:1xZ **first lane page-driven run 2 17/18 ✅ (the only red was a criterion fixture; after pointing item 6 at tgt_home a separate probe ✅;**
+> **violation 0) + the follow-up "object leases" code landed on the feature branch**: run 1 caught a real race — while a code-table landing was in progress (warehouse cold, 67 s) the criterion deleted the same code table ⇒ the create-table DDL had already passed the ledger guard, the following steps re-checked the ledger and were refused ⇒ the target region keeps an orphan physical table `dim_code_…` (recorded 2026-10-22).
+> Root fix = 🆕 **section 2.8, long-operation object leases**: every kind declares its exclusive resource keys in the closed list in `kinds.ts` (`LONG_OP_RESOURCES`); `submitLongOp` acquires them with a conditional write before executing; the three terminal writes release them; dead leases self-heal by the holder's real state; a second long operation or an update / delete route on the same object ⇒ 409 `LONG_OP_IN_PROGRESS`;
+> gate 🆕 ⑬;
+> criterion 🆕 item 11;
+> the test account's third lane (default 45 s) upgrading; after us-west-2 has been cold ≥ 60 minutes, run the real-cold criterion + the data-equality criterion + the lease criterion) · **1.1** (2026-10-22 01:2xZ **first-batch code landed on the feature branch**: implementation corrections — ① the protocol constants become a zero-import `protocol.ts` (shared by the browser interceptor / the criteria / the server);
+> ② the routes' existing "error ⇒ Response" mappers are absorbed by `http-error.ts` into `LongOpHttpError` (status + **original envelope `errorBody`**); the synchronous-branch route returns the original envelope via `longOpErrorResponse`, the asynchronous branch persists it and the client restores it byte for byte — no more per-kind error translation;
+> ③ the scan word list of gate ② actually matches **27** files (the 30 of section 10 minus the already migrated landing.ts, minus two places that are only a bounded retry / an inline short poll);
+> ④ unbind preview and read columns are **GET**; the approval execution's params carry `decided` (decideApproval stays in the route);
+> ⑤ gates: tsc 0 · vitest 5354 green (the only red, `bootstrap-roster-mode`, is a local-environment red, equally red on the development mainline) · naming parity · redline scan · infra tsc + synth-gate ✅;
+> a test account upgrading with `-c long-ops-sync-wait-ms=500`, the criteria script still to be run) · **1.0** (2026-10-21 10:1xZ;
+> direction given verbatim on that day: "the fix and schedule for the modeling-landing 504: you need to give a root-cause solution, dive deep, not a patch-it-up approach; solve this problem at a high level of abstraction, once and for all" / "UX candidate: do it") | one construction batch on a dedicated feature branch | acceptance: a dedicated headless segment for this framework (plus the governance-catalog segment extended with the UX criterion ⑥)
+> Basis: the approved work-plan entry for this framework · the four recorded incidents of the same disease (2026-10-13 governance column sync, 2026-10-18 workspace deletion, 2026-10-20 model-calling routes, 2026-10-21 modeling landing) · [the model-configuration specification](./model-configuration-spec.md), revision 2.5, section 3.3a (the hybrid response of the 2026-10-20 fix — this module **generalizes and takes it over**; that row of the specification now refers to this document) · [the multi-region specification](./multi-region-execution-spec.md), section 3.9a (admin-DDL executor: the execution channel and the authorization axis of modeling landing do not change by a single word) · the same specification, section 3.18 (added in its revision 3.54: the unified long-operation protocol; the implementation-level contract points to section 2 of this document) · engineering rule 6 of the [development guide](../development.md) (asynchronous work needs a settlement criterion;
+> a long call beyond the ALB's 60 s must turn into 202 + polling) · engineering rule 3 (no silent legal defaults) · engineering rule 4 (single author).
 
-Related: [Supported versions](../supported-versions.md).
+---
 
-## 1. Summary
+## 0. In one sentence
 
-- Some write requests must wait for an external system to reach a final state before they can answer.
-- Examples are a data-warehouse cold start, a large schema sync, a model inference, or an EMR application start.
-- The platform sits behind an edge with a hard 60-second request limit, so such requests used to fail with 504 while the work kept running.
-- This design removes "wait synchronously in the request handler" as a pattern from the whole platform.
-- Only one server primitive remains, `submitLongOp`, and only one client semantic remains, "follow to the final state and hand back the same response".
-- Routes and pages do not know that the 60-second limit exists.
-- Guards make the next synchronous wait impossible to write without failing a test.
+Pull the whole class of "the request handler **waits synchronously for an external system to reach a terminal state**" out of every route: the entire platform keeps **one** server-side primitive, "submit a long operation" (`submitLongOp`), and **one** client-side transport semantic, "follow to the terminal state, then hand back" (the global fetch interceptor); routes and pages no longer know that the 60-second wall exists; and gates make "the N+1th synchronous wait" **impossible to write**.
 
-## 2. Problem
+---
 
-### 2.1 Symptoms before this design
+## 1. Design overview
 
-Four independent routes hit the same wall and were each patched differently.
+### 1.1 The problem: the same disease, four outbreaks (all confirmed in real environments)
 
-| Route | External wait | Symptom | Local patch |
-|---|---|---|---|
-| Governance "sync columns" | OpenMetadata and Redshift column read | "Sync failed" after 60 s, work finished later | Route-specific 202 and page polling |
-| Delete project space | Redshift Serverless cold start | 400 "cannot verify" or 504 | Route-specific "warming" 202 and auto-retry |
-| Seven model-calling POST routes | Model inference of 60 to 140 s | 504 HTML, page shows a JSON parse error | Task table and polling for AI routes only |
-| Modeling "land" and "apply" | Target-region warehouse cold start | 504 while landing completed in the background | Not patched; triggered this design |
+| Incident | Date | Route | External system / cause of the delay | Symptom | Fix at the time (point by point) |
+|---|---|---|---|---|---|
+| Governance column-sync timeout | 2026-10-13, the night of the migration | Governance catalog "Sync column information" | OpenMetadata + Redshift column collection, >60 s with many tables | "Sync failed" after 60 s while the background had already finished | `startOrJoinSchemaSync` waits 45 s in-process, then turns into 202 + page polling if unfinished (governance-specific) |
+| Workspace-deletion cold start | 2026-10-18 | Delete workspace DELETE | Redshift Serverless **cold start**; the inventory statement stays STARTED for tens of seconds | 400 "cannot verify" / 504 | 202 `{status:"warming", retryAfterMs}` + the page's "Waking up the warehouse" automatic resend (deletion-specific) |
+| Model-call 504 | 2026-10-20 | Seven POST routes that call a large model | Kimi K3 inference 60–140 s | 504 HTML ⇒ page shows "Unexpected token '<'" | `lib/ai/long-call*.ts` task table + `GET /api/ai/tasks/[taskId]` + the seven page call sites each switched to `aiFetchJson` (AI-specific) |
+| Modeling-landing 504 | 2026-10-21 | Modeling "Land code table to this region" / dimension table "Apply" | Redshift Serverless cold start in the target region, 63 s for the whole chain | 504 "Service responded abnormally… the request may still be continuing in the background"; landing had in fact completed, the list still showed "not landed" | **Not fixed — decided that no further point fixes are allowed** |
 
-- Three 202 protocols and three polling loops existed, none reusable.
-- An inventory found about 30 files with a "sleep and poll an external status" loop in the request path.
-- Most of them had simply not met a slow day yet.
+- The four fixes share nothing (three 202 protocols, three page polling loops); every one was "fix this route only after this route hit the wall".
+- Repository-wide inventory on 2026-10-21 (section 10): the server-side primitive "loop sleep + query external state until terminal" is scattered over **30 files** (38 including bounded retries / hybrid-response races),
+- of which at least 20 files **wait to the end synchronously in the HTTP request path, with no 202 protocol at all** — catalog create table / alter table / read columns, sync `execute-ddl` (20 s + 15 s + 15 s), S3 external table `s3-external` (≤ 6 minutes), zero-ETL status GET, Flink start / stop (2–3 minutes), data-source provisioning (2 minutes), workflow publish `unpauseWhenLoaded` (3 minutes), serverless unpublish (≤ 3 minutes), quality / metric batch computation, GenBI ask in its default synchronous mode … they simply **have not met their slow day yet**.
+- Another five local asynchronous shapes (flink delete `{deleting}` / seed 202 / table discovery `{discovering}` / heartbeat `state:"testing"` / schema-sync `{runId,state}`) each go their own way.
 
-### 2.2 Root cause in three layers
+### 1.2 Root-cause abstraction (three layers, only one of which can change)
 
-```text
-uncontrollable external time  x  edge 60-second limit  x  handler waits synchronously
-(cold start, inference, big table)  (CloudFront origin timeout, ALB idle)   (route awaits the final state)
-      physical, cannot change            defence in depth, kept               the only layer we can change
+```
+Uncontrollable external latency       ×   Hard 60 s wall at the edge                        ×   The request handler waits synchronously
+(warehouse cold start / model inference /   (CloudFront origin readTimeout 60 s ·               (the route awaits the terminal state before answering)
+ large tables / OpenMetadata fan-out)        ALB idle 60 s · Node keepAlive 65 s)
+      ↑ physical, cannot change                   ↑ defense in depth, deliberately not widened          ↑ the only layer that can change
 ```
 
-- The first layer is physical.
-- The second layer is deliberate defence in depth; widening it would turn observable 202s into unobservable hangs.
-- The third layer was decided per route in hundreds of handlers with no shared primitive and no guard.
-- The fix is that the third layer has exactly one way to be written, and any other way fails a test.
+- The first layer is a physical fact; the second is **defense in depth** (widening it to 300 s would turn the failure mode of every slow route from "an observable 202" into "an unobservable long hang", and the edge timeout also protects the WAF / connection pools), deliberately left unchanged.
+- In the third layer, each route used to decide on its own "how long to wait and what to do when the wait is over" ⇒ the decision was scattered over more than 300 handlers with neither a unified primitive nor a gate ⇒ leaks were inevitable.
+- **Root fix = the third layer has exactly one way to be written + anything not written that way does not compile / does not pass the tests.**
 
-## 3. Goals and non-goals
+### 1.3 Goals and non-goals
 
-### 3.1 Goals
-
-| Goal | Met when |
+| Goal | Achieved when |
 |---|---|
-| One primitive | Only `lib/long-ops/` knows how long to wait, how to switch to 202, how to poll, how to settle |
-| Zero call-site changes | Page `fetch("/api/...")` calls stay unchanged; adding a route changes the route and an executor, not pages |
-| Fast path unchanged | A response that settles within the wait window is byte-identical to the previous synchronous response |
-| Guards | The polling primitive has a single author, requires a wait context, and the call-site baseline only shrinks |
-| Mechanically verifiable | A test deployment can force every route onto the 202 path by lowering the wait window |
+| ① A single primitive | On the server only `lib/long-ops/` knows "how long to wait, how to turn into 202, how to poll, how to settle"; the `lib/ai/long-call*.ts` of the 2026-10-20 fix is merged in (not kept alongside) |
+| ② Zero call-site changes | ~300 page `fetch("/api/…")` calls do not change by one line; `aiFetchJson` shrinks to a thin shell; connecting a new route = change the route + write an executor + register the kind, **pages untouched** |
+| ③ Zero regression on the synchronous fast path | A response that is ready within 45 s is **byte-identical** (status code / envelope / `_meta`) |
+| ④ Gates | The polling primitive that waits for a terminal state has a single author and **throws without a long-operation context**; kind ↔ executor ↔ label ↔ parameter type correspond one to one under tsc; the number of call sites where the route layer directly awaits a long service only decreases, never increases |
+| ⑤ Mechanically verifiable | In a test account `LONG_OPS_SYNC_WAIT_MS=500` forces every connected route onto the 202 path, and page-driven acceptance verifies that the terminal state matches the page result; production default 45 s |
 
-### 3.2 Non-goals
+**Non-goals**: do not widen the edge's 60 s; no WebSocket / SSE push (2-second polling is consistent with GenBI and sufficient); no task-list page (a taskId lives only in the browser session that started it, as with GenBI); do not change GenBI's own `GENBI_ASYNC` protocol (merged in the third batch); do not change the execution channel and authorization axis of modeling landing ([the multi-region specification](./multi-region-execution-spec.md), sections 3.9a / 3.9d, not one word).
 
-- Do not widen the edge 60-second limit.
-- No WebSocket or server-sent events; 2-second polling is sufficient.
-- No task list page; a task id lives only in the browser session that started it.
-- No change to the admin-DDL execution channel or its authorisation axis.
+### 1.4 Design decisions (each with its reason)
 
-## 4. Design decisions
-
-| # | Decision | Reason |
+| # | Decision | Why |
 |---|---|---|
-| D1 | Name everything `long-ops`: library, endpoint, table, env prefix, CDK context | The word `ops` already means operations dashboards in this repository |
-| D2 | Keep the hybrid response: wait in-process, answer synchronously if settled, else 202 | The fast path must stay byte-identical for call sites to remain unchanged |
-| D3 | The 202 body carries `protocol: "long-op/1"`; the client only reacts to that marker | Other 202 shapes exist (NL2SQL ask, legacy warming) and must not be hijacked |
-| D4 | Client behaviour lives in the global fetch interceptor | Every `/api/*` call already passes through it; pages need no change |
-| D5 | Final states are reshaped into the exact synchronous response, including the HTTP status | Earlier async failures lost 403 / 404 / 409 / 422 and became a generic 500 |
-| D6 | Wait context via `AsyncLocalStorage`, process-wide singleton on `globalThis` | A polling primitive outside any context throws on its first call |
-| D7 | Background loops declare themselves from a closed list of owners | Background work is legitimately outside the limit, but the back door must be enumerated |
-| D8 | Interceptor emits DOM events; a shell component renders the global hint | The interceptor is not a React module and must not bypass the theme and locale providers |
-| D9 | The AI task table was replaced, not duplicated, by `bgp-long-ops` | The table count stays constant |
-| D10 | One set of environment knobs, prefix `LONG_OPS_*` | The earlier `AI_*` knobs were removed |
-| D11 | `GET /api/ai/tasks/{taskId}` stays for one release as an alias | Existing acceptance tooling used that path |
-| D12 | Closed kind list with a typed executor registry | Each kind maps to exactly one executor, one label, one parameter type |
+| D1 | Name it **`long-ops`**: library `platform/src/lib/long-ops/`, endpoint `GET /api/long-ops/[taskId]`, table `bgp-long-ops`, environment-variable prefix `LONG_OPS_*`, CDK context `long-ops-sync-wait-ms` | The `/api/ops/[taskId]` written in the original work-plan entry collides with the existing operations-dashboard API group `app/api/ops/summary` (`ops` in this repository = operations); one word with two meanings is exactly the drift that engineering rule 4 (single author) exists to split |
+| D2 | Keep the **hybrid response**: a POST first starts the execution in-process and waits `LONG_OPS_SYNC_WAIT_MS` (default 45 s < the 60 s wall); terminal ⇒ synchronous 200 **byte-identical**; not terminal ⇒ 202 | Follows the precedents of the 2026-10-20 model-call fix and the 2026-10-13 schema-sync fix; a zero-regression fast path is the precondition of "~300 call sites, zero changes" |
+| D3 | The 202 payload carries a **protocol marker** `protocol: "long-op/1"` (single-author constant `LONG_OP_PROTOCOL`); the client interceptor **honors only it** | GenBI's `POST /api/genbi/ask` also returns 202 `{taskId,status:"pending",async:true}`, and the 2026-10-18 fix returns 202 `{status:"warming"}` — keying on `async:true` alone would hijack GenBI's own polling; the marker keeps the three kinds of 202 from interfering, and when GenBI is merged in the third batch it only has to carry the marker too |
+| D4 | The client semantics live in the **transport layer**: the `AuthProvider` global fetch interceptor (every `/api/*` call passes through it; the non-JSON error shaping of 2026-10-21 already proved there that this path is reliable) meets the 202 of D3 ⇒ calls `lib/long-ops/client/follow.ts` to poll to the terminal state ⇒ shapes the terminal state into **a `Response` identical to the synchronous 200** and hands it to the caller | This is the carrier of "zero call-site changes"; the interceptor itself holds no polling logic (it only calls a thin module); polling uses native fetch and reuses the same Authorization / workspace / environment headers |
+| D5 | Terminal-state shaping rules: succeeded ⇒ `200 {success:true,data:result,_meta?}`; failed ⇒ **`errorStatus ?? 500`** + `{success:false,error:{message,code:"UPSTREAM_ERROR"},status}`; timeout ⇒ `504 {…code:"UPSTREAM_TIMEOUT"}`. The task row gains `errorStatus` (persisted when the executor throws `LongOpHttpError(status, message)`) | The asynchronous branch of the 2026-10-20 fix **always lost the status code** (404 / 403 / 409 / 422 all became "execution failed"); with `errorStatus`, a failure on the asynchronous branch is byte-identical to the synchronous branch, and the pages' existing error branches keep working as they are |
+| D6 | The execution context uses `AsyncLocalStorage` (a **process-level singleton** hung on `globalThis` under `Symbol.for`; following the lesson recorded for `lib/place/context.ts`, only `run` is used, never `enterWith`): `runInLongOp(frame, fn)` / `currentLongOp()`; `awaitTerminal` without a context ⇒ throws `LongOpContextMissing` | "An illegal state cannot be written" (the change-safety principle): directly `await`ing a function that polls an external terminal state inside a route throws on its very first step, red immediately in unit tests and in real environments, without relying on a code reviewer to remember |
+| D7 | Background callers outside a request (the data-plane job pump `runJobStep` / the reconciler and the mirror tick `runForTarget` / the fire-and-forget polling of sync · batch · backfill / scheduling) **are not request paths**; the **loop entry point** explicitly establishes a background-waiter context `runAsBackgroundWaiter(owner, fn)` (owner ∈ the closed list `BACKGROUND_WAITERS`, single author); a shared primitive (such as `execOnTarget`) **does not pass an owner** itself, it only checks whether a context exists; **request paths must not create a background context** (criterion, section 2.7 ③: `runAsBackgroundWaiter(` may appear only in the registered list of background entry files; any occurrence under `app/api/**` is red) | Background loops were never bound by the 60 s wall; but the "back door" must be a closed list + a criterion, otherwise it is the N+1th silent default; placing the context at the loop entry rather than in the primitive's parameters lets the same primitive serve both long operations and background work without two signatures |
+| D8 | Global hint: the interceptor only dispatches a DOM `CustomEvent` (event name single author `lib/long-ops/client/events.ts`); the shell component `components/long-ops/LongOpIndicator.tsx` listens and uses antd `message.loading` "Running in background: {label} ({n}s elapsed)", which disappears automatically at the terminal state; container `data-testid="long-op-indicator"` | The interceptor is a non-React module; calling the static `message` directly would escape the `ConfigProvider` (theme / language); event + component let the text go through `t()` and let the criteria read the DOM |
+| D9 | The table is **replaced**, not added: `bgp-ai-tasks` → `bgp-long-ops`; `TABLES.AI_TASKS` → `TABLES.LONG_OPS`; the totals of 72 / 63 tables do not change | The 2026-10-20 fix was **never released**; the customer's production (tag `release-2026-10-13`) has no `bgp-ai-tasks`, so the rename needs zero migration; in test accounts the old table stays as an empty shell after the upgrade because of `RemovalPolicy.RETAIN`, listed as pending decision, to be deleted only when named explicitly |
+| D10 | Environment variables: `LONG_OPS_SYNC_WAIT_MS` (in-process wait; **one new container key**, CDK context `-c long-ops-sync-wait-ms=<ms>`, default `45000`; the environment-variable list of the AI tools index `AGENTS.md`: 72 → 73 keys + `.env.example` + guard) · `LONG_OPS_MAX_MS` (ceiling 300000) · `LONG_OPS_STALE_MS` (30000) · `LONG_OPS_HEARTBEAT_MS` (8000) · `LONG_OPS_ASYNC` (default on; `0 / false / off` falls back to pure synchronous); the `AI_SYNC_WAIT_MS` / `AI_ASYNC_MAX_MS` / `AI_ASYNC_STALE_MS` / `AI_ASYNC_HEARTBEAT_MS` / `AI_ASYNC` of the 2026-10-20 fix are **deleted** (never released, no compatibility obligation) | Only one set of knobs; `LONG_OPS_SYNC_WAIT_MS` goes into the container env for ⑤ (a test account forces 202 with `-c long-ops-sync-wait-ms=500`) |
+| D11 | `GET /api/ai/tasks/[taskId]` is kept for **one release** as an alias (the same handler re-exported, same response shape), deleted after the next release | The local acceptance tooling of two existing segments hard-coded that path; the alias means the tooling does not have to change in the same commit as the product, but two implementations are not allowed |
+| D12 | The closed kind list has a single author, `lib/long-ops/kinds.ts` (`LONG_OP_KINDS` · `LongOpParamsByKind` · `LONG_OP_LABELS`); the registry `lib/long-ops/registry.ts` assembles the executors of **each domain** into `{ [K in LongOpKind]: LongOpExecutor<K> }` (one-to-one under tsc; a source-literal criterion pins it once more); executors live in their own domain directories (`lib/ai/long-op-executors.ts` · `lib/modeling/long-ops.ts`) | The framework must not import business code; business code imports only framework types; connecting a new route = write the executor in your own domain + add one line to the list |
+| D13 | Read-level ledger: `/api/long-ops` goes into the `INFRA_APIS` of `page-read-coverage` (same class as `/api/public/version`: the framework's own transport endpoint, fetching a row by taskId, taking part in no region decision); the original three per-page `/api/ai/tasks` entries are **deleted** | The polling is issued by the global interceptor and is not any page's data fetch; per-page registration would drift (any page may hit a 202) |
 
-## 5. Hybrid response
+---
 
-### 5.1 Server side
+## 2. Data model and interface contract (implementation level; the multi-region specification, section 3.18, points here)
 
-1. The route performs fast validation, authorisation, place resolution and audit actor capture.
-2. The route calls `submitLongOp({ kind, params, correlationId }, ctx)`.
-3. The driver acquires the object leases (section 9), creates the task row, claims it, and starts the executor in-process.
-4. The driver waits up to `LONG_OPS_SYNC_WAIT_MS` (default 45 000 ms, below the 60-second edge limit).
-5. If the executor settled within the window, the route answers exactly as before (same status, same envelope).
-6. If it did not, the route answers 202 with the accepted body below, and the executor keeps running.
+### 2.1 Table `bgp-long-ops` (`infra/lib/database-stack.ts`; pk `taskId` ULID; TTL `ttl` 7 days; `hardened`)
 
-```json
-{ "success": true,
-  "data": { "taskId": "<ulid>", "kind": "modeling-land", "label": "<label>",
-            "status": "running", "async": true, "protocol": "long-op/1" } }
-```
-
-### 5.2 Polling endpoint
-
-`GET /api/long-ops/{taskId}` returns the task state. The caller must be the user who created the task.
-
-| Case | Status | Body `data` |
-|---|---|---|
-| Succeeded | 200 | `status`, `result`, `resultStatus?`, `resultRaw?`, `elapsedMs` |
-| Failed or timed out | 200 | `status`, `error`, `errorStatus?`, `errorBody?`, `elapsedMs` |
-| Running with a fresh heartbeat | 200 | `status: "running"`, `elapsedMs`, `heartbeatAt` |
-| Pending or stale running | 200 | This process claims it and continues the execution; returns `running` |
-| Past the ceiling | 200 | Forced to `timeout`; never re-executed |
-| Unknown task | 404 | `NOT_FOUND` |
-| Another user's task | 403 | `RBAC_DENIED` |
-
-- A failed task is a final state of the task, not a failure of the polling request, so the poll itself returns 200.
-- `resultStatus` preserves a non-200 success status such as 201 for "create table".
-- `errorStatus` and `errorBody` preserve the exact error status and envelope the synchronous branch would have returned.
-
-### 5.3 Rollback switch
-
-- `LONG_OPS_ASYNC` set to `0`, `false` or `off` disables the 202 path.
-- Behaviour then equals the pre-framework behaviour byte for byte, including the ability to hit the edge limit.
-
-## 6. Task table
-
-Table `bgp-long-ops`; partition key `taskId` (ULID); TTL attribute `ttl` (7 days).
-
-| Field | Type | Written by | Meaning |
+| Field | Type | Writer | Description |
 |---|---|---|---|
-| `taskId` | string | create | Primary key |
-| `kind` | kind | create | Member of the closed kind list |
-| `params` | per kind | create | All inputs, including place and project; another process may take over execution |
-| `userId` | string | create | Owner; polling is restricted to the owner |
-| `correlationId` | string | create | Correlation id of the submitting request |
-| `status` | enum | state machine | `pending`, `running`, `succeeded`, `failed`, `timeout` |
-| `result` | any | succeed | The response `data` of the synchronous branch |
-| `resultStatus` | number | succeed | HTTP status of the synchronous success branch |
-| `resultRaw` | boolean | succeed | `result` is the whole body, not wrapped in the envelope |
-| `meta` | object | succeed | Source of `_meta` (for example the model used) |
-| `error` | string | fail / timeout | Failure text; timeout always `LONG_OP_TIMEOUT` |
-| `errorStatus` | number | fail | HTTP status the synchronous branch would have returned |
-| `errorBody` | any | fail | Full error envelope the synchronous branch would have returned |
-| `runToken` | string | claim | Current owner token; terminal and heartbeat writes are conditional on it |
-| `leases` | string[] | create | Resource keys held by this task |
-| timestamps | ISO | state machine | `createdAt`, `startedAt`, `heartbeatAt`, `finishedAt` |
+| `taskId` | string (ULID) | `createLongOp` | Primary key; lives only in the memory of the browser session that started it |
+| `kind` | `LongOpKind` | same | Closed list (section 2.6) |
+| `params` | `LongOpParamsByKind[kind]` | same | **Place / workspace / identity-derived values are all persisted here**: the task may be taken over for execution by another request; if they are not persisted, the moment of takeover has forgotten which region it was in |
+| `userId` | string (sub) | same | Ownership; polling is visible only to the owner (strict equality, otherwise 403) |
+| `correlationId` | string? | same | That of the submitting POST; the terminal `_meta.correlationId` echoes it |
+| `status` | `pending → running → succeeded \| failed \| timeout` | state machine | Terminal states are irreversible |
+| `result` | unknown | `markSucceeded` | The executor's response data (byte-identical to the data of the synchronous response) |
+| `resultStatus` | number? | `markSucceeded` | 🆕 The HTTP status the synchronous branch uses on success (catalog create table 201; default 200) — terminal shaping restores it, so the synchronous / asynchronous branches have the same shape |
+| `meta` | `{ model?: AiModelUse }` | `markSucceeded` | Source of the terminal `_meta` (AI kinds have `model`; modeling kinds have none) |
+| `error` | string (≤ 1000) | `markFailed` / `markTimeout*` | Failure text; timeout is always `LONG_OP_TIMEOUT` |
+| `errorStatus` | number? | `markFailed` | 🆕 The HTTP status when the executor throws `LongOpHttpError` (D5) |
+| `errorBody` | unknown? | `markFailed` | 🆕 Revision 1.1: the **complete error envelope** the synchronous branch would return (the product of the routes' existing mappers `targetNotReadyResponse` / `residencyErrorResponse` / `catalogDdlErrorResponse` …, absorbed by `LongOpHttpError.fromResponse`); with it, client shaping restores byte for byte and no per-kind error translation is needed |
+| `runToken` | string (ULID) | `claimForRun` / `reclaimStale` | Current owner; terminal / heartbeat conditional writes carry it, so a zombie executor cannot write |
+| `createdAt` / `startedAt` / `heartbeatAt` / `finishedAt` | ISO | state machine | Basis of read-time reconciliation |
+| `ttl` | epoch seconds | `createLongOp` | 7 days |
 
-### 6.1 State machine and concurrency guarantees
+### 2.2 State machine and three concurrency guarantees (as in the 2026-10-20 model-call fix / GenBI, text unchanged)
 
-1. Claim and reclaim are DynamoDB conditional writes; only one executor moves `pending` to `running`.
-2. Each claim issues a new `runToken`; a superseded executor cannot overwrite the current owner.
-3. Terminal writes require `status = running`; the state never moves backwards.
+1. Claim / reclaim = DynamoDB **conditional writes**: among concurrent pollers only one executor can move `pending → running` (or reclaim a running task whose heartbeat is stale).
+2. **runToken**: every claim generates a new ULID; terminal / heartbeat writes carry the condition `runToken = :tok`, so a superseded zombie executor cannot overwrite the current owner.
+3. Terminal writes always carry the condition `status = running`: the state never moves backwards; the first terminal writer wins.
 
-Two ceilings end a task that will not settle.
+Two layers of forced termination: if the executing process is alive ⇒ the driver actively aborts at `LONG_OPS_MAX_MS` (300 s) and writes `timeout`; if the executing process is dead ⇒ the poll read judges the ceiling by `startedAt` via `forceTimeoutIfExpired`, **never re-running**. The read-time reconciliation decision `reconcileDecision` has five values: `terminal / running / claim / reclaim / timeout`.
 
-- The executing process aborts the executor at `LONG_OPS_MAX_MS` (default 300 000 ms) and writes `timeout`.
-- If the process died, the next poll compares `startedAt` with the ceiling and forces `timeout` without re-running.
+### 2.3 Server-side primitives (`platform/src/lib/long-ops/`)
 
-Knobs: `LONG_OPS_STALE_MS` (heartbeat staleness, default 30 000 ms) and `LONG_OPS_HEARTBEAT_MS` (default 8 000 ms).
-
-## 7. Client interceptor shaping
-
-The global fetch interceptor in the auth provider handles every same-origin `/api/*` response.
-
-1. It reacts only to status 202, JSON content type, `body.data.protocol === "long-op/1"` and a string `taskId`.
-2. Any other 202 is passed through untouched.
-3. It polls `GET /api/long-ops/{taskId}` every 2 000 ms with a total budget of 320 000 ms, using the original fetch and the same authorisation, project and environment headers.
-4. Non-JSON 5xx responses during polling are treated as transient and polling continues.
-5. JSON 4xx or 5xx responses from the poll endpoint are returned to the caller with that status.
-6. On a final state it builds a new `Response` as the table below shows and hands it to the original caller.
-7. The shaped response carries `content-type: application/json` and the header `x-bgp-long-op: <taskId>`.
-
-| Final state | Shaped response |
-|---|---|
-| `succeeded` | `resultStatus ?? 200`, body `{ success: true, data: result, _meta? }` or the raw body when `resultRaw` |
-| `failed` | `errorStatus ?? 500`, body `errorBody` if present, else `{ success: false, error: { message, code: "UPSTREAM_ERROR" } }` |
-| `timeout` | 504, `{ success: false, error: { message, code: "UPSTREAM_TIMEOUT" } }` |
-| Client budget exhausted | Same as `timeout` |
-
-- The interceptor emits DOM events `started`, `progress` and `settled` (event name from a single author).
-- The shell component `LongOpIndicator` renders "Running in background: <label> (<n>s elapsed)" and removes it on settle.
-- Its container has `data-testid="long-op-indicator"` so page-driven tests can read it.
-- Several concurrent tasks each get their own hint, keyed by task id.
-
-## 8. Execution context and the wait primitive
-
-- `awaitTerminal({ probe, intervalMs, maxIntervalMs, backoff, maxPolls | budgetMs, abortSignal? })` is the only primitive allowed to poll an external final state.
-- `probe()` returns `{ done: false }` to continue or `{ done: true, value }` to finish; throwing propagates.
-- Without a wait context it throws `LongOpContextMissing` on the first call, so a route that awaits a long service directly fails immediately in tests and in a real environment.
-- Exceeding the budget throws `LongOpWaitBudgetExceeded`, with the time waited and the last observed state in the message.
-- `runInLongOp(frame, fn)` is used by the driver; executors therefore have a context.
-- `runAsBackgroundWaiter(owner, fn)` is used only at background loop entry points; `owner` must be in the closed list `BACKGROUND_WAITERS`.
-- Background owners today: data-plane job step, reconciler, metadata mirror, sync run tracker, ETL run tracker, backfill tick, real-time start, seed run, engine run, Flink deletion.
-- Request paths must not open a background context; a test pins the set of files allowed to call `runAsBackgroundWaiter`.
-
-## 9. Resource leases and 409 on conflicting operations
-
-### 9.1 Why
-
-- A long operation changes an object's external products in several non-transactional steps (DDL, observe, record binding).
-- The object definition itself remained editable and deletable during that window.
-- Observed race: landing a code table took 67 s while the same code table was deleted; the task reported success, but the physical table stayed behind as an orphan.
-
-### 9.2 Mechanism
-
-| Part | Definition |
-|---|---|
-| Resource key | `<family>:<segment>[:<segment>...]`, built only by `resourceKey(family, ...parts)` |
-| Families | Closed list: `codetable`, `dimension`, `table`, `approval`, `governance`, `project`, `flink`, `workflow`, `datasource`, `engine-job` |
-| Declaration | `LONG_OP_RESOURCES` maps every kind to a function returning its keys; read-only kinds return an empty array |
-| Lease row | Same table, key `lease#<resource key>`, fields `resource`, `holder` (task id), `kind`, `acquiredAt`, `ttl` |
-| Acquire | Conditional put per key in lexical order; any failure rolls back the acquired keys and raises 409 |
-| Dead lease | Decided by the holder's real state: finished, past the ceiling, or missing beyond a 60-second grace period |
-| Release | Terminal writes return the held keys and delete them conditionally on `holder` |
-| Route guard | `resourceBusyResponse([...keys])` in update and delete routes returns the same 409 or `null` |
-
-- The 409 body is `{ code: "LONG_OP_IN_PROGRESS", detail: { taskId, kind, label, resource } }` with the message "<label> is in progress (<n>s elapsed); wait for it to finish".
-- The driver checks leases before creating the task row; a conflicting submit answers 409 synchronously and leaves no row.
-- The synchronous-only mode (`LONG_OPS_ASYNC` off) still acquires and releases leases with a synthetic holder.
-- Guarded update and delete routes include code tables, dimensions, projects, Flink jobs, workflows, data sources, engine jobs, and the schedule-enable route of workflows.
-
-### 9.3 Not covered
-
-- Query-level mutual exclusion between concurrent read-only requests.
-- Cross-entity dependency locks (for example a project versus objects inside it).
-
-## 10. Closed kind list
-
-Every kind below is declared in `lib/long-ops/kinds.ts` together with its parameter type, label and resource keys.
-
-| Kind | Area | What it waits for |
+| File | Exports | Responsibility |
 |---|---|---|
-| `copilot-ask` | Copilot | Model inference |
-| `net-advise` | Network advisor | Model inference |
-| `param-advise` | Parameter advisor | Model inference |
-| `codegen-etl` | Offline compute | Model inference (code generation) |
-| `codegen-emr` | EMR jobs | Model inference (code generation) |
-| `codegen-requirement` | Requirements | Model inference (implementation generation) |
-| `flink-ai-sql` | Real-time compute | Model inference (Flink SQL generation) |
-| `modeling-land` | Modeling | Redshift DDL on the target region |
-| `modeling-apply` | Modeling | Redshift DDL on the target region |
-| `modeling-unbind` | Modeling | Redshift drop and ledger update |
-| `modeling-unbind-preview` | Modeling | Redshift row-count estimate (GET) |
-| `catalog-create-table` | Governance catalog | Redshift or S3 Tables DDL |
-| `catalog-alter-table` | Governance catalog | Redshift DDL or dry-run plan |
-| `catalog-read-columns` | Governance catalog | Live column read (GET) |
-| `approval-execute-ddl` | Approvals | Approved DDL execution |
-| `governance-schema-sync` | Governance | OpenMetadata and Redshift column collection |
-| `project-delete` | Projects | Redshift inventory statement on a possibly cold warehouse |
-| `sync-execute-ddl` | Data sync | Target table creation and platform marker |
-| `sync-generate-ddl` | Data sync | Target table probe |
-| `flink-start` | Real-time compute | Managed Flink application start |
-| `flink-stop` | Real-time compute | Managed Flink application stop |
-| `flink-delete` | Real-time compute | Application stop, then deletion (background waiter) |
-| `workflow-publish` | Orchestration | DAG upload and scheduler load |
-| `workflow-unpublish` | Orchestration | DAG removal on every region |
-| `workflow-trigger` | Orchestration | Scheduler run start per region |
-| `workflow-delete` | Orchestration | DAG removal, then row deletion |
-| `datasource-s3-external` | Data sources | Athena external table DDL |
-| `modeling-metric-compute` | Modeling | Redshift scalar query |
-| `metric-compute` | Metrics | Redshift query |
-| `datasource-create` | Data sources | Glue role check, network probe, Glue connection creation |
-| `engine-run` | EMR jobs | Script upload, application start, job run submission per region |
+| `protocol.ts` | `LONG_OP_PROTOCOL = "long-op/1"` · `LONG_OPS_API` · `LONG_OP_TIMEOUT_ERROR` · `LONG_OP_RESPONSE_HEADER = "x-bgp-long-op"` · `LONG_OP_TIMEOUT_MESSAGE` · `LongOpAcceptedBody` / `LongOpStateBody` | 🆕 Revision 1.1: **zero-import** protocol constants (one copy shared by the browser interceptor, the criteria and the server) |
+| `kinds.ts` | `LONG_OP_KINDS` · `LongOpKind` · `LongOpParamsByKind` · `LONG_OP_LABELS` · `isLongOpKind` (re-exports `LONG_OP_PROTOCOL`) | **Single author of the closed list**; contains only types and literals (type-only imports of business types), never imports business implementations |
+| `http-error.ts` | `httpErrorFromMappers(e, mappers)` · `rethrowAsHttpError(e, mappers)` | 🆕 Revision 1.1: absorbs the product of the routes' existing "error ⇒ Response" mappers into `LongOpHttpError` (status + original envelope); the idiomatic form of an executor's catch |
+| `store.ts` | `createLongOp` · `getLongOp` · `claimForRun` · `reclaimStale` · `heartbeat` · `markSucceeded` · `markFailed` · `markTimeoutByOwner` · `forceTimeoutIfExpired` · `reconcileDecision` · constants `CEILING_MS / STALE_MS / HEARTBEAT_INTERVAL_MS / SYNC_WAIT_MS` · `LONG_OP_TIMEOUT_ERROR` · `LongOpHttpError` · `longOpsAsyncEnabled` | = the `long-call.ts` of the 2026-10-20 fix, generalized (`TABLES.LONG_OPS`; the `model` field generalized to `meta`; `errorStatus` added) |
+| `context.ts` | `runInLongOp(frame, fn)` · `runAsBackgroundWaiter(owner, fn)` · `currentWaitContext()` (operation frame or background frame) · `BACKGROUND_WAITERS` (closed list: `dataplane-jobs-step` · `reconciler-target` · `metadata-mirror` · `sync-run-tracker` · `etl-run-tracker` · `backfill-tick` · `realtime-start` · `seed-run` · `engines-run`) · `LongOpContextMissing` | D6 / D7; process-level singleton ALS; both kinds of frame in the same store |
+| `await-terminal.ts` | `awaitTerminal<T>({ probe, intervalMs, maxIntervalMs, backoff, maxPolls \| budgetMs, abortSignal? }): Promise<T>` | **The only polling primitive for waiting on an external terminal state**: `probe()` returns `{ done:false, state? }` to continue, `{ done:true, value }` to return, and a throw propagates; **no `currentWaitContext()` ⇒ throws `LongOpContextMissing`** (a route that calls it directly in the request path is red at its first step); budget exhausted ⇒ throws `LongOpWaitBudgetExceeded` (the message includes how long it waited and the last state); back-off parameters match the existing code (150 ms × 1.6 capped at 1 s, etc.), and each migration keeps its original budget |
+| `executor-types.ts` | `LongOpExecContext { req, identity, abortSignal? }` · `LongOpExecOutput { data, meta? }` · `LongOpExecutor<K>` · `LongOpExecutorRegistry` | Domain executors import only this file and `kinds.ts` |
+| `registry.ts` | `LONG_OP_EXECUTORS: LongOpExecutorRegistry` | Assembles the domain executors; key set = `LONG_OP_KINDS` (type level + source-literal criterion) |
+| `driver.ts` | `driveExecution(row, runToken, ctx)` · `submitLongOp({ kind, params, correlationId }, ctx, opts?)` · `longOpResponse(req, result)` | = the `long-call-driver.ts` of the 2026-10-20 fix, generalized; `driveExecution` wraps the executor in `runInLongOp` (so the `awaitTerminal` inside the executor has a context); the 202 payload of `longOpResponse` is in section 2.4 |
+| `client/follow.ts` | `isLongOpAccepted(body)` · `followLongOp(res, { fetchImpl, pollMs, budgetMs, onProgress, sleep })` · `terminalToResponse(state)` | **Zero server-side imports**; shared by the interceptor and the criteria |
+| `client/events.ts` | `LONG_OP_EVENT = "bgp:long-op"` · `LongOpEventDetail { taskId, kind, label, phase: "started" \| "progress" \| "settled", elapsedMs, outcome? }` · `emitLongOpEvent` | Single author of the D8 event name |
 
-Notes on specific kinds:
+### 2.4 HTTP contract
 
-- `catalog-create-table` settles with `resultStatus` 201.
-- `flink-start` and `flink-delete` settle with `resultStatus` 202 because their own semantics are "accepted".
-- The four workflow kinds use `rawBody`; their historical responses were flat bodies without the envelope, and both branches return them unchanged.
-- `datasource-create` keeps the secret creation in the route so the password never enters the task row; the executor receives only the secret ARN and cleans up in reverse order on failure.
-- `engine-run` keeps fast validation, run-group creation and definition versioning in the route; the executor re-reads the job and submits per region.
-- `modeling-unbind-preview` and `catalog-read-columns` are GET routes that still use the framework because they share the same waiting primitives.
+**Connected POST / DELETE routes** (list in section 2.6):
 
-## 11. Adding a new kind
+| Case | Status | Payload | Notes |
+|---|---|---|---|
+| Succeeds within `LONG_OPS_SYNC_WAIT_MS` | Original status code (200; catalog create table **201**) | **Byte-identical** to before the connection (`apiOk(data, resultStatus ?? 200, _meta?)`) | Zero regression |
+| Fails within the budget | Original status code | Original error envelope | The executor's error is **thrown back unchanged to the route's catch**; the route's existing `placeErrorResponse / LongOpHttpError / fallback 500` branches are reused byte for byte |
+| Budget exhausted, not yet terminal | **202** | `{ success:true, data:{ taskId, kind, label, status:"running", async:true, protocol:"long-op/1" } }` | The client interceptor takes over based on `protocol` |
+| `LONG_OPS_ASYNC=0` | — | Pure synchronous, byte-identical to before the connection | Rollback switch |
 
-1. Add the kind to `LONG_OP_KINDS`, its parameter type to `LongOpParamsByKind`, and its label to `LONG_OP_LABELS` in `kinds.ts`.
-2. Declare its resource keys in `LONG_OP_RESOURCES`; use a new family only after adding it to `LONG_OP_RESOURCE_FAMILIES`.
-3. Write the executor in the owning domain (for example `lib/<domain>/long-ops.ts`) importing only `executor-types.ts` and `kinds.ts`.
-4. Register the executor in `registry.ts`; the type system requires exactly one executor per kind.
-5. In the route, keep validation, authorisation and place resolution; move the waiting body into the executor; call `submitLongOp` and return `longOpResponse(req, result)`.
-6. Map errors with `LongOpHttpError` (status plus original envelope) so both branches answer identically.
-7. Add update and delete route guards with `resourceBusyResponse` for the object family.
-8. Move any `sleep`-and-poll loop in the executor to `awaitTerminal`, keeping the original budget.
-9. Make sure the executor is idempotent on re-execution, or add an idempotency key, because a stale task may be reclaimed by another process.
-10. Run the guard tests; the call-site baselines must shrink or stay equal, never grow.
+**`GET /api/long-ops/[taskId]`** (alias `GET /api/ai/tasks/[taskId]`, D11):
 
-## 12. Guards
+| Case | Status | Payload |
+|---|---|---|
+| Terminal succeeded | 200 | `{ success:true, data:{ taskId, kind, label, status:"succeeded", result, resultStatus?, elapsedMs, heartbeatAt? }, _meta? }` (when `meta.model` exists, `_meta = buildAiMeta(req, model, { correlationId })`) |
+| Terminal failed / timeout | 200 | `{ …status, error, errorStatus?, elapsedMs }` (a failure is the terminal state of the **task**, not a failure of the polling request, hence 200; `errorStatus` is used only when the client shapes the response) |
+| running (fresh heartbeat) | 200 | `{ …status:"running", elapsedMs, heartbeatAt }` |
+| pending / stale running | 200 | If the claim succeeds ⇒ this process takes over the execution fire-and-forget; returns `status:"running"` |
+| Past the ceiling | 200 | After `forceTimeoutIfExpired`, returns `status:"timeout"`, **never re-running** |
+| Does not exist / not the owner | 404 / 403 | `NOT_FOUND` / `RBAC_DENIED` |
 
-| Guard | What it pins |
+### 2.5 Client transport-layer contract (`AuthProvider` interceptor + `client/follow.ts`)
+
+1. Applies only to same-origin `/api/*` responses with `status === 202`, a JSON `content-type`, `body.data.protocol === "long-op/1"` and `typeof body.data.taskId === "string"`; any other 202 (GenBI / warming) **passes through unchanged**.
+2. Polls `GET /api/long-ops/<taskId>` every `2000ms` with a total budget of `320_000ms` (the server's 300 s ceiling + margin); the polling requests use **native fetch** and carry the same `Authorization` / `x-bgp-project` / `x-bgp-env` headers; a non-JSON 5xx (gateway jitter) is treated as transient and polling continues; a JSON 4xx / 5xx (404 / 403 / 500) ⇒ shaped into the error envelope of that status and handed back.
+3. Terminal-state shaping (D5): `succeeded ⇒ new Response(JSON{ success:true, data:result, _meta? }, resultStatus ?? 200)`;
+   - `failed ⇒ new Response(JSON{ success:false, error:{ message:error, code:"UPSTREAM_ERROR" }, status }, errorStatus ?? 500)`;
+   - `timeout ⇒ 504 + UPSTREAM_TIMEOUT` with the text "The operation exceeded 5 minutes and was stopped automatically; narrow the scope and retry";
+   - exhaustion of the front-end budget is treated like timeout.
+   - The shaped `Response` has the header `content-type: application/json; charset=utf-8` and carries `x-bgp-long-op: <taskId>` (criteria can use it to prove that the 202 path was taken).
+4. Events: `started` on takeover, `progress` on every poll (with `elapsedMs`), `settled` before shaping (with `outcome`); `LongOpIndicator` shows / updates / closes `message.loading` accordingly (key = taskId; concurrent tasks each get their own).
+5. `aiFetchJson` shrinks to a thin shell of "`fetch` + `readJsonEnvelope`" (the exports and the non-JSON wrapping are kept; the 202 branch is deleted — the interceptor has already followed the 202 to its terminal state before it); the seven AI page call sites **do not change**.
+
+### 2.6 Closed kind list (first batch, 15 kinds; the 14 kinds of the second batch are in section 2.6a)
+
+| kind | Route (method) | Executor (file) | params (all persisted) | Label `LONG_OP_LABELS` | Terminal data = the data of the original synchronous 200 |
+|---|---|---|---|---|---|
+| `copilot-ask` | `POST /api/copilot/ask` | `lib/ai/long-op-executors.ts` (renamed from `long-call-executors.ts`; the seven executors are unchanged) | `{ prompt, conversationId, projectId, env, canCreate }` (🔴 no token is stored) | Copilot Q&A | `{ answer, steps, usage, backend }` + `_meta` |
+| `net-advise` | `POST /api/network-advisor/advise` | same | `{ request, conversationId, projectId? }` | Network connectivity advice | advisor rec + `_meta` |
+| `param-advise` | `POST /api/param-advisor/advise` | same | `{ request, conversationId, projectId? }` | Parameter recommendation | advisor rec + `_meta` |
+| `codegen-etl` | `POST /api/etl-jobs/generate` | same | `{ prompt, targetType, currentCode?, targetId, projectId }` | AI-generated batch job code | `{ targetType, code, explanation, usage, groundedOn, dialect }` + `_meta` |
+| `codegen-emr` | `POST /api/engines/generate` | same | `{ prompt, currentCode?, targetId, projectId }` | AI-generated EMR job code | `{ code, explanation, usage, groundedOn }` + `_meta` |
+| `codegen-requirement` | `POST /api/requirements/[id]/generate` | same | `{ requirementId, targetType, targetId }` | Generate implementation from requirement | `{ requirement, generated }` + `_meta` |
+| `flink-ai-sql` | `POST /api/flink/ai-sql` | same | `{ prompt, sinkType }` | AI-generated Flink SQL | `{ sql, model, usage, dialect }` + `_meta` |
+| `modeling-land` | `POST /api/modeling/codetables/[id]/land` | `lib/modeling/long-ops.ts` | `{ codeTableId, targetIds, projectId, actor }` | Land code table to execution region | The whole `CodeTable` row (with `landedByTarget{…}`), = the current `apiOk(ct)` |
+| `modeling-apply` | `POST /api/modeling/dimensions/[id]/apply` | same | `{ modelTableId, targetIds, projectId, actor }` | Apply dimension table to execution region | The whole `ModelTable` row, = the current `apiOk(t)` |
+| `modeling-unbind` | `POST /api/modeling/codetables/[id]/unbind` · `POST /api/modeling/dimensions/[id]/unbind` | same | `{ entity:"codetable"\|"dimension", id, targetId, drop, projectId, actor }` | Unbind / clean up landing artifacts | `{ codeTable \| modelTable, dropped, table }`; `UnbindRejected` ⇒ 400 / 404, `UPSTREAM_ERROR` ⇒ 502 with the original status via `LongOpHttpError` |
+| `modeling-unbind-preview` | **`GET`** `/api/modeling/codetables/[id]/unbind-preview` · `GET /api/modeling/dimensions/[id]/unbind-preview` | same | `{ entity, id, targetId }` | Unbind preview (row-count estimate) | `{ table, status, lastLandedAt, rowCountEstimate, bound }` |
+| `catalog-create-table` | `POST /api/governance/tables` (execution branch; in prod ⇒ approval ticket 202 `{pending,approvalId}` **stays in the route**, not an operation) | `lib/governance/long-ops.ts` | `{ spec, targetId, projectId, actor }` | Create catalog table | `{ kind:"redshift"\|"s3tables", … }`, **`resultStatus` 201** |
+| `catalog-alter-table` | `POST /api/governance/tables/alter` (both the dryRun and the execution branch; the prod approval stays in the route as above) | same | `{ targetId, schema, table, changes, dryRun, confirmName?, projectId, actor }` | Alter catalog table structure | dryRun `{ dryRun:true, plan, statements, … }` / execution returns the result of `alterCatalogTable`; `DECISION_REQUIRED` 409 via `LongOpHttpError` |
+| `catalog-read-columns` | **`GET`** `/api/governance/tables/columns` | same | `{ targetId, schema, table }` | Read the table's real column structure | `{ targetId, schema, table, exists, columns, live, … }` |
+| `approval-execute-ddl` | `POST /api/approvals/[id]` (approve ⇒ the `executeApprovedDdl` step; `decideApproval` is still done first in the route) | same | `{ approvalId, payload, decided }` (`decided` = the approval row already set to approved, to be echoed unchanged at the terminal state) | Execute create / alter table after approval | `{ ...decided, ddl }` = the same shape as the current route's approval response |
+
+> 🔴 **Why the four catalog kinds are in the first batch**: they share `landing.ts`'s `queryOnTarget` / `execOnBinding` with the four modeling kinds (`readLiveColumns` / `createRedshiftCatalogTable` / `alterModelTable` all call them).
+> Once gate ④ makes these two primitives require a wait context, **all** request-path callers must be connected in the same batch, otherwise create table / alter table / read columns throw `LongOpContextMissing` on the spot — this is how the gate forces out the routes of the same family; it is the design intent, not a side effect.
+> `model-metrics/[id]/compute` uses a different primitive, `execScalarAt` (`lib/modeling/redshift.ts`), and is left for the second batch.
+
+> Parameter names and existing payloads are as in the table above (inventoried route by route from the source on 2026-10-21; checked again item by item at connection time; the terminal data must be byte-identical to the data of the original `apiOk(data)`; the data-equality criterion in section 7 compares mechanically).
+> The Redshift Data polling inside the executors (the two `DescribeStatement` back-off loops in `landing.ts` `queryOnTarget` / `execOnBinding`) is changed to `awaitTerminal` **in the same commit** (the first batch migrated out of the baseline of section 2.7);
+> `target-clients.execOnTarget` (the non-home-region admin-DDL hop, also used by the mirror tick and the data-plane job pump) is grepped for all its callers in step 5: if all request-path callers are already operations ⇒ migrate it in the same batch (wrap the two background entry points in `runAsBackgroundWaiter`), otherwise leave it for the second batch.
+
+The second and third batches (section 6) **write the list first, then wire** (engineering rule 3 of the development guide, no silent legal defaults); at connection time rows are appended to this table and the revision of this document is raised.
+
+#### 2.6a Second batch (2026-10-22; code on the second-batch feature branch)
+
+| kind | Route (method) | Executor (file) | params (all persisted) | Label | Resource key (section 2.8) | Notes |
+|---|---|---|---|---|---|---|
+| `governance-schema-sync` | `POST /api/governance/sync-redshift-schema` | `lib/governance/long-ops.ts` (work body `schema-sync-work.ts`) | `{}` | Sync column information to the data catalog | `governance:schema-sync` | Root fix of the 2026-10-13 incident: the governance-specific 202 of that fix (`{runId,state:"running"}` + GET polling / join) is retired; run records still go to the settings table, the GET is unchanged; a second person clicking at the same time ⇒ 409 |
+| `project-delete` | `DELETE /api/projects/[id]` | `lib/projects/long-ops.ts` | `{ projectId }` | Delete workspace | `project:<id>` | Root fix of the 2026-10-18 incident: the `PROJECT_DELETE_WARMING` protocol (202 warming + automatic page resend) is retired; the inventory statement `awaitSchemaCountStatement` waits for the terminal state via awaitTerminal (150 rounds ≈ 290 s); `SchemaCheck` returns two states; PUT gains the guard |
+| `sync-execute-ddl` | `POST /api/sync/execute-ddl` | `lib/sync/long-ops.ts` | `{ targetId, projectId, spec, workgroupOverride?, databaseOverride? }` | Create target table from preview | `table:<region>:<schema.table>` | Create-table / marker statements wait 240 × 500 ms = 120 s (the original 15 s produced a 504 "platform marker not applied") |
+| `sync-generate-ddl` | `POST /api/sync/generate-ddl` | same | same | Generate DDL and probe the target table | — | Read-only probe; `probeTables` itself stays in the baseline (see the reasons for not migrating) |
+| `flink-start` | `POST /api/flink/jobs/[id]/start` | `lib/realtime/long-ops.ts` | `{ jobId, targetId, discardStateConfirmed }` | Start streaming job | `flink:<jobId>` | The reverse guard (stamp cannot be parsed ⇒ 409) and flinkReady stay in the route; `FlinkDecisionRequired` ⇒ 409 DECISION_REQUIRED with diagnostics; on success `resultStatus` 202 |
+| `flink-stop` | `POST /api/flink/jobs/[id]/stop` | same | `{ jobId, targetId }` | Stop streaming job | `flink:<jobId>` | Writes `stopping` (no short-circuit) |
+| `flink-delete` | `DELETE /api/flink/jobs/[id]` | same | `{ jobId, targetId }` | Delete streaming job | `flink:<jobId>` | `requestFlinkDeletion`: if it can be stopped ⇒ delete the row; if still stopping ⇒ mark deleting + background destruction (`runAsBackgroundWaiter("flink-deletion")`) ⇒ `resultStatus` 202; destruction failure ⇒ 502 and the row is not deleted; PUT gains the guard |
+| `workflow-publish` | `POST /api/workflow/[id]/publish` | `lib/workflow/long-ops.ts` | `{ workflowId }` | Publish workflow | `workflow:<id>` | **rawBody**; the unpausing `ensureDagUnpaused`, previously fire-and-forget, now waits to completion inside the executor |
+| `workflow-unpublish` | `POST /api/workflow/[id]/unpublish` | same | `{ workflowId }` | Take workflow offline | `workflow:<id>` | **rawBody**; if it cannot be withdrawn ⇒ 502 `DAG_CLEANUP_FAILED` and the record is not changed |
+| `workflow-trigger` | `POST /api/workflow/[id]/trigger` | same (`triggerOneTarget` moved in) | `{ workflowId, targets, runGroupId? }` | Trigger workflow run | `workflow:<id>` | **rawBody** (`fanoutRunBody`); the subset / cross-jurisdiction consent / run-group opening stay in the route; the classic MWAA "wait for the scheduler to load the DAG" 5 × 8 s loop migrates to awaitTerminal |
+| `workflow-delete` | `DELETE /api/workflow/[id]` | same | `{ workflowId }` | Delete workflow | `workflow:<id>` | **rawBody**; first withdraw the DAG region by region, then delete the row; PUT gains the guard |
+| `datasource-s3-external` | `POST /api/datasources/[id]/s3-external` | `lib/datasource/long-ops.ts` | `{ datasourceId, projectId, dataset?, columns? }` | Create Athena external table for S3 data source | `datasource:<id>` | The 60 × 2 s loop of the three DDL statements in `athena-external.ts` migrates to awaitTerminal; datasources/[id] PUT + DELETE gain the guard; 🔴 revision 1.5 inventory: **no page call site** (API-only; a page entry "Create Athena external table" is a UX candidate; page-driven acceptance is temporarily replaced by an API cross-check); ✅ revision 1.6 API cross-check in a test account: a POST against the demo S3 CSV source ⇒ 400 JSON "Could not infer column definitions (CSV requires a header row…)", the original envelope handed back byte for byte — error-envelope restoration on the long-operation path ✅; the demo CSV having no header is a fixture limitation, not a product defect; the page entry remains a UX candidate |
+| `modeling-metric-compute` | `POST /api/modeling/model-metrics/[id]/compute` | `lib/modeling/long-ops.ts` | `{ modelMetricId, targetId, projectId }` | Compute model metric | — | `execScalarAt` 50 × 700 ms migrates to awaitTerminal |
+| `metric-compute` | `POST /api/metrics/[id]/compute` | `lib/metrics/long-ops.ts` | `{ metricId, targetId, projectId }` | Compute metric | — | `computeMetric` via `directQueryRaw` (the primitive itself stays for the third batch, see section 6) |
+
+> 🆕 **`rawBody` / `resultRaw` (revision 1.4)**: an executor may mark `rawBody: true` ⇒ `data` is the entire response body — on the synchronous branch `longOpResponse` returns `NextResponse.json(data, {status})` as is; on the asynchronous branch the task row stores `resultRaw: true`, `GET /api/long-ops/[taskId]` echoes it, and the client's `terminalToResponse` does not wrap it in the `{success,data}` envelope.
+> Only for routes whose historical response is not an apiOk envelope (the four workflow routes);
+> new routes always use apiOk.
+> Errors likewise: `LongOpHttpError.body` carries the original route's flat error body, and `longOpErrorResponse` / client shaping both restore it byte for byte from body.
+
+
+### 2.6b Third batch, first kind (revision 1.7; root fix of the data-source creation 504, 2026-10-28)
+
+| kind | Route | Executor | params | Label | Lease | Notes |
+|---|---|---|---|---|---|---|
+| `datasource-create` | `POST /api/datasources` (JDBC paradigm; non-JDBC paradigms remain synchronous) | `lib/datasource/long-ops.ts` | `{ datasourceId, projectId, targetId, name, type, host, port, database, username, secretArn, jdbcParams?, probeVia?, env?, tags?, network? }` | New data source | `datasource:create:<projectId>:<name>` | 🔴 **The secret is created synchronously in the route** (one CreateSecret measured under 1 second; the password never enters the task row, the executor only receives the ARN); executor = verify the Glue role (home region only; one in-process verification cache) → probe the network segment / create the platform security group, or use the user-specified network → create the Glue connection → persist → source tables into OpenMetadata / configuration check ⇒ the connectivity conclusion is written to status (fire-and-forget; following the 2026-10-21 rule that "connected" may only come from a real connectivity conclusion) ⇒ `resultStatus: 201`; the AWS call sequence is byte-identical to before the connection (pinned by create-network-assembly). Failure: the executor cleans up in reverse order the Glue connection / platform security group (DependencyViolation goes through the existing background retry) / secret, then throws `LongOpHttpError(500, "Failed to create data source: …")`; IAM verification failure ⇒ 503 "…the Glue job role is not in place…" without going through CreateRole; the route's catch deletes the secret once more in every case (idempotent). Page call sites change by zero (the DataSourceModal's fetch receives the restored 201 through the global interceptor). A real environment has no controllable Glue failure point ⇒ the cleanup path is evidenced by assembly-level unit tests; the page segment for data-source creation (section 7b) judges 201 / the 202 protocol / the global hint / same-name concurrency 409 / a route-level failure creates nothing at all / the cleanup leaves nothing behind |
+
+### 2.6c Third batch, second kind (revision 1.8; root fix of the EMR run 504, 2026-10-29)
+
+| kind | Route | Executor | params | Label | Lease | Notes |
+|---|---|---|---|---|---|---|
+| `engine-run` | `POST /api/engines/[engine]/[id]/run` | `lib/engines/long-ops.ts` | `{ engine: EngineType, jobId, projectId, runTargets: string[], runDate?, runGroupId?, definitionVersion? }` | Run engine job | `engine-job:<jobId>` | The route keeps the **fast** validations / **fast** writes (job row / non-empty script / runDate grammar / targets ⊆ bindings / cross-jurisdiction consent / `openRunGroupIfFanout` creates the run-group row / definition version); the executor re-reads the job row by jobId ⇒ `forEachTargetPlace(runTargets, …, { sequential: true, via: "engine-job.run" })` region by region `getProvider(engine).submit` (upload script → ensureApplication → ensureStarted ≤ ~60 s → StartJobRun → run ledger) ⇒ the run group records `noteFanoutResult` per target ⇒ failures in three classes (`RunLockBusy` / `TargetBindingRejected` / `ResidencyAckRequired` ⇒ rejected; `AuditUnavailable`) ⇒ zero runs: all audit unavailable 503 `UPSTREAM_ERROR` / all rejected 409 `CONFLICT` / otherwise 500; with runs: audit `engine.<engine>.run`, response `{ ...runs[0], runs, runGroupId?, partial?, failures?, groupLedgerIncomplete? }` shape-identical to before the connection (the `EmrJobPanel`'s "Run submitted → <region>" toast changes by zero). Clicking "Run" again / PUT / DELETE while the submission is in progress ⇒ 409 `LONG_OP_IN_PROGRESS` "'Run engine job' is in progress (<n>s elapsed)". `[id]/rerun` (single-region rerun) still submits synchronously ⇒ next change |
+
+### 2.7 Gates (criteria; "the N+1th long route cannot slip through")
+
+| # | Criterion (file) | What it pins |
+|---|---|---|
+| ① | `lib/long-ops/__tests__/registry-wiring.test.ts` | The key set of the `LONG_OP_EXECUTORS` object literal === `LONG_OP_KINDS`; the key set of `LONG_OP_LABELS` === `LONG_OP_KINDS`; every kind has a `LongOpParamsByKind` entry (source literal); the type level is pinned separately with `Record` |
+| ② | `lib/long-ops/__tests__/await-terminal-ratchet.test.ts` | **Single author of the polling primitive that waits for a terminal state**: across `platform/src` (excluding `lib/long-ops/await-terminal.ts` and `__tests__`), the list of files in which a "`sleep(` / `setTimeout(r` loop + a status-query command (`DescribeStatementCommand` / `GetQueryExecutionCommand` / `GetJobRunCommand` / `GetJobRunsCommand` / `DescribeReplicationTasksCommand` / `DescribeReplicationInstancesCommand` / `DescribeApplicationCommand` / `GetApplicationCommand` / `DescribeStreamSummaryCommand` / `DescribeIntegrationsCommand` / `ListWorkflowRunsCommand` / `waitUntil*` etc.)" co-occur in the same file ⊆ the baseline `AWAIT_TERMINAL_BASELINE` (**only decreases, never increases**; the actual baseline in revision 1.1 = **27** files: the 30 of section 10 minus the already migrated `landing.ts`, minus `region-org-block.ts` (bounded retry) and `dataplane-jobs/handler.ts` (8-second inline short poll), which the scan word list does not count; the criterion also pins in reverse that "files already clean must be removed from the baseline"); a new file appearing is red |
+| ③ | same | **Request paths must not create a background context**: the list of files calling `runAsBackgroundWaiter(` === `BACKGROUND_WAITER_ENTRYPOINTS` (closed; all are loop entry points under `lib/**`; an occurrence under `app/api/**` is red); every owner literal ∈ `BACKGROUND_WAITERS` |
+| ④ | `lib/long-ops/__tests__/route-wiring.test.ts` | Every route of section 2.6 calls `submitLongOp(` and submits only **its own** kind, returns the envelope via `longOpResponse(req, result)`, and recognizes `LongOpHttpError`; the body (`landToTargets(` / `unlandFromTarget(` / `estimateRows(` / `runCopilot(` …) **no longer stays in the route** |
+| ⑤ | same | **The number of call sites where the route layer directly awaits a long service only decreases, never increases**: the list of files under `app/api/**` that directly call `LONG_SERVICE_ENTRYPOINTS` (closed list: `landCodeTableById / applyModelTableById / unbindCodeTable / unbindModelTable / previewUnbind* / createRedshiftCatalogTable / createS3Table / planCatalogAlter / alterCatalogTable / readLiveColumns / executeApprovedDdl / startOrJoinSchemaSync / inventoryProject / probeTables / directQueryRaw / runSelectAthena / ensureExternalTable / startFlinkJob / unpauseWhenLoaded / ensureWorkflow / deleteWorkflow …`) ⊆ the baseline (only decreases, never increases; the first batch migrates ≈ 10 modeling / catalog / approval route files out) |
+| ⑥ | `lib/long-ops/__tests__/store.test.ts` · `driver.test.ts` · `route.test.ts` (in-memory table fixture `fixtures/mem-long-ops.ts`) | The three state-machine guarantees / the five read-time reconciliation decisions / the three hybrid-response branches (success within 45 s · failure thrown unchanged · budget exhausted 202 with `protocol`) / `errorStatus` persisted and echoed / `LONG_OPS_ASYNC=0` pure synchronous / ownership 403 / forced timeout at the ceiling never re-runs |
+| ⑦ | `lib/long-ops/client/__tests__/follow.test.ts` | Honors only `protocol:"long-op/1"` (GenBI 202 / warming 202 pass through unchanged); polling to succeeded shapes a 200 of the same shape; failed uses `errorStatus`; timeout 504; a non-JSON 5xx is transient and polling continues; budget exhausted 504; the three event phases |
+| ⑧ | `lib/auth/__tests__/fetch-interceptor-long-op.test.ts` | The interceptor's call site exists ("written" ≠ "wired"): in the source of `installFetchInterceptor`, `/api/*` responses go through `normalizeApiResponse` first and then `followLongOp`; polling uses `orig` and carries the same headers |
+| ⑨ | `lib/long-ops/__tests__/two-sides.test.ts` | `TABLES.LONG_OPS === "bgp-long-ops"` and `infra/lib/database-stack.ts` creates a table of the same name (pk `taskId` + `ttl` + `...hardened`); no `bgp-ai-tasks` / `AI_TASKS` literal remains anywhere in the repository (docs excepted) |
+| ⑩ | `lib/__tests__/env-template-guard.test.ts` (changed) + `infra/test/*` (changed) | The 73 container env keys include `LONG_OPS_SYNC_WAIT_MS`; the platform stack literal `long-ops-sync-wait-ms` defaults to `45000`, a non-positive integer is rejected |
+| ⑪ | `lib/scope/__tests__/page-read-coverage.test.ts` (changed) | `INFRA_APIS` contains `/api/long-ops`; the ledger has no `/api/ai/tasks` entry |
+| ⑫ | `lib/long-ops/__tests__/context.test.ts` | `awaitTerminal` without a context throws `LongOpContextMissing`; usable inside `runInLongOp`; an `owner` not in `BACKGROUND_WAITERS` throws; the ALS survives across `await` / `Promise.all` |
+| 🆕 ⑬ (revision 1.2) | `lib/long-ops/__tests__/leases-wiring.test.ts` + `leases.test.ts` | **Object leases (section 2.8)**: the `LONG_OP_RESOURCES` source literal has exactly one entry per kind, key set === `LONG_OP_KINDS`, keys are generated only via `resourceKey` / `tableResource` and the families ⊆ `LONG_OP_RESOURCE_FAMILIES`; for entities that declare the `codetable` / `dimension` families, both the PUT and the DELETE of their update / delete routes (closed list) have a `resourceBusyResponse([resourceKey("<family>", params.id)])` call site **before** the service-layer call, and the files under `app/api/**` that call `deleteCodeTable(` / `updateCodeTable(` / `deleteModelTable(` / `updateModelTable(` ⊆ that list (no second path that bypasses the guard); `longOpErrorResponse` has the single author `http-error.ts` (the driver re-exports it; the guard does not import the driver); both paths of `submitLongOp` call `acquireLeases` first, and both terminal writes call `releaseLeasesOfRow`; behavior: acquire / conflict 409 / multiple resources in lexical order + rollback / three kinds of dead-lease self-healing / release on the three terminal writes / guard / a concurrent second submit in the driver answers 409 synchronously without creating a row / the pure synchronous path also acquires |
+
+---
+
+### 2.8 Object leases (revision 1.2; the race caught for real by page-driven run 1 in a test account on 2026-10-22)
+
+- **The disease**: a long operation changes an object's **external artifacts** (multi-step, non-transactional: create-table DDL → observe → record the binding), while the object definition itself can still be changed / deleted by other requests.
+- This framework keeps the page operable during background execution, which makes that window even larger.
+- Caught for real: while a code-table landing (us-west-2 cold, 67 s) was in progress, the same code table was deleted ⇒ the create-table DDL had already passed the ledger guard of `admin-ddl-executor`; the following steps re-checked the ledger — `codeTableId=… not found in the code-table ledger ⇒ refused` ⇒ the task is `succeeded` but `landed:false`, the target region keeps the physical table `public.dim_code_…`, and the platform no longer knows about it (engineering rule 7, "deleting an object leaves no orphans", was bypassed).
+- Same class: dimension-table apply vs. delete / update of the dimension table;
+- two catalog alterations of the same table;
+- an approval ticket executed twice.
+
+**Root fix (not a patch for deleting code tables)**:
+
+| Part | Definition | Location |
+|---|---|---|
+| Resource key | `<family>:<segment>[:<segment>…]`; the families are closed, `LONG_OP_RESOURCE_FAMILIES = ["codetable","dimension","table","approval"]`; generated only via `resourceKey(family, …parts)` | `kinds.ts` |
+| Declaration | `LONG_OP_RESOURCES: { [K in LongOpKind]: (params) => string[] }` — tsc pins that every kind **must** declare; read-only kinds / kinds with no contendable object declare an empty list (the seven AI kinds, unbind preview, read columns, alter-table dryRun); `modeling-land` ⇒ `codetable:<id>`, `modeling-apply` ⇒ `dimension:<id>`, `modeling-unbind` ⇒ by `entity`, `catalog-create-table` / `catalog-alter-table` (execute · request-approval) ⇒ `table:<region>:<schema>.<table>`, `approval-execute-ddl` ⇒ `approval:<id>` + its table | `kinds.ts` |
+| Lease row | The same table `bgp-long-ops`, pk `lease#<resource key>`, `{ resource, holder = taskId, kind, acquiredAt, ttl }`; the task row gains a column `leases: string[]` | `store.ts` |
+| Acquire | `acquireLeases(holder, kind, keys)`: conditional Put (`attribute_not_exists`) one by one in lexical order; if any cannot be acquired ⇒ roll back the ones already acquired and throw `LongOpHttpError(409, "'<label>' is in progress (<n>s elapsed); wait for it to finish before operating", { code: "LONG_OP_IN_PROGRESS", detail: { taskId, kind, label, resource } })` | `store.ts` |
+| Dead lease | When someone else's lease is read, look at the holder's **real state**: the holder row is terminal ⇒ dead; running but past the ceiling ⇒ `forceTimeoutIfExpired` along the way and treat it as dead; the holder row does not exist and the 60-second row-creation grace period has passed ⇒ dead; otherwise (including a stale heartbeat not yet past the ceiling) ⇒ still held. A dead lease is overwritten with a conditional Put (`holder = :prev`), not by the clock | `store.ts` |
+| Release | The three terminal writes (owner success / failure / forced timeout by reconcile) fetch `leases` with `ReturnValues: ALL_NEW` and then conditionally Delete (`holder = :h`); `submitLongOp` also releases when creating the row fails | `store.ts` |
+| Driver | `submitLongOp`: `taskId = ulid()` → `acquireLeases` → `createLongOp({ taskId, leases })` → claim → execute; cannot acquire ⇒ 409 **synchronously** without creating a task row; the `LONG_OPS_ASYNC=0` path acquires / releases in the same way with `sync-only-<ulid>` as the holder | `driver.ts` |
+| Route guard | `resourceBusyResponse([resourceKey("codetable", id)])` ⇒ a 409 response or null (dead leases are cleaned along the way); currently connected: PUT and DELETE of code tables / dimension tables; second batch (revision 1.5): workspace PUT · Flink job PUT · workflow PUT · data source PUT / DELETE (each DELETE now goes through a long operation, the lease is acquired by `acquireLeases`) · 🆕 the monitor page's "Enable / disable schedule" `app/api/schedule/enable` workflow branch (re-publishing the DAG writes the same artifact as publishing; the bypass caught by gate ⑬ b on 2026-10-22) · 🆕 third batch, second kind (revision 1.8): engine job PUT / DELETE `app/api/engines/[engine]/[id]/route.ts` (family `engine-job:<jobId>`, the same key as the `acquireLeases` of `engine-run`; root fix of the EMR run 504 of 2026-10-29) | `guard.ts` · each `[id]/route.ts` + `schedule/enable/route.ts` |
+| What the user sees | On delete / update a toast "'Land code table to execution region' is in progress (37s elapsed); wait for it to finish before operating"; after the landing ends, deleting works as usual (or goes through the existing 409 DECISION_REQUIRED clean-up / keep split) | the existing `message.error(d.error.message)` |
+
+**Non-goals**: back-end query-level mutual exclusion (two concurrent read-only requests are harmless); cross-entity dependency locks (deleting a workspace vs. the objects inside it — when `project-delete` is connected in the second batch it declares `project:<id>` in the same grammar and the object-creation routes check it).
+
+---
+
+## 3. Interaction (what the user sees)
+
+| Scenario | Behavior |
 |---|---|
-| Registry wiring | Executor keys, label keys and parameter types equal the kind list |
-| Await-terminal ratchet | Files containing a sleep loop next to a status query command are a subset of a baseline that only shrinks |
-| Background entry points | Files calling `runAsBackgroundWaiter` equal a closed list; none under `app/api/**` |
-| Route wiring | Every listed route calls `submitLongOp` with its own kind and no longer contains the waiting body |
-| Direct-await ratchet | Routes calling long services directly are a subset of a shrinking baseline |
-| Store and driver | State machine guarantees, five reconcile decisions, three response branches, error status preservation |
-| Client follow | Only the protocol marker is honoured; reshaping rules; transient handling; events |
-| Interceptor wiring | The interceptor actually calls the follow function with the original fetch and headers |
-| Two sides | Table name in code equals the table created by the infrastructure stack |
-| Environment keys | Container environment includes `LONG_OPS_SYNC_WAIT_MS`; CDK context default is 45 000 |
-| Leases wiring | Every kind declares resources; guarded routes call the guard before the service call; no bypass route |
+| The operation completes within 45 s (the vast majority) | **Exactly as today**: button in loading state → success message / list refresh |
+| The operation exceeds 45 s (cold warehouse / reasoning model / large table) | The page button stays in loading state; a global `message.loading` appears at the top, "Running in background: Land code table to execution target (52s elapsed)", updated every 2 seconds; when the operation completes the hint disappears automatically and the page's **original success message and refresh happen as usual** (what the call site receives is the synchronous 200); a failure keeps the original wording and the original status code |
+| More than 5 minutes | Message "The operation was automatically terminated after 5 minutes; narrow the scope and retry" (504, the same wording as the AI long calls); server-side status `timeout`, **never re-executed** |
+| The user refreshes / closes the tab while waiting | The task continues on the server to its final state (in-process execution + heartbeat; if the process dies, the next poll takes it over or the ceiling marks it `timeout`); after a refresh the page no longer tracks it, but **the ledger is the real observation** (the modeling landing status "landed / not landed" is visible on refresh), the same semantics as Ask-Your-Data (GenBI) |
+| English locale | Labels go through `t()` (the Chinese source strings of `LONG_OP_LABELS` are in the English dictionary, watched by `en-coverage-guard`) |
 
-## 13. User-visible behaviour
+### 3.1 UX ⑥: partial refresh of the modeling page (decided on 2026-10-21: "to be done")
 
-| Situation | Behaviour |
+**Current state**: `loadAll()` in `app/modeling/page.tsx` re-fetches the data of all six tabs at once, and during that time a whole-page `Spin` **unmounts** the six tabs; every successful create / edit / delete / land calls `loadAll()` ⇒ the whole page flashes white after every step the user takes, and scroll position and expanded state are lost; an acceptance check once produced a false failure because of this.
+
+- **Change** (same branch): ① each of the six tabs gets its own independent loader (`loadCodeTables / loadDimensions / loadModels / loadLanding / …`, split by the data sources the page already has);
+- ② `loadAll()` is called only on the **first load**, and the whole-page `Spin` is shown only on the first load;
+- ③ after a successful create / edit / delete / land / apply / unbind, **only the list of the current tab is re-fetched** (plus the one the landing status depends on); the table stays in the DOM and uses the `Table loading` state;
+- ④ switching tabs does not re-fetch (the data is already there).
+- **Acceptance criterion**: the modeling page segment gains "the tab root DOM node is not unmounted after a create" (record the element handle of `data-testid=modeling-tab-<key>` before the create; after the create the same element is still `isConnected`, and `.ant-table` has shown a `loading` state).
+
+---
+
+## 4. Construction sequence (first batch; each step independently verifiable; gates: tsc / targeted vitest / parity / redline / synth-gate)
+
+| Step | What | Output files (relative to platform/src) |
+|---|---|---|
+| 1 | Design note (this document) + documentation index (the design index / the feature map, section 9 / the [multi-region specification](./multi-region-execution-spec.md), section 3.18 / the [model-configuration specification](./model-configuration-spec.md), section 3.3a, reference changed / the internal progress index, section 4, plus this item's status row / the multi-region acceptance criteria, section 8, new section for this segment / the core-concepts row of [`AGENTS.md`](../../AGENTS.md) / [modules overview](../modules.md) section 8 row + section 9 cross-reference / [architecture](../architecture.md) section 7 table list / [CHANGELOG](../../CHANGELOG.md) Unreleased) | One docs commit (development branch) |
+| 2 | **Inventory baseline completed (section 10, 30 files)**: written into the test file as the baseline; the list of routes that call long services directly (section 2.7 ⑤) is derived by the test itself with grep and pinned as a baseline | `lib/long-ops/__tests__/await-terminal-ratchet.test.ts` · `route-wiring.test.ts` (red first, then green) |
+| 3 | Framework: `kinds.ts` (initially registering only the 11 kinds of section 2.6) · `store.ts` · `context.ts` · `await-terminal.ts` · `executor-types.ts` · `registry.ts` · `driver.ts`;<br>`TABLES.LONG_OPS`;<br>table rename in `infra/lib/database-stack.ts`;<br>platform stack env `LONG_OPS_SYNC_WAIT_MS`;<br>`.env.example` / the environment-variable list of `AGENTS.md`, 73 keys | `lib/long-ops/*` · `lib/aws/dynamodb.ts` · `infra/lib/database-stack.ts` · `infra/lib/platform-stack.ts` · `platform/.env.example` |
+| 4 | Migration of the seven AI kinds: `lib/ai/long-call.ts` / `long-call-driver.ts` **deleted** (the logic now lives in `lib/long-ops/`), `long-call-executors.ts` → `long-op-executors.ts` (type imports changed to `lib/long-ops`; the seven executors are left verbatim);<br>the seven routes: `submitAiTask` → `submitLongOp`, `aiTaskResponse` → `longOpResponse`, `AiTaskHttpError` → `LongOpHttpError`;<br>`GET /api/long-ops/[taskId]` created, `GET /api/ai/tasks/[taskId]` changed to a re-export;<br>the earlier AI-task tests move to `lib/long-ops/__tests__/`;<br>the `AI_*` environment variables are deleted | `lib/ai/long-op-executors.ts` · seven `route.ts` files · `app/api/long-ops/[taskId]/route.ts` · `app/api/ai/tasks/[taskId]/route.ts` |
+| 5 | Four modeling kinds + three catalog kinds + one approval kind connected (section 2.6): six modeling routes + `governance/tables` · `tables/alter` · `tables/columns` + `approvals/[id]`; the bodies move into `lib/modeling/long-ops.ts` / `lib/governance/long-ops.ts` (authorization / validation / explicit place via `requestedTargetId` / production approval branching / audit actor **stay in the route**, the same division of labor as the earlier AI long-call routes);<br>the two `DescribeStatement` back-off loops `queryOnTarget` / `execOnBinding` in `landing.ts` change to `awaitTerminal` (1 file leaves the baseline);<br>grep all callers of `executeAdminDdl(` / `execOnTarget(` to decide whether `target-clients.ts` leaves the baseline in the same batch (the background entry points `runJobStep` / `runForTarget` wrap `runAsBackgroundWaiter`);<br>test comparing the final-state data with the original response byte for byte | `lib/modeling/long-ops.ts` · `lib/governance/long-ops.ts` · `lib/modeling/landing.ts` · `app/api/modeling/**/route.ts` · `app/api/governance/tables/**/route.ts` · `app/api/approvals/[id]/route.ts` |
+| 6 | Client: `client/follow.ts` · `client/events.ts`;<br>`AuthProvider.installFetchInterceptor` chains `followLongOp` after `normalizeApiResponse`;<br>`aiFetchJson` becomes a thin shell;<br>`components/long-ops/LongOpIndicator.tsx` is mounted in the `app/layoutClient.tsx` shell (inside `AuthGate`, not on the login page);<br>the English dictionary gains the labels | `lib/long-ops/client/*` · `lib/auth/AuthProvider.tsx` · `lib/ai/client/ai-fetch.ts` · `components/long-ops/LongOpIndicator.tsx` · `app/layoutClient.tsx` · `lib/i18n/messages/en.ts` |
+| 7 | Read-level ledger: `INFRA_APIS` gains `/api/long-ops`; the three `/api/ai/tasks` entries are deleted | `lib/scope/__tests__/page-read-coverage.test.ts` · `lib/scope/api-read-ledger.ts` |
+| 8 | UX ⑥ (section 3.1) | `app/modeling/page.tsx` |
+| 9 | Full gate: tsc 0 errors · vitest all green · parity · redline · infra tsc + synth-gate; one `npm run build` (Next page export guard) | ✅ revision 1.1: tsc 0 · vitest 5354 green (the only failure, `bootstrap-roster-mode`, is a local-environment failure that is identical on the development branch) · parity ✅ · redline ✅ · infra tsc + synth-gate ✅; `next build` was exercised by the image build of the test-account upgrade |
+| 10 | Upgrade a test account (demo mode, three regions, observe credential mode) and run two page-driven acceptance passes (section 7): the first with `-c long-ops-sync-wait-ms=500` forcing the 202 path; the second with the default 45 s plus a real cold-warehouse hit (code-table landing after the us-west-2 warehouse has been idle ≥ 1 h); merge back into the development branch; add the new acceptance segment to the gate suite list | `scripts/redeploy-platform.sh temp-account-1 us-east-1 -c dataplane-creds=observe -c long-ops-sync-wait-ms=500` (step 2c′ creates the new table) |
+
+---
+
+## 5. Upgrade / deployment / operations
+
+- **The new table is created by the upgrade**: step 2c′ of `redeploy-platform.sh` (added so that new tables are created on upgrade) deploys `BgpDatabaseStack` ⇒ creates `bgp-long-ops`; `bgp-ai-tasks` is removed from the stack ⇒ `RemovalPolicy.RETAIN` **keeps it as an empty shell** (rows self-clean through the 7-day TTL; the table itself must be deleted by a person). The customer production environment never had it (the AI-task table was never released) ⇒ zero impact; each of the three test accounts keeps one empty shell, **listed for decision** and deleted only after being explicitly named (real destruction only on explicitly named carriers).
+- **Container env, 73 keys**: `LONG_OPS_SYNC_WAIT_MS` defaults to `45000`; in production **do not** pass `-c long-ops-sync-wait-ms` (it is an acceptance switch of the same class as `-c dataplane-creds`; a redeploy without it returns to the default). The red-line row in the [deployment guide](../deployment.md), section 7, is updated in the same change.
+- **Rollback switch**: `LONG_OPS_ASYNC=0` (requires a redeploy) returns to pure synchronous mode — behavior = byte for byte the same as before the framework was connected (including hitting the wall).
+- **Observability**: does every switch to background (202) and every final state call `recordAudit`? **No** (the audit table is the ledger of write operations; the long-running operation itself is not a business write; business writes are audited by the executors exactly as the original routes did). Structured logs: `long-op.accepted` (taskId / kind / waitedMs), `long-op.settled` (status / elapsedMs / errorStatus) — single author `driver.ts`; CloudWatch can aggregate by `kind` to see "which routes often exceed 45 s" (= the list of what to connect / optimize in the next batch).
+- **IAM**: `bgp-long-ops` is covered by the TaskRole's `bgp-*` wildcard, zero IAM change (same as the earlier AI-task table); no new kind of AWS SDK call ⇒ `platform-taskrole-calls.json` is unchanged.
+
+---
+
+## 6. Batches
+
+| Batch | Content | Acceptance |
+|---|---|---|
+| First batch (this branch) | Framework + migration of the seven AI kinds + four modeling kinds (the cold-warehouse landing 504) + catalog create table / alter table / read columns + approval execution (same family, forced out by the guards) + interceptor + global hint + guard baselines + UX ⑥ | Section 7 segment, two passes + regression of the AI-routes segment (the seven AI kinds through the new endpoint) + regression of two existing page-driven segments (including the modeling page segment) |
+| Second batch (2026-10-22; code for the batch plus the root fix of the upgrade script's IAM-simulation probe-region selection; **✅ merged back into the development branch 2026-10-23 05:4xZ** (merge commit; all eight gate checks green); in a test account the new page-driven segment ran 3 times with 13 items, 0 failures, 1 recorded item, plus 8 regression segments all green) | ✅ **Verified and merged back, 14 kinds** (section 2.6a): `governance-schema-sync` (the governance "sync columns" timeout) · `project-delete` (the delete-workspace cold-start "warming") · `sync-execute-ddl` / `sync-generate-ddl` · `flink-start` / `flink-stop` / `flink-delete` · `workflow-publish` / `workflow-unpublish` / `workflow-trigger` / `workflow-delete` · `datasource-s3-external` · `modeling-metric-compute` / `metric-compute`; first background-waiter wiring `flink-deletion`.<br>🔴 **The three baseline files deliberately not migrated in this batch (each has callers outside the request path / outside long-running operations; migrating them would throw `LongOpContextMissing` on the first step of a run)**: `lib/sync/target-table-guard.ts` (`probeTables` is called by `overwritePreflight` ← the sync-task create / edit routes; those two routes stay within a 20 s budget ⇒ they do not hit the wall; left for the third batch to be merged together with "sync task create / edit") · `lib/scheduler/mwaa-endpoint.ts` (`unpauseWhenLoaded` is called fire-and-forget by the etl / engines schedule routes ⇒ the third batch moves the unpause of the two schedule routes into a lib entry point wrapped in `runAsBackgroundWaiter`) · `lib/scheduler/serverless/workflow-client.ts` (`startWorkflowRun` / `ensureWorkflow` / `deleteWorkflow` are called by action-schedules / trigger.ts / dependency.ts; the callers are on internal request paths).<br>**Items of the original second-batch list deferred to the third batch**: `datasource-create` (Kinesis provisioning takes 2 minutes; converting the whole data-source creation route to a long-running operation has a large blast radius) · `datasource-test` · zero-ETL status reads (`zeroetl-service.ts` is also used in the background by the start IIFE) · quality / metric batch computation · `redshift-schemas` / catalog OpenMetadata fallback (the `directQueryRaw` family has 7 callers including two in Ask-Your-Data; the primitive can only be migrated when Ask-Your-Data is merged in the third batch) | New page-driven segment (section 7a, 13 items: governance column sync + second-tab 409 / wizard generate DDL · execute create table · second create 409 / metric · model-metric computation / Flink start → stop → delete / S3 external table API cross-check / cleanup / violation / pageerror) + regressions: orchestration (the four workflow kinds) · delete workspace (two segments) · four further existing segments, including the first-batch segment and the AI-routes segment — all green |
+| Third batch, first item (2026-10-28; **✅ merged back into the development branch at 07:29Z**, all gates green on the development branch; a full acceptance-gate round was started) | ✅ **`datasource-create`** (section 2.6b; the 2026-10-27 data-source-creation 504 incident): the concern of the deferred second-batch item, "Kinesis provisioning 2 minutes / converting the whole creation route has a large blast radius", is closed like this — only the provisioning segment of the JDBC paradigm is migrated (the non-JDBC / provision=true Kinesis path stays synchronous, left for a later batch), the secret stays in the route (the password never lands in the task row), the lease is by workspace + name, and failures are cleaned up in reverse order.<br>The remaining third-batch candidates are unchanged: `datasource-test` · zero-ETL status reads · quality / metric batch computation · `redshift-schemas` / catalog OpenMetadata fallback · the three deliberately unmigrated baseline files;<br>🆕 candidate: persistent cleanup of the platform security groups left behind after deleting a data source (section 2.9: persisted background waiter + closure by network-interface facts) | New page-driven segment (section 7b, 5 items: data-source creation dialog closes on the page + first network response 201 / 202 protocol + page layer 201 (with the header when via 202) + exactly one list row / default mode synchronous 201 without 504 (knob mode: global hint) / 🔌 concurrent same-name creates 201 + 409 and no extra secret / 🔌 non-existent managed secret ARN ⇒ 500 and nothing created at all / cleanup: secret count back to baseline, this segment's fixture security groups deleted within the background deletion budget, otherwise recorded as the known orphaned-security-group issue and self-deleted) — one test account, default mode 5/5 · another test account, 500 ms knob 5/5;<br>regressions: network-advisor segment 7/7 · first-batch segment in 202-expected mode 12/12 |
+| Third batch | 🆕 The workflow branch of `app/api/schedule/enable` connected as a long-running operation (revision 1.5 only added the workflow-family guard; it still awaits publishWorkflowDag directly and is in the guard ⑤ baseline) · deferred second-batch items (the three deliberately unmigrated files `target-table-guard` / `mwaa-endpoint` / `workflow-client`;<br>`datasource-create` / `datasource-test` / zero-ETL / batch computation / the `directQueryRaw` family;<br>a page entry for S3 external tables) · 🆕 the engine job `[id]/rerun` route (single region, no fan-out, still a synchronous `provider.submit`;<br>same class as the engine-run 504; recorded in revision 1.8) · merging Ask-Your-Data `ask` (keeping the result contract;<br>the `GENBI_ASYNC` switch retired) · whether to merge `bgp-genbi-tasks` into the table is to be decided separately | A new segment plus the Ask-Your-Data segment |
+
+---
+
+## 7. Headless acceptance criteria (first-batch segment, page-driven; a test account in demo mode, three regions, observe credential mode; the second-batch segment is in section 7a, a second test account in demo mode, two regions, observe credential mode)
+
+| No. | Criterion | Source of truth |
+|---|---|---|
+| **1** | After the platform is upgraded with `-c long-ops-sync-wait-ms=500`, `GET /api/public/version` is readable, the `describe-task-definition` env contains `LONG_OPS_SYNC_WAIT_MS=500`, and `describe-table bgp-long-ops` is ACTIVE (debugging truth) | ECS / DDB |
+| **2** (modeling) | Page: Modeling → Code table → New → "Land in this region", choose `tgt_usw2_a` ⇒ the **first response the browser receives is 202** (`protocol:"long-op/1"`, recorded in the request log), then `[data-testid=long-op-indicator]` appears with text containing "Running in background: modeling landing to execution target";<br>the response the page finally receives is 200 and the response header `x-bgp-long-op` is present;<br>the list row shows `tgt_usw2_a: ✓`;<br>**the page does not refresh** (UX ⑥: the tab root node is the same DOM handle, still `isConnected`) | DOM + request log + screenshot |
+| **3** (byte for byte) | Turn off the 500 ms knob in the same account (default 45 s) and run the same action ⇒ the `data` of the synchronous 200 is **deeply equal** to the polled final-state `result` of criterion 2 (key set + values; `_meta.correlationId` excepted) | Request log |
+| **4** (four actions) | Dimension table "Apply" / "Unbind (keep table)" / "Unbind and clean up" / "Unbind preview" once each, all of them: first response 202 ⇒ final state 200 ⇒ the page outcome equals the existing attribution check (0 violations; landing / cleanup really happen; cross-checked with `svv_table_info`) | DOM + Redshift cross-check |
+| **5** (regression of the seven AI kinds) | The full AI-routes segment shows 0 failures under the new endpoint; the alias `GET /api/ai/tasks/<id>` and `GET /api/long-ops/<id>` return responses of the same shape for the same taskId | AI-routes segment |
+| **6** (failure status code) | Requests "Generate implementation with LLM" for a **non-assignee** under the 500 ms knob ⇒ first response 202 ⇒ the final state is shaped to **403** (`errorStatus`) and the message "Only the assigned developer can generate the implementation" = byte for byte the synchronous branch | Request log |
+| **7** (real cold-warehouse hit) | Default 45 s knob; code-table landing after the `tgt_usw2_a` warehouse has been idle ≥ 60 minutes ⇒ first response 202 (really > 45 s) ⇒ final state 200 ⇒ list `✓`; 504 / "the request may still be continuing in the background" **no longer appear** (the closing criterion for the modeling cold-start 504) | Request log + DOM |
+| **8** (negative) | Ask-Your-Data in the same page session behaves as before: the 202 of `POST /api/genbi/ask` is not taken over by the interceptor (in the request log it is followed by `/api/genbi/tasks/` polling, not `/api/long-ops/`) | Request log |
+| **9** (English) | In English locale the hint text is English (`Running in background: …`) | DOM |
+| **10** (offline) | Section 2.7 ①–⑬ all green; the `await-terminal-ratchet` baseline is ≥ 1 file smaller than the step 2 inventory (`landing.ts` migrated) | vitest |
+| 🆕 **11** (revision 1.2, leases) | **Immediately** after sending code table "Land in this region", close the panel, click "Delete" on the same row and confirm ⇒ toast "“Land code table to execution target” is in progress (n s elapsed); wait for it to finish before acting" (DELETE 409 `LONG_OP_IN_PROGRESS`) and the row is still there; the landing proceeds to ✓ as usual; afterwards unbind-and-clean-up / delete work as usual; the target region's `pg_tables` has no orphan matching the fixture code-table prefix | DOM + request log + Redshift |
+
+> Basis: section 2 of this document · the [multi-region specification](./multi-region-execution-spec.md), **revision 3.54, section 3.18** · the multi-region acceptance criteria, **section 8, new section (this segment)**.
+
+### 7a. Second-batch criteria (page-driven segment; a test account in demo mode, two regions, observe credential mode, default 45 s; the segment's headless script requires a second execution region to be configured; revision 1.6 backfill: 2026-10-22, three runs each 13 items, 0 failures, 1 recorded item)
+
+| No. | Criterion | Source of truth | Result |
+|---|---|---|---|
+| **A** | Log in + scope "All"; the demo source `Showcase-home-GameData-MySQL` exists; the home warehouse's `pg_tables` is readable (debugging truth) | DOM + Redshift | ✅ |
+| **D1** (generate DDL) | Data Sync "New" wizard: search the source for GameData, target type radio "Redshift" → step 2 check the first `[data-testid=sync-table-row]` → **step 3 "Target configuration"** fill a unique table-name prefix (`<prefix>_<ts>_`; in the other steps that field is `display:none`) → step 4 "Generate DDL" ⇒ the `<pre>` preview contains `CREATE TABLE` and `[data-testid=ddl-table-state][data-state=new]` (`sync-generate-ddl`, synchronous 200 of the same shape) | DOM + request log | ✅ |
+| **D2** (execute create table + idempotency) | "Execute create table" for the same table ⇒ toast "{table} created successfully" ⇒ "Refresh" (antd renders the two-character label with an inner space, so the check uses a whitespace-tolerant match) ⇒ `data-state=platform`; click "Execute create table" again ⇒ 409 "target table … already exists (created by the platform); table not created again"; the home `pg_tables` cross-check really has `public.<prefix>_…` | DOM + request log + Redshift | ✅ |
+| **D3** (governance column sync + lease) | Governance page "Sync Redshift columns" ⇒ toast "Backfilled N tables, M columns…" (`governance-schema-sync`, the same wording as the governance "sync columns" fix); click again at the same time in a **second tab** (`context.new_page()`) ⇒ 409 toast "“Sync column information to the data catalog” is in progress (n s elapsed); wait for it to finish before acting" (if the window is missed, two concurrent POSTs inside the browser cross-check the same 409) | DOM (two tabs) + request log | ✅ (real page 409 "1 s elapsed") |
+| **D4** (metric computation) | `/metrics` "New metric" choosing the new table from D2 (count) → click the card → the `get_by_role("dialog")` drawer shows "Current value 0" (`metric-compute`; `.ant-drawer-content` is not pinned) | DOM | ✅ |
+| **D5** (model-metric computation) | `/modeling` "Metric system" "New metric": the atomic metric points at the new table from D2 → row "Compute" ⇒ toast "Computed: 0" (`modeling-metric-compute`) | DOM | ✅ |
+| **D6** (Flink start) | `/realtime-compute` create a one-off streaming job (Kinesis source + S3 sink) → "Start" ⇒ first response 202 **not the protocol** `{status:"starting"}` (the own semantics of `flink-start`, not taken over by the interceptor) ⇒ row "Starting" → "Running" (reload every 15 s, ≤ 600 s) | DOM + request log | ✅ (≈ 2 minutes) |
+| **D7** (Flink stop) | "Stop" ⇒ 200 "Stopping…" ⇒ row "Stopping" and **no** "Delete" link → "Stopped" (`flink-stop`) | DOM | ✅ |
+| **D8** (Flink delete) | "Delete" Popconfirm ⇒ application already stopped 200 "Deleted (MSAF application cleaned up)" / still stopping 202 deleting (background waiter `flink-deletion`) ⇒ the row disappears; the MSAF application does not exist | DOM + MSAF cross-check | ✅ (200 path) |
+| **D9** (S3 external table, API cross-check) | No page entry ⇒ `GET /api/projects` per workspace (`x-bgp-project` named explicitly; the list uses `?scope=global`, `all` is invalid) find a source whose type starts with s3, POST `/api/datasources/[id]/s3-external` ⇒ 2xx ✅ / 4xx JSON original envelope ⚠️ recorded / 5xx or HTML ❌ | Request log | ⚠️ recorded: the demo CSV source returns 400 JSON "Could not infer column definitions (CSV needs a header row…)" (fixture limitation; a page entry = UX candidate) |
+| **I** (cleanup) | Metrics / model metrics / streaming jobs deleted through the `?scope=global` list (`purge_fixtures`); home `DROP TABLE public.<prefix>_%` (`purge_home_tables`) ⇒ re-check 0 residue | API + Redshift | ✅ |
+| **J** (observe) | `place.observe.violation` = 0 for the routes touched by this segment | Logs Insights | ✅ |
+| **K** (page errors) | pageerror 0 across the segment (after the non-JSON error-response shaping there is no "Unexpected token <") | Browser | ✅ |
+
+> The second-batch 202 `long-op/1` path was not hit in this segment under the default 45 s (all 9 kinds with a page entry returned a synchronous 200 of the same shape);
+> the mechanism is covered by the first batch's 500 ms knob second run and by criterion 7 of section 7 (the real cold-start hit);
+> optional: upgrade the test account once with `-c long-ops-sync-wait-ms=500` and run the second-batch segment again.
+> The four orchestration kinds (`workflow-publish / unpublish / trigger / delete`) are covered by the orchestration segment 15/15, and `project-delete` by the delete-workspace segments 6/6.
+> Toast filter: messages starting with the "Running in background:" prefix (the global hint is an antd message).
+
+---
+
+### 7b. Third batch, first-item criteria (page-driven segment; the home-region view suffices; revision 1.7 backfill: 2026-10-28, one test account in the default 45-second mode 5/5 · another test account in the `-c long-ops-sync-wait-ms=500` knob mode with the 202-expected switch 5/5)
+
+| Criterion | Content | Mode |
+|---|---|---|
+| 1 | In the home-region view, page "New data source" MySQL (host unreachable) ⇒ the dialog closes; first network response 201 (default) or 202 protocol long-op/1 (mandatory under the knob); the page layer (restored by the interceptor) finally gets 201, with `x-bgp-long-op` when it went through 202; exactly one list row with that name; the status cell is not "Connected" | Both modes |
+| 2 | Knob: the global hint "Running in background: New data source" has appeared and there is no 504 / "still continuing in the background" class of error; default: synchronous 201 in one go, no error message (it is normal that the background hint does not appear) | Both modes |
+| 3 🔌 | Two concurrent POSTs with the same name (the page cannot click twice in the same millisecond) ⇒ one 201, one 409 `LONG_OP_IN_PROGRESS` (message contains "New data source"); exactly one list row; secret count = baseline + 2 (the secret created by the route for the rejected request has been deleted) | Both modes |
+| 4 🔌 | A route-layer failure leaves no orphan: "Select from RDS" with a non-existent managed secret ARN ⇒ 500 "Failed to create data source: …"; no such row in the list; the secret count is unchanged (the first run tried a non-existent subnet / security group to make the Glue connection creation fail; measured: Glue CreateConnection does not validate ⇒ 201, the injection was ineffective; the executor's cleanup path is covered by the assembly-layer unit test) | Both modes |
+| T | Cleanup: the page deletes this segment's fixtures ⇒ the row disappears; the secret count returns to baseline; this segment's fixture platform security groups are deleted within the background deletion budget (5 minutes) — not deleted = recorded as the known orphaned-security-group issue (⚠️ not counted as a failure) and self-deleted by this segment by group name `bgp-ds-<last 8 characters of the source id>` | Both modes |
+
+### 7c. Third batch, second-item criteria
+
+- (page-driven segment; the home-region view suffices; revision 1.8 backfill: 2026-10-30 00:3xZ, a test account in the default 45-second mode 4/4 ✅;
+- knob mode ✅ 2026-10-30 04:0xZ, the same test account redeployed with `-c long-ops-sync-wait-ms=500` + observe (task definition LONG_OPS_SYNC_WAIT_MS=500 verified), then the segment with the 202-expected switch 4/4 (criterion 1: first network response 202 protocol long-op/1 ⇒ page layer 200 with x-bgp-long-op + global hint "Running in background: Run engine job", 25.1 seconds;
+- criterion 3: two concurrent requests ⇒ 202 + 409 LONG_OP_IN_PROGRESS) · in the same environment the first-batch segment in 202-expected mode 12/12 · the data-source creation segment in 202-expected mode 5/5 ⇒ both modes complete)
+
+| Criterion | Content | Mode |
+|---|---|---|
+| 1 | Page: create an EMR Serverless job (write the script in Monaco, save) ⇒ "Run now" ⇒ first network response 200 (submission completed within 45 seconds) or 202 protocol long-op/1 (cold start), never 504 / HTML;<br>when it went through 202, the page layer (restored by the global interceptor) finally gets 200 with `x-bgp-long-op`, and the global hint "Running in background: Run engine job";<br>toast "Run submitted (business date …) → <region>";<br>under the knob mode the first response must be 202 | Both modes |
+| 2 | No fork, no duplicate: this one click ⇒ the run ledger gains exactly 1 row; that run reaches the final state succeeded; the row in "Run history" (anchored by start time) shows succeeded | Both modes |
+| 3 🔌 | Object lease `engine-job:<jobId>`: two concurrent POST /run in the same millisecond inside the browser ⇒ one 200 / 202, one 409 `LONG_OP_IN_PROGRESS` (message contains "Run engine job"); the ledger gains only 1 row; the accepted one reaches the final state succeeded | Both modes |
+| T | Cleanup (page): job card "Delete" (together with the EMR application) ⇒ the row disappears + GET 404; the workspace is deleted through the page (deleting a workspace is a long-running operation, budget 330 s; the first run's 120 s budget judged "still executing in the background" as still-there while the long-operation row was succeeded = a timing defect of the check, since fixed) | Both modes |
+
+On the installation-chain side the same fact is carried by the "EMR run" row of `scripts/31-showcase-region.py` (it records whether the run went through a synchronous 200 or through long-operation 202 polling; both regions `--stage run --only realtime,emr` all green).
+
+## 8. Risks and limits (as they are)
+
+- **Execution runs in the ECS process that accepted the submission**: during a rolling upgrade / task replacement, a running task becomes stale by heartbeat ⇒ the next poll **re-claims and re-runs** it in the new process (same as the earlier AI long calls / Ask-Your-Data). The modeling landing executor is idempotent (`CREATE … IF NOT EXISTS` + ledger fingerprint); re-running an AI executor only costs one more inference; **a non-idempotent kind must get an idempotency key before it is connected** (the second batch's delete-workspace must carry an `inventoryToken`).
+- **A page refresh loses contact**: the task continues to its final state, but the page no longer shows a hint; we rely on "the ledger is the real observation" so the user sees the result on refresh. "Still tracking after a refresh" would require a task list page (not done, section 1.3).
+- **The request is held during the 45 s budget**: many concurrent slow operations occupy Node connections (exactly the same as today, not worse); `LONG_OPS_SYNC_WAIT_MS` can be lowered per environment.
+- **Scope of the interceptor's takeover**: only `protocol:"long-op/1"` is honored; any third-party / legacy-protocol 202 is unaffected (guard ⑦ negative case).
+- **Object leases lock only "long-running operation vs. edit / delete of the same object"** (section 2.8): object level, not row level / query level; lock granularity = resource key; too coarse (`table:<region>:<table>`) serializes two unrelated alterations of the same table, too fine misses conflicts; a new family always goes into `LONG_OP_RESOURCE_FAMILIES` first. After a crash the worst case is a lock until the 5-minute ceiling (a holder past the ceiling releases it).
+- **Guard ② is a source-literal scan**: it catches "writing a new sleep loop that waits for a state" but not "using the SDK's waiter utilities" — so waiter class names (`waitUntil*`) are also in the scan word list; anything more cunning is caught by ⑤ (routes calling long services directly).
+
+---
+
+## 9. Relation to existing documents
+
+| Document | Change (same commit) |
 |---|---|
-| Operation finishes within the wait window | Exactly as before: button loading, then success message and list refresh |
-| Operation exceeds the wait window | Button stays loading; a global hint shows the label and elapsed seconds; completion triggers the original success path |
-| Operation exceeds the ceiling | Message "operation exceeded 5 minutes and was stopped; narrow the scope and retry" (504); never re-executed |
-| User refreshes or closes the tab | The task continues to its final state; the page no longer tracks it; list pages show the real state on reload |
-| Second operation on the same object | Toast with the 409 message naming the running operation and elapsed time |
-| English locale | Labels and hints are translated |
+| [Model-configuration specification](./model-configuration-spec.md), section 3.3a, "hybrid response" row | Keep the factual narrative; append at the end "**revision 2.5: the implementation has moved into the long-running-operation framework (`lib/long-ops/`, endpoint `GET /api/long-ops/[taskId]`, `/api/ai/tasks/[taskId]` as an alias); this row keeps only the `_meta` echo contract; the hybrid-response contract is defined by section 2 of the long-running-operations design**" |
+| [Multi-region specification](./multi-region-execution-spec.md) | New section **3.18, revision 3.54, unified long-running-operation protocol** (one paragraph: scope = any write route that waits for an external final state; the contract points to sections 2.4 / 2.5 of this design; relation to section 3.9a = the execution channel is unchanged, only "how long to wait and how to answer" changes) |
+| Multi-region acceptance criteria | New section 8 … (this segment; the table in section 7 of this document) + overall basis row revision 3.54 |
+| [`AGENTS.md`](../../AGENTS.md), core-concepts row "AI long-call task" | Changed to a "**long-running operation**" row: points to `lib/long-ops/` and this document; section 1 size figures (API 50 groups → 51 groups / 308 → 309 route files; 72 tables unchanged) · section 10: 72 keys → 73 keys · section 13: the modeling cold-start 504 marked fixed |
+| [Modules overview](../modules.md) section 8, "AI long call" row / section 9 cross-reference | Changed to a "unified long-running-operation framework" row + the cross-reference gains this module |
+| [Architecture](../architecture.md) section 7 | Table list `ai-tasks` → `long-ops` |
+| [Deployment guide](../deployment.md) section 7 red lines / section 7ter.1 | In production do not pass `-c long-ops-sync-wait-ms`; upgrading to a version that contains this module creates `bgp-long-ops` and leaves `bgp-ai-tasks` as an empty shell (only in environments that had installed the pre-release version with the AI-task table) |
+| Defect record of the modeling cold-start 504 | Criterion for 🔧 → ✅ = criterion 7 of section 7 passes in a real environment |
 
-## 14. Acceptance behaviour
+---
 
-Acceptance is performed in a headless browser against the pages; API and table reads are cross-checks only.
+## 10. Inventory baseline (2026-10-21, `platform/src`; the initial value of guard ②'s `AWAIT_TERMINAL_BASELINE` = the 30 files in the table below; revision 1.1 measured 27 hits of the scan word list = 30 − landing.ts (migrated) − #22 region-org-block (bounded retry, not counted) − #30 dataplane-jobs/handler (8 s inline short poll, not counted))
 
-- A test deployment sets the CDK context `long-ops-sync-wait-ms` to a small value so every connected route takes the 202 path.
-- For each kind: the first network response is 202 with the protocol marker, the indicator appears, and the page finally receives the synchronous status with the `x-bgp-long-op` header.
-- The `data` of the synchronous branch and the `result` of the polled branch are deeply equal, except for the correlation id.
-- A failure on the asynchronous branch reshapes to the exact synchronous status and message (for example a 403 for a non-assignee).
-- A real cold-start scenario (idle warehouse for an hour) produces 202 then 200 and no 504.
-- The NL2SQL ask route's own 202 is not intercepted.
-- Starting a landing and immediately deleting the same object answers 409 and leaves no orphan table.
-- Unit guards in section 12 are all green.
+| # | File | Primitive | Waited-on object | Budget | Call surface | Migration batch |
+|---|---|---|---|---|---|---|
+| 1 | `lib/modeling/landing.ts` | `queryOnTarget` / `execOnBinding` | Redshift Data `DescribeStatement` | 60 / 80 rounds, 150 ms × 1.6 capped at 1 s | Request path (modeling / catalog / approvals) | **First batch** |
+| 2 | `lib/exec-env/target-clients.ts` | `execOnTarget` | Redshift Data | 200 rounds ≈ 3.3 minutes | Request path (admin DDL) + background (mirror / pump) | First batch (condition in section 4, step 5) or second batch |
+| 3 | `lib/modeling/redshift.ts` | `execScalarAt` | Redshift Data | 50 × 700 ms | Request path (metric computation) | Second batch |
+| 4 | `lib/redshift/direct-query.ts` | `directQueryRaw` | Redshift Data | 15–50 rounds × 0.6–1 s | Request path, 7 places (catalog fallback / schemas / quality / metrics / sensitivity scan / Ask-Your-Data × 2) | Second batch (the 7 callers in the same batch) |
+| 5 | `lib/projects/project-resources.ts` | `awaitSchemaCountStatement` | Redshift Data | 45 s (the delete-workspace warming) | Request path | Second batch |
+| 6 | `lib/sync/target-table-guard.ts` | `probeTables` | Redshift Data | 40 × 500 ms | Request path (execute-ddl / generate-ddl / start guard) | Second batch |
+| 7 | `app/api/sync/execute-ddl/route.ts` | `waitStatement` | Redshift Data | 30 × 500 ms × 2 | Request path | Second batch |
+| 8 | `lib/sync/start-run.ts` | `pollGlueJob` / `startJobRunWithRetry` | Glue GetJobRun / StartJobRun retry | 120 × 15 s / ≤ 40 s | Background + request path (start) | Wrap the background entry point in a context; the retry in the second batch |
+| 9 | `lib/etl/job-service.ts` | `pollGlueRun` / `pollRedshiftRun` | Glue / Redshift | 40 minutes / 4 minutes | Background | Wrap the background entry point in a context |
+| 10 | `lib/backfill/execute.ts` | `pollRedshiftRun` | Redshift | 5 minutes | Background | Wrap the background entry point in a context |
+| 11 | `lib/engines/emr/provider.ts` | `poll` | EMR Serverless GetJobRun | 60 minutes | Background | Wrap the background entry point in a context |
+| 12 | `lib/engines/emr/application.ts` | `ensureApplication` / `ensureStarted` / `destroyApplication` | EMR GetApplication | 30–60 s | Request path | Second batch |
+| 13 | `lib/genbi/athena.ts` | `introspectS3Tables` / `runSelectAthena` | Athena GetQueryExecution | 40 × 800 ms | Request path, 8 places (ask / bi / flink results / card refresh / OpenMetadata push / codegen) | Second / third batch |
+| 14 | `lib/datasource-spi/object-store/athena-external.ts` | `runDdl` / `ensureExternalTable` | Athena | 60 × 2 s × 3 statements | Request path (`s3-external`) | Second batch |
+| 15 | `lib/realtime/zeroetl-service.ts` | `execZeroEtlSql` / `destinationDatabaseExists` / `getReplicatedCounts` | Redshift Data | 60 s / 30 s / 20 s per table | Request path (zeroetl-status GET) + background | Second batch |
+| 16 | `lib/realtime/redshift-target.ts` | `execAdminSql` / `withNamespaceRetry` | Redshift / UpdateNamespace back-off | 30 s / ≈ 54 s | Background (start-realtime IIFE) | Wrap the background entry point in a context |
+| 17 | `lib/realtime/dms-service.ts` | `getReplicationInstanceArn` / `teardownReplicationTask` / `waitTaskStartable` | DMS Describe* | 8 minutes / 20 s / 150 s | Request path (stop / DELETE 20 s) + background | Second batch |
+| 18 | `app/api/sync/[id]/start-realtime/route.ts` | `testEndpoints` loop inside the IIFE | DMS endpoint test | 30 × 10 s | Background IIFE | Wrap the background entry point in a context |
+| 19 | `app/api/sync/[id]/start/route.ts` | `getIntegrationStatus` loop inside the IIFE | RDS DescribeIntegrations | 360 × 15 s | Background IIFE | Wrap the background entry point in a context |
+| 20 | `lib/realtime/flink-service.ts` | `ensureApplication` / `pauseFlinkJob` / `deleteFlinkApp` / `finishFlinkDeletion` | MSAF DescribeApplication | 2–3 minutes / 40 s + 15 minutes in the background | Request path (start / stop / delete) | Second batch |
+| 21 | `lib/exec-env/public-create-readback.ts` | `awaitPublicCreateRevoked` | Redshift `describeStatementState` | 20 s | Background / read-back | Wrap the background entry point in a context |
+| 22 | `lib/exec-env/region-org-block.ts` | `withThrottleRetry` | IAM simulation throttling retry | 6 attempts, full jitter | Request path (candidate-regions GET) | Second batch (retry class, not final-state polling; may stay) |
+| 23 | `lib/seed/run-once.ts` | `waitTerminal` | Glue GetJobRun | 35 minutes | Background IIFE / scheduled | Wrap the background entry point in a context |
+| 24 | `lib/datasource/glue-reach.ts` | `startRunAdoptingConcurrent` | Glue StartJobRun concurrent adoption | 4 × 5 s | Request path (tables / heartbeat) | Second batch |
+| 25 | `lib/datasource-spi/stream/kinesis.ts` | `provision` | Kinesis DescribeStreamSummary | 40 × 3 s | Request path (data-source creation) | Second batch |
+| 26 | `lib/aws/datasource-service.ts` | `deletePlatformSecurityGroupWithRetry` | EC2 DeleteSecurityGroup retry | 10 × 30 s | Background | Wrap the background entry point in a context |
+| 27 | `lib/scheduler/mwaa-endpoint.ts` | `unpauseWhenLoaded` | MWAA CLI | 18 × 10 s | Request path (publish) + background | Second batch |
+| 28 | `lib/scheduler/serverless/workflow-client.ts` | `ensureWorkflow` / `deleteWorkflow` / `startWorkflowRun` | Airflow serverless | 60 s / 3 minutes / 60 s | Request path (publish / unpublish / trigger) | Second batch |
+| 29 | `app/api/workflow/[id]/trigger/route.ts` | `triggerOneTarget` MWAA branch | MWAA CLI | 5 × 8 s | Request path | Second batch |
+| 30 | `lib/dataplane-jobs/handler.ts` | `pollWithin` | Redshift `describeStatementState` | 8 s inline, 45 s step wall clock | Background (pump / step) | Wrap the background entry point in a context (`runJobStep`) |
 
-Production deployments must not set `long-ops-sync-wait-ms`; the default of 45 seconds applies.
-
-## 15. Operations
-
-- New tables are created by the upgrade script's database-stack step.
-- Structured logs: `long-op.accepted` (task id, kind, waited ms) and `long-op.settled` (status, elapsed ms, error status), both from the driver.
-- Aggregating `long-op.accepted` by kind shows which routes exceed the wait window and are candidates for optimisation.
-- No audit rows are written by the framework itself; business writes are audited by the executors as before.
-- No new IAM actions are required.
-
-## 16. Limits
-
-- Execution runs inside the ECS task that accepted the request; a rolling deployment leads to a reclaim in a new process, so executors must be idempotent.
-- A refreshed page loses the hint; the ledger remains the truth.
-- Requests are held for up to 45 seconds; concurrency pressure is unchanged from before.
-- Leases are object-level; too coarse a key serialises unrelated changes, too fine a key misses conflicts.
-- The ratchet is a source-literal scan; SDK waiter helpers are included in the scan word list.
-
-## 17. Known gaps
-
-- The single-region engine rerun route still submits synchronously.
-- The schedule-enable route of workflows has the lease guard but still awaits publishing directly.
-- The NL2SQL ask route keeps its own asynchronous protocol.
-- A few waiting primitives with callers outside request paths remain on the ratchet baseline.
+> Bounded retries / hybrid-response races not counted in the baseline: `lib/etl/run-lock.ts` · `lib/redshift/concurrent-schema.ts` · `lib/ai/invoke.ts` · `lib/genbi/cards-store.ts` · `lib/governance/schema-sync-run.ts` · `lib/ai/long-call-driver.ts` (absorbed by this module) · `lib/dataplane-jobs/runner.ts` · `lib/metrics/service.ts` (dead `sleep`, deleted in passing).
+> The nine browser-side polling loops (`aiFetchJson` / Ask-Your-Data `pollTask` / workspace-deletion resend / schema-sync / Copilot planning / rehearsal / heartbeat / table discovery / `apiFetch` retry) are outside the scope of this guard: the first batch absorbs only `aiFetchJson`; the others are retired as their routes are merged in.

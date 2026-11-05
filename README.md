@@ -206,7 +206,7 @@ Key points:
 | Multi-region execution: the full specification (table design, API contract, key-mechanism pseudocode, change list, decisions) | [`docs/design/multi-region-execution-spec.md`](docs/design/multi-region-execution-spec.md) |
 | Multi-region execution: the full design document (requirements, architecture D1–D8, lifecycle, IAM and network, acceptance, decision record, correction ledger) | [`docs/design/multi-region-execution-design.md`](docs/design/multi-region-execution-design.md) |
 | Multi-region execution: the full interaction design (nine scenarios, safety mechanisms, execution-scope rulings, friendliness design) | [`docs/design/multi-region-execution-interaction.md`](docs/design/multi-region-execution-interaction.md) |
-| Design documents of the other modules | [`docs/design/`](docs/design/) |
+| Design documents of every module (index with status, one line per module) | [`docs/design/README.md`](docs/design/README.md) |
 | 🤖 Hand the project to an AI tool (Claude Code / Kiro / Codex …) | **[`AGENTS.md`](AGENTS.md)** |
 | Release history | [`CHANGELOG.md`](CHANGELOG.md) |
 

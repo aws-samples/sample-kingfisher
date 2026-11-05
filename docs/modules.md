@@ -62,8 +62,8 @@
 - **AWS dependencies**: Bedrock (Converse).
 - **Key mechanisms**: three tables for plans / steps / tasks (`bgp-copilot-plans/steps/plan-tasks`); a confirmed step calls the same create APIs the pages use;
   the domain vocabulary is unified in `src/lib/cookbook/capability-vocab.ts` so that the LLM cannot fill in fields outside the legal values.
-- **Known boundaries**: there is no AgentCore-hosted Copilot container (planned in the unified-Copilot design note, never implemented).
-- **Design note**: the unified-Copilot design note (including an endpoint inventory and the plan-execute design); it is not published separately.
+- **Known boundaries**: there is no AgentCore-hosted Copilot container (planned in the [unified Copilot design](design/unified-copilot.md), never implemented).
+- **Design note**: the [unified Copilot design](design/unified-copilot.md) (with the [endpoint inventory](design/unified-copilot-endpoint-inventory.md) and the [plan-execute design](design/unified-copilot-plan-execute.md)).
 
 ## 2. Data Integration
 
@@ -105,7 +105,7 @@
   (`lib/datasource-spi/object-store/athena-external.ts#ensureExternalTable(spec, place)` requires a place; the executor resolves it from the region stamp on the row through `resolveAthenaPlace`;
   - previously every table landed in the home-region catalog, and the platform TaskRole's `bgp_s3_ext` Glue permission was likewise authorized for the home region only — both now follow the execution-region axis);
   - the response returns `targetId / region`.
-- **Design note**: the data-source ecosystem design note (single-region stage; its §13 is the 2026-10-26 addendum on the S3 external-table place) · multi-region placement: see the [multi-region execution design](design/multi-region-execution.md).
+- **Design note**: the [data-source ecosystem design](design/datasource-ecosystem.md) (single-region stage; its §13 is the 2026-10-26 addendum on the S3 external-table place) · multi-region placement: see the [multi-region execution design](design/multi-region-execution.md).
 
 ### 2.2 Data Sync (key module)
 
@@ -147,7 +147,7 @@
 - **What it does**: source database → Redshift full load + CDC (DMS), plus zero-ETL integration status; exists as two channels of a sync task, without a page of its own.
 - **Core code**: `src/lib/realtime/dms-service.ts` (idempotent orchestration: endpoints / tasks / users / schemas are looked up before they are created) · `zeroetl-service.ts` · `redshift-target.ts` · `failure-advisor.ts`.
 - **AWS dependencies**: DMS (replication infrastructure provided by the gated `BgpRealtimeStack` / the per-region `-dms` stack) · Redshift.
-- **Design note**: the real-time CDC design note (including the DMS Serverless study); it is not published separately.
+- **Design note**: the [real-time CDC design](design/realtime-cdc.md) (including the [DMS Serverless study](design/realtime-cdc-dms-serverless.md)).
 
 ## 3. Data Development
 
@@ -164,7 +164,7 @@
 - **AWS dependencies**: Glue · Redshift Data API · EMR Serverless (shared base `BgpEmrStack` + the per-region `-core` execution role) · S3 · CloudWatch Logs.
 - **Key mechanisms**: run records are written uniformly to `bgp-task-runs` and reused by the monitor page; a scheduled job is published as a workflow on the region's MWAA Serverless (the artifact is generated at publish time, so after changing parameters the job must be republished);
   EMR scripts read `sys.argv` by parameter name (the template was changed accordingly), so adding a parameter no longer raises "unknown parameter".
-- **Design note**: the batch-job, run-parameter, parameter-advisor and engine-cookbook design notes (single-region stage); they are not published separately.
+- **Design note**: the [offline jobs](design/etl-jobs.md), [job run parameters](design/etl-run-parameters.md), [parameter advisor](design/param-advisor.md) and [engine cookbook](design/engine-cookbook.md) designs (single-region stage).
 
 ### 3.2 ETL Orchestration (workflows)
 
@@ -182,7 +182,7 @@
 - **Key mechanisms**: the multiple statements of a SQL node run as **one transaction**; the workflow execution contract is the home region (a workflow bound to a non-home region cannot be backfilled — backfill the individual jobs instead);
   "the region stamp must not lie" — republishing to a different region returns 409.
 - **Known boundaries (this release)**: in a region that has only MWAA Serverless, the schedule-configuration page wrongly reports "This region has no Airflow environment yet" (scheduling actually works).
-- **Design note**: the multi-engine node design note (single-region stage) · moving all scheduling to MWAA Serverless: see the scheduling work package in the [multi-region execution design](design/multi-region-execution.md).
+- **Design note**: the [multi-engine node design](design/multi-engine-nodes.md) (single-region stage) · moving all scheduling to MWAA Serverless: see the scheduling work package in the [multi-region execution design](design/multi-region-execution.md).
 
 ### 3.3 Redshift Query
 
@@ -205,7 +205,7 @@
   - the list comes from `GET /api/admin/lake-buckets/candidates?targetId=` (`src/lib/lake/table-bucket-candidates.ts` reads all pages of ListTableBuckets read-only in the region of the place and marks "Platform table bucket of this region" and "Registered";
   - if the list cannot be fetched ⇒ 502 with an honest notice and a fallback to manual entry).
 - **Known boundaries (this release)**: the table tree lists only **the platform's own table bucket** in each region; tables in customer-owned table buckets must be queried with a hand-written three-part name.
-- **Design note**: the Athena / S3 Tables design note; it is not published separately.
+- **Design note**: the [Athena / S3 Tables design](design/athena-s3tables.md).
 
 ### 3.5 Stream Compute (Flink)
 
@@ -215,7 +215,7 @@
 - **Core code**: `src/lib/realtime/flink-service.ts` (ensure → Start → Describe → Stop + Delete) · `flink-connectors.ts` · `connector-modules.ts` · `flink-sql-ai.ts` · `flink-place.ts`;
   - runner sources `flink-sql-runner/` (base) · `flink-sql-runner-s3t/` (S3 Tables / Iceberg) · `flink-sql-runner-s3t-kafka/` (MSK source), all on Flink 1.20; the JARs are built by `deploy-all.sh` and uploaded to each region's scripts bucket under `flink/`.
 - **AWS dependencies**: Managed Service for Apache Flink · Kinesis · MSK · S3 Tables.
-- **Design note**: the stream-compute design note; it is not published separately.
+- **Design note**: the [real-time compute design](design/realtime-compute.md) (with the [modular connector runtime](design/realtime-compute-connector-runtime-modular.md), the [S3 Tables 412 root fix](design/realtime-compute-flink-s3tables-412-root-fix.md) and the [tri-engine verification](design/realtime-compute-tri-engine-s3tables-verification.md)).
 
 ## 4. Smart Analytics
 
@@ -239,25 +239,25 @@
 
 - **Key mechanisms**: a 300-second ceiling per question; on timeout the request is aborted and compute stops immediately;
   three-layer model resolution (factory default → Settings → takes effect only after a run-time probe passes; see the [model configuration design](design/model-configuration.md)), and the response `_meta` echoes the model actually used
-  (implemented after this baseline and released on 2026-10-27: the result card shows "Model used: <id> · backend", `data-testid=genbi-model-used`); masking follows the classification rules (classification-and-masking design note);
+  (implemented after this baseline and released on 2026-10-27: the result card shows "Model used: <id> · backend", `data-testid=genbi-model-used`); masking follows the classification rules ([classification and masking design](design/classification-masking.md));
   before a scheduled refresh **runs on the author's behalf**, the account / workspace membership / the card's region are re-verified.
 - **Known boundaries**: if Bedrock is unavailable in the customer account (model access denied), Ask-Your-Data and all other AI features are unavailable; the remaining features are unaffected.
   - Since the release of 2026-10-27 the selectable models have been extended to four families (Claude Opus / GPT-5.6 / GLM 5 / Kimi K3, single author `platform/src/lib/ai/core/vendors.ts`), so an account whose access to Anthropic models is denied at the account level can switch to GLM / Kimi;
   - Kimi K3 always returns reasoning blocks and produces roughly twice as many output tokens as Claude (the platform scales maxTokens by a factor), and GLM 5.3 may not be enabled at the account level (probe classification `NotAvailableForAccount`).
-- **Design note**: the AgentCore GenBI, asynchronous-execution, engine-unification and session-card design notes (the session-card note is current); they are not published separately · deep dive in [`docs/deep-dive.md`](deep-dive.md).
+- **Design note**: the [AgentCore GenBI](design/agentcore-genbi.md), [asynchronous execution](design/genbi-async-execution.md), [engine unification](design/genbi-engine-unification.md) and [session card](design/genbi-session-cards.md) designs (the session-card design is current) · deep dive in [`docs/deep-dive.md`](deep-dive.md).
 
 ### 4.2 Report Builder
 
 - **What it does**: maintains report widgets, dashboards and ad-hoc analyses per workspace; data comes from Ask-Your-Data results / warehouse queries; export.
 - **Pages**: `/bi`. **API**: `bi` (`reports` · `reports/[id]` · `dashboards` · `dashboards/[id]` · `analyses` · `analyses/[id]` · `analysis-query` · `query` · `schema` · `export`).
 - **Core code**: `src/lib/bi/` (`reports.ts` key-based isolation with pk=projectId and optimistic locking; `query-builder.ts` · `chart-series.ts` · `definition-regions.ts`).
-- **Design note**: the BI report / dashboard design note (its early v2 – v4 drafts are archived); it is not published separately.
+- **Design note**: the [BI report / dashboard design](design/bi-report-dashboard.md) (its early v2 – v4 drafts are archived).
 
 ### 4.3 Requests
 
 - **What it does**: intake → assignment → comments → generation / job creation → state transitions for Ask-Your-Data requests; **published datasets** serve as grounding for Ask-Your-Data.
 - **Pages**: `/requirements`. **API**: `requirements` (root · `[id]` · `assign` · `comment` · `create-job` · `generate` · `transition` · `assignees`).
-- **Core code**: `src/lib/requirements/`. **Design note**: the GenBI requirement-pipeline and semantic-retrieval design notes; they are not published separately.
+- **Core code**: `src/lib/requirements/`. **Design note**: the [GenBI requirement pipeline](design/genbi-requirement-pipeline.md) and [semantic retrieval](design/genbi-semantic-retrieval.md) designs.
 
 ## 5. Data Governance
 
@@ -299,12 +299,12 @@
   - **Boundary**: no alter-table for S3 Tables tables (Iceberg schema evolution needs Spark; Athena does not support DDL on s3tablescatalog); the button is disabled with an explanation.
 - **Known boundaries (this release)**: in an environment with many tables, "Sync column information" in the governance catalog may report "Sync failed" after 60 seconds although the background work has completed
   (refresh and the result is visible; fixed on the development branch after this baseline, then moved onto the long-running-operation framework in its second batch; released on 2026-10-27).
-- **Design note**: the SQL lineage and impact, classification and masking, quality rules / scoring / SLA, and governance-deepening design notes; they are not published separately.
+- **Design note**: the [SQL lineage and impact](design/sql-lineage-impact.md), [classification and masking](design/classification-masking.md), [quality rules / scoring / SLA](design/quality-rules-scoring-sla.md) and [governance deepening](design/governance-deepening.md) designs.
 
 ### 5.2 Governance Workbench
 
 - **What it does**: the overall governance health score (0–100; security / classification 0.30 · quality 0.30 · SLA 0.20 · lineage 0.20) + per-dimension scores + asset ranking + to-dos; purely aggregated reads, zero new tables.
-- **Pages**: `/governance-workbench`. **API**: `governance/health`. **Core code**: `src/lib/governance/health-service.ts`. **Design note**: the governance-deepening design note; it is not published separately.
+- **Pages**: `/governance-workbench`. **API**: `governance/health`. **Core code**: `src/lib/governance/health-service.ts`. **Design note**: the [governance deepening design](design/governance-deepening.md).
 
 ### 5.3 Data Modeling
 
@@ -312,12 +312,12 @@
 - **Pages**: `/modeling`. **API**: `modeling` (`layers` · `domains` · `codetables` (`land` · `unbind` · `unbind-preview`) · `dimensions` (`ddl` · `apply` · `unbind` · `unbind-preview`) · `model-metrics` · `assets` …, 22 routes).
 - **Core code**: `src/lib/modeling/` (`service.ts` · `landing.ts` · `dimensions.ts` · `redshift.ts` safe SQL + unified execution · `unbind.ts`). **AWS dependencies**: Redshift Data API.
 - **Key mechanisms**: code tables and dimension tables can be landed in non-home regions (single author of the physical place); since the graphical create / alter table feature (released on 2026-10-27) the ledger row carries `origin` (modeling / catalog / catalog-adopted)
-  and, for alterations in non-home regions, the pending execution plan `pendingAlter` (the admin executor operation `alter-model-table` reads only that). **Design note**: the data-modeling design note; it is not published separately.
+  and, for alterations in non-home regions, the pending execution plan `pendingAlter` (the admin executor operation `alter-model-table` reads only that). **Design note**: the [data modeling design](design/data-modeling.md).
 
 ### 5.4 Metrics Store
 
 - **What it does**: metric definitions and value computation (single / all). **Pages**: `/metrics` (outside the menu; referenced from modeling / Ask-Your-Data). **API**: `metrics` (root · `[id]` · `compute` · `compute-all`). **Core code**: `src/lib/metrics/service.ts`.
-  **Design note**: the metrics-store and metrics-consolidation design notes; they are not published separately.
+  **Design note**: the [metrics store](design/metrics-store.md) and [metrics consolidation](design/metrics-consolidation.md) designs.
 
 ### 5.5 Business Glossary & Rules
 
@@ -332,7 +332,7 @@
 - **Core code**: `src/lib/openmetadata/` (`om-client.ts` · `om-push.ts` · `om-sync-coords.ts` (single author of the per-region service / FQN) · `om-reconcile.ts` · `om-mirror-push.ts` · `om-glossary.ts`) · `infra/lib/om-{database,search,service,ingestion}-stack.ts`.
 - **AWS dependencies**: ECS Fargate · RDS MySQL · OpenSearch · ECS scheduled tasks (ingestion).
 - **Key mechanisms**: objects of non-home regions are pushed under a per-region service (no longer attached to the home-region service); the factory password is replaced at deployment time with a random password in Secrets Manager.
-  **Design note**: the OpenMetadata ingestion design note; it is not published separately.
+  **Design note**: the [OpenMetadata ingestion design](design/openmetadata-ingestion.md).
 
 ## 6. Scheduling & Ops
 
@@ -344,7 +344,7 @@
   **the front-end panel was removed following the user decision of 2026-10-21**, and the endpoints are called only by acceptance scripts / fixtures).
 - **Core code**: `src/lib/monitor/` (`run-records.ts` single author of run records · `run-groups.ts` · `run-cancel.ts` · `cron-slot.ts`) · `src/lib/scheduler/` (`action-schedules.ts` · `carrier-ledger.ts` · `mwaa-*.ts`).
 - **Key mechanisms**: every run is written to `bgp-task-runs`; cancel is a user action and is never rewritten to "failed" by automation; a missing / offline MWAA produces an explicit three-state notice.
-- **Known boundaries (this release)**: the schedule-configuration false alarm described in 3.2. **Design note**: the intelligent-ops-and-alerting design note (monitoring part) · the historical schedule design card of the single-region stage; neither is published separately.
+- **Known boundaries (this release)**: the schedule-configuration false alarm described in 3.2. **Design note**: the [intelligent operations and alerting design](design/intelligent-ops-alerting.md) (monitoring part) · the historical schedule design card of the single-region stage (not published).
 
 ### 6.2 Multi-Region Dashboard
 
@@ -356,7 +356,7 @@
 - **What it does**: backfills batch jobs (Glue / EMR, per region) and sync tasks over a business-date range: plan → instances → background advancement pump (the backfill completes even if the page is closed) → results;
   a workflow that contains a sync node runs with concurrency fixed at 1; workflows bound to a non-home region are explicitly refused.
 - **Pages**: `/backfill`. **API**: `backfill` (root · `plan` · `targets` · `[planId]` · `control` · `tick`) · `internal/backfill/tick`.
-- **Core code**: `src/lib/backfill/` (`plan.ts` · `execute.ts` · `pump.ts` the 30 s advancement pump · `sync-task.ts` · `due.ts`). **Design note**: the backfill section of the agent-native design note; it is not published separately.
+- **Core code**: `src/lib/backfill/` (`plan.ts` · `execute.ts` · `pump.ts` the 30 s advancement pump · `sync-task.ts` · `due.ts`). **Design note**: the [backfill center design](design/agent-native-operations-backfill.md) of the agent-native operations set.
 - **Instance observability** (released on 2026-10-27, following a customer report of 2026-10-19): the cells of the progress matrix are clickable ⇒ instance drawer
   (date / node / execution region / status / attempts / start and end / duration / **rows written and their source** / **verbatim error** / underlying run taskId · runId / Glue job)
   + "View run log" (the same dialog as the Task Monitor page, `components/monitor/RunLogModal.tsx`) / "Locate in Monitor" (`/monitor?name=&triggeredBy=backfill`; the monitor page's "Trigger" column and filter recognize "Backfill") / "Open task page";
@@ -372,13 +372,13 @@
   `learn`) · `public/alerting-sink`.
 - **Core code**: `src/lib/alerting/` (`evaluate.ts` · `rules.ts` · `channels/` · `events.ts` · `notify.ts` · `redact.ts`) · `src/lib/baseline/`.
 - **Key mechanisms**: evaluate scans `bgp-task-runs`; events are idempotent through `putEventIfNew`; in this first phase evaluation is driven by front-end polling / manual triggering, with no resident worker.
-  **Design note**: the intelligent-ops-and-alerting design note · the baseline / SLA section of the agent-native design note; neither is published separately.
+  **Design note**: the [intelligent operations and alerting design](design/intelligent-ops-alerting.md) · the [baselines / SLA design](design/agent-native-operations-baseline-sla.md) of the agent-native operations set.
 
 ### 6.5 FinOps
 
 - **What it does**: Cost Explorer collection by service × region × day (T+1, with rolling re-collection of the last N days), attribution by region, anomaly detection, budgets, advice, task-level cost signatures. **Pages**: `/finops`.
   **API**: `finops` (`overview` · `collect` · `detect` · `anomalies` · `budgets` · `budgets/[id]` · `advice` · `tasks` · `tasks/[taskId]`).
-- **Core code**: `src/lib/finops/` (`collector.ts` · `cost-region.ts` · `anomaly*.ts` · `budget-eval.ts` · `advice.ts` · `cost-signature.ts`). **AWS dependencies**: Cost Explorer (T+1). **Design note**: the FinOps design note; it is not published separately.
+- **Core code**: `src/lib/finops/` (`collector.ts` · `cost-region.ts` · `anomaly*.ts` · `budget-eval.ts` · `advice.ts` · `cost-signature.ts`). **AWS dependencies**: Cost Explorer (T+1). **Design note**: the [FinOps design](design/finops.md).
 
 ### 6.6 Ops Dashboard · Incident Knowledge Base · Run diagnosis
 
@@ -386,7 +386,7 @@
 - **Incident Knowledge Base** `/incidents`: incidents and their handling, accumulated by failure signature (`incidents`: root · `[signature]` · `silence` · `lookup` · `health` · `export`; `src/lib/incidents/`).
 - **Run diagnosis**: AI diagnosis of failed runs / Flink jobs through the **AWS DevOps Agent managed service** (discover / create the Agent Space `bgp-devops-agent` by name → open a session → send the evidence → collect the investigation reply;
   asynchronous, with the page polling every 3 seconds; `diagnostics` API; `src/lib/diagnostics/devops-agent.ts`; flow diagram `docs/diagrams/devops-agent-flow.png`).
-- **Design note**: the DevOps-agent diagnostics design note · the incident-memory section of the agent-native design note; neither is published separately.
+- **Design note**: the [DevOps-agent diagnostics design](design/devops-agent-diagnostics.md) · the [incident memory design](design/agent-native-operations-incident-memory.md) of the agent-native operations set.
 
 ## 7. System
 
@@ -397,7 +397,7 @@
 - **Pages**: `/projects`. **API**: `projects` (root · `[id]` · `members` · `members/[username]`) · `approvals` · `promote` · `versions`.
 - **Core code**: `src/lib/projects/` (`guard.ts` · `project-service.ts` · `config-permissions.ts` · `project-resources.ts`) · `src/lib/exec-env/project-cred-*.ts` · `project-schema.ts` · `src/lib/versions/`.
 - **Key mechanisms**: Ask-Your-Data / saving cards / direct query all check workspace membership; the default workspace starts with no members (non-administrators must be added first).
-  **Design note**: the [project isolation design](design/project-isolation.md) (current) · the multi-tenancy RBAC, versioning / rollback and multi-environment release design notes (single-region stage; not published separately).
+  **Design note**: the [project isolation design](design/project-isolation.md) (current) · the [multi-tenancy RBAC](design/multitenancy-rbac.md), [versioning / rollback](design/versioning-rollback.md) and [multi-environment release](design/multi-environment-release.md) designs (single-region stage).
 
 ### 7.2 Execution Environments (key module)
 
@@ -462,7 +462,7 @@
 | Long-running-operation framework (released on 2026-10-27; root fix for the 504 on cold-start landings, absorbs the hybrid AI-response protocol, adds object leases) | every request that waits for an external system to reach a terminal state goes through `submitLongOp`: the process waits `LONG_OPS_SYNC_WAIT_MS` (default 45 s); already terminal ⇒ the synchronous response is unchanged byte for byte; not terminal ⇒ 202 `protocol:"long-op/1"` + task table `bgp-long-ops` + `GET /api/long-ops/[taskId]`; a 300 s ceiling; a stale heartbeat is taken over by polling; a task is never re-run; **the client transport layer**, in the global fetch interceptor, recognizes only 202 responses that carry this protocol marker, polls to the terminal state and then reshapes the result into a Response of the same shape (success / failure status codes and envelopes restored byte for byte) ⇒ page call sites need no change, and the bottom-right corner shows "Running in background: <label> (n s elapsed)"; the first batch of 15 kinds: seven AI kinds + modeling landing / apply / unbind / unbind preview + catalog create table / alter table / read columns + approval DDL execution; the second batch of 14 kinds (released on 2026-10-27): governance column sync (the 60-second "Sync failed" false alarm) / workspace deletion (the warehouse cold-start retry) / sync generate DDL · execute create table / Flink start, stop and delete / workflow publish · unpublish · trigger · delete / S3 external table / metrics · model-metric computation; **the single primitive for awaiting a terminal state** is `awaitTerminal` (it throws when no waiting context is present; the 27-file ratchet baseline may only shrink); **object leases**: every kind declares the exclusive resource key it holds; if the lease cannot be taken ⇒ 409 `LONG_OP_IN_PROGRESS`, and the code-table / dimension-table modify and delete routes share the same guard; the six tabs of the modeling page refresh independently (a UX improvement of the same release) | `src/lib/long-ops/` (`kinds.ts` · `store.ts` · `driver.ts` · `await-terminal.ts` · `guard.ts` · `client/follow.ts`) · `src/lib/ai/long-op-executors.ts` · `src/lib/{modeling,governance,projects,sync,realtime,workflow,datasource,metrics}/long-ops.ts` · `src/app/api/long-ops/[taskId]/route.ts` · `src/components/long-ops/LongOpIndicator.tsx` |
 | Background pumps | 15 s pump for long data-plane jobs, 30 s backfill pump, periodic reconciler; advanced through internal endpoints | `src/lib/dataplane-jobs/pump.ts` · `backfill/pump.ts` · `exec-env/reconciler-loop.ts` · `api/internal/*` |
 | Platform-action dispatch | MWAA node → command table in the home region → dispatcher Lambda → `/api/internal/actions/run` | `src/lib/scheduler/action-*.ts` · `infra/lambda/action-dispatcher/` |
-| Onboarding | interactive tour, a "How to use this page" help button on every page, role-based getting started | `src/lib/guide/` (operation-guide design note) |
+| Onboarding | interactive tour, a "How to use this page" help button on every page, role-based getting started | `src/lib/guide/` ([operation guide design](design/operation-guide.md)) |
 | Multiple tabs (keep-alive) | every visited route opens a tab, and switching does not unmount opened pages; tab context menu "Close others / Close tabs to the right / Close all"; the tab bar is never empty (Close all keeps Home) | `src/components/layout/MultiTabs.tsx` · rules `multitabs-close.ts` |
 | Internationalization / themes | Chinese string bundle and check scripts; preview page for 12 skins | `src/lib/i18n/` · `platform/scripts/i18n-*.mjs` · `src/lib/skins/` |
 | Data service (retired) | `/api/public/data/*` returns 410 Gone | the superseded data-service design note (historical; not published) |
@@ -474,8 +474,8 @@
 | Execution environments / multi-region / place / execution scope / autonomous scheduling / zero egress / jurisdiction / cost by region | [`design/multi-region-execution.md`](design/multi-region-execution.md) | Current |
 | Run-time AI model configuration | [`design/model-configuration.md`](design/model-configuration.md) | Current |
 | Workspace isolation and copy | [`design/project-isolation.md`](design/project-isolation.md) | Current |
-| Operation guide | the operation-guide design note (not published separately) | Current |
-| Ask-Your-Data session cards | the session-card design note (not published separately) | Current |
+| Operation guide | [`design/operation-guide.md`](design/operation-guide.md) | Current |
+| Ask-Your-Data session cards | [`design/genbi-session-cards.md`](design/genbi-session-cards.md) | Current |
 | Long-running-operation framework (automatic switch to 202 + polling after 45 s; root fix for the 504 on cold-start landings, absorbs the hybrid AI-response protocol, object leases) | [`design/long-running-operations.md`](design/long-running-operations.md) | Design note published; the first and second batches were merged to the development branch and released on 2026-10-27; the third-batch list is in the design note |
 | Data Sync (capability completion of the 2026-10-13 release) | [`CHANGELOG.md`](../CHANGELOG.md), entry for the 2026-10-13 release | Current record |
-| All other modules | the design notes of the single-region stage, each with a scope header (not published separately) | Single-region-stage notes; current behavior is defined by this document and the code |
+| All other modules | the design documents of the single-region stage, each with a scope header; index in [`design/README.md`](design/README.md) | Single-region-stage designs; current behavior is defined by this document and the code |

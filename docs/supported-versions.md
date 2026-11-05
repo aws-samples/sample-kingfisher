@@ -141,7 +141,7 @@ Realtime compute runs on Managed Service for Apache Flink. The repository ships 
 | Component | Version | Default | Minimum | Notes |
 |---|---|---|---|---|
 | Managed Flink runtime environment | 1.20 | `FLINK-1_20` | — | Env `FLINK_RUNTIME_ENVIRONMENT` |
-| Flink, runner and connector JARs | 1.20.0 | — | — | `flink.version` in every Maven module |
+| Flink, runner and connector JARs | 1.20.4 | — | — | `flink.version` in every Maven module |
 | Java bytecode target | 11 | — | — | Managed Flink runtime is Java 11 |
 | Runner and module artifact version | 1.0 | — | — | All Maven modules |
 

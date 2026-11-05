@@ -1,259 +1,92 @@
-# Workflow Job Node
+# Workflow Job Node · Batch Job Nodes in the Orchestration DAG (requirements + design)
 
-Status: implemented. Code lives under `platform/src/lib/workflow/` (`job-ref.ts`, `job-node-spec.ts`, `job-node-prepare.ts`, `job-references.ts`, `back-links.ts`, `job-exec-py.ts`) and `platform/src/components/dag-editor/`.
+> Revision **1.0** (2026-11-03). Status: 🆕 design written, code pending (ships with the 2.2.0 release).
+> Decided on 2026-11-03: "Allow data sync tasks and batch development jobs to be chained into one DAG workflow and **published completely into Airflow Serverless**. This is a **basic capability; it must be fixed at the root, and to the highest global standard**."
+> Origin (the second question raised the same day): a Data Sync task's dependencies can only be other sync tasks; Batch Compute jobs cannot enter orchestration — to chain "sync → batch job → SQL" today, the only way is to paste the job's code once more into an inline SQL / Python node, losing the engine configuration, the execution role, the dependency libraries and the run history.
 
-Related: [Execution role binding](execution-role-binding.md), [Long-running operations](long-running-operations.md), [Supported versions](../supported-versions.md).
+## 1. Current state and gaps (🔵 code facts, surveyed 2026-11-03 on the development tree of that day)
 
-## 1. Summary
-
-- The orchestration canvas gains a **job node** that references an existing offline compute job (Glue script or Redshift SQL) or an EMR Serverless job.
-- A sync task, a job and a SQL step can now be chained into one DAG and published completely to the region's scheduler.
-- The node runs the referenced job with the same core as "run now": the same per-region Glue job name, the same EMR application and execution role, the same Redshift statements, the same run lock, and the same run ledger.
-- Binding is checked at publish time and fails closed: a job that is not bound to the workflow's region rejects the whole publish.
-- Run records link in both directions: from the job's run history to the workflow run, and from the workflow run's node details to the job's run history.
-- A job referenced by a workflow cannot be deleted (409).
-- Job nodes participate in backfill.
-
-## 2. Problem
-
-### 2.1 Before
-
-| Layer | Fact | Gap |
+| Layer | Fact (file:line) | Gap |
 |---|---|---|
-| Node types | Ten node types; none referenced an offline or EMR job | A job could not be placed on the canvas |
-| Executor | One shared Python block used by two scheduler carriers | The single-job run family lived only in the serverless runtime, outside the shared block |
-| DAG to platform | DAG Python talks to AWS directly, not to the platform HTTP API | Job nodes must do the same; no new internal endpoints |
-| Sync node | Started the Glue job by its home-region name; no business date; no run row for the sync task | A task bound to another region failed at run time; run history did not show "triggered by workflow" |
-| Binding check | Place consistency checked only on start and backfill, not on publish | Mismatches surfaced as `EntityNotFound` at run time |
-| Candidates | Node panel listed all sync tasks regardless of region or project | Users could pick tasks the workflow could never run |
-| Backfill | Workflow scope recognised only SQL and sync nodes | Job nodes could not be backfilled |
+| Node list | `types/workflow.ts:32-36` ten kinds `sync / sql / python / branch / empty / join / foreach / setvar / external / platform-action`;<br>`lib/workflow/node-registry.ts:62-142` one row per kind (`runtimeExecutor · supportsBackfill · minEngine · serverless · userPlaceable · validate`); a missing row is a tsc error | **No node references a Batch Compute job (`bgp-etl-jobs`, glue / redshift) or an EMR engine job (`bgp-engine-jobs`)** |
+| Executor | Node semantics exist in exactly **one** Python block `NODE_EXEC_PY` (`lib/workflow/node-exec-py.ts`), spliced into two carriers: the classic runtime-lib (`lib/workflow/runtime-lib.ts`, `RUNTIME_LIB_VERSION = 10`) and the MWAA Serverless `bgp_runtime` (`lib/scheduler/serverless/runtime-py.ts`);<br>the legacy generator `dag-generator.ts` is frozen | A new node = one executor added to the shared block + one dispatch entry in each of the two carriers; legacy does not support it (same rule as branch / foreach, `minEngine: "runtime-lib"`) |
+| Single-job carrier | The serverless runtime library already has the `run_job` family (`runtime-py.ts:177-300`: `_run_glue` with `bgp_run_param_args(ds)` · `_run_emr` waits for the application to be STARTED and then calls `start_job_run` · `_run_redshift` · `_acquire_run_lock` job lock `lockAttrFor(target)` · `_record` writes `bgp-task-runs` + writes back to the job row · `_check_soft_limit` 50 minutes); the spec is resolved **at publish time** by `lib/etl/dag-fanout.ts:325-358` / `lib/engines/emr/schedule-fanout.ts:124-158` (per-region Glue job name / EMR application / statements) | This family is **not in the shared block**, so workflow nodes cannot use it; the classic carrier does not have it |
+| DAG ⇄ platform | The Python inside a DAG **goes entirely through boto3** (glue / redshift-data / emr-serverless / dynamodb), never through the platform HTTP API (`/api/internal/*` serves only the platform-action node and the two pumps) | Job nodes must also go through boto3; no new endpoint is opened |
+| Sync node | `_exec_sync(env, task_id)` (`node-exec-py.ts:148-166`): reads the task row's `glueJobName` (**the home-region display copy**) → `start_job_run` **without Arguments** (no business date) → polls every 15 seconds with no upper bound;<br>**does not write** the sync task's own run row;<br>save / publish **do not check** that the task's place ∋ the workflow's place (`assertDefinitionRunsHere` is used only by the start route and by backfill, `definition-binding.ts:50-82`);<br>the node panel's `/api/sync` is not filtered by place / project (`NodeConfigPanel.tsx:20-25`) | A task bound to another region ⇒ EntityNotFound at run time; the sync run history never shows "triggered by workflow" |
+| Backfill | `lib/backfill/execute.ts:93-125` workflow scope recognizes only `sql` / `sync` nodes | Job nodes must be backfillable |
+| Pages | Canvas render mapping `components/dag-editor/DagEditor.tsx:62-66`; panel `NodeConfigPanel.tsx`; the palette `PALETTE_NODE_TYPES` lists `userPlaceable` kinds automatically | Add the `JobNode` render + the panel fields |
 
-- The only workaround was pasting the job code into a SQL or Python node.
-- That lost the engine configuration, the execution role, the dependency libraries and the run history.
+In one sentence: **today "sync → SQL / Python" can be chained; "sync → batch job" cannot** — not because the generator cannot generate it, but because there is no such node and no shareable job executor.
 
-### 2.2 In one sentence
+## 2. Requirements (contract)
 
-"Sync then SQL or Python" could be chained; "sync then job" could not, because neither the node nor a shared job executor existed.
-
-## 3. Requirements
-
-| # | Requirement |
-|---|---|
-| R1 | A job node references one job of the same project whose bindings include the workflow's region; the picker filters by project and region |
-| R2 | Execution equals "run now": same Glue job name per region, same EMR application and role, same Redshift statements, same run lock, business date passed |
-| R3 | Run rows are written twice: the job's own run row with a back-link to the workflow run, and the workflow instance row |
-| R4 | Publish is complete on both scheduler carriers; the legacy generator rejects the node with 400 |
-| R5 | Place consistency is checked at publish for job nodes and sync nodes; any mismatch rejects the whole publish with 400 |
-| R6 | Backfill supports job nodes with `triggeredBy: "backfill"` |
-| R7 | Deleting a referenced job returns 409 naming the workflows; a missing or retyped job is flagged on the canvas and rejects publish |
-| R8 | Sync nodes gain the same publish-time check, region-filtered candidates and run-row back-links |
-| R9 | Stored DAG definitions are unchanged; new fields are additive; no new tables |
-
-## 4. Concepts
-
-| Term | Definition |
-|---|---|
-| Job node | Node type `job`; `data.jobRef = { kind, jobId }` |
-| `kind` | Closed list `JOB_NODE_KINDS = ["etl", "emr"]`; `etl` covers Glue and Redshift offline jobs, `emr` covers EMR Serverless jobs |
-| `jobSpec` | The run spec resolved at publish time and attached to `node.data.jobSpec` in the generated artefact only; never saved with the workflow |
-| Workflow place | The execution region the workflow publishes to; every node must be runnable there |
-| Back-link | Fields on a run row (`workflowId`, `workflowRunId`, `nodeId`, `workflowName`) and the derived page links |
-
-`jobRefOf(node)` in `job-ref.ts` is the only reader of the reference; it is a pure function usable in the browser and on the server.
-
-## 5. Node registry entry
-
-| Attribute | Value |
-|---|---|
-| `type` | `job` |
-| `labelKey` | "Batch Job Node" |
-| `runtimeExecutor` | `job` |
-| `supportsBackfill` | `true` |
-| `minEngine` | `runtime-lib` (the frozen legacy generator rejects it) |
-| `serverless` | `task` (one scheduler task per node) |
-| `userPlaceable` | `true` (appears in the palette automatically) |
-| `validate` | `jobRef.kind` in the closed list and `jobId` non-empty, else "node is not linked to a batch job" |
-
-The engine from the job row is not duplicated on the node; it is read when the spec is resolved.
-
-## 6. Publish-time resolution
-
-### 6.1 Loading the referenced job
-
-`loadJobNodeRow(node, workflow, wfTarget)` performs the checks below and throws `JobNodeUnbound` on any failure.
-
-| Reason | Check | Message names |
+| # | Requirement | Acceptance (page-driven) |
 |---|---|---|
-| `missing-ref` | `jobRef` absent or malformed | Node |
-| `not-found` | Job row missing in `bgp-etl-jobs` or `bgp-engine-jobs` | Node, job id |
-| `kind-mismatch` | `kind: emr` but the row's engine is not EMR Serverless | Node, job id, engine |
-| `project-mismatch` | Job's project differs from the workflow's project | Node, job name, both projects |
-| `not-bound` | `bindingTargets(job)` does not include the workflow place | Node, job name, bound regions, target region |
+| R1 | New node **Batch Job Node `job`**: references one Batch Compute job (Glue script / Redshift SQL) or EMR Serverless job of the same project **whose bindings include the workflow's place**; the panel dropdown filters by project + place and shows "name · engine · bound region" | The panel of a us-west-2 workflow lists only jobs bound to us-west-2; once selected, the canvas node shows the job name and engine |
+| R2 | Execution semantics = the **same core** as the job's "Run now": the same per-region Glue job name (`glueJobNameFor(jobId, target)`) / the same EMR application + execution role / the same set of Redshift statements;<br>with the business date (classic takes Airflow `ds`; serverless has no logical date ⇒ `today`, the same rule as the single-job carrier, with backfill passing it in);<br>**the same job run lock** (`lockAttrFor(target)` on the `bgp-etl-jobs` / `bgp-engine-jobs` row; busy ⇒ wait up to 45 minutes / skip on timeout, consistent with the scheduler);<br>waits for the terminal state;<br>the 50-minute soft limit writes `timeout-pending` (the serverless single-task hard limit is 60 minutes) | The Glue JobRun the node runs has the job's own per-region name; the job page's "Run history" shows that run |
+| R3 | **Run rows written twice with back-links**: the job's own `bgp-task-runs` row (taskId = jobId, taskType `etl-glue / etl-redshift / emr-serverless`, `triggeredBy: "workflow"`, extra `{ workflowId, workflowRunId, nodeId }`) + the workflow instance row as before;<br>the job's "Run history" can click through to the workflow instance, and the workflow instance's node can click through to the job run | The job's run history row shows "Triggered by workflow X" and can be followed |
+| R4 | **Complete publish**: both carriers — the serverless YAML (one task per node) and the classic runtime-lib — support it; publishing with the legacy engine ⇒ 400 pointing to switch to runtime-lib (same rule as branch) | us-west-2 (serverless) publish succeeds, `ListWorkflows` lists it, a trigger really runs all three nodes green |
+| R5 | **Place consistency fails closed (at publish)**: the job a job node references must satisfy `bindingTargets(job) ∋ workflow place`, otherwise publish 400 naming the node and the job; **the sync node gets the same check in the same change** (`assertDefinitionRunsHere`), instead of waiting for EntityNotFound at run time | Drag a home-bound job into a us-west-2 workflow ⇒ publish 400 names it verbatim |
+| R6 | Backfill: workflow scope supports `job` nodes ⇒ `runEtlJob(job, { runDate, triggeredBy: "backfill", targetId })` / `provider.submit(...)`; `supportsBackfill: true` | A backfill plan that ticks the workflow ⇒ the job node runs per date, run rows `triggeredBy: backfill` |
+| R7 | Referential integrity: before deleting a job, check workflow references (single author); referenced ⇒ 409 `JOB_IN_USE` listing each workflow (the same rule as deleting a data source that sync / stream tasks still reference); job missing / type changed ⇒ the canvas node is flagged "job not found", publish 400 | Delete a referenced job ⇒ 409 names the workflow verbatim, nothing is deleted |
+| R8 | Sync node follow-up (same change, not a separate item): ① publish-time place consistency (R5); ② the panel dropdown filters by place + project; ③ a run writes the sync task's own run row (`taskType: sync`, `triggeredBy: "workflow"`, back-link) — the same "two rows with back-links" as the job node | The sync task's "Run history" shows the row triggered by the workflow |
+| R9 | Compatibility: existing `dagDefinition` unchanged; the new kind is additive only; `RUNTIME_LIB_VERSION` 10 → 11 (already published classic workflows are republished once to pick up the new library, same rule as 9 → 10); the serverless runtime library version = the source sha, changes automatically; no new tables | Existing workflows are untouched unless changed; behavior unchanged after republishing |
 
-- The read uses a consistent read so a row updated moments earlier during preparation is seen.
-- The project of rows without an explicit project resolves through the same stamp resolver used for run records; no second default is written.
-- `JobNodeUnbound` has `code = "JOB_NODE_UNBOUND"`; routes map it to 400 because the fix is to change the diagram or the binding, not to install anything.
-- The platform never picks another region on the user's behalf.
+## 3. Design
 
-### 6.2 Resolving the spec
+### 3.1 Types and registry (the closed list changes first)
+- `types/workflow.ts`: `WorkflowNodeType` + `"job"`; `{ type: "job"; data: CommonNodeData & { jobRef?: { kind: "etl" | "emr"; jobId: string } } }` (`kind` is closed; `etl` covers both Batch Compute job kinds, glue / redshift; the engine is read from the job row and not stored again on the node).
+- `node-registry.ts`: `job: { labelKey: "Batch Job Node", runtimeExecutor: "job", supportsBackfill: true, minEngine: "runtime-lib", serverless: "task", userPlaceable: true, validate: d => d.jobRef?.jobId ? null : { key: "Batch Job node \"{nm}\" is not linked to a batch job" } }` (the two string literals are i18n keys, shown here with their English locale text).
+- `dag-generator-v2.test.ts:29` "exactly sql + sync support backfill" becomes `sql + sync + job`.
 
-- `resolveJobNodeSpec(node, wfTarget, projectId, ctx)` calls the existing single-job spec authors: `lib/etl/job-spec.ts` for offline jobs and `lib/engines/emr/job-spec.ts` for EMR jobs.
-- The result is the same `ServerlessJobSpec` the single-job scheduler carrier uses: `engine`, `jobId`, `dagId`, `taskType`, `jobsTable`, `lockAttr`, `place`, `stamp { projectId, targetId }` and engine-specific fields.
-- `withJobSpecs` attaches the spec to `node.data.jobSpec` for job nodes only; every other node and edge is byte-identical, so existing workflows produce unchanged artefacts.
-- An EMR job that has never been prepared in the region resolves to `not-prepared` on the read-only path; the publish path prepares first (section 7).
+### 3.2 Publish-time resolution: a single author for the job spec
+- New `lib/workflow/job-node-spec.ts#resolveJobNodeSpec(node, wfTarget, projectId)`: read the job row (ETL `bgp-etl-jobs` / EMR `bgp-engine-jobs`) → same project, `bindingTargets(job) ∋ wfTarget` (otherwise `JobNodeUnbound` ⇒ 400) → call the **existing** single-job spec constructor to obtain **the very same** spec as the single-job carrier.
+- Extract the spec construction in `dag-fanout.ts:325-358` (ETL) and `schedule-fanout.ts:124-158` (EMR) into the single authors `lib/etl/job-spec.ts#serverlessJobSpecFor(job, targetId)` / `lib/engines/emr/job-spec.ts#emrJobSpecFor(job, targetId)`; both call sites switch to importing them (ratchet: the spec field set is defined only in these two places).
+- `buildDagSpec` (classic v2) and `buildWorkflowTasksYaml` (serverless) both write the resolved result into `node.data.jobSpec` for `job` nodes (engine / jobId / glueJobName | statements | the five EMR fields / jobsTable / lockAttr / taskType / place / stamp); resolution failure ⇒ publish 400 naming it (`JobNodeUnbound` added to the existing error mapping in `long-ops.ts`).
 
-### 6.3 Fail-closed order inside publish
+### 3.3 Python executor: the job family moves into the shared block
+- New shared block `lib/workflow/job-exec-py.ts#JOB_EXEC_PY`: move `_ddb / _record / _acquire_run_lock / _release_run_lock / _check_soft_limit / _exec_place / _run_redshift / _run_glue / _run_emr` from `runtime-py.ts` **as they are** (bytes unchanged); both carriers splice it in; the single-job carrier's `run_job` is changed to call the same family.
+- `NODE_EXEC_PY` gains `_exec_job(env, node, ds)`: `spec = node["data"]["jobSpec"]` → `_acquire_run_lock(spec, token)` (busy ⇒ wait 45 minutes / skip) → run by `spec["engine"]` → `_record(spec, run_id, status, extra={ "triggeredBy": "workflow", "workflowId", "workflowRunId", "nodeId", "duration" })` → release;
+  - exceptions close the books and re-throw, following the existing `run_node` convention.
+- `_exec_sync` in the same change: at the end of the run, write the sync task's own run row (`taskType: sync`, `triggeredBy: workflow`, back-link fields as above); everything else untouched (whether the business date can be passed to the sync script still has to be checked against `SYNC_RUN_VARS_PY`; not promised in this change).
 
-1. Resolve the carrier plan (read-only): scheduler endpoint present, warehouse place, node and sync binding consistency, unsupported node types, legacy engine capability gate, spec self-validation.
-2. Any rejection here leaves the region untouched: 409 when the scheduler component is not installed, 400 for every other reason.
-3. Prepare job nodes (write phase, section 7).
-4. Generate the artefact and upload it.
+### 3.4 Wiring the two carriers
+- classic `runtime-lib.ts#_make_operator`: `job` ⇒ `PythonOperator(_exec_job, op_kwargs={env, node, ds: "{{ ds }}"})`; `RUNTIME_LIB_VERSION = 11`.
+- serverless `runtime-py.ts#_run_node_body`: `job` ⇒ `_exec_job(e, node, ds=ctx.get("ds") or today)`; `workflow-yaml.ts` unchanged (one task per node already covers it).
+- `runtime-single-author.test.ts`: `SHARED_DEFS` gains the job family + `_exec_job`; both carriers byte-identical; the version-bump check as before.
 
-`assertWorkflowNodesRunOn(workflow, wfTarget)` iterates nodes: sync nodes go through `assertDefinitionRunsHere`; job nodes go through the checks in 6.1. One failure rejects the entire publish; nothing is published partially.
+### 3.5 Place consistency (R5)
+- Before `publish-dag.ts#buildCarrierArtifact` generates: iterate the nodes; `sync` ⇒ `assertDefinitionRunsHere(task, "sync task", wfTarget)` (the second argument is the display label, shown here in English); `job` ⇒ the `JobNodeUnbound` of 3.2; any mismatch ⇒ the whole publish is 400 (no publishing half first; the same fail-fast rule `publishWorkflowDag` already has).
 
-## 7. Preparation per region
+### 3.6 Backfill (R6)
+- `lib/backfill/execute.ts` workflow scope gains a `job` branch: ETL ⇒ `runEtlJob(job, { runDate, triggeredBy: "backfill", targetId: inst.targetId })`; EMR ⇒ `getProvider("emr").submit(job, { runDate, triggeredBy: "backfill", targetId })`; the run row's extra carries `backfillPlanId / backfillNode` (same shape as the sql node).
 
-`prepareJobNodesForTarget(workflow, wfTarget)` makes each referenced job runnable in the region, using the same authors as "run now".
+### 3.7 Reference guard (R7)
+- New `lib/workflow/job-references.ts#workflowsReferencingJob(jobId)` (scans `bgp-workflows` for `dagDefinition.nodes[].data.jobRef.jobId`, within the project); the ETL / EMR delete routes check before deleting; non-empty ⇒ 409 `JOB_IN_USE` (`ApiErrorCode` gains one member, detail `{ workflows: [{ id, name }] }`); the page dialog points the way.
 
-| Job kind | Writes |
-|---|---|
-| Offline Glue job | `ensureGlueJob(job, wfTarget)` creates or updates the per-region Glue job definition, including the custom role preflight |
-| Offline Redshift job | Nothing to prepare; statements run through the warehouse place at run time |
-| EMR Serverless job | Upload the script, ensure the S3 Tables jar, ensure the application, persist the application id on the job row |
+### 3.8 Pages (R1 / R8)
+- `components/dag-editor/JobNode.tsx` (reuses `RichNodes.tsx#Shell`: job name · engine Tag · "Not linked / job not found"); `DagEditor.tsx` nodeTypes gains `job`.
+- `NodeConfigForm` job fields: a `Select` grouped into "Batch Compute (Glue / Redshift)" and "EMR Serverless"; the options come from `GET /api/etl-jobs?scope=<workflow place>` and `GET /api/engines/emr?scope=<workflow place>` (two existing read endpoints, filtered by `scope=` — the execution-scope read guard recognizes it), label `name · engine · bound region`; the sync node's dropdown likewise gains `scope=`.
+- The palette picks it up automatically; "How to use this page" gains a sentence; the English dictionary in the same commit.
 
-- A custom execution role on an EMR job is preflighted for the region before anything is written; a gap fails the publish with the preflight message.
-- Without job nodes the preparation performs zero writes.
-- The returned list records what was prepared per node for audit and troubleshooting.
+## 4. Checks and gates
+- Unit tests: registry closure / the backfill set;
+  - `job-node-spec` (project mismatch / not bound to the region / job missing ⇒ rejected; the spec equals the single-job carrier's field by field);
+  - `runtime-single-author` (the job family is shared + both carriers dispatch `job` to the same executor);
+  - `workflow-tasks-yaml` (a job node ⇒ one task, `op_kwargs.node.data.jobSpec` complete);
+  - `py_compile` of both carriers;
+  - publish 400 checks (sync place mismatch / job not bound to the region / legacy engine);
+  - the backfill job branch;
+  - delete job 409;
+  - component server-side real render (JobNode / panel fields).
+- New page-driven acceptance segment (us-west-2, serverless): create a workflow → drag a "Data Sync Node" (a us-west-2 sync task) → drag a "Batch Job Node" (a us-west-2 Glue job) → drag a "SQL Node" → connect → publish → trigger → all three nodes green, workflow instance succeeded → the job's "Run history" shows a `triggeredBy=workflow` row with a back-link → the sync task's run history likewise → negative: drag a home-bound job in and publish ⇒ 400 verbatim → delete a referenced job ⇒ 409 → a backfill plan ticks the workflow ⇒ the job node runs per date.
+- Mutations: remove `_acquire_run_lock` from `_exec_job` ⇒ the lock check goes red; remove the publish-time place check ⇒ the check goes red.
 
-## 8. Two scheduler carriers
+## 5. Risks / boundaries
+- Serverless single-task hard limit of 60 minutes: a long job node over the limit ⇒ `timeout-pending` (same rule as the single-job carrier); the text names it.
+- `RUNTIME_LIB_VERSION` bump ⇒ already published classic workflows must be republished once (the upgrade note goes into CHANGELOG).
+- EMR application cold start of up to 10 minutes (40 × 15 s) counts toward the node's duration.
+- Business date for sync scripts: whether the sync node passes ds to the Glue sync job depends on how the sync script reads its parameters; this change only adds the place check + the run-row back-link, and date passing is decided after a separate check.
 
-The node semantics exist once, in Python, and are embedded in both carriers.
-
-| Carrier | Dispatch | Business date |
-|---|---|---|
-| MWAA Serverless runtime | `_run_node_body` routes `type == "job"` to `_exec_job(env, node, ds, workflow_run_id)` | From the run context, else today |
-| Classic MWAA runtime library | `_make_operator` creates a `PythonOperator` calling `_exec_job` with `scheduler="mwaa"` | Airflow `{{ ds }}` |
-
-- The job family (`_ddb`, `_record`, `_acquire_run_lock`, `_release_run_lock`, `_check_soft_limit`, `_exec_place`, `_run_redshift`, `_run_glue`, `_run_emr`) moved into the shared block `JOB_EXEC_PY` and is included byte-identically in both carriers.
-- The single-job carrier's `run_job` calls the same family.
-- The classic runtime library version was incremented; already-published classic workflows must be republished once to receive it.
-- The serverless runtime library version is derived from the source hash and changes automatically.
-- A single-author test asserts both carriers embed the same bytes and dispatch `job` to the same executor.
-
-## 9. Run-time semantics of `_exec_job`
-
-1. Read `node.data.jobSpec`; a missing spec means the workflow must be republished.
-2. Verify `spec.stamp.targetId` equals the runtime's region; otherwise refuse (publish checked it, the runtime checks again).
-3. Build the job run id from the workflow run id, node id and region.
-4. Acquire the job's run lock on the job row (`lockAttr` of the region) with a wait budget of 45 minutes.
-5. If the lock is still held, write a `failed` run row and raise; the node is never skipped, because a skip would let the workflow finish green without the job's output.
-6. Run by engine: `_run_redshift`, `_run_glue` (with the business date) or `_run_emr`.
-7. The soft limit of 50 minutes counts from the node start, including lock wait, because the serverless task hard limit of 60 minutes also counts from task start.
-8. Write the run row with `triggeredBy: "workflow"`, `workflowId`, `workflowRunId`, `nodeId`, `runDate`, and `workflowName` when available; `scheduler` is added on the classic carrier.
-9. Release the lock; on failure close the ledger first and rethrow the original exception.
-
-## 10. Run-record back-links in both directions
-
-### 10.1 Job run history to workflow run
-
-- Run rows written by a job node or a sync node carry `triggeredBy: "workflow"` and the workflow fields.
-- `workflowRunHref(run)` builds `/workflow/<workflowId>?run=<workflowRunId>`; the run id is URL-encoded because it contains `#`.
-- The shared cell `RunTriggerCell` renders "Triggered by workflow <name>" as a link, `data-testid="run-trigger-workflow"`.
-- It is used on the offline compute run history and the EMR job panel.
-
-### 10.2 Workflow run to job run history
-
-- The workflow detail page opens the node details of the run named by `?run=` once the run list has loaded.
-- The node status API attaches `backLink` to every row by mapping Airflow task ids back to definition nodes through the generator's id map.
-- `nodeBackLinkHref` builds `/etl-jobs?jobId=<jobId>&tab=runs` for job nodes and `/sync/<taskId>` for sync nodes.
-- The link is rendered with `data-testid="node-job-run-link"` and labelled "job run history" or "sync run history".
-- Rows without a link carry `backLink: null`, so the page never guesses.
-
-## 11. Sync node changes in the same design
-
-- Publish checks that the referenced sync task is bound to the workflow place.
-- The node panel lists only sync tasks of the workflow's region and project.
-- After a run, a run row is written for the sync task itself with `triggeredBy: "workflow"` and the same back-link fields.
-- Passing the business date to the sync Glue job is not part of this design (section 16).
-
-## 12. Delete guard
-
-- `workflowsReferencingJob(jobId, projectId)` scans workflow definitions for job nodes whose `jobRef.jobId` matches.
-- Workflows in the job's project are listed with id, name and node ids.
-- Workflows in other projects are counted but not named, so object names do not leak across projects.
-- Both delete routes (offline jobs and engine jobs) call it before deleting; any reference returns 409.
-
-```json
-{ "success": false,
-  "error": { "code": "JOB_IN_USE",
-             "message": "This job is still referenced by 2 workflow job nodes: <A>, <B>; deletion refused. ...",
-             "detail": { "workflows": [ { "id": "<wf>", "name": "<A>", "nodeIds": ["n3"] } ],
-                         "otherProjects": { "count": 0 } } } }
-```
-
-The page shows the message verbatim and points the user to the workflow canvas.
-
-## 13. Backfill
-
-- The backfill executor's workflow scope has a `job` branch.
-- Offline jobs run through `runEtlJob(job, { runDate, triggeredBy: "backfill", targetId, backfill })`.
-- EMR jobs run through the EMR provider's `submit` with the same options.
-- Run rows carry `triggeredBy: "backfill"`, `backfillPlanId` and `backfillNode`, matching SQL node backfill rows.
-- The runner collects the final state by `(jobId, runId)`.
-
-## 14. User interface
-
-| Element | Location | `data-testid` |
-|---|---|---|
-| Job node card | Canvas, `JobNode.tsx` | `dag-node-job-name`, `dag-node-job-engine`, `dag-node-job-warning` |
-| Job picker | Node configuration panel | `job-node-picker` |
-| Missing-job hint | Node configuration panel | `job-node-missing` |
-| Sync task picker | Node configuration panel | `sync-node-picker` |
-| Candidate scope note | Node configuration panel | `node-candidates-scope` |
-| Candidate load error | Node configuration panel | `node-candidates-error` |
-
-- The palette lists the node automatically because it is user-placeable.
-- The job picker has two groups, "Offline compute (Glue / Redshift)" and "EMR Serverless", with labels `name · engine · bound region`.
-- Candidates come from the existing read endpoints `/api/etl-jobs`, `/api/engines/emr-serverless` and `/api/sync`, each called once per workflow region with `?scope=<targetId>`.
-- For a workflow bound to several regions only candidates bound to every region are shown.
-- A job that no longer exists or is no longer bound shows a warning on the card and in the panel; publish rejects it.
-- The page help explains the node; English dictionary entries ship with the feature.
-
-## 15. Compatibility
-
-- Existing DAG definitions are untouched; `job` is a new node type.
-- Classic published workflows must be republished once because the runtime library version changed.
-- No new tables; no environment variables.
-- Error code `JOB_IN_USE` is added to the API error code list.
-
-## 16. Acceptance behaviour
-
-Page-driven scenarios in a headless browser on a non-home region using the serverless scheduler:
-
-1. Create a workflow; drag a sync node (a task of that region), a job node (a Glue job of that region) and a SQL node; connect them; publish.
-2. Publish succeeds; the scheduler lists the workflow; a trigger runs all three nodes green and the instance ends `succeeded`.
-3. The job's run history shows a row "Triggered by workflow <name>" that links to the workflow run; the workflow run's node details link back to the job's run history.
-4. The sync task's run history shows the same kind of row.
-5. Negative: a job bound only to the home region placed into the non-home workflow makes publish return 400 naming the node and the job.
-6. Negative: deleting the referenced job returns 409 naming the workflow; the job remains.
-7. A backfill plan that includes the workflow runs the job node per date with `triggeredBy: "backfill"`.
-
-Unit guards:
-
-- Registry closure and the backfill-capable set.
-- Spec resolution rejections, and spec equality with the single-job carrier.
-- Runtime single author across both carriers.
-- YAML emits one task per job node carrying the spec.
-- Python compile of both carriers.
-- Publish 400 cases (sync mismatch, unbound job, legacy engine).
-- Backfill job branch.
-- Delete 409.
-- Server render of the node card and panel fields.
-
-Mutations: removing the lock acquisition or the publish-time binding check turns a test red.
-
-## 17. Limits and known gaps
-
-- The serverless task hard limit of 60 minutes applies; long job nodes end as `timeout-pending`, as with the single-job carrier.
-- EMR application cold start of up to 10 minutes counts toward the node duration.
-- Whether the business date reaches the sync Glue job depends on how the sync script reads arguments; this design adds only the binding check and run-row back-links for sync nodes.
+## 6. Effort
+2 days: ① types / registry / spec single author / shared block and wiring of both carriers ② publish-time place check / backfill / reference guard / pages ③ unit tests + the page-driven acceptance segment.
