@@ -48,7 +48,7 @@ Install the following on your workstation. Exact versions are pinned in [`suppor
 - git, Node.js and npm.
 - AWS CLI with named profiles. Every AWS command in this project takes an explicit `--profile`.
 - Docker with buildx, needed to build the platform image and the agent images.
-- `python3`, needed by several scripts and by the headless acceptance tooling.
+- `python3` with the `boto3` package (`python3 -m pip install --user boto3`). Several scripts and the headless acceptance tooling need Python, and the platform unit tests execute the scheduler runtime library's Python sources, which import `boto3` at module level; without it those tests fail.
 - A JDK and Maven, needed only to build the Flink runner modules.
 
 ## 3. Getting started
@@ -58,6 +58,7 @@ git clone <repository-url> kingfisher
 cd kingfisher
 (cd platform && npm ci)
 (cd infra && npm ci)
+python3 -m pip install --user boto3
 bash scripts/install-hooks.sh
 ```
 
@@ -189,8 +190,8 @@ Bug reports use `.github/ISSUE_TEMPLATE/bug_report.md`. They describe what the u
 | Job | Steps |
 |---|---|
 | Red-line scan | `bash scripts/redline-scan.sh` over tracked files |
-| Platform | `npm ci`; rebuild all `core-dist` bundles with `scripts/core-prebuild.sh all` and fail if they differ from the committed ones; `npm test`; `npm run build` |
-| Infra | `npm ci`; `npm run build` (TypeScript); `npx cdk synth --all` with placeholder account and region |
+| Platform | `npm ci` in `platform/` and `infra/` (several offline judges run the infra scripts) and `pip install boto3`; rebuild all `core-dist` bundles with `scripts/core-prebuild.sh all` and fail if they differ from the committed ones; `npm test`; `npm run build` |
+| Infra | `npm ci` in `infra/` and `platform/` (the agent skills Lambdas are bundled from `platform/src` with esbuild at synth time); `npm audit` on production dependencies; `npm run build` (TypeScript); `npx cdk synth` with a placeholder account, region and availability-zone context and no credentials |
 
 The `core-dist` check guards the compiled bundles that the agent containers and the skills Lambda load.
 If you change a `core/*.ts` source, run `bash scripts/core-prebuild.sh all` and commit the refreshed bundles.
