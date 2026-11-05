@@ -1,8 +1,10 @@
 # Kingfisher Features
 
 This document walks through every page of the Kingfisher console, one section per menu group and one subsection per page.
-Each subsection states the purpose of the page, its key capabilities, a screenshot and the AWS services behind it.
+Each subsection states the purpose of the page, how to use it and its key capabilities, its multi-region semantics, a screenshot and the AWS services behind it.
 Screenshots come from a two-region demo environment (home region plus one execution region); the UI is shown in Chinese, and an English mode is available from the top-right language switcher.
+Account ids and resource identifiers in the screenshots have been replaced with placeholders.
+The architecture, including the code layout behind these pages, is described in [`architecture.md`](architecture.md).
 
 Three behaviours are shared by every page:
 
@@ -11,12 +13,26 @@ Three behaviours are shared by every page:
 - Any action that waits for an external system (table creation, model landing, sync generation, model calls) moves to the background after 45 seconds.
   Progress shows in the bottom-right corner, so no page ever hits the 60-second gateway timeout.
 
+## Contents
+
+- [1. Sign-in and home](#1-sign-in-and-home)
+- [2. AI Hub: Copilot Plan Center](#2-ai-hub)
+- [3. Data Integration: Data Sources, Data Sync](#3-data-integration)
+- [4. Data Development: Batch Compute, ETL Orchestration, Redshift Query, Athena Query, Stream Compute](#4-data-development)
+- [5. Smart Analytics: Ask-Your-Data, Skills, Observability, Report Builder, Requests](#5-smart-analytics)
+- [6. Data Governance: Data Governance, Governance Workbench, Data Modeling, Business Glossary and Rules, Governance Center](#6-data-governance)
+- [7. Scheduling and Ops: Task Monitor, Multi-Region Dashboard, Backfill Center, Alerting Center, FinOps, Ops Dashboard, Incident Knowledge Base](#7-scheduling-and-ops)
+- [8. System: Workspaces, Execution Environments, Users, Audit Log, Settings](#8-system)
+- [9. Pages outside the menu](#9-pages-outside-the-menu)
+- [10. Cross-cutting behaviours](#10-cross-cutting-behaviours)
+
 ## 1. Sign-in and home
 
 ### 1.1 Sign-in (`/login`)
 
 Users sign in against an Amazon Cognito user pool that the platform creates at deployment.
-The page footer shows the release tag and build commit of the running platform; the public endpoint `GET /api/public/version` returns the same facts.
+The page footer shows the release tag and build commit of the running platform (an unreleased build shows the short commit hash plus "unreleased");
+the public endpoint `GET /api/public/version` returns the same facts.
 
 ![Sign-in page with the release tag in the footer](screenshots/login.webp)
 *Figure 1.1: Sign-in page. The footer shows the release tag and build commit.*
@@ -25,7 +41,8 @@ The page footer shows the release tag and build commit of the running platform; 
 
 ### 1.2 Home (`/`)
 
-The home page summarises the selected execution scope: resource counts, today's runs and success rate, run-status distribution and a 7-day run trend.
+The home page summarises the selected execution scope: resource counts (data sources, sync tasks, workflows, ETL jobs, EMR jobs), today's runs and success rate,
+run-status distribution, a 7-day run trend and the resource composition.
 It also shows the trigger mix (scheduled versus manual) and core business metrics taken from the metrics system of Data Modeling.
 A "getting started" row offers the interactive tour, the operation guide and shortcuts to Workspaces and Execution Environments.
 
@@ -78,16 +95,16 @@ Creating objects is the plan's job; running them stays with you on the correspon
 
 The data source page registers and manages connections to source systems: JDBC databases (MySQL, PostgreSQL, Oracle, SQL Server), S3 object storage, DynamoDB, Kinesis and MSK.
 Credentials go to Secrets Manager; a JDBC source gets a Glue connection and a platform-managed security group in the region you choose.
-Platform-owned network objects are tagged, and if someone deletes them outside the platform they are rebuilt at the next use with an audit record.
+Platform-owned network objects are tagged `bgp:managed`, and if someone deletes them outside the platform they are rebuilt at the next use with an audit record.
 
 **Key capabilities**
 
-- New-data-source wizard: type, connection details, network configuration, connection test, finish. Provisioning runs as a background task.
+- New-data-source wizard: type, connection details, network configuration, connection test, finish. Provisioning runs as a background task, so it never times out.
 - Per-row actions: browse tables, network configuration (subnet and security-group facts), reachability check, edit, delete.
-- Delete refuses with a list of the sync or streaming tasks that still reference the source.
+- Delete refuses (HTTP 409) with a list of the sync or streaming tasks that still reference the source, naming each one; nothing is deleted.
 - S3 sources can create an external table in the region's Glue catalog for direct Athena queries.
-- A network advisor agent diagnoses connectivity in the source's region and proposes applicable fixes.
-- Each source lives in one execution region; a task in another region cannot use it.
+- When a source cannot be reached, a network advisor agent probes from the source's region and proposes applicable fixes.
+- A source is created in the selected execution region and lives there; a mismatch between the source's region and a task's region is refused permanently (HTTP 409).
 
 ![Data source list with status, region and row actions](screenshots/datasources.webp)
 *Figure 3.1a: Data source list.*
@@ -115,6 +132,7 @@ Every run records row counts, duration and logs, and tasks can be scheduled on t
 - Start now, run for a given date, schedule by cron, or backfill a date range.
 - Post-write reconciliation, row-count metrics and column-level lineage pushed to OpenMetadata.
 - A guard that asks for confirmation before overwriting a table the platform did not create.
+- The first Redshift table creation and the platform marker are written in one transaction, so a half-created table cannot be left behind.
 - Stop and delete remove the DMS replication task and the Glue job, not just the row.
 - List auto-refresh while tasks are starting, running or stopping; a detail page with run history and per-run logs.
 - A task runs only in the region of its data source; list and detail views are filtered by execution scope.
@@ -122,11 +140,11 @@ Every run records row counts, duration and logs, and tasks can be scheduled on t
 ![Sync task list with target and status columns](screenshots/sync.webp)
 *Figure 3.2a: Sync task list.*
 
-![New sync task wizard](screenshots/sync-new.webp)
-*Figure 3.2b: New sync task wizard.*
-
 ![Sync task detail with run history and logs](screenshots/sync-detail.webp)
-*Figure 3.2c: Sync task detail.*
+*Figure 3.2b: Sync task detail.*
+
+![New sync task wizard](screenshots/sync-new.webp)
+*Figure 3.2c: New sync task wizard.*
 
 **Related AWS services:** AWS Glue, S3 Tables, Amazon Redshift Data API, Amazon S3, AWS DMS, CloudWatch Logs, OpenMetadata (self-hosted).
 
@@ -134,7 +152,8 @@ Every run records row counts, duration and logs, and tasks can be scheduled on t
 
 ### 4.1 Batch Compute (`/etl-jobs`)
 
-Batch Compute runs code-first ETL on three engines: Glue PySpark, Redshift SQL and EMR Serverless Spark.
+Batch Compute runs code-first ETL on three engines: Glue PySpark (default and selectable Glue versions), Redshift SQL and EMR Serverless PySpark (release labels);
+the engine versions are listed in [`supported-versions.md`](supported-versions.md).
 All engine parameters are exposed, a parameter advisor suggests tuning, and the full set of business-date parameters is passed to every run.
 Jobs run immediately or on a cron schedule published to the region's scheduler; run history and logs are available in Task Monitor.
 
@@ -146,21 +165,22 @@ Jobs run immediately or on a cron schedule published to the region's scheduler; 
 - Run, rerun, backfill, run groups, logs and dependency view.
 - Job submission runs as a background task, so an EMR application cold start cannot time out the page.
 - The job detail names its execution region, and the run button repeats "run now in <region>".
+- The Multi-Region Dashboard checks that job versions are consistent across regions.
 
 ![Batch job list](screenshots/etl-jobs.webp)
 *Figure 4.1a: Batch Compute job list.*
 
-![New job dialog with the three engines](screenshots/etl-job-new.webp)
-*Figure 4.1b: New job with engine choice.*
-
 ![Job detail with editor and run history](screenshots/etl-job-detail.webp)
-*Figure 4.1c: Job detail and script editor.*
+*Figure 4.1b: Job detail and script editor.*
+
+![New job dialog with the three engines](screenshots/etl-job-new.webp)
+*Figure 4.1c: New job with engine choice.*
 
 **Related AWS services:** AWS Glue, Amazon Redshift Data API, EMR Serverless, Amazon S3, CloudWatch Logs, AWS IAM.
 
 ### 4.2 ETL Orchestration (`/workflow`, `/workflow/[id]`)
 
-ETL Orchestration is a visual DAG editor whose nodes are sync tasks, batch jobs, SQL, Python, control flow and platform actions.
+ETL Orchestration is a visual DAG editor whose nodes are sync tasks, batch jobs, SQL, Python, control flow and platform actions (the node type that carries governance tasks and other platform operations).
 A workflow is published to the MWAA Serverless environment of its execution region, where it runs on a cron schedule or on demand.
 One publish can target several regions.
 
@@ -219,7 +239,7 @@ The left-hand tree lists namespaces and tables; queries are read-only and result
 
 ### 4.5 Stream Compute (`/realtime-compute`)
 
-Stream Compute runs Flink SQL jobs on Amazon Managed Service for Apache Flink.
+Stream Compute runs Flink SQL jobs on Amazon Managed Service for Apache Flink (runtime version in [`supported-versions.md`](supported-versions.md)).
 A job consumes a Kinesis or MSK stream, aggregates over event-time windows and writes to S3 or S3 Tables, where Athena can query the result immediately.
 
 **Key capabilities**
@@ -227,17 +247,17 @@ A job consumes a Kinesis or MSK stream, aggregates over event-time windows and w
 - One Flink application per job, built from a shared runner JAR with the user SQL injected as runtime properties.
 - Connector management for sources and sinks.
 - AI-assisted SQL authoring and AI run diagnosis.
-- A sample-data producer that writes ordered events so that window results appear within about a minute.
+- A "generate data" button that writes sample events in ascending event-time order for trial runs, so that window results appear within about a minute.
 - Start, stop and delete act on the real Flink application; one submission creates one application per selected region.
 
 ![Stream Compute job list](screenshots/realtime-compute.webp)
 *Figure 4.5a: Stream Compute job list.*
 
-![New streaming job form](screenshots/realtime-new.webp)
-*Figure 4.5b: New streaming job.*
-
 ![Streaming job detail with status and results](screenshots/realtime-detail.webp)
-*Figure 4.5c: Streaming job detail.*
+*Figure 4.5b: Streaming job detail.*
+
+![New streaming job form](screenshots/realtime-new.webp)
+*Figure 4.5c: New streaming job.*
 
 **Related AWS services:** Amazon Managed Service for Apache Flink, Amazon Kinesis, Amazon MSK, S3 Tables, Amazon S3.
 
@@ -247,11 +267,11 @@ A job consumes a Kinesis or MSK stream, aggregates over event-time windows and w
 
 Ask-Your-Data turns a natural-language question into read-only SQL, runs it in the region where the data lives (Redshift or Athena over S3 Tables) and returns a table, a chart and an explanation.
 The agent runs on Amazon Bedrock AgentCore with Runtime, Gateway (MCP) and Memory, and is grounded in the business glossary, published datasets and conversation memory.
-Results are masked automatically according to data classification, including aliased and expression columns.
+Results are masked automatically according to data classification, including aliased and expression columns, which are resolved back to their physical columns.
 
 **Key capabilities**
 
-- Built-in MCP skills for read-only Redshift and Athena SQL, schema exploration, business-context lookup and registered skills.
+- Seven built-in MCP skills: read-only Redshift and Athena SQL, schema exploration, business-context lookup, and listing and calling registered skills.
 - Session cards: save a conversation, resume it later, and refresh it on a schedule (up to 100 cards per user).
 - Asynchronous execution with polling, a 300-second ceiling per question and immediate cancellation on timeout.
 - The result card shows which model and backend answered.
@@ -297,7 +317,7 @@ Observability is the operational view of Ask-Your-Data and the AgentCore stack.
 
 ### 5.4 Report Builder (`/bi`)
 
-Report Builder is a self-service BI canvas: add several visuals to one dashboard, bind top-level filters to fields and let them drive every visual.
+Report Builder is a QuickSight-style self-service BI canvas: add several visuals to one dashboard, bind top-level filters to fields and let them drive every visual.
 Data is fetched through the platform's query engines with the same automatic masking as Ask-Your-Data.
 
 **Key capabilities**
@@ -344,6 +364,7 @@ Quality checks and sensitive scans run in the region of the data.
 - Sensitive-data scan with detector type, confidence and suggested level; findings can be adopted as classification.
 - Quality rules from templates (not null, unique, range, accepted values, row count, freshness/SLA) with runs, results and scores.
 - Scheduled governance tasks (quality check, sensitive scan, catalog sync) published to the region's scheduler.
+- Catalog, quality checks and sensitive scans run per region; in OpenMetadata the region is the service dimension.
 
 ![Governance catalog tab](screenshots/governance.webp)
 *Figure 6.1a: Governance catalog.*
@@ -361,7 +382,7 @@ Quality checks and sensitive scans run in the region of the data.
 *Figure 6.1e: Sensitive-data scan.*
 
 ![Adding a quality rule for a selected table](screenshots/governance-quality.webp)
-*Figure 6.1f: Data quality rule form.*
+*Figure 6.1f: Data quality, the "add quality rule" form for a selected table (rules, run checks, scores and SLA share this tab).*
 
 ![Scheduled governance tasks](screenshots/governance-schedule.webp)
 *Figure 6.1g: Scheduled governance tasks.*
@@ -385,6 +406,7 @@ The score (0 to 100) weights four dimensions: security and classification covera
 
 Data Modeling covers warehouse planning end to end: layers, data domains, data standards, code tables, dimension and fact models, and a metrics system.
 Models can be landed and applied to the Redshift warehouse of any execution region, and the resulting metrics are reused by Ask-Your-Data, Report Builder and the home page.
+A "how to use" illustration sits at the top of the page.
 
 **Key capabilities**
 
@@ -529,7 +551,7 @@ Alerting Center evaluates rules against the run ledger and delivers notification
 ### 7.5 FinOps (`/finops`)
 
 FinOps collects cost from AWS Cost Explorer by service, region and day and attributes it to regions, tasks and runs.
-Per-region totals reconcile with Cost Explorer grouped by REGION, so the numbers match the AWS bill.
+Per-region totals reconcile with Cost Explorer grouped by REGION (attribution is by region, not by execution target), so the numbers match the AWS bill.
 
 **Key capabilities**
 
@@ -603,32 +625,32 @@ Members hold the roles owner, editor or viewer; platform-level Cognito groups ad
 ### 8.2 Execution Environments (`/exec-envs`)
 
 Execution Environments manages the regions themselves.
-The new-environment wizard registers a region, triggers a CodeBuild run that deploys the region's CDK stack group, then lets you detect initialization and enable the region.
+The new-environment wizard registers a region, triggers a CodeBuild run that deploys the region's CDK stack group, then lets you check initialization and enable the region.
 
 **Key capabilities**
 
 - Candidate regions come from the account's enabled regions; regions blocked by organisation policy are listed but disabled with the blocked action named.
 - One environment per region with the full component set; a jurisdiction tag marks data-residency requirements.
-- Detect initialization probes every component and enables the region's S3 Tables federated catalog.
+- Check initialization probes every component and enables the region's S3 Tables federated catalog.
 - Detail view with components and probes, redeploy with preview, add components, stop accepting work, delete preview and approved deletion (data resources are retained).
 - Credential state, health canary and residency acknowledgement per region.
-- Regions pre-authorised at install or upgrade time need no command-line step after the wizard.
+- Regions pre-authorized at install or upgrade time with `EXEC_REGION_CANDIDATES` need no command-line step after the wizard; adding such a region is completed entirely on the page.
 
 ![Execution environment list](screenshots/exec-envs.webp)
 *Figure 8.2a: Execution Environments.*
 
-![New execution environment wizard](screenshots/exec-env-new.webp)
-*Figure 8.2b: New execution environment wizard.*
-
 ![Execution environment detail with components and probes](screenshots/exec-env-detail.webp)
-*Figure 8.2c: Execution environment detail.*
+*Figure 8.2b: Execution environment detail.*
+
+![New execution environment wizard](screenshots/exec-env-new.webp)
+*Figure 8.2c: New execution environment wizard.*
 
 **Related AWS services:** AWS CodeBuild, AWS Lambda, AWS CloudFormation,
 plus the per-region VPC, KMS, Redshift Serverless, S3 Tables, Glue, EMR Serverless, MWAA Serverless, DMS and Managed Service for Apache Flink.
 
 ### 8.3 Users (`/admin/users`)
 
-Users manages the Cognito user pool: create users, assign roles, enable or disable accounts and reset passwords.
+Users manages the Cognito user pool: create users, change roles (Admin, Developer, Viewer), disable accounts and reset passwords.
 
 ![User management](screenshots/admin-users.webp)
 *Figure 8.3: Users.*
@@ -637,7 +659,7 @@ Users manages the Cognito user pool: create users, assign roles, enable or disab
 
 ### 8.4 Audit Log (`/audit`)
 
-Every write operation is recorded with who, when, what, resource, request and details.
+Every write operation is recorded in `bgp-audit` with who, when, what, resource, request and details.
 Entries carry the execution environment, so the log can be filtered by region; environments in a non-home jurisdiction keep a second copy of their audit records locally.
 
 ![Audit log](screenshots/audit.webp)
@@ -662,7 +684,7 @@ Settings shows the resource facts of the current scope and holds the platform-wi
 *Figure 8.5a: Settings.*
 
 ![AI model card and the change-default-model dialog](screenshots/settings-ai-model.webp)
-*Figure 8.5b: AI model selection grouped by family.*
+*Figure 8.5b: AI model card and the "change global default model" dialog; the model catalog dropdown is grouped by family, and a change takes effect only after the server-side probe passes.*
 
 **Related AWS services:** Amazon Bedrock, S3 Tables, Amazon EC2, AWS Systems Manager Parameter Store.
 
@@ -672,6 +694,7 @@ Settings shows the resource facts of the current scope and holds the platform-wi
 - **SLA** (`/sla`): redirects to the SLA tab of Alerting Center.
 - **Theme gallery** (`/theme-gallery`, `/theme-preview`): a set of UI themes you can preview and apply.
 - **English mode**: the language switcher in the top-right corner translates the whole console and the tours.
+- The API groups and code directories behind these pages are summarized in the code layout section of [`architecture.md`](architecture.md).
 
 ![Theme gallery](screenshots/theme-gallery.webp)
 *Figure 9: Theme gallery.*

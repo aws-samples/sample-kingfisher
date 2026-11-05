@@ -35,7 +35,7 @@ switch the "execution scope" in the top bar and you are working in another regio
 </table>
 
 > 📸 **Screenshots and a description of every feature**: [`docs/features.md`](docs/features.md) (feature tour, page by page following the menu).
-> 📚 **Pages / APIs / code / AWS dependencies of every module**: [`docs/architecture.md`](docs/architecture.md) (components, core concepts, code layout).
+> 📚 **Pages / APIs / code / AWS dependencies of every module**: [`docs/modules.md`](docs/modules.md) (module overview, seven menu groups module by module); components, core concepts and code layout in [`docs/architecture.md`](docs/architecture.md).
 > 🤖 **Taking over this project with an AI tool? Have it read [`AGENTS.md`](AGENTS.md) first** (the project index: overview / deployment relationships /
 > documentation map / red lines; Codex reads `AGENTS.md` natively, Claude Code, Kiro, Cursor and other tools load it as the project rules file).
 
@@ -194,11 +194,12 @@ Key points:
 | I want to… | Read this |
 |---|---|
 | **See what every feature looks like and how to use it** (screenshots page by page) | [`docs/features.md`](docs/features.md) |
-| **Know what every module does today** (pages / APIs / core code / AWS dependencies / mechanisms / boundaries) | [`docs/features.md`](docs/features.md) · [`docs/architecture.md`](docs/architecture.md) |
+| **Know what every module does today** (pages / APIs / core code / AWS dependencies / mechanisms / boundaries / where the design note went) | [`docs/modules.md`](docs/modules.md) |
 | Current architecture: components / request flow / data flow / stack list | [`docs/architecture.md`](docs/architecture.md) · figures [`docs/diagrams/README.md`](docs/diagrams/README.md) |
-| 🔴 **Deploy to production in the customer's account / add an execution region / upgrade / roll back / known boundaries** | **[`docs/deployment.md`](docs/deployment.md)** (the production deployment guide; adding a region is section 5) |
+| 🔴 **Deploy to production in the customer's account / add an execution region / upgrade / roll back / known boundaries** | **[`docs/deployment.md`](docs/deployment.md)** (the production deployment guide; adding a region is section 5) · step-by-step record of adding a region in production [`docs/adding-a-region.md`](docs/adding-a-region.md) |
 | Pre-flight for another account / restricted accounts / resuming after a failed step / troubleshooting | [`docs/operations.md`](docs/operations.md) |
 | What the platform costs per month | [`docs/cost-model.md`](docs/cost-model.md) |
+| Technical deep dive into GenBI / AgentCore / observability (home-region internals, written in the single-region stage) | [`docs/deep-dive.md`](docs/deep-dive.md) · [`docs/deep-dive-brief.md`](docs/deep-dive-brief.md) |
 | Which versions are supported (Node / Next.js / CDK · Glue / EMR / Flink / DMS / OpenMetadata / MySQL / OpenSearch · data-source drivers · JDK / Maven · browsers · version policy) | [`docs/supported-versions.md`](docs/supported-versions.md) (figures never carry versions; this file is the single source of truth) |
 | Security scanning conclusions and accepted findings | [`docs/security.md`](docs/security.md) (section 6, secure development) |
 | Requirements, architecture, API contract, interaction design and acceptance for multi-region execution | [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md) |

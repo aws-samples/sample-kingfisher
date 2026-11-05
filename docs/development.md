@@ -233,7 +233,7 @@ Conventions for writing acceptance steps:
 - Figures and prose never state service or library versions. Versions live only in [`supported-versions.md`](supported-versions.md); a version change edits that file and `CHANGELOG.md` in the same commit.
 - Screenshots under `docs/screenshots/` are scrubbed of account ids, resource ids and URLs before they are committed.
 - Design contracts under `docs/design/<module>/` are the place for rationale and acceptance criteria; this guide and `architecture.md` describe only what exists.
-- Documents with lines longer than 300 characters or table cells longer than 200 characters fail the documentation guard test. Keep tables to five columns or fewer.
+- Documentation has no line-length or cell-length limit (decision of 2026-11-04: GitHub wraps long lines and cells; sentences and table cells are never split or truncated to satisfy a tool). Keep tables to five columns or fewer.
 
 ## 14. Repository standards
 
@@ -242,8 +242,8 @@ One standard applies to every repository of this project, regardless of audience
 | Area | Rule | Enforced by |
 |---|---|---|
 | Language | Documentation in English; source comments, test titles and deployment-script output in Chinese (the engineering team's working language); UI strings in both locale files | `repo-standards-guard.test.ts` |
-| Format | Lines up to 300 characters, table cells up to 200, tables up to five columns; `README.md` keeps complete sentences and cells and is exempt from the length limits | `docs-format-guard.test.ts` |
-| Structure | One record per section; version history in its own section | `docs-format-guard.test.ts` |
+| Format | No line or cell length limit; complete sentences and complete table cells (never split or truncated for a tool); tables up to five columns | Review |
+| Structure | One record per section; version history in its own section | Review |
 | Links | Every relative link resolves to a tracked file | `repo-standards-guard.test.ts` |
 | Figures | Static PNG or WebP only; every figure is referenced; every Mermaid source is rendered | `repo-standards-guard.test.ts` |
 | Versions | Figures carry no version numbers; prose that names a component version links to `supported-versions.md`, the single source | Review |

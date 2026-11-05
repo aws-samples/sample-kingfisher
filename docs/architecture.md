@@ -1,11 +1,16 @@
 # Kingfisher Architecture
 
 This document describes how Kingfisher is deployed and how a request or a job travels through it.
-It covers the current shape of the product only. Design rationale, interface contracts and acceptance criteria live in `docs/design/`.
+It covers the current shape of the product only. Design rationale, interface contracts, interaction design and acceptance criteria live in
+[`design/multi-region-execution.md`](design/multi-region-execution.md) and the other notes under `docs/design/`.
+The pages and features are described one by one in [`features.md`](features.md); the entry point for AI coding tools is the root [`AGENTS.md`](../AGENTS.md).
+The architecture document and figure set of the single-region stage (2026-08) are historical only and are not part of this repository.
 
 When this document and the code disagree, the code wins. The authoritative places are `platform/src`, `infra` and `scripts`.
 
-Figures are static PNG files under `docs/diagrams/`, with sources in `docs/diagrams/src/`.
+Figures are static PNG files under `docs/diagrams/` (`mr-*.png`, sources `docs/diagrams/src/mr-*.mmd`; the AWS service-view figures `aws-*.png` are rendered by
+`docs/diagrams/src/render_aws_arch.py`); the rendering commands are in the Rendering section of [`diagrams/README.md`](diagrams/README.md).
+Markdown never embeds live Mermaid. When the architecture changes, change the source and re-render the figure in the same commit.
 
 Figures name components but never carry version numbers. Supported versions are listed in [`supported-versions.md`](supported-versions.md).
 
@@ -32,10 +37,18 @@ The account holds one **home region** and any number of **execution regions**.
 - The home region runs the **control plane**: the web application, metadata tables, identity, OpenMetadata, the AI agents and the deployment broker.
 - Every execution region runs a complete **data plane**: Redshift Serverless, an S3 Tables table bucket, Glue, EMR Serverless, MWAA Serverless, DMS and Managed Flink.
 - The home region also has its own data plane. It is registered as the execution target `tgt_home` and is treated like any other region.
+- Central services exist once: OpenMetadata and the AgentCore agents run only in the home region; regions are told apart by a per-region service dimension (OpenMetadata)
+  or by the place parameter carried by every call (agents).
 
 ![Figure 1. AWS service view: one control plane in the home region and one full data plane per execution region.](diagrams/aws-overview.png)
 
-*Figure 1. AWS service view. The entry chain is CloudFront, WAF, ALB and ECS Fargate. The control plane lives in the home region; each execution region carries its own data plane.*
+*Figure 1. AWS service view. The entry chain is CloudFront, WAF, ALB and ECS Fargate. The control plane lives in the home region; each execution region carries its own data plane.
+Source: `diagrams/src/render_aws_arch.py`. The same series also includes the control-plane layering (`aws-control-plane.png`, Figure 3), the execution-region data plane
+(`aws-execution-region.png`, Figure 4) and the multi-region mechanics (`aws-multi-region.png`, Figure 2); all four are also embedded in section 1 of the root README.*
+
+![Figure 1a. Deployment shape: home region plus N execution regions.](diagrams/mr-overview.png)
+
+*Figure 1a. Deployment shape (home region plus N execution regions). Source: `diagrams/src/mr-overview.mmd`; re-render with mermaid-cli after changes.*
 
 ### 1.2 What lives where
 
@@ -79,6 +92,10 @@ Jobs, syncs, schedules, queries and natural-language questions execute in the re
 
 *Figure 3. The control plane as CDK stacks: edge and application, state and identity, metadata and agents, the execution-region deployment mechanism, the home data plane, and observability.*
 
+![Figure 3a. Control-plane components: the 23 stacks of the home region.](diagrams/mr-control-plane.png)
+
+*Figure 3a. Control-plane components (23 stacks in the home region). Source: `diagrams/src/mr-control-plane.mmd`; re-render with mermaid-cli after changes.*
+
 ### 2.1 Stack inventory
 
 All control-plane stacks are instantiated by `infra/bin/app.ts` and are named `Bgp<Name>Stack`.
@@ -88,35 +105,38 @@ Seventeen stacks are always present. Six are created only when a CDK context fla
 |---|---|---|
 | Kms | Two customer-managed keys: `alias/bgp-data` and `alias/bgp-logs` | always |
 | Waf | CloudFront web ACL; always created in `us-east-1` | always |
-| Vpc | Home VPC and the home-side endpoint for the cross-region path | always |
-| Database | Platform DynamoDB tables encrypted with the data key | always |
+| Vpc | Home VPC and the home-side endpoint for the cross-region path; importing an existing VPC is not supported in a multi-region production deployment | always |
+| Database | Platform DynamoDB tables (67, see 7.1) encrypted with the data key | always |
 | FinOps | Three cost-governance tables | always |
-| Auth | Cognito user pool and app client | always |
+| Auth | Cognito user pool and app client; the initial accounts are created by `scripts/10-bootstrap-cognito.sh`; outputs `UserPoolId` and `ClientId` | always |
 | Audit | CloudTrail and VPC flow logs encrypted with the logs key | always |
 | Redshift | Home Redshift Serverless namespace and workgroup | always |
 | OmDatabase, OmSearch, OmService | OpenMetadata: RDS MySQL, OpenSearch, ECS Fargate service | always |
-| Platform | Web app on ECS Fargate, task role, ALB, CloudFront, home buckets | always |
+| Platform | Web app on ECS Fargate, task role, ALB, CloudFront, home buckets; runtime parameters (model, wiring, credential mode) are injected through CDK context; also creates two tables, `bgp-action-commands` and `bgp-action-schedules`. | always |
 | AirflowServerless | Home MWAA Serverless entry: workflow bucket, worker security group, role | always |
-| AgentCore | Question-answering agent runtime, gateway and skills Lambda | always |
-| NetAdvisorAgentCore | Network advisor agent runtime | always |
-| ParamAdvisorAgentCore | Parameter advisor agent runtime | always |
-| ExecEnvDeploy | CodeBuild project, broker Lambda and source asset for region deployment | always |
-| Rds | Demo source database with sample data | deployment mode `demo` |
+| AgentCore | Question-answering agent runtime, gateway and skills Lambda; container source `infra/agent/genbi`, image tagged with the git short hash | always |
+| NetAdvisorAgentCore | Network advisor agent runtime; container source `infra/agent/netadvisor`, image tagged with the git short hash | always |
+| ParamAdvisorAgentCore | Parameter advisor agent runtime; container source `infra/agent/paramadvisor`, image tagged with the git short hash | always |
+| ExecEnvDeploy | CodeBuild project `bgp-exec-env-deploy`, broker Lambda (sole holder of `StartBuild`, three allow-listed inputs) and source-package asset for region deployment | always |
+| Rds | Demo source MySQL database with sample data | `BGP_DEPLOY_MODE=demo` only |
 | Mwaa | Classic Airflow environment | `-c classic-mwaa=1` |
 | Realtime | DMS and Kinesis foundation | `-c enable-realtime=1` |
 | Flink | Managed Flink foundation | `-c enable-flink=1` |
 | Emr | EMR Serverless shared role and security group | `-c enable-emr=1` |
-| OmIngestion | Scheduled OpenMetadata ingestion | `-c om-bot-secret-arn` and `-c rs-admin-secret-arn` |
+| OmIngestion | Scheduled OpenMetadata ingestion, six kinds: redshift, glue, s3, s3tables, sources, profiler | `-c om-bot-secret-arn` and `-c rs-admin-secret-arn` |
+
+The three `enable-*` flags are set by `scripts/deploy-all.sh` as needed.
 
 ### 2.2 Deployment entry points
 
-Three scripts own deployment. They write SSM wiring, pick the deployment mode, build agent images and run the IAM simulation gate.
+Three scripts own deployment; they share one agent mapping table, `scripts/lib/agentcore-agents.sh`.
+They write SSM wiring, pick the deployment mode, build agent images and run the IAM simulation gate.
 
 | Script | Use |
 |---|---|
-| `scripts/deploy-all.sh <profile> <home-region>` | First install into a fresh account |
-| `scripts/redeploy-platform.sh <profile> <home-region>` | Upgrade, re-authorize regions, redeploy the platform stacks |
-| `scripts/redeploy-agents.sh <profile> <home-region>` | Rebuild and redeploy the three agent containers |
+| `scripts/deploy-all.sh <profile> <home-region>` | First install into a fresh account: writes SSM `/bgp/deploy-mode` and `/bgp/wiring/*`, enables the gated stacks as needed, builds and pushes the three agent images, runs the IAM simulation gate |
+| `scripts/redeploy-platform.sh <profile> <home-region> [extra cdk -c]` | Upgrade, re-authorize regions, redeploy the platform stacks; reads the wiring back from CloudFormation and SSM, so a bare deploy does not reset it; does **not** rebuild the agent images and does **not** deploy the agent stacks. |
+| `scripts/redeploy-agents.sh <profile> <home-region> [--check] [--only ...]` | Upgrade or refresh the three agents: recompile `core-dist`, build and push the three ARM64 images (tag = git short hash), deploy the agent stacks one by one, then read back the runtime image tag to verify; `--check` only compares the deployed tag with the local HEAD, read-only. |
 
 Running `cdk deploy` by hand is not supported. The scripts carry wiring that a bare deploy would silently reset.
 
@@ -127,11 +147,12 @@ The full key list is in `platform/.env.example`; a guard test keeps it identical
 
 | Setting | Source | Meaning |
 |---|---|---|
-| Deployment mode | SSM `/bgp/deploy-mode` | `production` or `demo`; fixed after install |
-| `BGP_DATAPLANE_CREDS` | CDK context `-c dataplane-creds` | `taskrole`, `observe` or `enforce`; see 4.5 |
-| Wiring (OpenMetadata URL, agent runtimes, memories) | SSM `/bgp/wiring/*` | Read back at synth time so a plain redeploy keeps them |
-| `EXECUTION_REGIONS` | Registry plus candidate list | Regions the control plane may call |
-| `BEDROCK_MODEL_ID` | Deploy-time resolution, changeable in Settings | Default model for all AI features |
+| Deployment mode (`BGP_DEPLOY_MODE`) | SSM `/bgp/deploy-mode`, read at synth time; a deploy-time parameter, **not** a container variable | `production` or `demo`; fixed after install |
+| `BGP_DATAPLANE_CREDS` | CDK context `-c dataplane-creds` | `taskrole` (default, production), `observe` or `enforce`; not written to SSM, so a redeploy without the flag returns to the default; see 4.5 |
+| Wiring: `OPENMETADATA_URL`, `GENBI_BACKEND`, `*_RUNTIME_ARN`, `*_MEMORY_ID` (OpenMetadata URL, agent backends, runtimes, memories) | SSM `/bgp/wiring/*` | Read back at synth time so a plain redeploy keeps them |
+| `EXECUTION_REGIONS` | Derived by `redeploy-platform.sh` from the registry plus the candidate list | Execution regions the control plane is authorized to call |
+| `BEDROCK_MODEL_ID` and the runtime setting | Factory default `us.anthropic.claude-opus-4-5-20251101-v1:0`. At deploy time `scripts/resolve-home-model.sh` walks the candidate chain against the home account's real model inventory and injects the first model whose real invocation succeeds; the chain is `candidateModelIds` in `platform/ai-model.json`: Claude Opus 4.5, then GLM 5.3, then Kimi K3. At runtime the model can be changed in Settings, AI model; the change takes effect only after the server-side probe passes. The selectable set is the four families of the vendor profile `platform/src/lib/ai/core/vendors.ts`; the same profile is compiled into the `core-dist/ai` of the three agent containers and shapes every Converse request. | Default model for all AI features |
+| `KEEP_ALIVE_TIMEOUT` | Platform stack (ALB idle timeout plus a margin) | Node keep-alive timeout kept at or above the ALB idle timeout (60 s) to avoid sporadic HTTP 502 |
 
 ## 3. Execution-region stack group
 
@@ -139,9 +160,14 @@ The full key list is in `platform/.env.example`; a guard test keeps it identical
 
 *Figure 4. One execution region. The VPC has no egress; compute, storage, scheduling and streaming services are regional; the only cross-region channel writes run metadata back to the home region.*
 
+![Figure 4a. Execution-environment stack group, one per region.](diagrams/mr-exec-env-stacks.png)
+
+*Figure 4a. Execution-environment stack group (one per region). Source: `diagrams/src/mr-exec-env-stacks.mmd`; re-render with mermaid-cli after changes.*
+
 ### 3.1 Stacks in the group
 
-The group is assembled by `infra/lib/exec-env/stack-group.ts`. Every stack name is produced by the naming source of truth, `platform/naming.json`.
+The group is assembled by `infra/lib/exec-env/stack-group.ts`. Every stack name is produced by the naming source of truth, `platform/naming.json`, through its deploy-side exit `infra/lib/shared/naming.ts`.
+The base class `exec-env-stack.ts` performs no context lookups and synthesizes with zero credentials, which `npm run synth-gate` verifies offline.
 Passing `-c exec-env-target=<targetId>` makes `infra/bin/app.ts` synthesize only this group and none of the control-plane stacks.
 
 | Stack suffix | Contents | Present when |
@@ -173,7 +199,8 @@ The registry row of a target carries a phase, an intent and an observed health. 
 
 ![Figure 5. Sequence for adding an execution region through the web wizard.](diagrams/mr-flow-add-exec-env.png)
 
-*Figure 5. Adding an execution region. The wizard registers the descriptor, the broker starts a CodeBuild run that deploys the stack group, the probe checks each component, and the administrator enables the target.*
+*Figure 5. Adding an execution region. The wizard registers the descriptor, the broker starts a CodeBuild run that deploys the stack group, the probe checks each component, and the administrator enables the target.
+Source: `diagrams/src/mr-flow-add-exec-env.mmd`; re-render with mermaid-cli after changes.*
 
 1. An administrator opens the execution-environment wizard and selects a region, a jurisdiction and a network range.
 2. The platform writes the descriptor and calls the broker Lambda with the target id and an operation id.
@@ -187,7 +214,7 @@ A region that was not pre-authorized needs one control-plane redeploy before it 
 
 ### 3.4 Removing a region
 
-Removal is the reverse path: stop accepting work, preview the impact, obtain approval, run the destroy build.
+Removal is the reverse path: stop accepting work (`draining`), preview the deletion with its impact list, obtain approval, run the broker's destroy build (`decommissioning`), then `deleted`.
 Data buckets, table buckets, the warehouse final snapshot and the regional CMK are kept.
 
 ## 4. Core concepts
@@ -279,7 +306,8 @@ The kinds are a closed list in `kinds.ts`; each kind declares the resources it h
 
 ![Figure 6. Request chain from the browser to a regional AWS client.](diagrams/mr-request-chain.png)
 
-*Figure 6. Request chain. CloudFront and WAF, ALB, the Next.js middleware, the route handler, the project, scope and place guards, then a client created for the target region.*
+*Figure 6. Request chain. CloudFront and WAF, ALB, the Next.js middleware, the route handler, the project, scope and place guards, then a client created for the target region.
+Source: `diagrams/src/mr-request-chain.mmd`; re-render with mermaid-cli after changes.*
 
 1. The browser calls CloudFront over HTTPS. WAF filters the request.
 2. CloudFront forwards to the ALB. The ALB security group admits only the CloudFront origin prefix list.
@@ -293,7 +321,8 @@ The kinds are a closed list in `kinds.ts`; each kind declares the resources it h
 
 ![Figure 7. Sequence of a synchronization run through Glue in the target region.](diagrams/mr-flow-sync-run.png)
 
-*Figure 7. A synchronization run. The route resolves the place, ensures the Glue job in that region, starts it, records the run, polls to a terminal state, and pushes lineage to OpenMetadata.*
+*Figure 7. A synchronization run. The route resolves the place, ensures the Glue job in that region, starts it, records the run, polls to a terminal state, and pushes lineage to OpenMetadata.
+Source: `diagrams/src/mr-flow-sync-run.mmd`; re-render with mermaid-cli after changes.*
 
 1. A trigger (manual, scheduled or backfill) calls `POST /api/sync/[id]/start`.
 2. The route applies the project guard, refuses cross-region reads, and selects the channel: Glue, DMS or zero-ETL.
@@ -306,29 +335,47 @@ The kinds are a closed list in `kinds.ts`; each kind declares the resources it h
 
 ![Figure 8. Publishing a workflow to the regional MWAA Serverless and dispatching platform actions.](diagrams/mr-flow-scheduling.png)
 
-*Figure 8. Scheduling. The publisher stores a DAG definition and code package in the regional workflow bucket and creates the workflow. Platform-action nodes reach the platform through a command table, a stream and a dispatcher Lambda.*
+*Figure 8. Scheduling. The publisher stores a DAG definition and code package in the regional workflow bucket and creates the workflow. Platform-action nodes reach the platform through a command table, a stream and a dispatcher Lambda.
+Source: `diagrams/src/mr-flow-scheduling.mmd`; re-render with mermaid-cli after changes.*
+
+Run records land in `bgp-task-runs`; monitoring, alerting, SLA and backfill all read that table.
+Downstream dependencies are triggered once by `lib/scheduler/dependency.ts` after the upstream run succeeds.
 
 ### 5.4 Natural-language questions (GenBI)
 
 ![Figure 9. Sequence of a natural-language question answered against the target region's warehouse or lake.](diagrams/mr-flow-genbi.png)
 
-*Figure 9. A question. The executor grounds the request with business context and memory, calls the AgentCore runtime or the in-process agent, runs read-only SQL in the target region, masks sensitive columns and records history.*
+*Figure 9. A question. The executor grounds the request with business context and memory, calls the AgentCore runtime or the in-process agent, runs read-only SQL in the target region, masks sensitive columns and records history.
+Source: `diagrams/src/mr-flow-genbi.mmd`; re-render with mermaid-cli after changes.*
 
 - Questions carry a project and a place. SQL is executed read-only in that region's Redshift or Athena.
 - When the AgentCore runtime is wired, it is called with a session id; otherwise an in-process agent runs the same tool loop against Bedrock.
 - The result is parsed for lineage, masked by classification policy, and recorded with the model that actually answered.
 - A saved card refreshes on a schedule in the region where the card lives, as a single-node workflow.
 
+### 5.5 Data source onboarding
+
+A data source lives in the execution region selected when it is created. The platform creates the Glue connection **in that region** (JDBC URL, subnet and security group;
+a user-specified subnet and several security groups can be used, otherwise the platform probes the network and creates its own security group), writes the password to Secrets Manager
+and ensures the Glue role (`lib/aws/datasource-service.ts`).
+
+The reachability check ("heartbeat") and "browse tables" log in to the source through a discovery job started over the data source's own Glue connection, in the source's region
+(`lib/datasource/glue-reach.ts`): a successful job means the source is reachable and brings the table list back; a failed job means unreachable, with Glue's error message.
+By default the probe first tries a direct connection from the control plane and runs the discovery job when that fails and the source has a Glue connection.
+The wizard's connection test for a JDBC source checks that the Glue connection exists; the status cell shows "connected" only after a real connection has succeeded.
+
 ## 6. Data flow
 
 ![Figure 10. Data flow from sources through integration and storage to metadata and consumption.](diagrams/mr-data-flow.png)
 
-*Figure 10. Data flow. Sources are attached to an execution region; integration and storage happen in that region; OpenMetadata holds one catalog for all regions; consumption reads through Athena, Redshift, questions, reports and governance.*
+*Figure 10. Data flow. Sources are attached to an execution region; integration and storage happen in that region; OpenMetadata holds one catalog for all regions; consumption reads through Athena, Redshift, questions, reports and governance.
+Source: `diagrams/src/mr-data-flow.mmd`; re-render with mermaid-cli after changes.*
 
 - **Sources**: JDBC databases (MySQL, PostgreSQL, Oracle, SQL Server), DynamoDB, S3 and Athena external tables, and streams (Kinesis, MSK). Each source lives in one execution region.
 - **Integration**: Glue synchronization jobs (full, incremental, date-variable, overwrite, merge), DMS change data capture, zero-ETL, and Flink SQL on Managed Flink.
 - **Storage**: the S3 Tables table bucket (Iceberg) and Redshift Serverless of that region.
-- **Metadata**: the regional Glue Data Catalog with the `s3tablescatalog` federated catalog; OpenMetadata in the home region fed by scheduled ingestion and event push; a read-only mirror table for the cross-region overview.
+- **Metadata**: the regional Glue Data Catalog with the `s3tablescatalog` federated catalog; OpenMetadata in the home region (one instance for the whole platform, regions told apart as services)
+  fed by scheduled ingestion and event push; the read-only local mirror table `bgp-metadata-mirror` for the cross-region overview.
 - **Consumption**: Athena queries, Redshift queries, natural-language questions, reports, the requirements workbench and governance (catalog, classification and masking, quality, lineage, modeling).
 
 ## 7. Storage
@@ -346,11 +393,12 @@ CDK synthesizes 72 tables (Database 67, FinOps 3, Platform 2). The platform proc
 | Runs and scheduling | `task-runs`, `run-groups`, `action-commands`, `action-schedules`, `dataplane-jobs`, `backfill-plans`, `backfill-instances` |
 | Governance | `data-classification`, `data-grants`, `quality-rules`, `quality-results`, `sensitive-findings`, `metrics`, `metric-values` |
 | Modeling | `data-layers`, `data-domains`, `data-standards`, `code-tables`, `model-assets`, `model-tables`, `model-metrics` |
-| Questions and AI | `genbi-history`, `genbi-cards`, `genbi-turns`, `genbi-context`, `genbi-skills`, `genbi-tasks`, `long-ops`, `requirements` |
+| Questions and AI | `genbi-history`, `genbi-cards`, `genbi-turns`, `genbi-context`, `genbi-skills`, `genbi-tasks`, `long-ops` (long-operation tasks and object leases), `requirements` |
 | Reports and Copilot | `bi-reports`, `bi-dashboards`, `bi-analyses`, `copilot-plans`, `copilot-steps`, `copilot-plan-tasks`, `copilot-recipes` |
 | Advisors | `network-advisor-turns`, `param-advisor-turns` |
 | Operations | `alert-rules`, `alert-channels`, `alert-events`, `baselines`, `slas`, `incidents`, `diagnostics` |
 | Identity and audit | `projects`, `project-members`, `approvals`, `audit` |
+| Infrastructure only and other | The three FinOps tables, the action command and action schedule tables and a few others, nine in total, are not in `TABLES`; the stacks create them directly |
 
 Table names are written once, in `TABLES`. The naming source of truth for regional resources deliberately excludes them.
 
@@ -386,7 +434,7 @@ All buckets block public access and are encrypted. Data buckets are retained whe
 Details, threat model and scan results are in [`security.md`](security.md). The boundaries in one view:
 
 - **Edge**: WAF in front of CloudFront for the platform and for OpenMetadata; the ALB admits only the CloudFront prefix list.
-- **Identity**: every `/api/*` request carries a Cognito ID token verified in the middleware; project membership is checked per resource.
+- **Identity**: every `/api/*` request carries a Cognito ID token verified in the middleware; project membership is checked per resource; the OpenMetadata factory administrator password is replaced during deployment.
 - **Deployment privilege**: the platform task role cannot start builds. Only the broker Lambda holds `codebuild:StartBuild`, and only for the one project; CloudFormation rights live on the CodeBuild service role.
 - **Region fencing**: IAM statements carry `aws:RequestedRegion` conditions for the allowed regions; the application refuses cross-region reads before any AWS call.
 - **Network**: execution-region VPCs have no NAT and no internet gateway; a single peering connection carries write-back traffic to the home region.
@@ -398,12 +446,12 @@ Details, threat model and scan results are in [`security.md`](security.md). The 
 
 | Area | Location | Notes |
 |---|---|---|
-| Pages | `platform/src/app/<route>/page.tsx` | 40 page routes; menu in `src/components/layout/routes.tsx` |
-| API routes | `platform/src/app/api/<group>/.../route.ts` | 52 groups, 314 route files at the time of writing |
-| Business libraries | `platform/src/lib/` | 57 directories; key ones are `exec-env`, `place`, `scope`, `projects`, `sync`, `scheduler`, `genbi`, `aws` |
-| Data-source providers | `platform/src/lib/datasource-spi/` | One provider per source family: connection model, probe, introspection |
-| Shared types | `platform/src/types/` | Used by pages and routes alike |
-| Tests | `platform/src/**/__tests__/*.test.ts` | Unit, assembly and static-gate tests |
+| Pages | `platform/src/app/<route>/page.tsx` | 40 page routes; menu in `src/components/layout/routes.tsx`; seven menu groups (AI Hub, Data Integration, Data Development, Smart Analytics, Data Governance, Scheduling and Ops, System); every page has the execution-scope selector in its top bar; run buttons restate the region they run in. |
+| API routes | `platform/src/app/api/<group>/.../route.ts` | 52 groups, 314 route files at the time of writing; shared response envelope `src/lib/api-response.ts`; read routes call `requireScope`, write routes go by place; authentication in `src/middleware.ts` and `src/lib/auth/`. |
+| Business libraries | `platform/src/lib/` | 57 directories; the key ones are: `exec-env/` (registry, state machine, deployment control, place clients) · `place/` (place resolution) · `scope/` (execution scope) · `projects/` (project isolation) · `sync/` (synchronization: script generation, jobs, start) · `scheduler/serverless/` (MWAA Serverless) · `workflow/` (orchestration) · `genbi/` (questions) · `copilot/` (plan center) · `openmetadata/` (catalog push) · `athena/` (S3 Tables direct query) · `realtime/` (DMS, Flink) · `governance/`, `quality/`, `lineage/`, `modeling/` (governance) · `finops/`, `alerting/`, `incidents/`, `monitor/` (operations) · `aws/` (SDK client factory `clients.ts`, table names `dynamodb.ts`, data-plane credentials `dataplane-creds.ts`) |
+| Data-source providers | `platform/src/lib/datasource-spi/` | One provider each for JDBC (MySQL, PostgreSQL, Oracle, SQL Server), DynamoDB, S3 and Athena external tables, and streams (Kinesis, MSK): connection model, probe, introspection |
+| Shared types | `platform/src/types/` | Shared types for data sources, tasks, execution environments and more; one copy used by pages and routes alike |
+| Tests | `platform/src/**/__tests__/*.test.ts` | Unit tests, assembly-level checks and static gates (naming source of truth, place ratchet, read-level scope ledger, mock hygiene) |
 | Control-plane stacks | `infra/lib/*.ts`, entry `infra/bin/app.ts` | See 2.1 |
 | Execution-region stacks | `infra/lib/exec-env/` | See 3.1 |
 | Lambdas | `infra/lambda/` | Broker, action dispatcher, Cognito bootstrap, skills, cross-region peering |
@@ -413,11 +461,20 @@ Details, threat model and scan results are in [`security.md`](security.md). The 
 
 Development workflow, local gates and engineering rules are in [`development.md`](development.md).
 
+### 9.1 Quality gates (developer side)
+
+- Local: `tsc`, `vitest` (started only from `platform/`), `naming-parity`, infra `tsc` plus `synth-gate`, and the red-line scan (pre-commit and CI).
+- Real environment: `scripts/mr-gate.sh` deploys to a developer test account, runs headless-browser acceptance of every multi-region feature,
+  fills the capability by region by execution-mode matrix and stamps the result.
+- IAM simulation gate: `scripts/iam-simulate-gate.py` against `infra/iam/platform-taskrole-calls.json`, run at the end of every `redeploy-platform.sh`.
+- Customer environments need only `scripts/02-postdeploy-truth.sh`.
+
 ## 10. Related documents
 
 - [`development.md`](development.md): repository layout, gates, engineering rules, branch model.
 - [`security.md`](security.md): security model and controls.
 - [`supported-versions.md`](supported-versions.md): every pinned runtime, engine and driver version.
-- `docs/design/50-multi-region-execution/`: the multi-region contract (`SPEC.md`), design (`DESIGN.md`), interaction design and acceptance criteria.
-- `docs/design/55-long-operations/DESIGN.md`: the long-operation framework.
-- `docs/diagrams/`: all figures and their sources.
+- [`features.md`](features.md): every page, what it does and how to use it.
+- [`design/multi-region-execution.md`](design/multi-region-execution.md): the multi-region contract, design, interaction design and acceptance criteria.
+- [`design/long-running-operations.md`](design/long-running-operations.md): the long-running-operation framework.
+- [`diagrams/README.md`](diagrams/README.md): all figures, their sources and the rendering commands.
