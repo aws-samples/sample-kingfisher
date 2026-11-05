@@ -1,5 +1,7 @@
 // Repository standards guard (see docs/development.md, section 14).
-//   1. Documentation is English: tracked Markdown contains no CJK characters.
+//   1. Documentation is English: tracked Markdown prose contains no CJK characters. Fenced code blocks are
+//      excerpts of real source (whose comments and string literals are Chinese by convention, see README
+//      "Languages") and are shown verbatim, so they are excluded; inline code spans in prose are still checked.
 //   2. Every relative link in tracked Markdown resolves to a tracked path.
 //   3. Figures are PNG or WebP only; every figure is referenced from a tracked text file;
 //      every Mermaid source has a rendered PNG; docs/diagrams/README.md lists every figure in that folder.
@@ -25,6 +27,11 @@ function prose(markdown: string): string {
   return markdown.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 }
 
+/** Markdown with fenced code blocks removed: verbatim source excerpts may carry Chinese comments and literals. */
+function withoutFencedCode(markdown: string): string {
+  return markdown.replace(/```[\s\S]*?```/g, "");
+}
+
 function trackedPathExists(p: string): boolean {
   if (TRACKED_SET.has(p)) return true;
   const prefix = p.endsWith("/") ? p : `${p}/`;
@@ -32,9 +39,13 @@ function trackedPathExists(p: string): boolean {
 }
 
 describe("repository standards", () => {
-  it("tracked Markdown is English", () => {
-    const offenders = MARKDOWN.filter((f) => CJK.test(read(f)));
-    expect(offenders, "Markdown files containing CJK characters").toEqual([]);
+  it("tracked Markdown prose is English (fenced code excerpts are verbatim and exempt)", () => {
+    const offenders = MARKDOWN.filter((f) => CJK.test(withoutFencedCode(read(f))));
+    expect(offenders, "Markdown files containing CJK characters outside fenced code").toEqual([]);
+  });
+
+  it("withoutFencedCode keeps prose and inline code, drops fenced blocks only", () => {
+    expect(withoutFencedCode("a `b` c\n```ts\nconst x = 1;\n```\nd")).toBe("a `b` c\n\nd");
   });
 
   it("every relative link in Markdown resolves to a tracked path", () => {
