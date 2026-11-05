@@ -21,6 +21,9 @@ import { recordComputeLineage } from "@/lib/governance/lineage-service";
 // 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
 import { workflowsReferencingJob, hasJobReferences, jobInUseResponse } from "@/lib/workflow/job-references";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
+// 2026-11-04 —— 删作业前核在途运行(唯一作者;run 行未终态 / 作业行运行锁刚续租 ⇒ 409 JOB_RUN_IN_PROGRESS,一样不删);删行是条件写
+import { jobInflight, hasInflight, jobRunInProgressResponse, jobRowDeleteInput } from "@/lib/etl/job-inflight";
+import { isConditionalCheckFailed } from "@/lib/aws/ddb-errors";
 
 const USER_ID = "default-user";
 
@@ -164,6 +167,14 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   if (!Item) return apiError("作业不存在", 404);
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
+  // 2026-11-04:仍有在途运行 ⇒ 409 逐条列 runId,作业行 / Glue 作业定义 / 调度产物一个都不动 —— 否则 Glue 定义随删、
+  //   轮询器永远查不到 JobRun、run 行永远「运行中」(任务监控孤儿)。在途的判据(实话):
+  //   · run 行未终态 —— 「立即运行」/ 补数 / 重跑由 TS 提交段在 StartJobRun 后立刻写 running 行;定时 / 工作流节点由 Python 执行体开跑即落
+  //     running 行(2026-11-04 起 `_record_start`;**更早发布的 DAG 要重发才有**,否则它们的在途只在 Glue / Redshift 侧,这里看不见);
+  //   · 作业行上**刚续租过**的运行锁 —— 只盖 TS 提交段抢到锁、run 行还没写出来的那几秒(Python 持有者不续租,不靠它)。
+  //   排在工作流引用核之前:两者都拒,但「正在跑」更紧迫、对用户也更直观(等它结束就行)。删行本身还是条件写(见下)。
+  const inflight = await jobInflight(params.id, Item as Record<string, unknown>);
+  if (hasInflight(inflight)) return jobRunInProgressResponse(inflight, "etl");
   // 仍被工作流的离线作业节点引用 ⇒ 409 逐条点名工作流,作业行 / Glue 作业 / 调度产物一个都不动(与删源同口径)
   //   §3.7 项目内:本项目的工作流逐条点名;其他项目的只给数量(名字不出项目),一样拒
   const jobRefs = await workflowsReferencingJob(params.id, resolveRunStamp(Item as { projectId?: string }).projectId);
@@ -199,8 +210,17 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
       { code: "UPSTREAM_ERROR" }
     );
   }
+  // 2026-11-04:删行是**条件写** —— 每把作业级运行锁都「不存在,或最近没人续租」才删(与删前在途核同一条判据,由 DDB 原子地判),
+  //   堵住「核完到删之间刚好有一次运行抢到锁」的窄窗;条件不满足 ⇒ 什么都没删,重读作业行按在途 409 回。
+  //   🔴 先删行、再删 Glue 定义:行一删,作业锁就再也抢不到(锁只许落在存在的行上),随后删定义不会撞上在途运行。
+  try {
+    await docClient.send(new DeleteCommand(jobRowDeleteInput(TABLES.ETL_JOBS, params.id, Item as Record<string, unknown>)));
+  } catch (e) {
+    if (!isConditionalCheckFailed(e)) throw e;
+    const { Item: fresh } = await docClient.send(new GetCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: params.id } }));
+    return jobRunInProgressResponse(await jobInflight(params.id, (fresh ?? Item) as Record<string, unknown>), "etl");
+  }
   // Glue 作业定义**随删**(每个绑定 target 各一份;best-effort,详见 deleteGlueJobs)
   const glueCleanup = del.type === "glue" ? await deleteGlueJobs(del).catch(() => [] as Array<{ targetId: string; name: string; ok: boolean }>) : [];
-  await docClient.send(new DeleteCommand({ TableName: TABLES.ETL_JOBS, Key: { userId: USER_ID, jobId: params.id } }));
   return apiOk({ deleted: true, glueJobsDeleted: glueCleanup });
 }

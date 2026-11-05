@@ -288,6 +288,8 @@ def _exec_job(env, node, ds=None, workflow_run_id=None, scheduler=None, **kwargs
         raise Exception(err)
     started = time.time()
     try:
+        # 2026-11-04:开跑即落 running 行(回链字段一并写上;在途运行对「删作业」可见,结束时 _record 用 update 收口)。放在 try 里:写不成也走 finally 放锁
+        _record_start(spec, job_run_id, started_at=_iso(started), extra=extra)
         engine = spec["engine"]
         # 软限的时钟 = node_started(含等锁);台账的 startedAt / duration = started(作业真正开跑)
         if engine == "redshift":

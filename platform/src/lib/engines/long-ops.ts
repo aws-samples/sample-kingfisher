@@ -13,7 +13,7 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { recordAudit } from "@/lib/audit";
 import { forEachTargetPlace } from "@/lib/place/fanout";
 import { getProvider } from "@/lib/engines/registry";
-import { RunLockBusy } from "@/lib/etl/run-lock";
+import { RunLockBusy, JobRowMissing } from "@/lib/etl/run-lock"; // 2026-11-04:作业行已删 ⇒ 用户可修的 409
 import { TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
 import { AuditUnavailable, ResidencyAckRequired } from "@/lib/exec-env/residency";
 import { userActor } from "@/lib/exec-env/residency-audit";
@@ -48,7 +48,7 @@ const engineRun: LongOpExecutor<"engine-run"> = async (params, ctx) => {
           targetId,
           error: String(e?.message ?? e),
           // 🔴 抢不到运行锁 / 绑定被拒 / 需要跨法域同意 都是「用户可修」⇒ 409,不是平台故障
-          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy,
+          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy || e instanceof JobRowMissing,
           auditUnavailable: e instanceof AuditUnavailable,
         });
         const w = await noteFanoutResult(runGroupId, targetId, { reason: String(e?.message ?? e).slice(0, 400) });

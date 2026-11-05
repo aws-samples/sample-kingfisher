@@ -8,7 +8,7 @@ import type { EtlJob } from "@/types/etl-job";
 // MWAA 旁路的建行点:章在**生成时**注入(DAG 在 MWAA 里跑,拿不到平台的写通道)。
 // 片段由 `run-records.pythonStampFields` 唯一产出 ⇒ 属性名与 TS 侧同源。
 // 台账行键唯一作者
-import { pyRunKeyFields } from "@/lib/monitor/run-key";
+import { pyRunKeyFields, pyRunIdExpr } from "@/lib/monitor/run-key";
 import { pythonStampFields, resolveRunStamp } from "@/lib/monitor/run-records";
 // Glue 作业名 per-target 单一作者(同 region 多 target 不许同名)
 import { glueJobNameFor } from "@/lib/etl/glue-job-name";
@@ -85,6 +85,8 @@ export function generateEtlJobDag(
   const stampFields = pythonStampFields(resolveRunStamp(job, boundTarget)); // 值非法即抛,不生成缺章的 DAG
   // 台账行键:runId 带 target 段 + taskTargetKey(唯一作者 lib/monitor/run-key.ts)
   const runKeyFields = pyRunKeyFields({ taskIdExpr: "JOB_ID", rawExpr: "run_id", targetId: boundTarget });
+  // 2026-11-04:开跑建行后用 update_item 收口 ⇒ Key 里只放 runId(与 runKeyFields 的 runId 段同一作者)
+  const runIdExpr = pyRunIdExpr({ rawExpr: "run_id", targetId: boundTarget });
   // 🔴 收编时补齐了 env 层:原来这里是两级兜底(跳过 REDSHIFT_WORKGROUP),
   // 而同一作业的「立即运行」路径(job-service)是三级 ⇒ env 一改,手动与调度会打到两个数仓。
   // 🔴 非 home 的落点**只能由调用方按描述符传进来**,不许在这里兜底
@@ -122,6 +124,9 @@ def run_job(**ctx):
     job_name = "${job.type === "glue" ? glueJobNameFor(job.jobId, boundTarget) : ""}"
     if not job_name:
         raise Exception("Glue job not created yet — run it once from the platform first")
+    # 2026-11-04:开跑即落 running 行(在途运行对「删作业」可见;done / on_failure 用 update 收口)
+    rid = _airflow_run_id(ctx)
+    _record_start(rid)
     # 与平台"立即运行"同一参数集(--ds 等业务日期,全套 15 个,同一张表 bgp_sync_run_vars):脚本可能
     # getResolvedOptions(['ds']),不传则调度运行必失败(GlueArgumentError)。ds 取 Airflow 逻辑日期;
     # 其余变量由同一张表推导(Airflow 2.2+ context 已移除 yesterday/tomorrow)。
@@ -129,6 +134,7 @@ def run_job(**ctx):
     args = bgp_run_param_args(ds)
     run_id = glue.start_job_run(JobName=job_name, Arguments=args)["JobRunId"]
     print(f"Started Glue job {job_name} run {run_id}")
+    _record(rid, "running", extra={"glueJobName": job_name, "glueJobRunId": run_id})   # 后端句柄进 running 行:平台读时对账能据此收口
     while True:
         state = glue.get_job_run(JobName=job_name, RunId=run_id)["JobRun"]["JobRunState"]
         if state in ("SUCCEEDED", "FAILED", "STOPPED", "ERROR", "TIMEOUT"):
@@ -183,9 +189,10 @@ def _release_run_lock(token):
     except Exception:
         pass
 
-def _run_statements_once():
+def _run_statements_once(rid):
     resp = rsdata.batch_execute_statement(WorkgroupName="${workgroup}", Database="${database}", Sqls=STATEMENTS${secretKw})
     sid = resp["Id"]
+    _record(rid, "running", extra={"statementId": sid})   # 2026-11-04:后端句柄进 running 行(平台读时对账能据此收口)
     while True:
         desc = rsdata.describe_statement(Id=sid)
         if desc["Status"] in ("FINISHED", "FAILED", "ABORTED"):
@@ -200,9 +207,12 @@ def run_job(**ctx):
         # 等满仍抢不到=另一执行体长时间持锁。跳过本次 tick(catchup=False → 下次调度再跑),绝不 raise 失败(否则误报)。
         raise AirflowSkipException("run lock busy: another run holds the job lock; skip this tick")
     try:
+        # 2026-11-04:抢到锁即落 running 行(在途运行对「删作业」可见;done / on_failure 用 update 收口)。在 try 里:写不成也走 finally 放锁
+        rid = _airflow_run_id(ctx)
+        _record_start(rid)
         last_err = ""
         for attempt in range(4):
-            desc = _run_statements_once()
+            desc = _run_statements_once(rid)
             if desc["Status"] == "FINISHED":
                 print("Redshift SQL FINISHED")
                 return
@@ -235,23 +245,78 @@ ${RUN_PARAMS_PY}
 
 ${taskBody}
 
-def _record(run_id, status, **ctx):
-        # 🔴 台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
-        #   两区的 run 行同键、**后写盖掉先写**(实测两区都跑成功而台账只剩一行)。口径单一作者 = lib/monitor/run-key.ts。
+def _airflow_run_id(ctx):
+    return ctx.get("dag_run").run_id if ctx.get("dag_run") else "manual"
+
+def _is_cond_failed(e):
+    resp = getattr(e, "response", None) or {}
+    return resp.get("Error", {}).get("Code") == "ConditionalCheckFailedException"
+
+def _update_job_row(run_id, status):
+    # 2026-11-04:🔴 条件写 attribute_exists(jobId) —— 作业行已删时 update_item 会 upsert 出一条没有名字的幽灵作业行;
+    #   条件不满足 ⇒ 丢弃(run 行自己的状态已落下),其余错误照抛。lastRunId 让平台读时对账能找到这条定时 run。
     try:
-        ddb.Table("bgp-task-runs").put_item(Item={
-            "taskId": JOB_ID, ${runKeyFields}, "taskType": "etl-" + JOB_TYPE,
-            "status": status, "startedAt": datetime.utcnow().isoformat() + "Z",
-            "finishedAt": datetime.utcnow().isoformat() + "Z",
-            "triggeredBy": "schedule", "airflowDagId": "${dagId}",
-            ${stampFields},
-        })
         ddb.Table("bgp-etl-jobs").update_item(
             Key={"userId": "default-user", "jobId": JOB_ID},
-            UpdateExpression="SET lastRunStatus = :s, #st = :s, updatedAt = :t",
+            UpdateExpression="SET lastRunStatus = :s, #st = :s, lastRunId = :r, updatedAt = :t",
+            ConditionExpression="attribute_exists(jobId)",
             ExpressionAttributeNames={"#st": "status"},
-            ExpressionAttributeValues={":s": status, ":t": datetime.utcnow().isoformat() + "Z"},
+            ExpressionAttributeValues={":s": status, ":r": ${runIdExpr}, ":t": datetime.utcnow().isoformat() + "Z"},
         )
+    except Exception as e:
+        if not _is_cond_failed(e):
+            raise
+        print("job row gone, skip status write", JOB_ID, run_id, status)
+
+def _record_start(run_id, **ctx):
+        # 2026-11-04:开跑即落一条 running 行 —— 在途运行必须在台账里可见(删作业前核的就是它);结束时 _record 用 update 收口,
+        #   不再整行 put(put 会冲掉这里的 startedAt 与章)。写不成即抛(同 _record)。
+        # 🔴 2026-09-07 真环境:台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
+        #   两区的 run 行同键、**后写盖掉先写**(实测两区都跑成功而台账只剩一行)。口径单一作者 = lib/monitor/run-key.ts。
+    ddb.Table("bgp-task-runs").put_item(Item={
+        "taskId": JOB_ID, ${runKeyFields}, "taskType": "etl-" + JOB_TYPE,
+        "status": "running", "startedAt": datetime.utcnow().isoformat() + "Z",
+        "triggeredBy": "schedule", "airflowDagId": "${dagId}",
+        ${stampFields},
+    })
+    _update_job_row(run_id, "running")
+
+def _record(run_id, status, extra=None, **ctx):
+        # 2026-11-04:收口用 update_item(条件 attribute_exists(taskId)):有开跑行就只改状态 / 结束时刻 / 结果字段;
+        #   没有(开跑行没写成、或 run_job 之前就失败)⇒ 退回整行 put(无论如何要有一行)。finishedAt 只在终态写。
+    try:
+        sets = {"status": status}
+        if status in ("succeeded", "failed", "stopped"):
+            sets["finishedAt"] = datetime.utcnow().isoformat() + "Z"
+        if extra:
+            sets.update(extra)
+        names, vals, parts = {}, {}, []
+        for i, (k, v) in enumerate(sets.items()):
+            names["#k%d" % i] = k
+            vals[":v%d" % i] = v
+            parts.append("#k%d = :v%d" % (i, i))
+        try:
+            ddb.Table("bgp-task-runs").update_item(
+                Key={"taskId": JOB_ID, "runId": ${runIdExpr}},
+                UpdateExpression="SET " + ", ".join(parts),
+                ConditionExpression="attribute_exists(taskId)",
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=vals,
+            )
+        except Exception as e:
+            if not _is_cond_failed(e):
+                raise
+            item = {
+                "taskId": JOB_ID, ${runKeyFields}, "taskType": "etl-" + JOB_TYPE,
+                "status": status, "startedAt": datetime.utcnow().isoformat() + "Z",
+                "finishedAt": datetime.utcnow().isoformat() + "Z",
+                "triggeredBy": "schedule", "airflowDagId": "${dagId}",
+                ${stampFields},
+            }
+            if extra:
+                item.update(extra)
+            ddb.Table("bgp-task-runs").put_item(Item=item)
+        _update_job_row(run_id, status)
     except Exception as e:
         # 🔴 「写不成即拒」:台账是运行历史与成本归因的唯一真值源。这里是**任务**(done),抛出去让本次 run 显红,
         #   而不是吞掉、留下一次「看板上不存在」的成功运行。失败回调侧另有 try 包裹,避免掩盖原始错误。
@@ -259,12 +324,10 @@ def _record(run_id, status, **ctx):
         raise
 
 def on_success(**ctx):
-    rid = ctx.get("dag_run").run_id if ctx.get("dag_run") else "manual"
-    _record(rid, "succeeded")
+    _record(_airflow_run_id(ctx), "succeeded")
 
 def on_failure(ctx):
-    rid = ctx.get("dag_run").run_id if ctx.get("dag_run") else "manual"
-    _record(rid, "failed")
+    _record(_airflow_run_id(ctx), "failed")
 
 with DAG(
     dag_id="${dagId}",

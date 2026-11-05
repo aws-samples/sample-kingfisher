@@ -72,8 +72,12 @@ describe("🔴 运行时与经典 DAG 同源(台账字段 / 锁属性 / 表名�
     expect(BGP_RUNTIME_PY).toContain('"scheduler": "serverless"');
     expect(BGP_RUNTIME_PY).toContain('Table("bgp-task-runs")');
     expect(classicEtl).toContain('Table("bgp-task-runs")');
-    expect(BGP_RUNTIME_PY).toContain('UpdateExpression="SET lastRunStatus = :s, #st = :s, updatedAt = :t"');
-    expect(classicEtl).toContain('UpdateExpression="SET lastRunStatus = :s, #st = :s, updatedAt = :t"');
+    // 2026-11-04:作业行回写带 lastRunId(平台读时对账据此找到定时 run)且是条件写(作业行已删不造幽灵行)—— 两侧同一句
+    expect(BGP_RUNTIME_PY).toContain('UpdateExpression="SET lastRunStatus = :s, #st = :s, lastRunId = :r, updatedAt = :t"');
+    expect(classicEtl).toContain('UpdateExpression="SET lastRunStatus = :s, #st = :s, lastRunId = :r, updatedAt = :t"');
+    expect(BGP_RUNTIME_PY).toContain('ConditionExpression="attribute_exists(jobId)"');
+    expect(classicEtl).toContain('ConditionExpression="attribute_exists(jobId)"');
+    expect(classicEmr).toContain('ConditionExpression="attribute_exists(jobId)"');
   });
   it("作业锁:<lockAttr>Token / <lockAttr>ExpiresAt、租约 90 min、attribute_not_exists OR 过期、REMOVE 释放 —— 与 run-lock.ts / 经典 DAG 同一形状", () => {
     expect(BGP_RUNTIME_PY).toContain('spec["lockAttr"] + "Token"');

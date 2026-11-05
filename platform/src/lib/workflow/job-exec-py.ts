@@ -35,16 +35,11 @@ def _ddb(spec):
 
 
 
-def _record(spec, run_id, status, started_at=None, extra=None, run_group_id=None):
-    """写台账 + 回写作业表。
-
-    🔴 **写不成即拒**(不再 print 吞掉):台账是运行历史与成本归因的唯一真值源,吞掉写失败 =
-    任务报成功而看板上这次运行不存在(看板假绿)。宁可让这次 run 失败、由 cron 下一刀重试。
-    """
-    ddb = _ddb(spec)
+def _ledger_item(spec, run_id, status, started_at=None, extra=None, run_group_id=None):
+    """台账行的字段(开跑建行与「没有开跑行时退回整行写」两处共用一份)。"""
     item = {
         "taskId": spec["jobId"], "runId": run_id, "taskType": spec["taskType"],
-        "status": status, "startedAt": started_at or _now(), "finishedAt": _now(),
+        "status": status, "startedAt": started_at or _now(),
         "triggeredBy": "schedule", "airflowDagId": spec["dagId"], "scheduler": "serverless",
     }
     if run_group_id:
@@ -60,13 +55,80 @@ def _record(spec, run_id, status, started_at=None, extra=None, run_group_id=None
         item["taskTargetKey"] = spec["jobId"] + "#" + target   # SPEC §1.2 GSI byTaskTarget 的分区键(先落数据)
     if extra:
         item.update(extra)
-    ddb.Table("bgp-task-runs").put_item(Item=item)
-    ddb.Table(spec["jobsTable"]).update_item(
-        Key={"userId": "default-user", "jobId": spec["jobId"]},
-        UpdateExpression="SET lastRunStatus = :s, #st = :s, updatedAt = :t",
-        ExpressionAttributeNames={"#st": "status"},
-        ExpressionAttributeValues={":s": status, ":t": _now()},
-    )
+    return item
+
+
+def _is_cond_failed(e):
+    resp = getattr(e, "response", None) or {}
+    return resp.get("Error", {}).get("Code") == "ConditionalCheckFailedException"
+
+
+def _update_job_row(spec, run_id, status):
+    """回写作业行 lastRunStatus / status / lastRunId(lastRunId 让平台读时对账能找到这条定时 run)。
+
+    2026-11-04:🔴 条件写 attribute_exists(jobId) —— 作业行已删时 update_item 会 upsert 出一条只有状态字段、没有名字的幽灵作业行;
+    条件不满足 ⇒ 丢弃(run 行自己的状态已落下),其余错误照抛(写不成即拒)。
+    """
+    try:
+        _ddb(spec).Table(spec["jobsTable"]).update_item(
+            Key={"userId": "default-user", "jobId": spec["jobId"]},
+            UpdateExpression="SET lastRunStatus = :s, #st = :s, lastRunId = :r, updatedAt = :t",
+            ConditionExpression="attribute_exists(jobId)",
+            ExpressionAttributeNames={"#st": "status"},
+            ExpressionAttributeValues={":s": status, ":r": run_id, ":t": _now()},
+        )
+    except Exception as e:
+        if not _is_cond_failed(e):
+            raise
+        print("job row gone, skip status write", spec["jobId"], run_id, status)
+
+
+def _record_start(spec, run_id, started_at=None, extra=None, run_group_id=None):
+    """开跑即落一条 running 行(2026-11-04):在途运行必须在台账里可见 —— 删作业前核的就是它;
+    结束时 _record 用 update 收口,不再整行 put(put 会冲掉这里的 startedAt 与章)。写不成即抛(同 _record)。"""
+    _ddb(spec).Table("bgp-task-runs").put_item(Item=_ledger_item(spec, run_id, "running", started_at, extra, run_group_id))
+    _update_job_row(spec, run_id, "running")
+
+
+def _record(spec, run_id, status, started_at=None, extra=None, run_group_id=None):
+    """写台账 + 回写作业表。
+
+    🔴 **写不成即拒**(不再 print 吞掉):台账是运行历史与成本归因的唯一真值源,吞掉写失败 =
+    任务报成功而看板上这次运行不存在(看板假绿)。宁可让这次 run 失败、由 cron 下一刀重试。
+    🔴 2026-11-04:用 update_item(条件 attribute_exists(taskId))—— 有开跑行就只改状态 / 结束时刻 / 结果字段;
+       没有(开跑行没写成、或 _record_start 之前就失败)⇒ 退回整行 put(无论如何要有一行)。
+       finishedAt 只在终态写:timeout-pending 是「调度器放手了、后端可能还在跑」,不是结束;running 是提交后补后端句柄。
+    """
+    ddb = _ddb(spec)
+    terminal = status in ("succeeded", "failed", "stopped")
+    sets = {"status": status}
+    if terminal:
+        sets["finishedAt"] = _now()
+    if run_group_id:
+        sets["runGroupId"] = run_group_id
+    if extra:
+        sets.update(extra)
+    names, vals, parts = {}, {}, []
+    for i, (k, v) in enumerate(sets.items()):
+        names["#k%d" % i] = k
+        vals[":v%d" % i] = v
+        parts.append("#k%d = :v%d" % (i, i))
+    try:
+        ddb.Table("bgp-task-runs").update_item(
+            Key={"taskId": spec["jobId"], "runId": run_id},
+            UpdateExpression="SET " + ", ".join(parts),
+            ConditionExpression="attribute_exists(taskId)",
+            ExpressionAttributeNames=names,
+            ExpressionAttributeValues=vals,
+        )
+    except Exception as e:
+        if not _is_cond_failed(e):
+            raise
+        item = _ledger_item(spec, run_id, status, started_at, extra, run_group_id)
+        if terminal:
+            item["finishedAt"] = _now()
+        ddb.Table("bgp-task-runs").put_item(Item=item)
+    _update_job_row(spec, run_id, status)
 
 
 def _acquire_run_lock(spec, token, wait_s=300):
@@ -107,9 +169,11 @@ def _release_run_lock(spec, token):
         pass
 
 
-def _check_soft_limit(spec, run_id, started):
+def _check_soft_limit(spec, run_id, started, handles=None):
     if time.time() - started > SOFT_LIMIT_S:
-        _record(spec, run_id, "timeout-pending")
+        # 2026-11-04:timeout-pending = 调度器放手、后端可能仍在跑(在途态,词表单一作者 run-groups.RUN_INFLIGHT_STATUSES);
+        #   带上后端句柄(glueJobName / glueJobRunId · statementId · nativeRunId / applicationId),平台读时对账据此拿到真实终态收口
+        _record(spec, run_id, "timeout-pending", extra=handles)
         raise Exception("serverless task soft limit (50 min) reached while waiting; job was submitted and may still be running")
 
 
@@ -136,11 +200,13 @@ def _run_redshift(spec, run_id, started):
     last_err = ""
     for attempt in range(4):
         sid = rsdata.batch_execute_statement(**kwargs)["Id"]
+        handles = {"statementId": sid}
+        _record(spec, run_id, "running", extra=handles)   # 2026-11-04:提交后立刻把后端句柄补到 running 行(对账能据此收口)
         while True:
             desc = rsdata.describe_statement(Id=sid)
             if desc["Status"] in ("FINISHED", "FAILED", "ABORTED"):
                 break
-            _check_soft_limit(spec, run_id, started)
+            _check_soft_limit(spec, run_id, started, handles)
             time.sleep(2)
         if desc["Status"] == "FINISHED":
             print("Redshift SQL FINISHED")
@@ -160,11 +226,13 @@ def _run_glue(spec, run_id, started, ds):
     job_name = spec["glueJobName"]
     rid = glue.start_job_run(JobName=job_name, Arguments=args)["JobRunId"]
     print("Started Glue job", job_name, "run", rid)
+    handles = {"glueJobName": job_name, "glueJobRunId": rid}
+    _record(spec, run_id, "running", extra=handles)   # 2026-11-04:提交后立刻把后端句柄补到 running 行(对账能据此收口)
     while True:
         state = glue.get_job_run(JobName=job_name, RunId=rid)["JobRun"]["JobRunState"]
         if state in ("SUCCEEDED", "FAILED", "STOPPED", "ERROR", "TIMEOUT"):
             break
-        _check_soft_limit(spec, run_id, started)
+        _check_soft_limit(spec, run_id, started, handles)
         time.sleep(15)
     if state != "SUCCEEDED":
         raise Exception("Glue job " + job_name + " ended with " + state)
@@ -201,12 +269,14 @@ def _run_emr(spec, run_id, started, ds):
     )
     native = resp["jobRunId"]
     print("Started EMR job run", native)
+    handles = {"nativeRunId": native, "applicationId": app}
+    _record(spec, run_id, "running", extra=handles)   # 2026-11-04:提交后立刻把后端句柄补到 running 行(对账能据此收口)
     while True:
         jr = emr.get_job_run(applicationId=app, jobRunId=native)["jobRun"]
         state = jr["state"]
         if state in ("SUCCESS", "FAILED", "CANCELLED"):
             break
-        _check_soft_limit(spec, run_id, started)
+        _check_soft_limit(spec, run_id, started, handles)
         time.sleep(15)
     if state != "SUCCESS":
         raise Exception("EMR job run " + native + " ended with " + state + ": " + str(jr.get("stateDetails", "")))

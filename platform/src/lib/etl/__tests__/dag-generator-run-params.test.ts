@@ -43,7 +43,13 @@ CALLS = []
 class _Glue:
     def start_job_run(self, **kw): CALLS.append(kw); return {"JobRunId": "r"}
     def get_job_run(self, **kw): return {"JobRun": {"JobRunState": "SUCCEEDED"}}
-b3 = types.ModuleType("boto3"); b3.client = lambda *a, **k: _Glue(); b3.resource = lambda *a, **k: None
+class _Tbl:
+    def __init__(self, n): self.n = n
+    def put_item(self, **kw): return {}
+    def update_item(self, **kw): return {}
+class _Res:
+    def Table(self, n): return _Tbl(n)
+b3 = types.ModuleType("boto3"); b3.client = lambda *a, **k: _Glue(); b3.resource = lambda *a, **k: _Res()  # 2026-11-04:run_job 开跑即写台账,ddb 不能是 None
 sys.modules["boto3"] = b3
 import time; time.sleep = lambda s: None
 g = {}

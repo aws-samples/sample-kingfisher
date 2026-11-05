@@ -25,9 +25,29 @@ import {
 } from "./run-group";
 import { listRunsByTask } from "./run-records";
 
-/** 子 run 的状态词表 —— 本模块**消费**的那四个(引擎侧 `mapEmrState` 同一组值)。 */
-export const RUN_CHILD_STATUSES = ["running", "succeeded", "failed", "stopped"] as const;
+// ── 子 run 状态词表(单一作者;引擎侧 `mapEmrState` / 两套 Python 执行体写的就是这几个值) ──
+/**
+ * 在途(还会自己变):
+ *   · `running` —— 后端在跑,持有者(平台轮询器 / 调度器任务)在看着;
+ *   · `timeout-pending` —— 2026-11-04显式收进词表:MWAA Serverless 单 task 50 分钟软限已到,调度器**放手了但后端可能仍在跑**
+ *     (`job-exec-py._check_soft_limit` 写它,同时带上后端句柄 glueJobRunId / statementId / nativeRunId),由平台读时对账
+ *     (`reconcileEtlJob` / EMR `reconcile`)按后端真实终态收口。它**不是终态**:当终态会把「不知道死活」说成结束;当 running 又会让人等一个不再续租的持有者。
+ */
+export const RUN_INFLIGHT_STATUSES = ["running", "timeout-pending"] as const;
+/** 终态(不会再自己变了)。 */
+export const RUN_TERMINAL_STATUSES = ["succeeded", "failed", "stopped"] as const;
+/** 本模块**消费**的全部子 run 状态 = 在途 ∪ 终态。 */
+export const RUN_CHILD_STATUSES = [...RUN_INFLIGHT_STATUSES, ...RUN_TERMINAL_STATUSES] as const;
 export type RunChildStatus = (typeof RUN_CHILD_STATUSES)[number];
+
+/**
+ * 2026-11-04 —— 「一条 run 结束了没有」的唯一判据(删作业前核在途运行、读时对账要不要再去问后端,都用它)。
+ * 🔴 fail-closed:只有写着终态词的 run 才算结束;`running` / `timeout-pending` / 词表外的值 / 缺失 都算**仍在途**
+ *   —— 没有终态结论就不许当成「已结束」(纪律 9:状态只许来自真正的结论)。
+ */
+export function isTerminalRunStatus(status: unknown): boolean {
+  return typeof status === "string" && (RUN_TERMINAL_STATUSES as readonly string[]).includes(status);
+}
 
 export type RunGroupFailurePolicy = "continue" | "fail-fast-submit";
 
@@ -129,7 +149,7 @@ export function deriveGroupStatus(children: readonly { status: unknown }[]): Der
       running++; // 不认识 ⇒ 按「还没终态」算(见 DerivedGroupStatus.unknownStatuses)
       continue;
     }
-    if (st === "running") running++;
+    if ((RUN_INFLIGHT_STATUSES as readonly string[]).includes(st)) running++; // running / timeout-pending 都还没终态
     else if (st === "succeeded") succeeded++;
     else if (st === "failed") failed++;
     else stopped++;

@@ -7,6 +7,8 @@ import {
   StartJobRunCommand,
   GetJobRunCommand,
   CancelJobRunCommand,
+  GetApplicationCommand,
+  type EMRServerlessClient,
 } from "@aws-sdk/client-emr-serverless";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
@@ -19,7 +21,7 @@ import { backfillRunExtra } from "@/lib/backfill/run-extra";
 import type { EngineJob } from "../types";
 import type { EmrEngineJob } from "./types";
 import { toSparkSubmitParameters, userSparkConfToParameters, s3TablesCatalogParameters, bgpLandingParameters } from "./spec";
-import { ensureApplication, ensureStarted, destroyApplication, applicationIdOf, allApplicationRefs, targetEmrNetwork } from "./application";
+import { ensureApplication, ensureStarted, destroyApplication, applicationIdOf, allApplicationRefs, targetEmrNetwork, isEmrApplicationBusy } from "./application";
 import { uploadScript, ensureS3TablesJar } from "./script";
 import { s3LogUri, EMR_LOG_PREFIX as LOG_PREFIX } from "./log-destination";
 // 执行角色解析 / 预检的唯一作者(原直接调 role-advisor/preflight,现经落点化封装)
@@ -32,12 +34,16 @@ import { requireReadyTarget } from "@/lib/exec-env/registry";
 import { isHome } from "@/lib/exec-env/target-id";
 // 运行提交的可审计闭包
 import { residencyAudit, auditActorOrService, auditObservedScheduledRun } from "@/lib/exec-env/residency-audit";
-import { createRunRecord, finishRunRecord, updateEngineJobStatus, mapEmrState, EMR_TERMINAL_STATES } from "./run-record";
+import { createRunRecord, finishRunRecord, updateEngineJobStatus, mapEmrState, EMR_TERMINAL_STATES, ENGINE_JOB_ROW_EXISTS } from "./run-record";
+// 2026-11-04:application 已不存在时轮询器的收口口径(error 原话单一作者)+ EMR「没有这个资源」判法 + 条件写不满足判法
+import { JOB_DEFINITION_GONE_ERROR, isEmrResourceNotFound } from "@/lib/etl/job-inflight";
+import { isConditionalCheckFailed } from "@/lib/aws/ddb-errors";
 import { recordComputeLineage } from "@/lib/governance/lineage-service";
 import { pushComputeLineageToOM } from "@/lib/openmetadata/om-push";
 import { parseSparkScriptLineage, sparkRefToFqn } from "@/lib/lineage/spark-lineage";
 import { guard } from "@/lib/cookbook";
-import { acquireJobRunLock, releaseJobRunLock, renewRunLockIfDue, keepRunLockForReconcile, type RunLock, RunLockBusy } from "@/lib/etl/run-lock";
+import { acquireJobRunLock, releaseJobRunLock, renewRunLockIfDueDetailed, keepRunLockForReconcile, type RunLock, RunLockBusy } from "@/lib/etl/run-lock";
+import { isTerminalRunStatus } from "@/lib/monitor/run-groups";
 // 业务日期以参数进作业(单一作者;与 Glue 离线作业同一张表)
 import { runParamArgv, todayDs } from "@/lib/etl/run-params";
 
@@ -107,35 +113,60 @@ export async function persistApplicationId(job: EmrEngineJob, targetId: string, 
   if (!applicationId) return;
   if (applicationIdOf(job, targetId) === applicationId) return;
   const { UpdateCommand } = await import("@aws-sdk/lib-dynamodb");
+  // 2026-11-04:🔴 作业行已在提交途中被删 ⇒ 不许 upsert 出一条只有 applicationId 的幽灵行(条件不满足即丢弃;其余错误照抛)
+  const sendIfRowExists = async (cmd: InstanceType<typeof UpdateCommand>) => {
+    try {
+      await docClient.send(cmd);
+    } catch (e) {
+      if (!isConditionalCheckFailed(e)) throw e;
+      console.warn("[emr] 作业行已不存在,丢弃 applicationId 回写(不造幽灵行)", JSON.stringify({ jobId: job.jobId, targetId, applicationId }));
+    }
+  };
   if (targetId === "tgt_home") {
-    await docClient.send(
+    await sendIfRowExists(
       new UpdateCommand({
         TableName: TABLES.ENGINE_JOBS,
         Key: { userId: USER_ID, jobId: job.jobId },
         UpdateExpression: "SET applicationId = :a, updatedAt = :t",
+        ConditionExpression: ENGINE_JOB_ROW_EXISTS,
         ExpressionAttributeValues: { ":a": applicationId, ":t": new Date().toISOString() },
       })
     );
     return;
   }
-  await docClient.send(
+  await sendIfRowExists(
     new UpdateCommand({
       TableName: TABLES.ENGINE_JOBS,
       Key: { userId: USER_ID, jobId: job.jobId },
       UpdateExpression: "SET #m = if_not_exists(#m, :empty), updatedAt = :t",
+      ConditionExpression: ENGINE_JOB_ROW_EXISTS,
       ExpressionAttributeNames: { "#m": "applicationIdByTarget" },
       ExpressionAttributeValues: { ":empty": {}, ":t": new Date().toISOString() },
     })
   );
-  await docClient.send(
+  await sendIfRowExists(
     new UpdateCommand({
       TableName: TABLES.ENGINE_JOBS,
       Key: { userId: USER_ID, jobId: job.jobId },
       UpdateExpression: "SET #m.#t = :a",
+      ConditionExpression: ENGINE_JOB_ROW_EXISTS,
       ExpressionAttributeNames: { "#m": "applicationIdByTarget", "#t": targetId },
       ExpressionAttributeValues: { ":a": applicationId },
     })
   );
+}
+
+/**
+ * 2026-11-04:application 本体是否已不存在。只有 GetApplication 明确 ResourceNotFound,或已 TERMINATED(DeleteApplication 之后的终态)才算;
+ * 别的错不下结论(回 false ⇒ 轮询器当瞬时错误继续)。
+ */
+async function emrApplicationGone(emr: Pick<EMRServerlessClient, "send">, applicationId: string): Promise<boolean> {
+  try {
+    const res = await emr.send(new GetApplicationCommand({ applicationId }));
+    return res?.application?.state === "TERMINATED";
+  } catch (e) {
+    return isEmrResourceNotFound(e);
+  }
 }
 
 async function loadJob(jobId: string): Promise<EmrEngineJob | null> {
@@ -171,7 +202,10 @@ export const emrServerlessProvider: EngineProvider = {
       } catch {
         region = undefined; // 解析不到就用 home 试一次:删不掉会在下面被吞掉,但不能因此不删
       }
-      await destroyApplication(ref.applicationId, region).catch(() => {});
+      // 2026-11-04:「还有作业在跑」不许吞 —— 路由据此 409、作业行不删;其余失败(已不存在 / 权限)照旧 best-effort
+      await destroyApplication(ref.applicationId, region).catch((e) => {
+        if (isEmrApplicationBusy(e)) throw e;
+      });
     }
   },
 
@@ -366,13 +400,21 @@ export const emrServerlessProvider: EngineProvider = {
     const { applicationId } = ctx;
     const emr = await emrServerlessClientFor(ctx.region);
     let reachedTerminal = false;
+    // 2026-11-04:作业行被删后锁随行消失 ⇒ 不再续租,但继续跟踪 job-run 到真正的终态(与 ETL 侧同一分叉 lockLostBecauseJobRowGone)
+    let live: RunLock | null | undefined = lock;
     try {
     for (let i = 0; i < 240; i++) {
       await sleep(15000);
-      if (!(await renewRunLockIfDue(lock))) {
+      const renew = await renewRunLockIfDueDetailed(live);
+      if (renew === "lost-taken-over") {
         console.warn("[emr] 轮询中丢锁,停止回写", j.jobId, runId);
         reachedTerminal = true;
         return;
+      }
+      if (renew !== "ok") {
+        // lost-row-gone / lost-unknown:作业行已删(锁随行消失)⇒ 没人会再收口这条 run,继续跟踪到终态,只是不再续租
+        console.warn("[emr] 作业行已不存在(或读不出),运行锁随行消失;继续跟踪这条 run 到终态(不再续租)", j.jobId, runId, renew);
+        live = null;
       }
       try {
         const { jobRun } = await emr.send(new GetJobRunCommand({ applicationId, jobRunId: nativeRunId }));
@@ -388,13 +430,26 @@ export const emrServerlessProvider: EngineProvider = {
           reachedTerminal = true;
           return;
         }
-      } catch {
-        /* 瞬时错误保留，继续轮询 */
+      } catch (e) {
+        // 2026-11-04:GetJobRun 说没有这个资源 ⇒ 再问 application 本体;application 已删 / TERMINATED ⇒ 这条 run 再也查不到终态,
+        //   当场按失败收口(error 原话给用户看)并释放锁 —— 原来一律 catch 继续空转 60 分钟再 keepRunLockForReconcile,run 行永远「运行中」。
+        //   application 还在(只是 job-run 一时查不到)或 GetApplication 报别的错 ⇒ 当瞬时错误,继续有界轮询。
+        if (isEmrResourceNotFound(e) && (await emrApplicationGone(emr, applicationId))) {
+          try {
+            await finishRunRecord(j, runId, "failed", { error: JOB_DEFINITION_GONE_ERROR.emr });
+            await updateEngineJobStatus(j.jobId, "failed", runId, "failed"); // 作业行已删 ⇒ 条件写丢弃(不造幽灵行)
+            reachedTerminal = true;
+            return;
+          } catch (we) {
+            console.warn("[emr] 按「application 已不存在」收口时回写失败,下一轮重试", j.jobId, runId, we);
+          }
+        }
+        /* 其余瞬时错误保留，继续轮询(有界) */
       }
     }
     } finally {
-      if (reachedTerminal) await releaseJobRunLock(lock);
-      else await keepRunLockForReconcile(lock, { jobId: j.jobId, runId, engine: "emr-serverless" });
+      if (reachedTerminal) await releaseJobRunLock(live);
+      else await keepRunLockForReconcile(live, { jobId: j.jobId, runId, engine: "emr-serverless" });
     }
   },
 
@@ -450,7 +505,8 @@ export const emrServerlessProvider: EngineProvider = {
       if (!run) return job;
       // 定时 run 的观测后审计补写(与 ETL 侧 reconcileEtlJob 同一口径;幂等、不影响对账)
       await auditObservedScheduledRun({ taskId: j.jobId, runId: j.lastRunId, targetId: run.targetId, triggeredBy: run.triggeredBy, residencyAuditId: run.residencyAuditId });
-      if (j.lastRunStatus !== "running") return job;
+      // 2026-11-04:`running` / `timeout-pending` 都要去问后端;只有终态才跳过(词表单一作者 isTerminalRunStatus)
+      if (isTerminalRunStatus(j.lastRunStatus)) return job;
       if (!run.nativeRunId || !run.applicationId) return job;
       // 🔴 与 ETL 侧那两处**同一类**:必须用这条 run 的 region。用 home 客户端查非 home 的 job-run
       //    会 ResourceNotFound ⇒ 下面那句 `state` 恒空 ⇒ run 永远卡 running(比写错状态更难查)。

@@ -51,7 +51,10 @@ import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 //   `PLACE_WIRE_PY` / `RUN_PARAMS_PY`;共享块 `NODE_EXEC_PY` 新增 `_exec_job`(作业节点)并让 `_exec_sync` 写同步任务自己的运行行
 //   ;`_make_operator` 加 `job` 分支、`sync` 分支改带节点 id 与工作流 run id(回链)。
 //   模块名带版本 ⇒ 内容变了就必须升号(存量 DAG 仍 import v10,零影响;重发一次拿新库)。
-export const RUNTIME_LIB_VERSION = 11;
+// v11 → **v12**(2026-11-04):作业族共享块 `JOB_EXEC_PY` 的台账写法改为「开跑 `_record_start` 落 running 行 → 结束 `_record` 用 update 收口」
+//   (在途运行对删作业可见;作业行回写一律 attribute_exists(jobId) 条件写,不造幽灵行;软限 timeout-pending 带后端句柄)。
+//   🔴 已发布的工作流 / 单作业 DAG 仍 import 旧版本号的库 ⇒ 要重新发布才拿到新执行体(升级须知)。
+export const RUNTIME_LIB_VERSION = 12;
 export const RUNTIME_LIB_MODULE = `bgp_workflow_runtime_v${RUNTIME_LIB_VERSION}`;
 export const RUNTIME_LIB_FILENAME = `${RUNTIME_LIB_MODULE}.py`;
 

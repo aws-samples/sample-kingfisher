@@ -5,6 +5,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 真实属性名在 ExpressionAttributeNames 里(如 runLockToken / runLock_nodeAToken)。mock 按占位名解析真实属性。
 // store 行是 {属性名: 值} 的字典(支持任意锁属性名 → 覆盖 workflow 不同节点的 runLock_<node>Token)。
 const store: Record<string, Record<string, any>> = {};
+// 2026-11-04:标成「行不存在」的键 —— 抢锁条件带 attribute_exists(#pk) 时对它条件不满足(模拟作业行已删)
+const missingRows = new Set<string>();
 
 class ConditionalCheckFailedException extends Error {
   name = "ConditionalCheckFailedException";
@@ -26,11 +28,22 @@ vi.mock("@/lib/aws/dynamodb", () => ({
       const expAttr = names["#e"];   // 真实过期属性名(如 runLockExpiresAt)
       const ue = input.UpdateExpression || "";
 
+      // 2026-11-04:条件写被拒时 DDB 按 ReturnValuesOnConditionCheckFailure=ALL_OLD 带回旧行(行不存在 ⇒ 不带)—— mock 同形
+      const ccf = (msg: string) => {
+        const e = new ConditionalCheckFailedException(msg) as ConditionalCheckFailedException & { Item?: Record<string, any> };
+        if (input.ReturnValuesOnConditionCheckFailure === "ALL_OLD" && !missingRows.has(rowKey)) e.Item = { ...row, userId: "default-user" };
+        return e;
+      };
+      // 读行(lockRowPresence 的确认步):行不存在 ⇒ Item 缺
+      if (cmd.constructor.name === "GetCommand" || input.ProjectionExpression) {
+        return missingRows.has(rowKey) ? { Item: undefined } : { Item: { userId: "default-user" } };
+      }
       // 抢锁:SET #t=:tok, #e=:exp  条件 attribute_not_exists(#t) OR #e < :now
       if (ue.startsWith("SET #t")) {
+        if (cond.includes("attribute_exists(#pk)") && missingRows.has(rowKey)) throw ccf("row missing");
         const free = row[tokenAttr] === undefined;
         const expired = row[expAttr] !== undefined && now !== undefined && row[expAttr] < now;
-        if (cond && !(free || expired)) throw new ConditionalCheckFailedException("locked");
+        if (cond && !(free || expired)) throw ccf("locked");
         row[tokenAttr] = vals[":tok"];
         row[expAttr] = vals[":exp"];
         return {};
@@ -38,7 +51,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
       // 🆕 续租:SET #e = :exp  条件 #t = :tok(P0-6)。必须在"抢锁"分支之后判,
       // 且不能被 `SET #t` 前缀匹配吞掉 —— 否则 mock 会静默"成功"、测不出条件语义。
       if (ue.startsWith("SET #e")) {
-        if (cond && row[tokenAttr] !== vals[":tok"]) throw new ConditionalCheckFailedException("token mismatch");
+        if (cond && (missingRows.has(rowKey) || row[tokenAttr] !== vals[":tok"])) throw ccf("token mismatch");
         row[expAttr] = vals[":exp"];
         return {};
       }
@@ -55,13 +68,16 @@ vi.mock("@/lib/aws/dynamodb", () => ({
 }));
 
 import { tryAcquireRunLock, acquireRunLock, releaseRunLock, acquireJobRunLock, releaseJobRunLock,
-  renewRunLockIfDue, keepRunLockForReconcile } from "../run-lock";
+  renewRunLockIfDue, renewRunLockIfDueDetailed, keepRunLockForReconcile, runLockRecentlyRenewed, runLockLiveCutoff, heldJobRunLocks,
+  jobLockAttrsOf, noLiveJobLockCondition, lockRowPresence, JobRowMissing, RUN_LOCK_LEASE_MS, RUN_LOCK_LIVE_WINDOW_MS } from "../run-lock";
+import { docClient } from "@/lib/aws/dynamodb";
 
 const T = "bgp-etl-jobs";
 const K = (jobId: string) => ({ userId: "default-user", jobId });
 
 beforeEach(() => {
   for (const k of Object.keys(store)) delete store[k];
+  missingRows.clear();
 });
 
 describe("run-lock 运行锁(根治裂缝C)", () => {
@@ -172,5 +188,107 @@ describe("P0-6 续租 + 轮询耗尽不释放", () => {
     await releaseRunLock(lock);
     const second = await tryAcquireRunLock(T, K("j-done"));
     expect(second).not.toBeNull();
+  });
+});
+
+
+// ── 2026-11-04:锁只许落在存在的作业行上;从作业行反读「谁还持着锁、是不是刚续租」 ──────────────
+describe("2026-11-04 作业行锁的存在性条件 + 反读", () => {
+  const lastAcquire = () => {
+    const calls = (docClient.send as unknown as { mock: { calls: Array<[{ input: any }]> } }).mock.calls;
+    return calls.map((c) => c[0].input).filter((i) => String(i.UpdateExpression) === "SET #t = :tok, #e = :exp").at(-1)!;
+  };
+
+  it("acquireJobRunLock(作业行锁):条件带 attribute_exists(#pk)(#pk = userId)+ ReturnValuesOnConditionCheckFailure;作业行不存在 ⇒ 抛 JobRowMissing(S4:不是 RunLockBusy、不排队)且**不写任何属性**(不造幽灵行)", async () => {
+    missingRows.add(`${T}#job-gone`);
+    await expect(acquireJobRunLock(T, "job-gone", 0, "tgt_usw2_a")).rejects.toBeInstanceOf(JobRowMissing);
+    await expect(acquireJobRunLock(T, "job-gone", 0, "tgt_usw2_a")).rejects.toThrow("作业已被删除,无法运行(作业行不存在)");
+    expect(lastAcquire().ConditionExpression).toBe("attribute_exists(#pk) AND (attribute_not_exists(#t) OR #e < :now)");
+    expect(lastAcquire().ExpressionAttributeNames).toEqual({ "#t": "runLock-tgt_usw2_aToken", "#e": "runLock-tgt_usw2_aExpiresAt", "#pk": "userId" });
+    expect(lastAcquire().ReturnValuesOnConditionCheckFailure).toBe("ALL_OLD");
+    expect(store[`${T}#job-gone`]).toEqual({});
+    // 排队语义(补数 / 定时 waitMs>0)也当场抛,不再等 45–60 分钟
+    await expect(acquireJobRunLock(T, "job-gone", 60 * 60 * 1000, "tgt_usw2_a")).rejects.toBeInstanceOf(JobRowMissing);
+    // 行存在 ⇒ 与原来逐字节同样抢到;被占 ⇒ 仍是 null(忙),不是 JobRowMissing
+    const ok = await acquireJobRunLock(T, "job-here", 0, "tgt_usw2_a");
+    expect(ok).not.toBeNull();
+    expect(store[`${T}#job-here`]["runLock-tgt_usw2_aToken"]).toBe(ok!.token);
+    expect(await acquireJobRunLock(T, "job-here", 0, "tgt_usw2_a")).toBeNull();
+  });
+
+  it("续租失败三分(S3 / S5):行在、token 不是我的 ⇒ lost-taken-over;行已删 ⇒ lost-row-gone(DDB 没带回旧行 + 读行确认);布尔版两者都是 false", async () => {
+    const taken = (await acquireJobRunLock(T, "j-taken", 0))!;
+    store[`${T}#j-taken`].runLockToken = "someone-else";
+    expect(await renewRunLockIfDueDetailed(taken)).toBe("lost-taken-over");
+    expect(await renewRunLockIfDue({ ...taken, token: taken.token + "x" })).toBe(false);
+    const gone = (await acquireJobRunLock(T, "j-gone-later", 0))!;
+    missingRows.add(`${T}#j-gone-later`);
+    expect(await renewRunLockIfDueDetailed(gone)).toBe("lost-row-gone");
+    expect(await lockRowPresence(T, K("j-gone-later"))).toBe("absent");
+    expect(await lockRowPresence(T, K("j-taken"))).toBe("present");
+    expect(await renewRunLockIfDueDetailed(null)).toBe("ok");
+  });
+
+  it("noLiveJobLockCondition / jobLockAttrsOf:home + 绑定区 + 行上残留的作业级锁属性,每把都「不存在 或 ExpiresAt < 刚续租下界」;与 runLockRecentlyRenewed 同一个数", () => {
+    const now = 1_800_000_000_000;
+    const row = { "runLock-tgt_eu1Token": "x", "runLock-tgt_eu1ExpiresAt": now + 1, runLock_nodeAToken: "n", name: "j" };
+    expect(jobLockAttrsOf(row, ["tgt_home", "tgt_usw2_a"])).toEqual(["runLock", "runLock-tgt_eu1", "runLock-tgt_usw2_a"]);
+    const cond = noLiveJobLockCondition(row, ["tgt_usw2_a"], now);
+    expect(cond.ConditionExpression).toBe(
+      "(attribute_not_exists(#lk0) OR #le0 < :liveCutoff) AND (attribute_not_exists(#lk1) OR #le1 < :liveCutoff) AND (attribute_not_exists(#lk2) OR #le2 < :liveCutoff)"
+    );
+    expect(cond.ExpressionAttributeNames).toEqual({
+      "#lk0": "runLockToken", "#le0": "runLockExpiresAt",
+      "#lk1": "runLock-tgt_eu1Token", "#le1": "runLock-tgt_eu1ExpiresAt",
+      "#lk2": "runLock-tgt_usw2_aToken", "#le2": "runLock-tgt_usw2_aExpiresAt",
+    });
+    expect(cond.ExpressionAttributeValues).toEqual({ ":liveCutoff": runLockLiveCutoff(now) });
+    expect(runLockLiveCutoff(now)).toBe(now + RUN_LOCK_LEASE_MS - RUN_LOCK_LIVE_WINDOW_MS);
+    // 同一个数:内存判据 ⇔ ExpiresAt > cutoff
+    expect(runLockRecentlyRenewed(runLockLiveCutoff(now) + 1, now)).toBe(true);
+    expect(runLockRecentlyRenewed(runLockLiveCutoff(now), now)).toBe(false);
+  });
+
+  it("泛化 tryAcquireRunLock 不开 requireRowExists ⇒ 条件串逐字不变(工作流节点锁 / MWAA Python 镜像的口径不动)", async () => {
+    missingRows.add(`${T}#wf-gone`);
+    const lock = await tryAcquireRunLock(T, K("wf-gone"), "runLock_nodeA");
+    expect(lock).not.toBeNull();
+    expect(lastAcquire().ConditionExpression).toBe("attribute_not_exists(#t) OR #e < :now");
+    expect(lastAcquire().ExpressionAttributeNames).toEqual({ "#t": "runLock_nodeAToken", "#e": "runLock_nodeAExpiresAt" });
+  });
+
+  it("runLockRecentlyRenewed:刚抢 / 一个续租间隔前续过 ⇒ true;两个间隔没人续 ⇒ false;lease 已过期 / 非数 ⇒ false", () => {
+    const now = 1_800_000_000_000;
+    expect(runLockRecentlyRenewed(now + RUN_LOCK_LEASE_MS, now)).toBe(true);
+    expect(runLockRecentlyRenewed(now + RUN_LOCK_LEASE_MS - 60_000, now)).toBe(true);
+    expect(runLockRecentlyRenewed(now + RUN_LOCK_LEASE_MS - RUN_LOCK_LIVE_WINDOW_MS + 1, now)).toBe(true);
+    expect(runLockRecentlyRenewed(now + RUN_LOCK_LEASE_MS - RUN_LOCK_LIVE_WINDOW_MS, now)).toBe(false);
+    expect(runLockRecentlyRenewed(now - 1, now)).toBe(false);
+    expect(runLockRecentlyRenewed(undefined, now)).toBe(false);
+    expect(runLockRecentlyRenewed("abc", now)).toBe(false);
+    expect(RUN_LOCK_LIVE_WINDOW_MS).toBe(120_000);
+    expect(RUN_LOCK_LEASE_MS).toBe(90 * 60 * 1000);
+  });
+
+  it("heldJobRunLocks:home 锁 ⇒ tgt_home;runLock-<target> ⇒ 反解 target;过期 / 工作流节点锁 / 没 token 的不算;真抢到的锁反读得到自己", async () => {
+    const now = 1_800_000_000_000;
+    const row = {
+      runLockToken: "a", runLockExpiresAt: now + RUN_LOCK_LEASE_MS,
+      "runLock-tgt_usw2_aToken": "b", "runLock-tgt_usw2_aExpiresAt": now + RUN_LOCK_LEASE_MS - 5 * 60_000,
+      "runLock-tgt_eu1Token": "c", "runLock-tgt_eu1ExpiresAt": now - 1,
+      "runLock_nodeAToken": "d", "runLock_nodeAExpiresAt": now + RUN_LOCK_LEASE_MS,
+      "runLock-tgt_apsToken": "e", // 没有 ExpiresAt ⇒ 不算
+      name: "x",
+    };
+    expect(heldJobRunLocks(row, now)).toEqual([
+      { attr: "runLock", targetId: "tgt_home", expiresAt: now + RUN_LOCK_LEASE_MS, renewedAgoMs: 0, recentlyRenewed: true },
+      { attr: "runLock-tgt_usw2_a", targetId: "tgt_usw2_a", expiresAt: now + RUN_LOCK_LEASE_MS - 5 * 60_000, renewedAgoMs: 5 * 60_000, recentlyRenewed: false },
+    ]);
+    expect(heldJobRunLocks(null)).toEqual([]);
+    const lock = (await acquireJobRunLock(T, "job-rt", 0, "tgt_usw2_a"))!;
+    const held = heldJobRunLocks(store[`${T}#job-rt`]);
+    expect(held.map((l) => [l.attr, l.targetId, l.recentlyRenewed])).toEqual([["runLock-tgt_usw2_a", "tgt_usw2_a", true]]);
+    await releaseRunLock(lock);
+    expect(heldJobRunLocks(store[`${T}#job-rt`])).toEqual([]);
   });
 });

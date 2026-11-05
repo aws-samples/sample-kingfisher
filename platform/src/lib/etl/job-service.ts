@@ -27,7 +27,11 @@ import { FLEX_CAPABLE_WORKER_TYPES } from "@/lib/etl/worker-types";
 // Glue 版本的单一作者 —— 作业行里存了就用它;没存 ⇒ 按它被写下时的缺省 5.1(不跟新缺省走,升级不改存量作业);清单外当场拒(不替用户猜)
 import { glueVersionOfRecord } from "@/lib/sync/glue-version";
 import { guard } from "@/lib/cookbook";
-import { acquireJobRunLock, releaseJobRunLock, renewRunLockIfDue, keepRunLockForReconcile, RunLockBusy, type RunLock } from "@/lib/etl/run-lock";
+import { acquireJobRunLock, releaseJobRunLock, renewRunLockIfDueDetailed, keepRunLockForReconcile, RunLockBusy, type RunLock } from "@/lib/etl/run-lock";
+// 2026-11-04:作业定义已不存在时轮询器的收口口径(error 原话单一作者)+ Glue「实体不存在」只认错误名(S2)+ 条件写不满足判法 + 终态词表
+import { JOB_DEFINITION_GONE_ERROR, isGlueEntityNotFoundByName } from "@/lib/etl/job-inflight";
+import { isConditionalCheckFailed } from "@/lib/aws/ddb-errors";
+import { isTerminalRunStatus } from "@/lib/monitor/run-groups";
 // task-runs 唯一写通道(50 SPEC §6 S10)。
 import { putRunRecord, updateRunRecord, resolveRunStamp, type RunOwner } from "@/lib/monitor/run-records";
 // Redshift SQL 作业成功时把受影响行数写进 run 行 `metrics.rowsAffected`(唯一作者)
@@ -158,16 +162,25 @@ async function finishRunRecord(
   });
 }
 
+// 2026-11-04:🔴 作业行的回写一律 `attribute_exists(jobId)` 条件写 —— UpdateItem 是 upsert,作业行已删(或正在被删)时轮询器 / 对账的回写
+//   会凭空造出一条只有状态字段、没有名字的幽灵作业行(与删源后在途探测写回已删行留幽灵行同类)。行不在 ⇒ 条件不满足 ⇒ 丢弃这次回写(run 行自己的终态已由 run 写通道落下)。
+const JOB_ROW_EXISTS = "attribute_exists(jobId)";
 async function updateJobStatus(jobId: string, status: string, runId: string) {
-  await docClient.send(
-    new UpdateCommand({
-      TableName: TABLES.ETL_JOBS,
-      Key: { userId: USER_ID, jobId },
-      UpdateExpression: "SET #s = :s, lastRunId = :r, lastRunStatus = :ls, lastRunAt = :t, updatedAt = :t",
-      ExpressionAttributeNames: { "#s": "status" },
-      ExpressionAttributeValues: { ":s": status, ":r": runId, ":ls": status, ":t": new Date().toISOString() },
-    })
-  );
+  try {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: TABLES.ETL_JOBS,
+        Key: { userId: USER_ID, jobId },
+        UpdateExpression: "SET #s = :s, lastRunId = :r, lastRunStatus = :ls, lastRunAt = :t, updatedAt = :t",
+        ConditionExpression: JOB_ROW_EXISTS,
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: { ":s": status, ":r": runId, ":ls": status, ":t": new Date().toISOString() },
+      })
+    );
+  } catch (e) {
+    if (!isConditionalCheckFailed(e)) throw e;
+    console.warn("[etl] 作业行已不存在,丢弃状态回写(不造幽灵行)", JSON.stringify({ jobId, runId, status }));
+  }
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -184,16 +197,18 @@ export async function reconcileEtlJob(job: any): Promise<any> {
     // 定时 run 的**观测后审计**补写(SPEC v3.23 §3.2:MWAA 是执行体,平台不在提交路径上);
     //    幂等(pending 抢占协议),失败不影响对账;非定时 / home 行零 I/O 直接返回。
     await auditObservedScheduledRun({ taskId: job.jobId, runId: job.lastRunId, targetId: run.targetId, triggeredBy: run.triggeredBy, residencyAuditId: run.residencyAuditId });
-    if (job.lastRunStatus !== "running") return job;
+    // 2026-11-04:作业行上是终态才跳过;`running` / `timeout-pending`(调度器放手、后端未知)都要去问后端(词表单一作者 isTerminalRunStatus)
+    if (isTerminalRunStatus(job.lastRunStatus)) return job;
     // (顺带:取消不许被对账改写)
     // 🔴 判据要看**run 行自己**的状态,不能只看作业行:组取消把 run 行写成了 `stopped`,
     //    而作业行的 `lastRunStatus` 是**另一份**(取消不写它)⇒ 只看作业行就会一路走到下面
     //    「去后端重新判一次」,把「用户取消」判成 `failed`(唯一写通道上另有一道条件写兜底)。
     // 🔴 而且这里**不能只是 return**:run 行已终态、作业行还挂着 running,那正是对账要修的东西 ——
     //    用 **run 行**回填作业行(run 行才是 run 级状态的权威来源),而不是再去问一次后端。
-    if (typeof run.status === "string" && run.status !== "running") {
-      await updateJobStatus(job.jobId, run.status, job.lastRunId).catch(() => {});
-      return { ...job, status: run.status, lastRunStatus: run.status };
+    if (isTerminalRunStatus(run.status)) {
+      const st = String(run.status);
+      await updateJobStatus(job.jobId, st, job.lastRunId).catch(() => {});
+      return { ...job, status: st, lastRunStatus: st };
     }
     let real: string | null = null; let extra: Record<string, unknown> = {};
     if (run.glueJobRunId && run.glueJobName) {
@@ -465,17 +480,24 @@ export async function runGlueScriptJob(job: EtlJob, opts: RunOpts = {}): Promise
     const runId = ulid();
     // 章盖**这次真跑的那个 target**(不是绑定的第一个)。
     await createRunRecord(job, runId, "etl-glue", { glueJobName: jobName, glueJobRunId: JobRunId, runDate, ...(audit ? { residencyAuditId: audit.auditId } : {}), ...backfillRunExtra(opts.backfill) }, triggeredBy, targetId, opts.runGroupId);
-    await docClient.send(
-      new UpdateCommand({
-        TableName: TABLES.ETL_JOBS,
-        Key: { userId: USER_ID, jobId: job.jobId },
-        UpdateExpression: "SET glueJobName = :j, #s = :s, lastRunId = :r, updatedAt = :t",
-        ExpressionAttributeNames: { "#s": "status" },
-        // 🔴 作业行的 `glueJobName` 恒为 **home 名**(展示副本):非 home 的 run 不许把 per-target 名写进去,
-        //    否则下一次 home 运行 / workflow 节点会拿着别的 target 的作业名去 home 区找(找不到或找错)。
-        ExpressionAttributeValues: { ":j": glueJobNameFor(job.jobId), ":s": "running", ":r": runId, ":t": new Date().toISOString() },
-      })
-    );
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: TABLES.ETL_JOBS,
+          Key: { userId: USER_ID, jobId: job.jobId },
+          UpdateExpression: "SET glueJobName = :j, #s = :s, lastRunId = :r, updatedAt = :t",
+          // 2026-11-04:作业行已在这几秒里被删 ⇒ 不许 upsert 出幽灵行;JobRun 已经起了,照常起轮询(它会按「定义已不存在」收口)
+          ConditionExpression: JOB_ROW_EXISTS,
+          ExpressionAttributeNames: { "#s": "status" },
+          // 🔴 作业行的 `glueJobName` 恒为 **home 名**(展示副本):非 home 的 run 不许把 per-target 名写进去,
+          //    否则下一次 home 运行 / workflow 节点会拿着别的 target 的作业名去 home 区找(找不到或找错)。
+          ExpressionAttributeValues: { ":j": glueJobNameFor(job.jobId), ":s": "running", ":r": runId, ":t": new Date().toISOString() },
+        })
+      );
+    } catch (e) {
+      if (!isConditionalCheckFailed(e)) throw e;
+      console.warn("[etl] 作业行已不存在,丢弃 running 回写(不造幽灵行)", JSON.stringify({ jobId: job.jobId, runId }));
+    }
 
     pollGlueRun(job, runId, jobName, JobRunId!, lock, landing.region).catch(() => {});
     return { runId, glueJobName: jobName, glueJobRunId: JobRunId, runDate };
@@ -503,15 +525,23 @@ async function pollGlueRun(
   // 可以跑更久 ⇒ 第 40 分钟释放锁时**后端还在跑**,第二个 run 立刻 DROP+CTAS 同一张表 =
   // 裂缝C 的 OID 事故复现。现在:轮询期间续租;**只有确认终态才释放**;耗尽则保持持锁。
   let reachedTerminal = false;
+  // 2026-11-04:作业行被删后锁随行消失 ⇒ 之后不再续租(live = null),但继续跟踪到真正的终态(见 lockLostBecauseJobRowGone)
+  let live: RunLock | null | undefined = lock;
   try {
     for (let i = 0; i < 160; i++) {
       await sleep(15000);
-      if (!(await renewRunLockIfDue(lock))) {
+      const renew = await renewRunLockIfDueDetailed(live);
+      if (renew === "lost-taken-over") {
         // 锁已被他人抢走(lease 曾过期)⇒ 我们已不是这条 run 的持有者,停止回写终态,
         // 免得把状态写花(另一个 run 正在跑同一作业)。
         console.warn("[etl] Glue 轮询中丢锁,停止回写", jobId, runId);
         reachedTerminal = true; // 锁已不属于我们,无需也不该再 keep
         return;
+      }
+      if (renew !== "ok") {
+        // lost-row-gone / lost-unknown:作业行已删(锁随行消失)⇒ 没人会再收口这条 run,继续跟踪到终态,只是不再续租
+        console.warn("[etl] 作业行已不存在(或读不出),运行锁随行消失;继续跟踪这条 run 到终态(不再续租)", jobId, runId, renew);
+        live = null;
       }
       try {
         const { JobRun } = await glueC.send(new GetJobRunCommand({ JobName: jobName, RunId: jobRunId }));
@@ -526,13 +556,36 @@ async function pollGlueRun(
           reachedTerminal = true;
           return;
         }
-      } catch {
-        /* keep polling */
+      } catch (e) {
+        // 2026-11-04:GetJobRun 说实体不存在 ⇒ 再问一次作业定义本体;定义也没了(作业被删 / 定义被外部删)⇒ 这条 run 再也查不到终态,
+        //   当场按失败收口(error 原话给用户看)并释放锁 —— 原来一律 catch 继续空转 40 分钟再 keepRunLockForReconcile,run 行永远「运行中」。
+        //   定义还在(只是 JobRun 一时查不到)或 GetJob 本身报别的错 ⇒ 当瞬时错误,继续有界轮询。
+        if (isGlueEntityNotFoundByName(e) && (await glueJobDefinitionGone(glueC, jobName))) {
+          try {
+            await finishRunRecord(job, runId, "failed", { error: JOB_DEFINITION_GONE_ERROR.glue });
+            await updateJobStatus(jobId, "failed", runId); // 作业行已删 ⇒ 条件写丢弃(不造幽灵行);只是定义被外部删 ⇒ 列表显示失败
+            reachedTerminal = true;
+            return;
+          } catch (we) {
+            console.warn("[etl] 按「定义已不存在」收口时回写失败,下一轮重试", jobId, runId, we);
+          }
+        }
+        /* 其余瞬时错误:继续轮询(有界) */
       }
     }
   } finally {
-    if (reachedTerminal) await releaseJobRunLock(lock);
-    else await keepRunLockForReconcile(lock, { jobId, runId, engine: "glue" });
+    if (reachedTerminal) await releaseJobRunLock(live);
+    else await keepRunLockForReconcile(live, { jobId, runId, engine: "glue" });
+  }
+}
+
+/** 2026-11-04:作业定义本体是否已不存在(只有 GetJob 明确回 EntityNotFoundException 才算;别的错不下结论)。 */
+async function glueJobDefinitionGone(glueC: Pick<GlueClient, "send">, jobName: string): Promise<boolean> {
+  try {
+    await glueC.send(new GetJobCommand({ JobName: jobName }));
+    return false;
+  } catch (e) {
+    return isGlueEntityNotFoundByName(e);
   }
 }
 
@@ -738,13 +791,20 @@ async function pollRedshiftRun(
   // 就放锁、后端还在执行,第二个 run 进来 DROP+CTAS 同一张表 = OID 事故。现在:续租 +
   // 只有确认终态才释放 + 耗尽保持持锁。
   let reachedTerminal = false;
+  // 2026-11-04:与 Glue 轮询同一分叉 —— 作业行被删后锁随行消失,继续跟踪语句到终态(statement 不依赖作业行),不再续租
+  let live: RunLock | null | undefined = lock;
   try {
     for (let i = 0; i < 120; i++) {
       await sleep(2000);
-      if (!(await renewRunLockIfDue(lock))) {
+      const renew = await renewRunLockIfDueDetailed(live);
+      if (renew === "lost-taken-over") {
         console.warn("[etl] Redshift 轮询中丢锁,停止回写", jobId, runId);
         reachedTerminal = true;
         return;
+      }
+      if (renew !== "ok") {
+        console.warn("[etl] 作业行已不存在(或读不出),运行锁随行消失;继续跟踪这条 run 到终态(不再续租)", jobId, runId, renew);
+        live = null;
       }
       try {
         const desc = await poller.send(new DescribeStatementCommand({ Id: statementId }));
@@ -772,7 +832,7 @@ async function pollRedshiftRun(
       }
     }
   } finally {
-    if (reachedTerminal) await releaseJobRunLock(lock);
-    else await keepRunLockForReconcile(lock, { jobId, runId, engine: "redshift" });
+    if (reachedTerminal) await releaseJobRunLock(live);
+    else await keepRunLockForReconcile(live, { jobId, runId, engine: "redshift" });
   }
 }

@@ -22,6 +22,11 @@ import { resourceKey } from "@/lib/long-ops/kinds";
 // 删作业前核编排 DAG 的离线作业节点引用(唯一作者;被引用 ⇒ 409 JOB_IN_USE,一样不删)
 import { workflowsReferencingJob, hasJobReferences, jobInUseResponse } from "@/lib/workflow/job-references";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
+// 2026-11-04 —— 删作业前核在途运行(唯一作者;与 ETL 侧同一份:run 行未终态 / 作业行运行锁刚续租 ⇒ 409 JOB_RUN_IN_PROGRESS,一样不删);删行是条件写
+import { jobInflight, hasInflight, jobRunInProgressResponse, jobRowDeleteInput } from "@/lib/etl/job-inflight";
+import { isConditionalCheckFailed } from "@/lib/aws/ddb-errors";
+// 2026-11-04:EMR 说 application 仍有作业在跑 ⇒ 409,不吞成「删成功」
+import { isEmrApplicationBusy } from "@/lib/engines/emr/application";
 
 const USER_ID = "default-user";
 
@@ -120,6 +125,11 @@ export async function DELETE(
   if (!Item) return apiError("作业不存在", 404, { code: "NOT_FOUND" });
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
+  // 2026-11-04:仍有在途运行(EMR job-run 还在跑的 run 行未终态,或提交段刚抢到运行锁)⇒ 409 逐条列 runId,作业行 / application / 调度产物一个都不动
+  //   —— `engine-job` 租约只盖提交段(下面那条),运行本身可以跑一小时;原来删成功 ⇒ StopApplication 被「还有 job 在跑」拒掉、application 成孤儿、
+  //   run 行永远「运行中」、轮询器往已删的作业行 upsert 幽灵行。
+  const inflight = await jobInflight(params.id, Item as Record<string, unknown>);
+  if (hasInflight(inflight)) return jobRunInProgressResponse(inflight, "engine");
   // 「运行」提交进行中 ⇒ 删作业 409(删掉会让正在提交的那次运行成为再也定位不到的孤儿)
   const busy = await resourceBusyResponse([resourceKey("engine-job", params.id)]);
   if (busy) return busy;
@@ -157,10 +167,26 @@ export async function DELETE(
   // 再删 application（StopApplication+DeleteApplication）——best-effort，不阻断作业删除。
   try {
     await getProvider(params.engine).destroyResource(Item as any);
-  } catch {
+  } catch (e) {
+    // 2026-11-04:EMR 不许停有作业在跑的 application ⇒ 这不是「已不存在」那种可吞的失败,是还有运行在跑(台账外的 / 刚提交的)⇒ 409,作业行不删
+    if (isEmrApplicationBusy(e)) {
+      return apiError(
+        `EMR application ${e.applicationId} 仍在运行(${e.state}),还有作业运行在跑,EMR 拒绝停止 / 删除 —— 已拒绝删除作业。` +
+          `请等这些运行结束(或先在运行历史 / EMR Serverless 控制台停止它们)后再删除。`,
+        409,
+        { code: "JOB_RUN_IN_PROGRESS", detail: { applicationId: e.applicationId, state: e.state } }
+      );
+    }
     /* application 可能已不存在；作业删除照常 */
   }
-  await docClient.send(new DeleteCommand({ TableName: TABLES.ENGINE_JOBS, Key: { userId: USER_ID, jobId: params.id } }));
+  // 2026-11-04:删行是条件写(每把作业级运行锁都不存在或最近没人续租;与 ETL 侧同一作者 jobRowDeleteInput);被拒 ⇒ 重读作业行按在途 409 回
+  try {
+    await docClient.send(new DeleteCommand(jobRowDeleteInput(TABLES.ENGINE_JOBS, params.id, Item as Record<string, unknown>)));
+  } catch (e) {
+    if (!isConditionalCheckFailed(e)) throw e;
+    const { Item: fresh } = await docClient.send(new GetCommand({ TableName: TABLES.ENGINE_JOBS, Key: { userId: USER_ID, jobId: params.id } }));
+    return jobRunInProgressResponse(await jobInflight(params.id, (fresh ?? Item) as Record<string, unknown>), "engine");
+  }
   recordAudit(req, `engine.${params.engine}.delete`, {
     resourceType: "engine-job",
     resourceId: params.id,

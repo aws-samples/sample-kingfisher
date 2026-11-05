@@ -90,6 +90,8 @@ def run_job(**ctx):
         raise AirflowSkipException("run lock busy: another run holds the job lock; skip this tick")
     started = time.time()
     try:
+        # 2026-11-04:开跑即落 running 行(在途运行对「删作业」可见;结束时 _record 用 update 收口)。放在 try 里:写不成也要走 finally 放锁
+        _record_start(spec, run_id, started_at=_iso(started), extra={"airflowRunId": airflow_run_id}, run_group_id=run_group_id)
         engine = spec["engine"]
         if engine == "redshift":
             _run_redshift(spec, run_id, started)

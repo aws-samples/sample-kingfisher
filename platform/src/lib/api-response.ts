@@ -37,6 +37,10 @@ export type ApiErrorCode =
   // R7 (409):删离线计算 / EMR 作业时它仍被编排 DAG 的「离线作业节点」引用 ⇒ 拒绝,detail = { workflows:[{id,name,nodeIds}] };
   //   🔴 与 CONFLICT 分开:不是并发写冲突,是「先去工作流里摘掉该节点」—— 用户可修,文案逐条点名(与 DATASOURCE_IN_USE 同口径)。
   | "JOB_IN_USE"
+  // 2026-11-04(409):删离线计算 / EMR 作业时它仍有**在途运行**(task-runs 未终态的 run 行,或作业行上刚续租的运行锁)⇒ 拒绝,
+  //   detail = { runs:[{runId,status,startedAt,targetId}], locks:[{targetId,expiresAt,renewedAgoMs}] };文案逐条列 runId 指路「等终态 / 先停止」。
+  //   🔴 与 LONG_OP_IN_PROGRESS 分开:那是长操作框架的对象租约(提交段);这里是运行本身还没结束(Glue JobRun / EMR job-run 还在跑)。
+  | "JOB_RUN_IN_PROGRESS"
   | "UPSTREAM_TIMEOUT" // 依赖(AWS/查询)超时
   | "UPSTREAM_ERROR" // 依赖调用失败
   // 执行范围三种拒因(50 SPEC v3.34 §2.6.5)。

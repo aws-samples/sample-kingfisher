@@ -18,7 +18,7 @@
 //  · 工作流 SQL 节点:table=bgp-workflows, key={userId,workflowId}, attr="runLock_<nodeId>"
 //    (按 nodeId 命名锁属性 → 同一 workflow 不同节点可并行,同节点不同日期串行,精准)。
 
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
@@ -114,14 +114,66 @@ function lockAttrs(attr: string): { tokenAttr: string; expAttr: string } {
  * 尝试抢一次运行锁(不重试)。条件:锁不存在 OR 已过期(lease 到期,兜底僵尸锁)。
  * 抢到返回 RunLock,抢不到(别的 run 持锁且未过期)返回 null。
  */
+/**
+ * 2026-11-04:**作业行已不存在** ⇒ 抢锁 / 续租都不可能成功,也不该排队。
+ * 🔴 为什么是独立类型而不是 RunLockBusy:RunLockBusy 让补数 / 定时排队等 45–60 分钟再放弃 —— 行都没了,等多久都一样;
+ *   运行路由按 instanceof 分流成 409「作业已被删除」(用户可修:别再对它点运行),而不是 500 或「正在运行中」这句假话。
+ */
+export class JobRowMissing extends Error {
+  readonly missing = true as const;
+  constructor() {
+    super("作业已被删除,无法运行(作业行不存在)");
+    this.name = "JobRowMissing";
+  }
+}
+
+export type RowPresence = "present" | "absent" | "unknown";
+
+/**
+ * 锁所在的实体行在不在(只读主键投影;一次读失败立即重试一次;两次都读不出 ⇒ `unknown`,调用方按自己的语义处理,不凭读错下结论)。
+ * 条件写被拒时 DDB 可能已经把旧行带回来(见 ccfReturnedItem);没带回来才需要这一步确认。
+ */
+export async function lockRowPresence(table: string, key: Record<string, string>): Promise<RowPresence> {
+  const pk = Object.keys(key)[0];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { Item } = await docClient.send(new GetCommand({ TableName: table, Key: key, ProjectionExpression: "#pk", ExpressionAttributeNames: { "#pk": pk } }));
+      return Item ? "present" : "absent";
+    } catch (e) {
+      if (attempt === 1) console.warn("[run-lock] 读不出锁所在的实体行(重试一次仍失败)", table, JSON.stringify(key), e);
+    }
+  }
+  return "unknown";
+}
+
+/** 条件写被拒时 DDB 回了旧行(请求带 ReturnValuesOnConditionCheckFailure=ALL_OLD;行不存在 ⇒ 不会有 Item)。 */
+function ccfReturnedItem(e: unknown): boolean {
+  return (e as { Item?: unknown } | null | undefined)?.Item !== undefined;
+}
+
+export interface AcquireRunLockOptions {
+  /**
+   * 2026-11-04:🔴 **锁只许落在仍然存在的实体行上**。锁是用 UpdateItem 写在业务行的属性上,而 UpdateItem 是 upsert ——
+   *   作业行刚被删掉、一次排队中的运行(补数 / 定时 / 手动)这时才抢到锁 ⇒ 凭空造出一条只有锁属性、没有名字的幽灵作业行,
+   *   随后 ensureGlueJob 还会把刚删掉的 Glue 作业定义重建出来(与删源后在途探测写回已删行留幽灵行同类)。开了它,条件里多一句 `attribute_exists(<分区键>)`:
+   *   行不在 ⇒ 条件不满足 ⇒ 当作「抢不到」(返回 null),什么都不写。
+   *   作业行锁(`acquireJobRunLock`)恒开;工作流节点锁与 MWAA 侧的 Python 镜像不动(节点锁所在的工作流行在发布期不会被删)。
+   */
+  requireRowExists?: boolean;
+}
+
 export async function tryAcquireRunLock(
   table: string,
   key: Record<string, string>,
-  attr = "runLock"
+  attr = "runLock",
+  opts: AcquireRunLockOptions = {}
 ): Promise<RunLock | null> {
   const token = ulid();
   const expiresAt = nowMs() + LEASE_MS;
   const { tokenAttr, expAttr } = lockAttrs(attr);
+  // 分区键名从 Key 自己取(作业行 / 工作流行都是 `userId` 打头),不在这里硬编码表结构
+  const pkName = Object.keys(key)[0];
+  const freeOrExpired = "attribute_not_exists(#t) OR #e < :now";
   try {
     await docClient.send(
       new UpdateCommand({
@@ -129,15 +181,20 @@ export async function tryAcquireRunLock(
         Key: key,
         // 抢锁:当前无锁(属性不存在)或 lease 已过期 → 写入本次 token + 新 lease。用占位名兼容动态属性名。
         UpdateExpression: "SET #t = :tok, #e = :exp",
-        ConditionExpression: "attribute_not_exists(#t) OR #e < :now",
-        ExpressionAttributeNames: { "#t": tokenAttr, "#e": expAttr },
+        ConditionExpression: opts.requireRowExists ? `attribute_exists(#pk) AND (${freeOrExpired})` : freeOrExpired,
+        ExpressionAttributeNames: { "#t": tokenAttr, "#e": expAttr, ...(opts.requireRowExists ? { "#pk": pkName } : {}) },
         ExpressionAttributeValues: { ":tok": token, ":exp": expiresAt, ":now": nowMs() },
+        // 行在、别人持锁 ⇒ DDB 把旧行带回来;行不在 ⇒ 没有旧行 —— 据此分辨「忙」与「作业已删」(S4),不再把两者都当成忙去排队
+        ...(opts.requireRowExists ? { ReturnValuesOnConditionCheckFailure: "ALL_OLD" as const } : {}),
       })
     );
     return { table, key, attr, token };
   } catch (e: any) {
-    if (e?.name === "ConditionalCheckFailedException") return null; // 别的 run 持锁未过期
-    throw e; // 其它错误(权限/网络)照抛,不吞
+    if (e?.name !== "ConditionalCheckFailedException") throw e; // 其它错误(权限/网络)照抛,不吞
+    if (!opts.requireRowExists || ccfReturnedItem(e)) return null; // 别的 run 持锁未过期
+    // 没带回旧行:要么行不在,要么端点没回旧行 —— 再读一次确认,不凭缺省下结论
+    if ((await lockRowPresence(table, key)) === "absent") throw new JobRowMissing();
+    return null; // 行在(或读不出)⇒ 当作抢不到,排队的下一次重试会再分辨
   }
 }
 
@@ -150,11 +207,12 @@ export async function acquireRunLock(
   table: string,
   key: Record<string, string>,
   waitMs = 0,
-  attr = "runLock"
+  attr = "runLock",
+  opts: AcquireRunLockOptions = {}
 ): Promise<RunLock | null> {
   const deadline = nowMs() + waitMs;
   for (;;) {
-    const lock = await tryAcquireRunLock(table, key, attr);
+    const lock = await tryAcquireRunLock(table, key, attr, opts);
     if (lock) return lock;
     if (nowMs() + RETRY_INTERVAL_MS > deadline) return null; // 再等一轮也会超时 → 放弃
     await sleep(RETRY_INTERVAL_MS);
@@ -187,9 +245,23 @@ const _lastRenew = new Map<string, number>();
  * 返回 false = **锁已不再属于我们**(lease 曾过期并被他人抢走)⇒ 调用方应停止写终态。
  */
 export async function renewRunLockIfDue(lock: RunLock | null | undefined): Promise<boolean> {
-  if (!lock) return true;
+  return (await renewRunLockIfDueDetailed(lock)) === "ok";
+}
+
+/**
+ * 2026-11-04:续租失败的**两种原因动作相反**,所以要分开说。
+ *   · `lost-taken-over`:行在,锁 token 不是我的(lease 曾过期被别的 run 抢走)⇒ 停止回写(另一条 run 正在跑同一作业,写会把状态写花);
+ *   · `lost-row-gone`:实体行已被删(锁随行消失)⇒ **没有任何人会再收口这条 run**,轮询器必须继续跟踪到真正的终态,只是不再续租;
+ *   · `lost-unknown`:条件不满足且两次都读不出行 ⇒ 按「行可能已删」处理(继续跟踪;停下来才是缺陷原形);
+ *   · `ok`:续上了 / 没到点 / 瞬时错误(lease 还在,下轮再续)。
+ * 分辨靠 DDB 原子带回的旧行(ReturnValuesOnConditionCheckFailure=ALL_OLD):有旧行 = 行在;没带回来再读一次确认。
+ */
+export type RenewOutcome = "ok" | "lost-taken-over" | "lost-row-gone" | "lost-unknown";
+
+export async function renewRunLockIfDueDetailed(lock: RunLock | null | undefined): Promise<RenewOutcome> {
+  if (!lock) return "ok";
   const last = _lastRenew.get(lock.token) ?? 0;
-  if (nowMs() - last < RENEW_INTERVAL_MS) return true;
+  if (nowMs() - last < RENEW_INTERVAL_MS) return "ok";
   const { tokenAttr, expAttr } = lockAttrs(lock.attr);
   try {
     await docClient.send(
@@ -200,16 +272,29 @@ export async function renewRunLockIfDue(lock: RunLock | null | undefined): Promi
         ConditionExpression: "#t = :tok", // 🔴 只续自己的锁
         ExpressionAttributeNames: { "#t": tokenAttr, "#e": expAttr },
         ExpressionAttributeValues: { ":tok": lock.token, ":exp": nowMs() + LEASE_MS },
+        ReturnValuesOnConditionCheckFailure: "ALL_OLD",
       })
     );
     _lastRenew.set(lock.token, nowMs());
-    return true;
+    return "ok";
   } catch (e: any) {
-    if (e?.name === "ConditionalCheckFailedException") {
-      console.warn("[run-lock] 续租失败:锁已不属于本 run(lease 曾过期被抢)", lock.table, lock.key, lock.attr);
-      return false;
+    if (e?.name !== "ConditionalCheckFailedException") return "ok"; // 网络/限流抖动:不当作丢锁(lease 还在),下轮再续
+    const where = `${lock.table} ${JSON.stringify(lock.key)} ${lock.attr}`;
+    if (ccfReturnedItem(e)) {
+      console.warn("[run-lock] 续租失败:锁已被别的 run 持有(lease 曾过期被抢),本 run 停止回写", where);
+      return "lost-taken-over";
     }
-    return true; // 网络/限流抖动:不当作丢锁(lease 还在),下轮再续
+    const presence = await lockRowPresence(lock.table, lock.key);
+    if (presence === "present") {
+      console.warn("[run-lock] 续租失败:锁已被别的 run 持有(lease 曾过期被抢),本 run 停止回写", where);
+      return "lost-taken-over";
+    }
+    if (presence === "absent") {
+      console.warn("[run-lock] 续租失败:实体行已不存在(作业已删,锁随行消失);本 run 继续跟踪到终态、不再续租", where);
+      return "lost-row-gone";
+    }
+    console.warn("[run-lock] 续租失败且两次都读不出实体行 ⇒ 按「行可能已删」处理:继续跟踪到终态、不再续租", where);
+    return "lost-unknown";
   }
 }
 
@@ -268,8 +353,109 @@ export async function acquireJobRunLock(
   // 缺省/home 时属性名与存量逐字节相同。
   targetId?: string | null
 ): Promise<RunLock | null> {
-  return acquireRunLock(table, { userId: USER_ID, jobId }, waitMs, lockAttrFor({ targetId }));
+  // 2026-11-04:作业行锁只许落在仍存在的作业行上(见 AcquireRunLockOptions.requireRowExists)
+  return acquireRunLock(table, { userId: USER_ID, jobId }, waitMs, lockAttrFor({ targetId }), { requireRowExists: true });
+}
+
+// ── 2026-11-04:从作业行**读出**谁还持着运行锁(删作业前的在途判据之一;锁属性文法的唯一作者在本文件,所以反解也放这里)──
+
+/**
+ * 「刚续租过」的时间窗 —— 它只覆盖**平台进程里的持有者**(TS 的 runGlueScriptJob / runRedshiftSqlJob / EMR submit 抢锁时把 ExpiresAt 写成
+ * `now + LEASE_MS`,轮询每 RENEW_INTERVAL_MS 顶一次),所以 `ExpiresAt - LEASE_MS` = 上一次续租时刻,两个间隔内续过 ⇒ 提交段 / 轮询仍活着。
+ * 🔴 实话:**MWAA / Serverless 的 Python 执行体抢锁后从不续租**(一次 ExpiresAt = now + 90 min,`_acquire_run_lock`),两分钟后就落到窗外 ——
+ *   定时 / 工作流节点的在途**不靠这把锁判**,靠它们开跑即落的 running run 行(2026-11-04 起 `_record_start`;更早发布的 DAG 要重发才有)。
+ *   这把锁对删除只多挡一件事:TS 提交段抢到锁、run 行还没写出来的那几秒。
+ * 超过窗还没续 ⇒ 轮询已耗尽(`keepRunLockForReconcile` 之后)或进程已死,只剩 lease 在兜底 —— 此时 run 行才是权威(对账会把它收口),
+ *   删作业的判据不该再被这把「没人看着」的锁挡 90 分钟。
+ */
+export const RUN_LOCK_LIVE_WINDOW_MS = 2 * RENEW_INTERVAL_MS;
+/** lease 时长(只读导出给判据算 ExpiresAt;写侧仍只有本文件一个作者)。 */
+export const RUN_LOCK_LEASE_MS = LEASE_MS;
+
+/** 「刚续租过」的 ExpiresAt 下界:ExpiresAt 大于它 ⇔ 最近一个 live 窗内续过(内存判据与 DeleteItem 条件共用这一个数)。 */
+export function runLockLiveCutoff(now = nowMs()): number {
+  return now + LEASE_MS - RUN_LOCK_LIVE_WINDOW_MS;
+}
+
+/** lease 未过期 **且** 最近一个 live 窗内续过租(= ExpiresAt > runLockLiveCutoff(now);LEASE_MS ≫ 窗,所以也必然 > now)。 */
+export function runLockRecentlyRenewed(expiresAt: unknown, now = nowMs()): boolean {
+  const exp = typeof expiresAt === "number" ? expiresAt : Number(expiresAt);
+  return Number.isFinite(exp) && exp > runLockLiveCutoff(now);
+}
+
+export interface HeldJobRunLock {
+  /** 锁属性前缀(`runLock` / `runLock-<targetId>`) */
+  attr: string;
+  /** 由属性名反解的执行目标(home 的锁属性没有 target 段 ⇒ `tgt_home`) */
+  targetId: string;
+  expiresAt: number;
+  /** 距上次续租的毫秒数(由 ExpiresAt 反推) */
+  renewedAgoMs: number;
+  /** 见 runLockRecentlyRenewed */
+  recentlyRenewed: boolean;
+}
+
+/** 作业行上 token 属性名的文法(只认作业级锁:`runLock` / `runLock-<target>`;工作流节点锁 `runLock_<node>` 不在此列)。 */
+const JOB_LOCK_TOKEN_ATTR_RE = /^(runLock(?:-([A-Za-z0-9_]+))?)Token$/;
+
+/**
+ * 从**作业行**读出所有 lease 未过期的作业级运行锁(不读库,只看传进来的行)。
+ * `targetId` 的字符集是 `[a-z0-9_]`(§1.1a)⇒ `sanitizeLockPart` 对它是恒等 ⇒ 由属性名反解无歧义。
+ */
+export function heldJobRunLocks(row: Record<string, unknown> | null | undefined, now = nowMs()): HeldJobRunLock[] {
+  if (!row) return [];
+  const out: HeldJobRunLock[] = [];
+  for (const [k, v] of Object.entries(row)) {
+    const m = JOB_LOCK_TOKEN_ATTR_RE.exec(k);
+    if (!m || v === undefined || v === null) continue;
+    const attr = m[1];
+    const rawExp = row[`${attr}ExpiresAt`];
+    const expiresAt = typeof rawExp === "number" ? rawExp : Number(rawExp);
+    if (!Number.isFinite(expiresAt) || expiresAt <= now) continue; // lease 已过期 = 僵尸锁,下一个 run 可直接抢,不算在途
+    out.push({
+      attr,
+      targetId: m[2] ?? HOME_TARGET_ID,
+      expiresAt,
+      renewedAgoMs: Math.max(0, now - (expiresAt - LEASE_MS)),
+      recentlyRenewed: runLockRecentlyRenewed(expiresAt, now),
+    });
+  }
+  return out;
 }
 export async function releaseJobRunLock(lock: RunLock | null | undefined): Promise<void> {
   return releaseRunLock(lock);
+}
+
+/**
+ * 2026-11-04:作业行上可能承载作业级锁的全部属性前缀 —— home + 各绑定区(由 lockAttrFor 算)+ 行上已有的任何作业级锁属性
+ * (含已解绑区的残留)。给 DeleteItem 的条件用,所以**宁多勿少**。
+ */
+export function jobLockAttrsOf(row: Record<string, unknown> | null | undefined, targets: readonly string[]): string[] {
+  const set = new Set<string>([lockAttrFor({}), ...targets.map((t) => lockAttrFor({ targetId: t }))]);
+  for (const k of Object.keys(row ?? {})) {
+    const m = JOB_LOCK_TOKEN_ATTR_RE.exec(k);
+    if (m) set.add(m[1]);
+  }
+  return Array.from(set).sort();
+}
+
+/**
+ * 删作业行的 DeleteItem 条件:每把作业级锁都「不存在,或最近一个 live 窗内没人续租」—— 与 `heldJobRunLocks().recentlyRenewed`
+ * 是**同一条判据**(同一个 runLockLiveCutoff),只是交给 DDB 原子地判:堵住「删前核完、删行之前刚好有一次运行抢到锁」的窄窗。
+ * 条件不满足 ⇒ ConditionalCheckFailedException,什么都没删。
+ */
+export function noLiveJobLockCondition(
+  row: Record<string, unknown> | null | undefined,
+  targets: readonly string[],
+  now = nowMs()
+): { ConditionExpression: string; ExpressionAttributeNames: Record<string, string>; ExpressionAttributeValues: Record<string, unknown> } {
+  const names: Record<string, string> = {};
+  const parts: string[] = [];
+  jobLockAttrsOf(row, targets).forEach((attr, i) => {
+    const { tokenAttr, expAttr } = lockAttrs(attr);
+    names[`#lk${i}`] = tokenAttr;
+    names[`#le${i}`] = expAttr;
+    parts.push(`(attribute_not_exists(#lk${i}) OR #le${i} < :liveCutoff)`);
+  });
+  return { ConditionExpression: parts.join(" AND "), ExpressionAttributeNames: names, ExpressionAttributeValues: { ":liveCutoff": runLockLiveCutoff(now) } };
 }

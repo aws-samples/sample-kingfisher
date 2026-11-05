@@ -205,6 +205,25 @@ export async function ensureStarted(applicationId: string, region?: string): Pro
   throw new Error(`EMR application ${applicationId} 未能在超时内进入 STARTED`);
 }
 
+/**
+ * 2026-11-04:application 删不掉且仍在 STARTED / STOPPING —— EMR 不许停有作业在跑的 application,所以这是「还有作业运行在跑」
+ * (平台台账外的运行、或刚提交的运行),不是「已不存在」那种可以吞掉的失败。类型化抛出让删作业路由回 409,作业行不删。
+ */
+export class EmrApplicationBusy extends Error {
+  constructor(readonly applicationId: string, readonly state: string) {
+    super(`EMR application ${applicationId} 仍处于 ${state}(还有作业运行在跑),EMR 拒绝停止 / 删除`);
+    this.name = "EmrApplicationBusy";
+  }
+}
+
+/**
+ * 「application 还有作业在跑」的唯一判法 —— 按错误名,不用 `instanceof`:Next 产物里同一源文件可能有多个模块实例,
+ * `instanceof` 会静默失明(2026-11-04 判据在 resetModules 后先撞到,产品侧同一风险)。
+ */
+export function isEmrApplicationBusy(e: unknown): e is EmrApplicationBusy {
+  return !!e && typeof e === "object" && (e as { name?: unknown }).name === "EmrApplicationBusy";
+}
+
 // 删作业时回收 application（先 Stop 再 Delete；已不存在则静默）。零垃圾。
 export async function destroyApplication(applicationId?: string, region?: string): Promise<void> {
   if (!applicationId) return;
@@ -213,7 +232,7 @@ export async function destroyApplication(applicationId?: string, region?: string
   try {
     await emr.send(new StopApplicationCommand({ applicationId }));
   } catch {
-    /* 可能已 STOPPED/不存在 */
+    /* 可能已 STOPPED/不存在;有作业在跑时 EMR 也在这里拒(ValidationException),由下面按最终状态判 */
   }
   // Stop 后需等状态离开 STARTED/STOPPING 才能 Delete；简单重试。
   for (let i = 0; i < 15; i++) {
@@ -224,6 +243,15 @@ export async function destroyApplication(applicationId?: string, region?: string
       await sleep(2000);
     }
   }
-  // 最后一搏（抛出让调用方 fire-and-forget 吞掉）。
-  await emr.send(new DeleteApplicationCommand({ applicationId }));
+  // 最后一搏;仍失败 ⇒ 看 application 现在什么状态:STARTED / STOPPING = 还有作业在跑 ⇒ EmrApplicationBusy(路由 409);别的状态 ⇒ 原错上抛(调用方按 best-effort 吞)
+  try {
+    await emr.send(new DeleteApplicationCommand({ applicationId }));
+  } catch (e) {
+    const state = await emr
+      .send(new GetApplicationCommand({ applicationId }))
+      .then((r) => r.application?.state)
+      .catch(() => undefined);
+    if (state === "STARTED" || state === "STOPPING") throw new EmrApplicationBusy(applicationId, state);
+    throw e;
+  }
 }

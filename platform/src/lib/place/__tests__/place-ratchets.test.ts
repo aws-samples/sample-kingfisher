@@ -45,7 +45,9 @@ const BASELINE = {
   // 2026-10-01 82 → 81:ensureApplication 去掉「没传落点 = process.env.AWS_REGION」
   /** L2:主控区分支(`isHome(` / `HOME_TARGET_ID`) */
   // 2026-10-24 259 → 257(-2):probeEnvironment 的决策改记**真实落点**(req.targetId),HOME_TARGET_ID 引用 + import 两处退场
-  homeBranches: 257, // 2026-10-23 257 → 259(+2):lib/network-advisor/environment-probe.ts
+  // 2026-11-04 257 → 258(+1):lib/etl/run-lock.ts `heldJobRunLocks` 从作业行**反解**锁属性名 ⇒ targetId(`runLock` 无 target 段 ⇒ 主控区),
+  //   是 `lockAttrFor` 的逆映射(§3.6「home 锁属性与存量逐字节同名」的另一半读法),不是「没给 = 主控区」的回落;删作业前核在途运行用它
+  homeBranches: 258, // 2026-10-23 257 → 259(+2):lib/network-advisor/environment-probe.ts
   //   `probeEnvironment` 开头 `notePlaceDecision({ targetId: HOME_TARGET_ID, … homeReason })` 一处 + 它的 import 一处(量具对 import 也计数,
   //   与 start-run.ts 那条「import 1」同口径)—— 不是分支、不是回落:L1 探测的 EC2 客户端本来就是模块级主控区客户端,这一笔只是把事实
   //   写进账本(观测器归因);非主控区网络事实的缺口登记。

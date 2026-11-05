@@ -26,11 +26,21 @@ class _C:
     def get_application(self, **kw): return {"application": {"state": "STARTED"}}
 def client(svc, region_name=None):
     CLIENTS.append(svc + "@" + str(region_name)); return _C(svc)
+LEDGER = []
+class _Table:
+    def __init__(self, name): self.name = name
+    def put_item(self, **kw): LEDGER.append({"op": "put_item", "table": self.name, **kw}); return {}
+    def update_item(self, **kw): LEDGER.append({"op": "update_item", "table": self.name, **kw}); return {}
+class _R:
+    def Table(self, name): return _Table(name)
 def resource(svc, region_name=None):
-    CLIENTS.append(svc + "@" + str(region_name)); return None
+    CLIENTS.append(svc + "@" + str(region_name)); return _R()
 `;
 
-function run(spec: Record<string, unknown>, fn: "_run_redshift" | "_run_glue" | "_run_emr"): { clients: string[]; calls: unknown[]; error: string | null } {
+type RunOut = { clients: string[]; calls: unknown[]; error: string | null; ledger: Array<Record<string, unknown>> };
+/** 引擎客户端(台账走控制区的 DynamoDB 资源,另看 `ledger`) */
+const engineClients = (r: RunOut) => r.clients.filter((c) => !c.startsWith("dynamodb@"));
+function run(spec: Record<string, unknown>, fn: "_run_redshift" | "_run_glue" | "_run_emr"): RunOut {
   const dir = mkdtempSync(join(tmpdir(), "kf-rt-place-"));
   writeFileSync(join(dir, "bgp_runtime.py"), BGP_RUNTIME_PY, "utf8");
   writeFileSync(join(dir, "boto3.py"), FAKE_BOTO3, "utf8");
@@ -52,7 +62,8 @@ except Exception as e:
     out["error"] = str(e)
 out["clients"] = boto3.CLIENTS
 out["calls"] = boto3.CALLS
-print(json.dumps(out))
+out["ledger"] = boto3.LEDGER
+print(json.dumps(out, default=str))
 `,
     "utf8"
   );
@@ -72,15 +83,19 @@ describe("🔴 MWAA Serverless 运行时:执行落点只来自 spec.place(PlaceW
   it("redshift:客户端建在落点区,工作组 / 库 / 凭证来自数仓腿", () => {
     const r = run(base, "_run_redshift");
     expect(r.error).toBeNull();
-    expect(r.clients).toEqual(["redshift-data@us-west-2"]);
+    expect(engineClients(r)).toEqual(["redshift-data@us-west-2"]);
     expect(r.calls).toEqual([{ WorkgroupName: "wg-usw2", Database: "devw", Sqls: ["SELECT 1"], SecretArn: SECRET }]);
+    // 2026-11-04:提交后把后端句柄补进 running 行 —— 台账写在控制区的 DynamoDB、带 statementId
+    expect(r.clients).toContain("dynamodb@us-east-1");
+    expect(JSON.stringify(r.ledger)).toContain('"s1"');
   });
 
   it("glue:客户端建在落点区;Arguments = 全套业务日期参数(与平台「立即运行」runParamArguments 逐项同值)", () => {
     const r = run({ ...base, engine: "glue", place: { v: 1, targetId: "tgt_usw2_a", region: "us-west-2" }, glueJobName: "g" }, "_run_glue");
     expect(r.error).toBeNull();
-    expect(r.clients).toEqual(["glue@us-west-2"]);
+    expect(engineClients(r)).toEqual(["glue@us-west-2"]);
     expect(r.calls).toEqual([{ JobName: "g", Arguments: runParamArguments("2026-10-11") }]);
+    expect(JSON.stringify(r.ledger), "提交后 running 行要带 Glue 句柄").toContain('"jr1"');
   });
 
   // 该缺陷的调度那一半:serverless 运行时给 EMR 作业追加业务日期参数
@@ -92,7 +107,8 @@ describe("🔴 MWAA Serverless 运行时:执行落点只来自 spec.place(PlaceW
     };
     const r = run(spec, "_run_emr");
     expect(r.error).toBeNull();
-    expect(r.clients).toEqual(["emr-serverless@us-west-2"]);
+    expect(engineClients(r)).toEqual(["emr-serverless@us-west-2"]);
+    expect(JSON.stringify(r.ledger), "提交后 running 行要带 EMR 句柄").toContain('"ejr1"');
     const call = r.calls[0] as { jobDriver: { sparkSubmit: { entryPoint: string; entryPointArguments: string[] } } };
     expect(call.jobDriver.sparkSubmit.entryPointArguments).toEqual(["--mode", "daily", ...runParamArgv("2026-10-11")]);
     expect(call.jobDriver.sparkSubmit.entryPoint).toBe("s3://b/emr-scripts/j.py");

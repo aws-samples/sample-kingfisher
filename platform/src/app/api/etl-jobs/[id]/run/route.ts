@@ -19,7 +19,7 @@ import { currentDefinitionVersion } from "@/lib/versions/version-service";
 import { isValidDs } from "@/lib/etl/run-params";
 import { recordAudit } from "@/lib/audit";
 // 抢不到运行锁 = 用户可修 ⇒ 409(锁的单一作者导出这个类型)
-import { RunLockBusy } from "@/lib/etl/run-lock";
+import { RunLockBusy, JobRowMissing } from "@/lib/etl/run-lock"; // 2026-11-04:作业行已删 ⇒ 409「作业已被删除」,不是 500 也不排队
 import { guardResourceAccess } from "@/lib/projects/guard";
 import type { EtlJob } from "@/types/etl-job";
 // 同意前置 + 残留错误映射;区域审计在 job-service 内逐 target 写
@@ -149,7 +149,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           // 原来它是 `new Error(文案)` ⇒ 落到下面的 500「运行失败」⇒ 把人引去查平台故障。
           // 与上面那条注释(落点冲突报 500 = W3a-9)同一个病,当时只修了绑定那一类;
           // 2026-09-09 硬门 w3f 段 W3f-3 又撞到(单区运行紧跟两区运行 ⇒ 500)。
-          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy,
+          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy || e instanceof JobRowMissing,
           // 区域审计写不成 = 该 target 未提交(审计完整性),不是绑定问题也不是平台 500
           auditUnavailable: e instanceof AuditUnavailable,
         });

@@ -56,5 +56,14 @@ export function pyRunKeyFields(args: { taskIdExpr: string; rawExpr: string; targ
   const { taskIdExpr, rawExpr, targetId } = args;
   if (!targetId) throw new Error("pyRunKeyFields:targetId 必填(台账行必须能按区归因)");
   const t = JSON.stringify(targetId);
-  return `"runId": ${rawExpr} + "${RUN_KEY_SEPARATOR}" + ${t}, "taskTargetKey": ${taskIdExpr} + "${RUN_KEY_SEPARATOR}" + ${t}`;
+  return `"runId": ${pyRunIdExpr({ rawExpr, targetId })}, "taskTargetKey": ${taskIdExpr} + "${RUN_KEY_SEPARATOR}" + ${t}`;
+}
+
+/**
+ * 2026-11-04:只要 runId 那一个 Python 表达式(经典 DAG 开跑建行后用 update_item 收口,Key 里只能放键属性,不能带 taskTargetKey)。
+ * 与 pyRunKeyFields 的 runId 段**同一作者产出**,不许各拼一遍 `#`。
+ */
+export function pyRunIdExpr(args: { rawExpr: string; targetId: string }): string {
+  if (!args.targetId) throw new Error("pyRunIdExpr:targetId 必填(台账行必须能按区归因)");
+  return `${args.rawExpr} + "${RUN_KEY_SEPARATOR}" + ${JSON.stringify(args.targetId)}`;
 }

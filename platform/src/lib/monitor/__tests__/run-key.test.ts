@@ -62,12 +62,18 @@ describe("台账行键(复合 runId + taskTargetKey)", () => {
   });
 
   it("🔴「写不成即拒」:四处都不许把台账写失败吞成 print", () => {
+    // 2026-11-04 起台账有两个写入点(开跑 put running 行 / 结束 update 收口,条件不满足退回 put):逐个写入点判 ——
+    //   写入点到所在函数末尾(下一个 def)之间若有 except,就必须 raise;没有 except = 异常原样上抛,同样算「不吞」。
     for (const f of ["lib/etl/dag-generator.ts", "lib/engines/emr/dag-generator.ts", "lib/workflow/dag-generator.ts", "lib/workflow/runtime-lib.ts"]) {
       const src = read(f);
-      const idx = src.indexOf('Table("bgp-task-runs").put_item');
-      expect(idx, `${f} 找不到台账写入点`).toBeGreaterThan(0);
-      const tail = src.slice(idx, idx + 1200);
-      expect(tail, `${f} 台账写失败没有 raise`).toMatch(/raise/);
+      const sites = [...src.matchAll(/Table\("bgp-task-runs"\)\.(put|update)_item/g)].map((m) => m.index!);
+      expect(sites.length, `${f} 找不到台账写入点`).toBeGreaterThan(0);
+      for (const idx of sites) {
+        const end = src.indexOf("\ndef ", idx);
+        const tail = src.slice(idx, end > 0 ? end : idx + 2400);
+        if (/except/.test(tail)) expect(tail, `${f} 台账写失败被 except 吞掉没有 raise(写入点 ${idx})`).toMatch(/raise/);
+        expect(tail, `${f} 台账写失败只 print 不抛(写入点 ${idx})`).not.toMatch(/except[^\n]*:\s*\n\s*print\([^\n]*\n(?!\s*raise)/);
+      }
     }
     expect(read("lib/scheduler/serverless/runtime-py.ts")).not.toContain('print("record failed"');
   });

@@ -11,7 +11,11 @@
 //   ⑤ 同步节点写同步任务自己的运行行;同步任务自己的定时载体(ledger_task_id == taskId)不多写;
 //   ⑥ 两载体真分派:经典 build_dag 的 job operator 调 _exec_job(scheduler=mwaa · workflowRunId=run_id#target);serverless _run_node_body 同;
 //   ⑦ 两载体 py_compile 通过。
-// 变异提示:删 `_exec_job` 里的 `_acquire_run_lock` ⇒ ①红;删发布期落点判定 ⇒ job-node-spec / publish-guard 判据红。
+//   ⑧ 2026-11-04:开跑即 `_record_start` 落 running 行(put,在 start_job_run 之前)→ 提交后把后端句柄补进 running 行 →
+//      结束 `_record` 用 update_item(条件 attribute_exists(taskId))收口,不再整行 put;作业行回写条件写 attribute_exists(jobId) + lastRunId;
+//      软限 timeout-pending 的那一笔带 glueJobName / glueJobRunId(平台对账能据此收口)。
+// 变异提示:删 `_exec_job` 里的 `_acquire_run_lock` ⇒ ①红;删发布期落点判定 ⇒ job-node-spec / publish-guard 判据红;
+//   删 `_exec_job` 里的 `_record_start(` ⇒ ⑧「开跑先落 running 行」红。
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
@@ -46,6 +50,8 @@ COND_ATTEMPTS = 0
 GLUE_STATE = "SUCCEEDED"
 GLUE_STATES = None       # 列表 = 依次返回(最后一个重复);None = 恒 GLUE_STATE
 GET_ITEMS = {}
+JOB_ROW_GONE_TABLE = None   # 2026-11-04:模拟作业行已删 —— 条件 attribute_exists(jobId) 的回写被拒
+PUT_KEYS = set()            # 2026-11-04:put 过的 (table, taskId, runId),给 attribute_exists(taskId) 的条件 update 判
 class _Cond(Exception):
     def __init__(self):
         Exception.__init__(self, "cond")
@@ -53,7 +59,14 @@ class _Cond(Exception):
 class _Table:
     def __init__(self, name): self.name = name
     def update_item(self, **kw):
-        CALLS.append({"api": "ddb.update_item", "table": self.name, "UpdateExpression": kw.get("UpdateExpression"), "ConditionExpression": kw.get("ConditionExpression"), "Key": kw.get("Key")})
+        CALLS.append({"api": "ddb.update_item", "table": self.name, "UpdateExpression": kw.get("UpdateExpression"), "ConditionExpression": kw.get("ConditionExpression"), "Key": kw.get("Key"), "Names": kw.get("ExpressionAttributeNames"), "Values": kw.get("ExpressionAttributeValues")})
+        if self.name == JOB_ROW_GONE_TABLE and (kw.get("ConditionExpression") or "") == "attribute_exists(jobId)":
+            raise _Cond()
+        # 2026-11-04:台账行的条件 update(attribute_exists(taskId))—— 之前没 put 过这个键 ⇒ 条件不满足(与真 DDB 同形,逼出退回整行 put 的路径)
+        if (kw.get("ConditionExpression") or "") == "attribute_exists(taskId)":
+            k = kw.get("Key") or {}
+            if (self.name, k.get("taskId"), k.get("runId")) not in PUT_KEYS:
+                raise _Cond()
         if self.name == BUSY_TABLE and "attribute_not_exists" in (kw.get("ConditionExpression") or ""):
             global COND_ATTEMPTS
             COND_ATTEMPTS += 1
@@ -61,7 +74,10 @@ class _Table:
                 raise _Cond()
         return {}
     def put_item(self, **kw):
-        CALLS.append({"api": "ddb.put_item", "table": self.name, "Item": kw.get("Item")}); return {}
+        CALLS.append({"api": "ddb.put_item", "table": self.name, "Item": kw.get("Item")})
+        it = kw.get("Item") or {}
+        PUT_KEYS.add((self.name, it.get("taskId"), it.get("runId")))
+        return {}
     def get_item(self, **kw):
         CALLS.append({"api": "ddb.get_item", "table": self.name, "Key": kw.get("Key")})
         return {"Item": GET_ITEMS.get(self.name)}
@@ -140,6 +156,7 @@ boto3.BUSY_FIRST_N = S.get("busyFirstN")
 boto3.GLUE_STATE = S.get("glueState", "SUCCEEDED")
 boto3.GLUE_STATES = S.get("glueStates")
 boto3.GET_ITEMS = S.get("getItems", {})
+boto3.JOB_ROW_GONE_TABLE = S.get("jobRowGoneTable")
 _t = [1700000000.0]
 def _tt():
     _t[0] += S.get("timeStep", 1.0)
@@ -170,7 +187,30 @@ print("@@" + json.dumps(out, default=str))
 }
 
 const ddbCalls = (o: Out) => o.calls.filter((c) => String(c.api).startsWith("ddb."));
-const runRow = (o: Out) => o.calls.find((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs")?.Item as Record<string, any> | undefined;
+/** 解一条 update_item 的 SET 段(#k<i> = :v<i>)成字段对象 */
+const decodeSet = (c: Record<string, any>): Record<string, any> => {
+  const out: Record<string, any> = {};
+  for (const [alias, name] of Object.entries((c.Names ?? {}) as Record<string, string>)) {
+    if (!alias.startsWith("#k")) continue;
+    const v = (c.Values ?? {})[`:v${alias.slice(2)}`];
+    if (v !== undefined) out[name] = v;
+  }
+  return out;
+};
+/** 作业自己那条台账行的**最终视图**(2026-11-04:开跑 put running 行 + 之后的 update_item 叠加);没有开跑行时退回看整行 put */
+const ledgerWrites = (o: Out) => o.calls.filter((c) => (c.api === "ddb.put_item" || c.api === "ddb.update_item") && c.table === "bgp-task-runs");
+const runRow = (o: Out): Record<string, any> | undefined => {
+  const writes = ledgerWrites(o);
+  if (!writes.length) return undefined;
+  let row: Record<string, any> | undefined;
+  for (const w of writes) {
+    if (w.api === "ddb.put_item") row = { ...(w.Item as Record<string, any>) };
+    else if (row) Object.assign(row, decodeSet(w));
+  }
+  return row;
+};
+/** 台账行状态的写入序列(put 的 status + 每次 update 的 status) */
+const statusSeq = (o: Out) => ledgerWrites(o).map((w) => (w.api === "ddb.put_item" ? (w.Item as Record<string, any>).status : decodeSet(w).status)).filter((x) => x !== undefined);
 
 describe("① 作业锁:同一把锁、同一个顺序", () => {
   it("先抢作业行上的锁(lockAttr Token/ExpiresAt · 条件写)→ 再 start_job_run(带 --ds)→ 成功后释放(REMOVE)", () => {
@@ -222,9 +262,13 @@ describe("① 作业锁:同一把锁、同一个顺序", () => {
     const slow = runShared({ fn: "_exec_job", env: ENV, node: NODE, ds: "2026-10-11", workflowRunId: "ex_abc#" + USW2, busyTable: "bgp-etl-jobs", busyFirstN: 4, timeStep: 300, glueStates: ["RUNNING", "SUCCEEDED"] });
     expect(slow.ok).toBe(false);
     expect(slow.error).toContain("soft limit (50 min)");
-    const statuses = slow.calls.filter((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs").map((c) => c.Item.status);
-    expect(statuses).toEqual(["timeout-pending", "failed"]);
-    const finalRow = slow.calls.filter((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs").at(-1)!.Item as Record<string, any>;
+    // 2026-11-04:开跑 put running → 提交后补句柄(running)→ 软限 timeout-pending(带 glueJobRunId,平台对账能据此收口)→ 失败 failed(update,不再整行 put)
+    expect(statusSeq(slow)).toEqual(["running", "running", "timeout-pending", "failed"]);
+    const tp = ledgerWrites(slow).map(decodeSet).find((w) => w.status === "timeout-pending")!;
+    expect(tp.glueJobRunId).toBe("jr-1");
+    expect(tp.glueJobName).toBe(glueJobNameFor(JOB.jobId, USW2));
+    expect(tp.finishedAt, "timeout-pending 不是终态,不许写 finishedAt").toBeUndefined();
+    const finalRow = runRow(slow)!;
     expect(finalRow.status).toBe("failed");
     expect(finalRow.error).toContain("soft limit (50 min)");
     expect(finalRow.workflowName).toBe("链");
@@ -265,8 +309,14 @@ describe("② 作业自己的台账行(双写回链)", () => {
     expect(o.result).toBe(row.runId);
     expect(typeof row.duration).toBe("number");
     expect(typeof row.startedAt).toBe("string");
-    const jobUpdate = ddbCalls(o).find((c) => c.table === "bgp-etl-jobs" && String(c.UpdateExpression).startsWith("SET lastRunStatus"));
-    expect(jobUpdate?.UpdateExpression).toBe("SET lastRunStatus = :s, #st = :s, updatedAt = :t");
+    const jobUpdates = ddbCalls(o).filter((c) => c.table === "bgp-etl-jobs" && String(c.UpdateExpression).startsWith("SET lastRunStatus"));
+    expect(jobUpdates.length).toBeGreaterThanOrEqual(2); // 开跑 running + 收口 succeeded
+    for (const u of jobUpdates) {
+      expect(u.UpdateExpression).toBe("SET lastRunStatus = :s, #st = :s, lastRunId = :r, updatedAt = :t");
+      expect(u.ConditionExpression, "作业行回写必须是条件写(作业行已删不造幽灵行)").toBe("attribute_exists(jobId)");
+      expect(u.Values[":r"]).toBe(row.runId);
+    }
+    expect(jobUpdates.at(-1)!.Values[":s"]).toBe("succeeded");
   });
   it("老产物的 env 没有 workflow_name ⇒ 行上不写 workflowName 键(不编名字;页面回落显示 workflowId)", () => {
     const { workflow_name: _omit, ...legacyEnv } = ENV;
@@ -431,6 +481,62 @@ print("@@" + json.dumps(out, default=str))
     expect(row.runId).toBe(`ex_9__job_1#${USW2}`);
     expect(row.taskType).toBe("etl-glue");
     expect(o.calls.find((c) => c.api === "glue.start_job_run")?.Arguments["--ds"]).toBe("2026-10-11");
+  });
+});
+
+describe("⑧ 2026-11-04:开跑即落 running 行;收口用 update;作业行已删不造幽灵行", () => {
+  it("🔴 B1:_record_start 的 put(status=running · 回链 · 章 · taskTargetKey)排在 glue.start_job_run **之前**;收口是 update_item(attribute_exists(taskId)),不再整行 put(变异:删 _record_start( ⇒ 红)", () => {
+    const o = runShared({ fn: "_exec_job", env: ENV, node: NODE, ds: "2026-10-11", workflowRunId: "ex_abc#" + USW2 });
+    expect(o.ok, o.error).toBe(true);
+    const iPut = o.calls.findIndex((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs");
+    const iStart = o.calls.findIndex((c) => c.api === "glue.start_job_run");
+    expect(iPut, "开跑没落 running 行 ⇒ 在途对删作业不可见").toBeGreaterThan(-1);
+    expect(iPut).toBeLessThan(iStart);
+    const start = o.calls[iPut].Item as Record<string, any>;
+    expect(start.status).toBe("running");
+    expect(start.taskId).toBe(JOB.jobId);
+    expect(start.runId).toBe(`ex_abc__job_1#${USW2}`);
+    expect(start.triggeredBy).toBe("workflow");
+    expect(start.workflowId).toBe("wf1");
+    expect(start.nodeId).toBe("job-1");
+    expect(start.projectId).toBe(PROJ);
+    expect(start.targetId).toBe(USW2);
+    expect(start.taskTargetKey).toBe(`${JOB.jobId}#${USW2}`);
+    expect(start.finishedAt).toBeUndefined();
+    // 只有这一次 put;之后全是 update(条件 attribute_exists(taskId)),最后一笔 succeeded 带 finishedAt / duration
+    const puts = o.calls.filter((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs");
+    expect(puts).toHaveLength(1);
+    const updates = o.calls.filter((c) => c.api === "ddb.update_item" && c.table === "bgp-task-runs");
+    expect(updates.length).toBeGreaterThanOrEqual(2); // 提交后补句柄 + 收口
+    for (const u of updates) {
+      expect(u.ConditionExpression).toBe("attribute_exists(taskId)");
+      expect(u.Key).toEqual({ taskId: JOB.jobId, runId: `ex_abc__job_1#${USW2}` });
+    }
+    expect(decodeSet(updates[0]).glueJobRunId).toBe("jr-1");
+    const last = decodeSet(updates.at(-1)!);
+    expect(last.status).toBe("succeeded");
+    expect(typeof last.finishedAt).toBe("string");
+    expect(typeof last.duration).toBe("number");
+    expect(statusSeq(o)).toEqual(["running", "running", "succeeded"]);
+  });
+  it("🔴 作业行已删(B1 原形:cron 跑到一半被删作业):作业行回写条件写被拒 ⇒ 吞掉、不 upsert 幽灵行;台账行照常收口;作业锁照常释放", () => {
+    const o = runShared({ fn: "_exec_job", env: ENV, node: NODE, ds: "2026-10-11", workflowRunId: "ex_abc#" + USW2, jobRowGoneTable: "bgp-etl-jobs" });
+    expect(o.ok, o.error).toBe(true);
+    expect(runRow(o)!.status).toBe("succeeded");
+    const jobUpdates = ddbCalls(o).filter((c) => c.table === "bgp-etl-jobs" && String(c.UpdateExpression).startsWith("SET lastRunStatus"));
+    expect(jobUpdates.length).toBeGreaterThan(0);
+    for (const u of jobUpdates) expect(u.ConditionExpression).toBe("attribute_exists(jobId)");
+    expect(o.calls.some((c) => c.api === "ddb.update_item" && c.UpdateExpression === "REMOVE #t, #e")).toBe(true);
+  });
+  it("锁忙 45 分钟仍抢不到:没有开跑行(没拿到锁就没开跑)⇒ _record 的条件 update 走不通时退回整行 put,台账仍有 failed 行", () => {
+    const o = runShared({ fn: "_exec_job", env: ENV, node: NODE, ds: "2026-10-11", workflowRunId: "ex_abc#" + USW2, busyTable: "bgp-etl-jobs", timeStep: 60 });
+    expect(o.ok).toBe(false);
+    // 没抢到锁就没开跑 ⇒ 没有 running 开跑行;_record 的条件 update 被拒(行不存在)⇒ 退回整行 put 一条 failed(无论如何要有一行)
+    expect(o.calls.some((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs" && (c.Item as Record<string, any>).status === "running")).toBe(false);
+    const upd = o.calls.find((c) => c.api === "ddb.update_item" && c.table === "bgp-task-runs");
+    expect(upd?.ConditionExpression).toBe("attribute_exists(taskId)");
+    expect(statusSeq(o)).toEqual(["failed", "failed"]); // 被拒的 update(记了一笔)+ 退回的整行 put
+    expect(runRow(o)!.status).toBe("failed");
   });
 });
 

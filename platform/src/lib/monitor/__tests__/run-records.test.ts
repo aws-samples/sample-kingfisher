@@ -398,10 +398,13 @@ describe("🔴 ABORTED / STOPPED 是「被取消」,不是「失败」", () => {
   });
 
   it("读时对账遇到「run 行已终态、作业行还 running」⇒ 用 run 行回填作业行(不再去后端重新判)", () => {
-    const i = svc.indexOf('typeof run.status === "string" && run.status !== "running"');
+    // 2026-11-04 起「已终态」只认词表单一作者 isTerminalRunStatus(running / timeout-pending 都是未终态,要去问后端);
+    //   原写法 run.status !== "running" 会把 timeout-pending 当终态回填 ⇒ 不许再出现
+    const i = svc.indexOf("if (isTerminalRunStatus(run.status)) {");
     expect(i, "缺少「run 行已终态」这道判据 ⇒ 会一路走到把用户取消判成 failed").toBeGreaterThan(0);
     const blk = svc.slice(i, i + 260);
-    expect(blk, "回填作业行要用 run 行的状态").toMatch(/updateJobStatus\(job\.jobId, run\.status/);
-    expect(blk).toMatch(/return \{ \.\.\.job, status: run\.status/);
+    expect(blk, "回填作业行要用 run 行的状态").toMatch(/const st = String\(run\.status\);\s*await updateJobStatus\(job\.jobId, st/);
+    expect(blk).toMatch(/return \{ \.\.\.job, status: st, lastRunStatus: st \}/);
+    expect(svc).not.toContain('run.status !== "running"');
   });
 });
