@@ -3,8 +3,8 @@
  *
  * 🔴 为什么:Flink 运行器 / 连接器模块 JAR 只在安装 / 升级时同步一次,跑错的后果是「仓库里升了 Flink、现网 MSAF 还跑旧包」
  *   (2026-11-05 Flink 1.20.4 安全升级时抓到:安装脚本「桶里有就跳过」、升级脚本根本不碰 JAR)。真桶上没法反复排练。
- *   scripts/lib 下的作者不是登记表 infra/prod-only-layers.json 意义上的「层」(层 = scripts/ 顶层脚本与 buildspec / lambda / codegen),
- *   所以替身只能靠这里真跑:infra/test/flink-jars/test_flink_jars.sh。
+ *   scripts/lib 下被 source 的作者也是登记表 infra/prod-only-layers.json 意义上的「层」(发现规则按 git 跟踪的 scripts/**;文件未 git add 时发现不到 ⇒ 别被假绿骗),
+ *   登记项指向替身 infra/test/flink-jars/test_flink_jars.sh,这里负责把它真跑进门禁。
  *   这里 spawn 真 bash 跑替身:假 aws(目录当桶、.meta 当 metadata)/ 假 mvn 真跑函数,零凭证、不联网;逐条点名它必须覆盖的事实。
  */
 import { describe, it, expect } from "vitest";

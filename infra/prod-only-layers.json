@@ -624,6 +624,18 @@
       "executor": "本机 bash(被 deploy-all.sh / redeploy-platform.sh source)→ AWS Glue",
       "note": "2026-11-04 发现规则扩到 scripts/lib 后才进台账(此前根本不在清单上)。每次空账号从零重建都执行它:deploy-all 第 6.3 步经 run_step 调 `ensure_s3tables_catalog`(失败记账、收尾以非零码退出,响亮不静默;正是 …7698 全新账号首装暴露的),升级链 redeploy-platform 第 3c 步在 `set -euo pipefail` 下裸调(失败立即中止)。platform/src/lib/aws/__tests__/s3tables-catalog.test.ts 只钉「安装脚本与运行时入参逐字段相同」(文本判据,不执行脚本)⇒ 不算替身;想翻成 harness 要照 execution-regions/test_lib.sh 的手法用假 aws 离线真跑每个分支",
       "reason": "covered-by-fresh-account-rebuild"
+    },
+    {
+      "id": "script:lib/flink-jars.sh",
+      "what": "Flink 运行器 / 连接器模块 JAR 的唯一作者:三运行器 + 全部连接器模块的清单、本地 JAR 缺或比 pom / src 旧即 mvn 重建、sha256 写进 S3 对象 metadata、相同才跳过(deploy-all 10.6 步与 redeploy-platform 2e 步共用 sync_flink_jars)",
+      "executor": "本机 bash(被 deploy-all.sh / redeploy-platform.sh source)→ mvn + AWS S3",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/flink-jars/test_flink_jars.sh",
+        "marker": "✅ flink-jars 离线判据全过",
+        "cases": 43
+      },
+      "note": "2026-11-05 Flink 1.20.4 安全升级时立:安装脚本原来对桶里已存在的 JAR 一律跳过、升级脚本根本不碰 JAR ⇒ 仓库里升了 Flink 现网 MSAF 仍跑旧包。替身用假 aws(目录当桶、.meta 当 metadata)与假 mvn 真跑函数:首装 / 幂等 / 老对象无 metadata / 远端 sha 不同 / pom 新于 jar 重建 / 缺 mvn 只 WARNING 继续 / 上传失败只 WARNING 继续 / 两条部署脚本接线 / key 与 platform-stack 同值,由 platform/src/lib/__tests__/flink-jars-harness.test.ts 在 vitest 里真跑。诚实边界:真桶上传与 MSAF 重取 JAR 只有真环境(2026-11-05 测试账号真桶两跑 10 传 / 10 unchanged、应用版本 1 → 2 坐实)"
     }
   ]
 }
