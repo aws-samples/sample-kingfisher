@@ -1,3 +1,5 @@
+// 路由图 conf 键 / 平台路由别名的唯一作者(纯模块,页面也 import 本文件 ⇒ 不许拉 AWS SDK)
+import { EMR_LAKE_CATALOGS_CONF, PLATFORM_ROUTE_ALIAS } from "@/lib/lake/routes-grammar";
 // EMR Serverless 作业规格「单一事实源」。
 // 对齐 EMR Serverless console「提交 Spark 作业」核心可填项；照 lib/etl/worker-types.ts 范式：
 // 表单、参数顾问 catalog、provider 都从这里取，避免多处漂移。
@@ -151,6 +153,8 @@ export const RESERVED_SPARK_CONF = new Set([
   "spark.emr-serverless.driverEnv.AWS_DEFAULT_REGION",
   "spark.executorEnv.AWS_REGION",
   "spark.executorEnv.AWS_DEFAULT_REGION",
+  // 数据湖表桶路由:`别名=桶` 路由图是平台事实(脚本 spark.conf.get 读),用户不许覆盖
+  EMR_LAKE_CATALOGS_CONF,
 ]);
 
 // 用户自定义 sparkConf → 追加的 --conf 串（过滤保留键；空值跳过）。
@@ -169,17 +173,11 @@ export function userSparkConfToParameters(conf?: Record<string, string>): string
 //  · --jars 挂 s3-tables-catalog-for-iceberg-runtime（EMR 默认 classpath 无此类）
 //  · warehouse = 表桶 ARN
 //  · application 必须挂带 NAT 的私有子网（S3TablesCatalog 运行时连 s3tables 公共 API）
-// 环境变量由 CDK 注入（platform-stack）：EMR_S3TABLES_JAR / EMR_S3TABLES_WAREHOUSE_ARN。
-export const S3TABLES_CATALOG_NAME = "s3tablescatalog";
-
-export function s3TablesCatalogParameters(jarS3Uri?: string, warehouseArn?: string): string {
-  if (!jarS3Uri || !warehouseArn) return ""; // 未配置则不注入（作业仍可跑纯 Spark）
-  const c = S3TABLES_CATALOG_NAME;
-  return [
-    `--jars ${jarS3Uri}`,
-    `--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions`,
-    `--conf spark.sql.catalog.${c}=org.apache.iceberg.spark.SparkCatalog`,
-    `--conf spark.sql.catalog.${c}.catalog-impl=software.amazon.s3tables.iceberg.S3TablesCatalog`,
-    `--conf spark.sql.catalog.${c}.warehouse=${warehouseArn}`,
-  ].join(" ");
-}
+// 环境变量由 CDK 注入（platform-stack）：EMR_S3TABLES_JAR。
+// 数据湖表桶路由(设计稿 §6.5.2 / D8):**每条被选中的路由一个目录**(别名 = 路由别名;平台路由仍是 s3tablescatalog ⇒
+//   没有外部路由的区产出的参数串与改动前逐字相同),目录属性字面只在唯一作者 lib/lake/routes.ts#sparkCatalogConf(engine "emr");
+//   jar / extensions 只加一次;再加 `spark.bgp.lakeCatalogs=别名=桶,…`(脚本 spark.conf.get 读回路由图)与可选的 spark.sql.defaultCatalog。
+//   原来按 env EMR_S3TABLES_WAREHOUSE_ARN 拼主控区 warehouse 的那条路已删:home / 非 home 都从落点派生平台路由(该 env 键留一个版本后移除)。
+// 🔴 参数串的拼法在 `./job-spec.ts#emrS3TablesCatalogParameters`(服务端;它 import 路由作者)。本文件被页面(EmrJobPanel)import,
+//    必须保持浏览器安全(不许 import 带 AWS SDK 的 lib/lake/routes),所以只从纯文法模块取常量。
+export const S3TABLES_CATALOG_NAME = PLATFORM_ROUTE_ALIAS;

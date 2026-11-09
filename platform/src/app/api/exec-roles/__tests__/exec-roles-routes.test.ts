@@ -15,6 +15,11 @@ vi.mock("@/lib/execution-role/candidates", () => ({
 vi.mock("@/lib/execution-role/preflight", () => ({
   preflightExecutionRole: async (input: unknown) => { h.preflightCalls.push(input); return { ok: true, roleExists: true, gaps: [], checked: 3, trusted: true }; },
 }));
+// 数据湖表桶路由:预检接口按作业的数据湖表桶声明解析路由(lib 单一作者;这里不碰路由表 ⇒ 空选集),形状校验用真实现
+vi.mock("@/lib/lake/job-declaration", async (orig) => {
+  const real = (await orig()) as Record<string, unknown>;
+  return { ...real, resolveJobLakeRoutes: async () => ({ selected: [], set: null }) };
+});
 
 import { GET as candidatesGET } from "../candidates/route";
 import { POST as preflightPOST } from "../preflight/route";
@@ -68,6 +73,7 @@ describe("POST /api/exec-roles/preflight", () => {
     const ok = await post({ engine: "glue", targetId: "tgt_use1_a", roleArn: " arn:aws:iam::123456789012:role/x ", extraS3Uris: ["s3://b/k", 7], scriptCode: "x" });
     expect(ok.status).toBe(200);
     expect((await ok.json()).data).toEqual({ ok: true, roleExists: true, gaps: [], checked: 3, trusted: true });
-    expect(h.preflightCalls).toEqual([{ engine: "glue", roleArn: "arn:aws:iam::123456789012:role/x", targetId: "tgt_use1_a", extraS3Uris: ["s3://b/k"], scriptCode: "x" }]);
+    // 数据湖表桶路由:预检接口把按声明解析出的路由带给 lib(本判据不碰路由表 ⇒ 空选集,但键必须在:不传 = 不量路由)
+    expect(h.preflightCalls).toEqual([{ engine: "glue", roleArn: "arn:aws:iam::123456789012:role/x", targetId: "tgt_use1_a", extraS3Uris: ["s3://b/k"], scriptCode: "x", lakeRoutes: [] }]);
   });
 });

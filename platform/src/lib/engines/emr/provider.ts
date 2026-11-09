@@ -2,7 +2,6 @@
 // 结构照抄 lib/etl/job-service.ts（submit/poll/reconcile）+ lib/realtime/flink-service.ts（stop/readLogs）。
 // per-作业 application（拍板④⑤）：submit 前 ensureApplication+ensureStarted；作业删除时 destroyResource。
 
-import { homeRegion } from "@/lib/place/home-region";
 import {
   StartJobRunCommand,
   GetJobRunCommand,
@@ -20,7 +19,8 @@ import type { EngineProvider, RunOpts, RunResult, LogLine } from "../spi";
 import { backfillRunExtra } from "@/lib/backfill/run-extra";
 import type { EngineJob } from "../types";
 import type { EmrEngineJob } from "./types";
-import { toSparkSubmitParameters, userSparkConfToParameters, s3TablesCatalogParameters, bgpLandingParameters } from "./spec";
+// spark 参数的拼法 + 作业的数据湖路由解析收在唯一作者 ./job-spec.ts(扇出 / 工作流节点拼同一份)
+import { emrLakeRoutesFor, emrSparkSubmitParametersFor } from "./job-spec";
 import { ensureApplication, ensureStarted, destroyApplication, applicationIdOf, allApplicationRefs, targetEmrNetwork, isEmrApplicationBusy } from "./application";
 import { uploadScript, ensureS3TablesJar } from "./script";
 import { s3LogUri, EMR_LOG_PREFIX as LOG_PREFIX } from "./log-destination";
@@ -68,7 +68,8 @@ const USER_ID = "default-user";
 // 平台注入的 S3 Tables 支持（catalog runtime JAR + 表桶 warehouse ARN）。CDK 注入。
 // 导出给 schedule-fanout(EMR 定时逐 target 扇出)复用,免第二份常量
 export const S3TABLES_JAR = process.env.EMR_S3TABLES_JAR || (process.env.AWS_ACCOUNT_ID ? `s3://bgp-glue-scripts-${process.env.AWS_ACCOUNT_ID}/emr-jars/s3-tables-catalog-for-iceberg-runtime-0.1.8.jar` : "");
-export const S3TABLES_WAREHOUSE_ARN = process.env.EMR_S3TABLES_WAREHOUSE_ARN || (process.env.AWS_ACCOUNT_ID ? `arn:aws:s3tables:${homeRegion()}:${process.env.AWS_ACCOUNT_ID}:bucket/bgp-table-bucket` : "");
+// 数据湖表桶路由:原 `S3TABLES_WAREHOUSE_ARN`(读 env EMR_S3TABLES_WAREHOUSE_ARN,恒指主控区平台表桶)已删 —— warehouse 由作业被选中的
+//   每条路由(含从落点派生的平台路由)给出,home / 非 home 同一条路(./job-spec.ts#emrLakeRoutesFor)。该 env 键在任务定义里留一个版本后移除。
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -248,9 +249,12 @@ export const emrServerlessProvider: EngineProvider = {
     // 🔴 预检**自己**量不了(平台缺 iam:SimulatePrincipalPolicy / 被限流)⇒ 不阻断,但把
     //   「这次没被预检过」如实写进日志(三态分开:齐 / 缺 / 量不了)。
     // ══════════════════════════════════════════════════════════════════════
+    // 数据湖表桶路由(设计稿 §6.5.2):作业用到的数据湖路由 = 声明的子集(没声明 ⇒ 本区全部),按**本区**路由表 fresh 解析;
+    //   桶不是路由 / 写只读路由 / 缺省目录不在目录里 ⇒ 抛 LakeRouteError(用户可修 ⇒ 运行路由回「被拒」)。放在预检之前(预检按路由逐桶量)。
+    const lake = await emrLakeRoutesFor(j, targetId, landing);
     if (customRole) {
       // 走统一入口(信任 emr-serverless.amazonaws.com + 引擎基线 + 脚本里 s3:// 引用;模拟带本区 RequestedRegion)
-      const pf = await preflightExecutionRole({ engine: "emr", roleArn: execRoleArn, targetId, scriptCode: j.script });
+      const pf = await preflightExecutionRole({ engine: "emr", roleArn: execRoleArn, targetId, scriptCode: j.script, lakeRoutes: lake.selected });
       assertPreflightPassed(pf, { engine: "emr", roleArn: execRoleArn, targetId, what: `emr-job ${j.jobId}` });
     }
     // 抢锁之前写区域审计(entry=run-submit;与 ETL 侧同一口径;脚本原文进 sqlText)
@@ -299,17 +303,9 @@ export const emrServerlessProvider: EngineProvider = {
     // 2b) 非 home 的 applicationId 记在 `applicationIdByTarget`(home 仍写老字段 ⇒ 存量零迁移)
     await persistApplicationId(j, targetId, applicationId);
 
-    // 3) 组 sparkSubmitParameters：平台规格（保留键）+ 平台注入 S3 Tables catalog 支持 + 用户自定义 conf。
-    //    S3 Tables 参数由平台自动注入（catalog+jars+warehouse），用户脚本直接 spark.table("s3tablescatalog.ns.tbl")。
-    const specParams = toSparkSubmitParameters(j.spec);
-    // 🔴 catalog 的 warehouse ARN 也必须是**该区的表桶**(拿 home 的 ARN 去那个区 = 跨区写元数据)
-    const s3tParams = s3TablesCatalogParameters(
-      s3tJar,
-      landing.home
-        ? S3TABLES_WAREHOUSE_ARN
-        : `arn:aws:s3tables:${landing.region}:${process.env.AWS_ACCOUNT_ID}:bucket/${landing.tableBucket}`
-    );
-    const userParams = userSparkConfToParameters(j.sparkConf);
+    // 3) 组 sparkSubmitParameters：平台规格（保留键）+ 平台注入 S3 Tables catalog 支持 + 该区落点事实 + 用户自定义 conf。
+    //    S3 Tables 参数由平台自动注入(每条被选中的路由一个目录 + jars),用户脚本直接 spark.table("<别名>.ns.tbl")。
+    //    🔴 catalog 的 warehouse ARN 都是**该区**的表桶(路由按本区解析;拿 home 的 ARN 去那个区 = 跨区写元数据)。
     // 🔴🔴 与 Glue 同一件事:**把该区的落点事实注入作业**(`spark.conf.get('spark.bgp.datalakeBucket')`)。
     // 不注入的话用户脚本只能硬编码桶名 ⇒ 多区域执行时所有区的产物都写回同一个桶,
     // 而作业照样报成功(权限是通的)。真环境实测:usw2 的 run 原生 SUCCESS、usw2 桶里 0 个产物。
@@ -324,8 +320,8 @@ export const emrServerlessProvider: EngineProvider = {
     } catch (e) {
       console.warn(`[emr] ${j.jobId} 解析该区 Redshift 连接事实失败(不阻断,但作业里读不到 spark.bgp.redshift*):${String((e as Error)?.message || e).slice(0, 160)}`);
     }
-    const bgpParams = bgpLandingParameters({ ...landing, ...rsFacts });
-    const sparkSubmitParameters = [specParams, s3tParams, bgpParams, userParams].filter(Boolean).join(" ");
+    // 🔴 拼法唯一作者 ./job-spec.ts(扇出 / 工作流节点同一份;漏改一处 = 那条路依然 NoRegionError / permission denied)
+    const sparkSubmitParameters = emrSparkSubmitParametersFor(j, landing, s3tJar, rsFacts, lake);
 
     // 4) StartJobRun。
     // 🔴 业务日期参数**追加在用户入参之后**(用户按位置读自己的入参,下标不变),

@@ -172,12 +172,15 @@ export function engineBaseline(engine: RoleEngine, ctx: BaselineCtx): BaselineNe
       why: `读 Glue 作业脚本(脚本桶 ${scriptBucket})`,
       probe: { action: "s3:GetObject", resource: `arn:aws:s3:::${scriptBucket}/scripts/probe.py` },
     });
+    // ── 数据湖表桶路由(设计稿 §6.6):Glue 的**真实** TempDir 是脚本桶 `s3://<scriptsBucket>/temp/`(job-service.ts / start-run.ts),
+    //    原 `BaselineGlueDatalake`(PutObject 到 <datalakeBucket>/temp/probe)探的是一个作业根本不写的位置 ⇒ 只碰客户表桶的作业被迫给
+    //    平台数据湖桶写权限。改探真 TempDir;数据湖桶的读写不再是 Glue 的「必备」(作业真用到的桶由声明 / 资源画像 / 路由探针按桶量)。
     needs.push({
-      sid: "BaselineGlueDatalake",
+      sid: "BaselineGlueTempDir",
       actions: S3_WRITE,
-      resources: [`arn:aws:s3:::${logBucket}`, `arn:aws:s3:::${logBucket}/*`],
-      why: `读写平台数据湖桶 ${logBucket}(Glue 的输入/输出/临时目录)`,
-      probe: { action: "s3:PutObject", resource: `arn:aws:s3:::${logBucket}/temp/probe` },
+      resources: [`arn:aws:s3:::${scriptBucket}`, `arn:aws:s3:::${scriptBucket}/temp/*`],
+      why: `Glue 作业的临时目录 --TempDir = s3://${scriptBucket}/temp/(平台注入);写不了它作业在 shuffle / 书签阶段就失败`,
+      probe: { action: "s3:PutObject", resource: `arn:aws:s3:::${scriptBucket}/temp/probe` },
     });
   }
 

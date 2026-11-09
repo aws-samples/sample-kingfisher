@@ -18,11 +18,11 @@ vi.mock("@/lib/lake/table-bucket-candidates", () => ({
 import { GET } from "../route";
 import { listTableBucketCandidates } from "@/lib/lake/table-bucket-candidates";
 
-const get = (qs: string) => GET(new NextRequest(`http://x/api/admin/lake-buckets/candidates${qs}`));
+const get = (qs: string) => GET(new NextRequest(`http://x/api/lake-buckets/candidates${qs}`));
 
 beforeEach(() => { h.identity = { username: "u", isPlatformAdmin: false }; h.fail = null; (listTableBucketCandidates as any).mockClear(); });
 
-describe("GET /api/admin/lake-buckets/candidates", () => {
+describe("GET /api/lake-buckets/candidates", () => {
   it("普通登录用户可读;应答原样透传清单", async () => {
     const r = await get("?targetId=tgt_home");
     expect(r.status).toBe(200);

@@ -1,4 +1,5 @@
-// 外部表桶登记的装配判据(只 mock 真外部:DDB、s3tables 客户端、落点解析)。
+// 外部表桶登记(兼容薄壳 ⇒ 路由作者 lib/lake/routes)的装配判据:只 mock 真外部(DDB、s3tables 客户端、主控区区名);
+//   薄壳、路由作者、Athena 落点解析全走真实现 —— 要钉的就是「老函数名仍接在新作者上」。
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@aws-sdk/client-s3tables";
 
@@ -9,7 +10,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/aws/dynamodb", () => ({
-  TABLES: { SETTINGS: "bgp-settings" },
+  TABLES: { SETTINGS: "bgp-settings", SYNC_TASKS: "bgp-sync-tasks", ETL_JOBS: "bgp-etl-jobs", ENGINE_JOBS: "bgp-engine-jobs" },
   docClient: {
     send: vi.fn(async (cmd: any) => {
       const input = { ...((cmd.input || {}) as Record<string, unknown>) };
@@ -31,21 +32,15 @@ vi.mock("@/lib/aws/dynamodb", () => ({
         h.rows.delete(sk);
         return { Attributes: old };
       }
+      if (n === "ScanCommand") return { Items: [] }; // 撤销前的引用扫描(同步任务 / 作业):本判据无引用
       return {};
     }),
   },
 }));
-vi.mock("@/lib/athena/s3tables", async (orig) => {
-  const real: any = await orig();
-  return {
-    ...real,
-    resolveS3TablesPlace: vi.fn(async (tid: string) => ({ targetId: tid, region: "ap-southeast-1", bucket: "bgp-table-bucket", catalogRef: "s3tablescatalog/bgp-table-bucket", home: tid === "tgt_home" })),
-    // 真函数外包一层 spy:判「登记 / 撤销后读缓存作废」这条接线有没有接上(s38 单跑 71b 红的根因之一)
-    forgetExternalBucketsMemo: vi.fn(real.forgetExternalBucketsMemo),
-  };
-});
-import { forgetExternalBucketsMemo } from "@/lib/athena/s3tables";
+// 主控区区名(真外部:环境事实)—— 平台表桶的落点 region 随它;登记行 / 拒绝文案都要点名这个区
+vi.mock("@/lib/place/home-region", () => ({ homeRegion: () => "ap-southeast-1" }));
 
+import { resolveS3TablesPlaces, forgetExternalBucketsMemo } from "@/lib/athena/s3tables";
 import {
   registerExternalTableBucket, listExternalTableBuckets, unregisterExternalTableBucket, assertTableBucketName, lakeExtBucketSk, ExternalTableBucketError,
 } from "@/lib/lake/external-table-buckets";
@@ -53,15 +48,16 @@ import {
 const s3t = {
   send: vi.fn(async (cmd: any) => {
     h.calls.push({ svc: "s3tables", cmd: cmd.constructor.name, input: cmd.input });
+    if (cmd.constructor.name === "ListNamespacesCommand") return { namespaces: [] }; // 登记守卫探新桶的命名空间:空 ⇒ 无冲突
     if (!h.bucketExists) { const e = new Error("The specified bucket does not exist"); e.name = "NotFoundException"; throw e; }
     return { arn: cmd.input.tableBucketARN, name: String(cmd.input.tableBucketARN).split("/").pop() };
   }),
 };
 
-beforeEach(() => { h.rows.clear(); h.calls.length = 0; h.bucketExists = true; process.env.AWS_ACCOUNT_ID = "123456789012"; });
+beforeEach(() => { h.rows.clear(); h.calls.length = 0; h.bucketExists = true; process.env.AWS_ACCOUNT_ID = "123456789012"; forgetExternalBucketsMemo(); });
 
 describe("表桶名", () => {
-  it("合法 / 非法", () => {
+  it("合法 / 非法(薄壳把路由作者的 LakeRouteError 整形成存量调用方认的 ExternalTableBucketError)", () => {
     expect(assertTableBucketName("bigdata-test-sg-tables")).toBe("bigdata-test-sg-tables");
     expect(assertTableBucketName("  abc  ")).toBe("abc");
     for (const bad of ["", "A", "ab", "-abc", "abc-", "Abc", "a_b", "a".repeat(64), undefined, 3]) {
@@ -74,13 +70,16 @@ describe("表桶名", () => {
 });
 
 describe("登记 / 列 / 撤销", () => {
-  it("登记:核该区真有(GetTableBucket 按该区 ARN)→ 落 bgp-settings 一行;列得到;撤销后列不到", async () => {
+  it("登记:核该区真有(GetTableBucket 按该区 ARN)→ 落 bgp-settings 一行(路由行:别名按桶名派生 / 分层 other / 可写);列得到;撤销后列不到", async () => {
     const row = await registerExternalTableBucket({ targetId: "tgt_home", bucket: "bigdata-test-sg-tables", label: " 客户自有 ", addedBy: "admin", s3tablesClient: s3t, now: new Date("2026-10-13T03:00:00Z") });
-    expect(row).toEqual({ targetId: "tgt_home", bucket: "bigdata-test-sg-tables", region: "ap-southeast-1", label: "客户自有", addedBy: "admin", addedAt: "2026-10-13T03:00:00.000Z" });
+    expect(row).toEqual({
+      targetId: "tgt_home", bucket: "bigdata-test-sg-tables", region: "ap-southeast-1", label: "客户自有", addedBy: "admin", addedAt: "2026-10-13T03:00:00.000Z",
+      alias: "bigdata_test_sg_tables", tier: "other", writable: true,
+    });
     const get = h.calls.find((c) => c.svc === "s3tables" && c.cmd === "GetTableBucketCommand")!;
     expect(get.input).toEqual({ tableBucketARN: "arn:aws:s3tables:ap-southeast-1:123456789012:bucket/bigdata-test-sg-tables" });
     const put = h.calls.find((c) => c.svc === "ddb" && c.cmd === "PutCommand")!;
-    expect(put.input.Item).toMatchObject({ pk: "system", sk: "lake-ext-bucket#tgt_home#bigdata-test-sg-tables" });
+    expect(put.input.Item).toMatchObject({ pk: "system", sk: "lake-ext-bucket#tgt_home#bigdata-test-sg-tables", alias: "bigdata_test_sg_tables", tier: "other", writable: true });
     expect(put.input.ConditionExpression).toBe("attribute_not_exists(sk)");
     expect(await listExternalTableBuckets("tgt_home")).toEqual([row]);
     expect(await listExternalTableBuckets("tgt_usw2_a")).toEqual([]);
@@ -88,16 +87,16 @@ describe("登记 / 列 / 撤销", () => {
     expect(await listExternalTableBuckets("tgt_home")).toEqual([]);
     expect(await unregisterExternalTableBucket("tgt_home", "bigdata-test-sg-tables")).toBe(false);
   });
-  it("登记该区的平台表桶 ⇒ 409(本来就在表树里),不调 s3tables、不落库", async () => {
+  it("登记该区的平台表桶 ⇒ 409(本来就是隐式缺省路由),不调 s3tables、不落库", async () => {
     await expect(registerExternalTableBucket({ targetId: "tgt_home", bucket: "bgp-table-bucket", addedBy: "admin", s3tablesClient: s3t }))
-      .rejects.toMatchObject({ status: 409 });
+      .rejects.toMatchObject({ status: 409, code: "CONFLICT" });
     expect(h.calls.filter((c) => c.svc === "s3tables")).toHaveLength(0);
     expect(h.rows.size).toBe(0);
   });
   it("该区没有这个表桶 ⇒ 404 说清区与 ARN,不落库", async () => {
     h.bucketExists = false;
     await expect(registerExternalTableBucket({ targetId: "tgt_home", bucket: "no-such-bucket", addedBy: "admin", s3tablesClient: s3t }))
-      .rejects.toMatchObject({ status: 404, message: expect.stringContaining("ap-southeast-1") });
+      .rejects.toMatchObject({ status: 404, code: "NOT_FOUND", message: expect.stringContaining("arn:aws:s3tables:ap-southeast-1:123456789012:bucket/no-such-bucket") });
     expect(h.rows.size).toBe(0);
   });
   it("重复登记 ⇒ 409", async () => {
@@ -108,16 +107,13 @@ describe("登记 / 列 / 撤销", () => {
     await expect(registerExternalTableBucket({ targetId: "tgt_home", bucket: "Bad_Name", addedBy: "admin", s3tablesClient: s3t })).rejects.toMatchObject({ status: 400 });
     expect(h.calls).toHaveLength(0);
   });
-  it("🔴 登记成功 / 撤销成功都让表树的读缓存作废;被拒的登记与「本来就没登记」的撤销不碰缓存", async () => {
-    const forget = vi.mocked(forgetExternalBucketsMemo);
-    forget.mockClear();
+  it("🔴 登记 / 撤销成功后,走 15s 读缓存的表树落点(resolveS3TablesPlaces)**立刻**看到变化(缓存作废的行为判据,不钉某个函数被调过)", async () => {
+    expect((await resolveS3TablesPlaces("tgt_home")).map((p) => p.bucket)).toEqual(["bgp-table-bucket"]); // 先把缓存填上
     await registerExternalTableBucket({ targetId: "tgt_home", bucket: "cust-b", addedBy: "admin", s3tablesClient: s3t });
-    expect(forget).toHaveBeenCalledTimes(1);
+    expect((await resolveS3TablesPlaces("tgt_home")).map((p) => `${p.bucket}:${p.alias}`)).toEqual(["bgp-table-bucket:s3tablescatalog", "cust-b:cust_b"]);
     await expect(registerExternalTableBucket({ targetId: "tgt_home", bucket: "cust-b", addedBy: "admin", s3tablesClient: s3t })).rejects.toMatchObject({ status: 409 });
-    expect(forget).toHaveBeenCalledTimes(1);
+    expect((await resolveS3TablesPlaces("tgt_home")).map((p) => p.bucket)).toEqual(["bgp-table-bucket", "cust-b"]);
     expect(await unregisterExternalTableBucket("tgt_home", "cust-b")).toBe(true);
-    expect(forget).toHaveBeenCalledTimes(2);
-    expect(await unregisterExternalTableBucket("tgt_home", "cust-b")).toBe(false);
-    expect(forget).toHaveBeenCalledTimes(2);
+    expect((await resolveS3TablesPlaces("tgt_home")).map((p) => p.bucket)).toEqual(["bgp-table-bucket"]);
   });
 });

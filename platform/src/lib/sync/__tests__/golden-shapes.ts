@@ -18,6 +18,8 @@ export const GOLDEN_BINDINGS: GlueScriptBindings = {
     database: "dev",
     secretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift!bgp-namespace-admin-AbCdEf",
   },
+  // 数据湖表桶路由:存量任务写平台表桶 ⇒ 目录别名 = 平台路由的固定别名(脚本与改动前逐字节相同;golden 文件因此一字不改)
+  lakeCatalogAlias: "s3tablescatalog",
 };
 
 const mysqlDs = {

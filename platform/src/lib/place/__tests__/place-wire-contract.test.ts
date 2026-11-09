@@ -170,6 +170,7 @@ const glueScript = () =>
     {
       landing: { targetId: "tgt_usw2_a", region: "us-west-2", datalakeBucket: "bgp-datalake-x", tableBucket: "tb" },
       rsb: { region: "us-west-2", workgroup: RS.workgroup, database: RS.database, secretArn: RS.secretArn },
+      lakeCatalogAlias: "s3tablescatalog",
     }
   );
 

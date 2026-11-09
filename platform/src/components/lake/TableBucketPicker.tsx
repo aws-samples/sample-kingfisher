@@ -1,12 +1,13 @@
 "use client";
-// (客户 2026-10-16 待改进项)—— S3 Tables 表桶下拉,唯一作者
-//   同步任务「S3 Tables 数据湖配置 → Table Bucket」与系统设置「数据湖外部表桶 → 登记」共用。
-//   清单来自 GET /api/admin/lake-buckets/candidates?targetId=(只读 ListTableBuckets,lib/lake/table-bucket-candidates)。
+// S3 Tables 表桶下拉,唯一作者(客户 2026-10-16 待改进项):
+//   同步任务「S3 Tables 数据湖配置 → Table Bucket」与系统设置「数据湖表桶与路由 → 登记」共用。
+//   清单来自 GET /api/lake-buckets/candidates?targetId=(只读路径,任何登录用户可读;ListTableBuckets,lib/lake/table-bucket-candidates)。
 //   用 AutoComplete 而不是 Select:清单拉不到(SCP 拒 / 区不可达)时仍能手填,不把用户堵死;选项上标出「该区平台表桶」「已登记」。
 //   🔴 落点必须显式给(targetId 空 = 还不知道在哪个区,不拉、不猜主控区)。
 // 写意图(同步向导)下:既不是平台表桶也没登记的桶打「未登记」标;选中 / 手填了这样的桶
-//   就在输入框下方给出可点提示(非主控区:保存 / 启动会被拒,去登记;主控区:能写但直查 / 治理 / 问数看不到,建议登记)。
-//   改动前用户要到「完成」/「启动」被 409 才知道,文案还只说「与执行环境的表桶不一致 ⇒ 拒绝」,没有下一步(客户 2026-10-27 反馈)。
+//   就在输入框下方给出可点提示(保存 / 启动会被拒,去登记)。改动前用户要到「完成」/「启动」被 409 才知道,文案还只说「与执行环境的表桶不一致 ⇒ 拒绝」,没有下一步(客户 2026-10-27 反馈)。
+// 数据湖表桶路由(2026-11-04):已登记的桶是**路由** —— 选项显示「桶 · 别名 · 分层」并带 data-alias / data-tier / data-writable;
+//   写意图下只有**可写**路由可选(只读路由不列),未登记的桶仍列出并带「未登记」提示;主控区与执行区同一条规则(主控区不再任意桶放行)。
 import React, { useEffect, useMemo, useState } from "react";
 import { AutoComplete, Tag, Typography } from "antd";
 import { useT } from "@/lib/i18n/useT";
@@ -20,14 +21,14 @@ export interface TableBucketPickerProps {
   placeholder?: string;
   style?: React.CSSProperties;
   disabled?: boolean;
-  /** 不列该区平台表桶(登记外部表桶时它本来就在表树里,登记会被 409) */
+  /** 不列该区平台表桶(登记路由时它本来就是隐式缺省路由,登记会被 409) */
   excludePlatform?: boolean;
   /** 不列已登记的外部表桶(再登记一次会被 409) */
   excludeRegistered?: boolean;
   /** 变了就重拉(登记 / 撤销之后让清单跟上) */
   reloadToken?: unknown;
   /**
-   * 选中的桶是要**写**的(同步任务 Table Bucket):未登记的桶打「未登记」标,选中 / 手填后出提示与去登记的链接。
+   * 选中的桶是要**写**的(同步任务 Table Bucket):只列可写路由 + 未登记的桶(带「未登记」标);选中 / 手填未登记的桶后出提示与去登记的链接。
    * 系统设置的登记入口不传(它列的本来就都是未登记的)。
    */
   writeIntent?: boolean;
@@ -39,11 +40,11 @@ export interface TableBucketPickerProps {
 
 type LoadState = { status: "idle" | "loading" | "ok" | "error"; data?: TableBucketCandidates; error?: string };
 
-/** 系统设置页上登记外部表桶那张卡的锚点(app/settings/page.tsx 的 Card id 同值)。 */
+/** 系统设置页上登记路由那张卡的锚点(app/settings/page.tsx 的 Card id 同值)。 */
 export const LAKE_EXT_BUCKETS_ANCHOR = "/settings#lake-ext-buckets";
 
 export interface UnregisteredBucketHint {
-  /** exec-env = 非主控区(保存 / 启动会被拒);home = 主控区(能写,但三处读面看不到) */
+  /** exec-env = 非主控区;home = 主控区(数据湖表桶路由起两者都会被保存 / 启动拒,措辞只差「哪个环境」) */
   kind: "exec-env" | "home";
   targetId: string;
   bucket: string;
@@ -69,6 +70,11 @@ export function unregisteredBucketHint(args: {
   return { kind: args.data.home ? "home" : "exec-env", targetId: args.targetId, bucket };
 }
 
+/** 写意图下清单的可选项:平台表桶 + 可写路由 + 未登记的桶(带标);只读路由不列(选了也会被 400 / 409)。 */
+export function selectableForWrite(buckets: readonly TableBucketCandidate[]): TableBucketCandidate[] {
+  return buckets.filter((b) => b.platform || !b.registered || b.writable !== false);
+}
+
 export default function TableBucketPicker(props: TableBucketPickerProps) {
   const t = useT();
   const { targetId, value, onChange, placeholder, style, disabled, excludePlatform, excludeRegistered, reloadToken, writeIntent } = props;
@@ -80,7 +86,7 @@ export default function TableBucketPicker(props: TableBucketPickerProps) {
     if (!targetId) { setState({ status: "idle" }); return; }
     let alive = true;
     setState({ status: "loading" });
-    fetch(`/api/admin/lake-buckets/candidates?targetId=${encodeURIComponent(targetId)}`)
+    fetch(`/api/lake-buckets/candidates?targetId=${encodeURIComponent(targetId)}`)
       .then(async (r) => {
         const d = await r.json().catch(() => null);
         if (!r.ok || !d?.success) throw new Error(d?.error?.message || `HTTP ${r.status}`);
@@ -92,7 +98,9 @@ export default function TableBucketPicker(props: TableBucketPickerProps) {
   }, [targetId, reloadToken, recheck]);
 
   const options = useMemo(() => {
-    const list = (state.data?.buckets ?? []).filter((b) => !(excludePlatform && b.platform) && !(excludeRegistered && b.registered));
+    const all = state.data?.buckets ?? [];
+    const base = writeIntent ? selectableForWrite(all) : all;
+    const list = base.filter((b) => !(excludePlatform && b.platform) && !(excludeRegistered && b.registered));
     return list.map((b) => ({ value: b.name, label: <OptionLabel b={b} writeIntent={!!writeIntent} /> }));
   }, [state.data, excludePlatform, excludeRegistered, writeIntent]);
 
@@ -122,10 +130,10 @@ export default function TableBucketPicker(props: TableBucketPickerProps) {
       />
       {hint && (
         <div data-testid="table-bucket-unregistered-hint" data-hint-kind={hint.kind} data-bucket={hint.bucket} style={{ marginTop: 4, maxWidth: 420, fontSize: 12, lineHeight: 1.6 }}>
-          <Typography.Text type={hint.kind === "exec-env" ? "danger" : "warning"}>
+          <Typography.Text type="danger">
             {hint.kind === "exec-env"
-              ? t("表桶 {b} 还没有为执行环境 {tid} 登记:保存 / 启动都会被拒。先去「系统设置 → 数据湖外部表桶」登记(登记一次 = 同步可写入、直查 / 治理目录 / 问数可见),或清空改用平台表桶。", { b: hint.bucket, tid: hint.targetId })
-              : t("表桶 {b} 还没有登记:主控区的同步可以写入它,但直查表树 / 治理目录 / 问数看不到里面的表;建议去「系统设置 → 数据湖外部表桶」登记。", { b: hint.bucket })}
+              ? t("表桶 {b} 还没有为执行环境 {tid} 登记为路由:保存 / 启动都会被拒。先去「系统设置 → 数据湖表桶与路由」登记(登记一次 = 同步可写入、作业可按别名访问、直查 / 治理目录 / 问数可见),或清空改用平台表桶。", { b: hint.bucket, tid: hint.targetId })
+              : t("表桶 {b} 还没有在主控区登记为路由:保存 / 启动都会被拒(主控区不再任意桶放行)。先去「系统设置 → 数据湖表桶与路由」登记,或清空改用平台表桶。", { b: hint.bucket })}
           </Typography.Text>{" "}
           <a href={LAKE_EXT_BUCKETS_ANCHOR} target="_blank" rel="noreferrer" data-testid="table-bucket-register-link">{t("去登记 →")}</a>
           {" · "}
@@ -139,11 +147,15 @@ export default function TableBucketPicker(props: TableBucketPickerProps) {
 function OptionLabel({ b, writeIntent }: { b: TableBucketCandidate; writeIntent: boolean }) {
   const t = useT();
   const unregistered = writeIntent && !b.platform && !b.registered;
+  const isRoute = b.platform || b.registered;
   return (
-    <span data-testid="table-bucket-option" data-bucket={b.name} data-platform={b.platform ? "1" : "0"} data-registered={b.registered ? "1" : "0"} data-unregistered={unregistered ? "1" : "0"}>
+    <span data-testid="table-bucket-option" data-bucket={b.name} data-platform={b.platform ? "1" : "0"} data-registered={b.registered ? "1" : "0"} data-unregistered={unregistered ? "1" : "0"}
+      data-alias={b.alias ?? ""} data-tier={b.tier ?? ""} data-writable={b.writable === undefined ? "" : b.writable ? "1" : "0"}>
       <code>{b.name}</code>
+      {isRoute && b.alias && <span> · <code>{b.alias}</code> · {b.tier}</span>}
       {b.platform && <Tag color="blue" style={{ marginLeft: 8 }}>{t("该区平台表桶")}</Tag>}
       {b.registered && <Tag color="purple" style={{ marginLeft: 8 }}>{t("已登记")}</Tag>}
+      {b.registered && b.writable === false && <Tag style={{ marginLeft: 8 }}>{t("只读")}</Tag>}
       {unregistered && <Tag color="orange" style={{ marginLeft: 8 }}>{t("未登记")}</Tag>}
     </span>
   );

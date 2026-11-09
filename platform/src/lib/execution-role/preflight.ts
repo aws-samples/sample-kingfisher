@@ -4,11 +4,16 @@
 // (--extra-jars / --extra-py-files / 脚本里的 s3:// 字面)作为额外探针带进去,并要求信任策略含该引擎服务主体。
 // 三态语义不变:齐 ⇒ 放行;缺 ⇒ 400 当场拒(message 逐条列「动作 → 资源 → 为什么要」+ 出路);量不了 ⇒ 不阻断但回显。
 // 🔴 只量**自定义**角色:平台默认角色由 CDK 建、权限本来就齐(调用方用 `resolveExecutionRoleArn().isCustom` 判)。
+// 【数据湖表桶路由(设计稿 §6.6)】多一组**按表桶量**的探针:调用方把作业被选中的数据湖路由(`SelectedRoute[]`,带 read / write)
+//   传进来,这里经唯一作者 `lakeRouteProbes` 派生 s3tables(+ Glue 引擎的联邦目录)探针并进 `preflightRole`。
+//   角色缺某个桶的权限 ⇒ 保存 400 点名动作与桶 ARN(原来要跑到第一次访问表才 403)。
 
 import { apiError } from "@/lib/api-response";
 import { resolveEmrBinding, resolveGlueBinding } from "@/lib/exec-env/data-plane-target";
 import { resolveFlinkPlace } from "@/lib/realtime/flink-place";
 import { preflightRole, type PreflightResult } from "@/lib/role-advisor/preflight";
+import { lakeRouteProbes } from "@/lib/role-advisor/lake-probes";
+import type { SelectedRoute } from "@/lib/lake/routes";
 import { s3UrisFromScript } from "./s3-uris";
 import { SERVICE_PRINCIPAL_BY_ENGINE, type ExecRoleEngine } from "./types";
 
@@ -23,6 +28,8 @@ export interface ExecRolePreflightInput {
   extraS3Uris?: string[];
   /** 脚本正文(里面的 s3:// 字面也量)。 */
   scriptCode?: string;
+  /** 数据湖表桶路由:作业被选中的数据湖路由(读集必量;write 再量写集;Glue 引擎另量联邦目录)。缺省 / 空 = 不量路由。 */
+  lakeRoutes?: readonly SelectedRoute[];
 }
 
 interface Landing { region: string; scriptBucket?: string; logBucket?: string }
@@ -45,16 +52,18 @@ export async function preflightExecutionRole(input: ExecRolePreflightInput): Pro
   const landing = await landingOf(input.engine, input.targetId);
   const extra: string[] = [];
   for (const u of [...(input.extraS3Uris ?? []), ...s3UrisFromScript(input.scriptCode)]) if (!extra.includes(u)) extra.push(u);
+  const account = process.env.AWS_ACCOUNT_ID || "";
   return preflightRole({
     engine: input.engine,
     roleArn: input.roleArn,
     region: landing.region,
-    accountId: process.env.AWS_ACCOUNT_ID || "",
+    accountId: account,
     logBucket: landing.logBucket,
     scriptBucket: landing.scriptBucket,
     requireTrustService: SERVICE_PRINCIPAL_BY_ENGINE[input.engine],
     extraS3Uris: extra,
     requestedRegion: landing.region,
+    extraProbes: lakeRouteProbes(input.lakeRoutes ?? [], { engine: input.engine, account }),
   });
 }
 
@@ -94,6 +103,7 @@ export function execRolePreflightErrorResponse(e: unknown) {
 /**
  * 保存路由用:自定义角色 ⇒ 对每个绑定落点量一遍,第一处不通过就回 400;全部通过 / 不是自定义 ⇒ null。
  * 🔴 保存那一刻就把「这个角色读不到你的桶」说出来(客户现网那条 403 就是等到 Glue 启动期才炸)。
+ * 数据湖表桶路由:`lakeRoutesFor(targetId)` 由调用方给(作业声明按该区解析成被选中的路由),不给 = 不量路由。
  */
 export async function preflightCustomRoleForTargets(args: {
   engine: ExecRoleEngine;
@@ -101,11 +111,13 @@ export async function preflightCustomRoleForTargets(args: {
   targets: string[];
   extraS3Uris?: string[];
   scriptCode?: string;
+  lakeRoutesFor?: (targetId: string) => Promise<readonly SelectedRoute[]>;
 }) {
   const roleArn = typeof args.customRoleArn === "string" ? args.customRoleArn.trim() : "";
   if (!roleArn) return null;
   for (const targetId of args.targets) {
-    const result = await preflightExecutionRole({ engine: args.engine, roleArn, targetId, extraS3Uris: args.extraS3Uris, scriptCode: args.scriptCode });
+    const lakeRoutes = args.lakeRoutesFor ? await args.lakeRoutesFor(targetId) : undefined;
+    const result = await preflightExecutionRole({ engine: args.engine, roleArn, targetId, extraS3Uris: args.extraS3Uris, scriptCode: args.scriptCode, lakeRoutes });
     const res = preflightErrorResponse(result, { engine: args.engine, roleArn, targetId });
     if (res) return res;
   }

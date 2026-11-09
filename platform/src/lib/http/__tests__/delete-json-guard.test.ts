@@ -38,7 +38,6 @@ const BASELINE: Record<string, number> = {
   "app/realtime-compute/page.tsx": 2,
   "app/knowledge/page.tsx": 1,
   "app/governance/page.tsx": 2,
-  "app/settings/page.tsx": 1,
   "app/skills/page.tsx": 1,
   "components/engines/EmrJobPanel.tsx": 1, // 只剩「下线调度」的 schedule DELETE(它读了信封);删作业已改 deleteJson(R7:409 JOB_IN_USE 原话要给用户看)
   "components/genbi/SessionCards.tsx": 1,

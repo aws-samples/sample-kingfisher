@@ -632,7 +632,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                 <Form.Item
                   name={["s3Config", "tableBucket"]}
                   label="Table Bucket"
-                  extra={t("留空 = 按该数据源所在执行环境的表桶自动解析(推荐);选客户自有表桶时,非主控区的执行环境须先在「系统设置 → 数据湖外部表桶」登记该桶")}
+                  extra={t("留空 = 按该数据源所在执行环境的平台表桶自动解析(推荐);选客户自有表桶时,须先在「系统设置 → 数据湖表桶与路由」把它登记为可写路由(下拉显示 桶 · 别名 · 分层,只列可写路由)")}
                 >
                   {/* (客户待改进项):原来只能手填表桶名 ⇒ 改为下拉(可仍手填),清单 = 该源所在执行环境那个区账号内的
                       S3 Tables 表桶,平台表桶 / 已登记外部表桶带标;仍不设 initialValue,留空照旧由服务端解析。

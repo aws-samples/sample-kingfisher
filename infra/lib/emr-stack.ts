@@ -1,5 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { requestedRegionCondition, regionalStatement } from "./shared/execution-regions";
+// 数据湖表桶路由:「本区任意 S3 Tables 表桶」ARN 的唯一作者(主控区 EMR / Flink 与执行区角色同一口径)
+import { anyTableBucketArn } from "./shared/table-bucket-arn";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -91,14 +93,14 @@ export class EmrStack extends cdk.Stack {
       conditions: { StringEquals: { "aws:RequestedRegion": requestedRegionCondition(this) } },
     }));
     // S3 Tables(托管 Iceberg)+ Glue Catalog / Lake Formation 联邦(Spark SQL 读写表)。
+    // 数据湖表桶路由(设计稿 §6.7):主控区 EMR 角色从「只有平台表桶 bgp-table-bucket」放到「本区**任意**表桶 bucket/*」——
+    //   客户把聚合层 / 结果层放进自己的表桶后,主控区 EMR 作业要能读写它们(与执行区 Glue / EMR 角色 2026-10-27 起同一口径);
+    //   ARN 形态唯一作者 shared/table-bucket-arn.ts,synth-gate §9.8 断言不含任何桶名字面。region 段仍绑主控区(home 轴)。
     role.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "表桶名按命名 SSOT 逐 target 不同(非 home 带 targetSlug 后缀,见 naming.json 的 tableBucket)⇒ 光放 region 段也访问不到别的 target,必须连资源名一起改",
+      reason: "主控区 EMR 作业只在主控区跑,表桶也在主控区;非 home 的 EMR 角色由执行区 core 栈建(同样放到该区任意表桶)⇒ 本条不需要跨 region",
       actions: ["s3tables:*"],
-      resources: (r) => [
-        `arn:aws:s3tables:${r}:${acct}:bucket/bgp-table-bucket`,
-        `arn:aws:s3tables:${r}:${acct}:bucket/bgp-table-bucket/*`,
-      ],
+      resources: (r) => anyTableBucketArn("aws", r, acct),
     }));
     role.addToPolicy(new iam.PolicyStatement({ actions: ["glue:*", "lakeformation:*"], resources: ["*"] }));
     // 写 Redshift 数仓（EMR 脚本用 boto3 redshift-data API，与平台其他模块同范式，免 JDBC）：

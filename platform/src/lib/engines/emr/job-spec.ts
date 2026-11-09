@@ -4,9 +4,10 @@
 //   以对象字面量存在一份;让编排 DAG 的「离线作业节点」跑**同一份 spec**(同一个 application + 执行角色 + spark 参数 +
 //   日志落点)。各抄一份 = 静默分叉 ⇒ 字面量**原样搬到这里**(字段顺序逐字不变,单作业载体 YAML 与已发布产物逐字节相等),
 //   `sparkSubmitParameters` 的拼法也收成一个作者(`emrSparkSubmitParametersFor`,与 provider.submit 逐项同口径)。
-// 【边界】本文件**纯函数、零 AWS 调用**;脚本上传 / jar 复制 / application 建立这些写操作留在调用方
-//   (扇出:schedule-fanout.ts 循环体;工作流节点:发布写阶段 job-node-prepare.ts)。只读解析时用 `entryPointUri` / `s3TablesJarUriFor`
-//   / `applicationIdOf` 这些**确定性**读法得到同一个值。
+// 【边界】本文件**纯函数、零 AWS 调用**(路由解析 `emrLakeRoutesFor` 除外:它读路由表,是提交 / 发布前的只读解析);脚本上传 / jar 复制 /
+//   application 建立这些写操作留在调用方(扇出:schedule-fanout.ts 循环体;工作流节点:发布写阶段 job-node-prepare.ts)。
+// 【数据湖表桶路由(设计稿 §6.5.2)】S3 Tables 目录按**作业被选中的数据湖路由**逐条注入(别名 = 路由别名;S3TablesCatalog 实现),
+//   `spark.bgp.lakeCatalogs=别名=桶,…` 让脚本读回路由图;home 与非 home 都从落点派生平台路由(不再读 EMR_S3TABLES_WAREHOUSE_ARN)。
 import { homeRegion } from "@/lib/place/home-region";
 import { TABLES } from "@/lib/aws/dynamodb";
 import { resolveRedshiftBinding } from "@/lib/exec-env/data-plane-target";
@@ -15,8 +16,9 @@ import { lockAttrFor } from "@/lib/etl/run-lock";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
 import { buildPlaceWire } from "@/lib/place/wire";
 import type { ServerlessJobSpec } from "@/lib/scheduler/serverless/yaml-generator";
-import { S3TABLES_WAREHOUSE_ARN } from "./provider";
-import { s3TablesCatalogParameters, toSparkSubmitParameters, userSparkConfToParameters, bgpLandingParameters } from "./spec";
+import { EMR_LAKE_CATALOGS_CONF, lakeCatalogsArgument, rejectUserCatalogConf, sparkCatalogConf, type LakeRoute, type SelectedRoute } from "@/lib/lake/routes";
+import { normalizeLakeDeclaration, resolveJobLakeRoutes, userEmrConfEntries } from "@/lib/lake/job-declaration";
+import { toSparkSubmitParameters, userSparkConfToParameters, bgpLandingParameters } from "./spec";
 import type { EmrEngineJob } from "./types";
 
 /** 该区数仓连接事实(注进 `spark.bgp.redshift*`;不是所有 EMR 作业都碰数仓 ⇒ 解析失败不阻断、但绝不静默当「不需要」)。 */
@@ -35,25 +37,60 @@ export async function emrRedshiftFactsFor(targetId: string): Promise<EmrRedshift
   }
 }
 
-/** 该区表桶的 catalog warehouse ARN(拿 home 的 ARN 去那个区 = 跨区写元数据)。 */
-export function emrS3TablesWarehouseArnFor(landing: Pick<TargetSparkLanding, "home" | "region" | "tableBucket">): string {
-  return landing.home ? S3TABLES_WAREHOUSE_ARN : `arn:aws:s3tables:${landing.region}:${process.env.AWS_ACCOUNT_ID}:bucket/${landing.tableBucket}`;
+/** 作业在某个区被选中的数据湖路由 + 缺省目录(提交 / 发布 / 工作流节点三条路都走它;fresh 读路由表)。 */
+export interface EmrLakeSelection {
+  selected: SelectedRoute[];
+  defaultAlias?: string;
+}
+
+export async function emrLakeRoutesFor(
+  job: Pick<EmrEngineJob, "lakeBuckets" | "defaultCatalogAlias">,
+  targetId: string,
+  landing?: Pick<TargetSparkLanding, "targetId" | "region" | "tableBucket" | "home">
+): Promise<EmrLakeSelection> {
+  const { selected, defaultAlias } = await resolveJobLakeRoutes(targetId, normalizeLakeDeclaration(job), landing ? { landing } : {});
+  return { selected, ...(defaultAlias ? { defaultAlias } : {}) };
+}
+
+/**
+ * 平台自动注入的 S3 Tables(托管 Iceberg)catalog 支持 —— 让用户脚本直接 spark.table("<别名>.<namespace>.<table>")。
+ * 权威配法(实证 SUCCESS,见 memory emr-serverless-s3tables-recipe):catalog-impl = S3TablesCatalog(非 GlueCatalog)· --jars 挂
+ * s3-tables-catalog-for-iceberg-runtime · warehouse = 表桶 ARN · application 挂带 NAT 的私有子网。
+ * 数据湖表桶路由:每条路由一个目录(属性字面只在 lib/lake/routes.ts#sparkCatalogConf);jar / extensions 一次;末尾 `spark.bgp.lakeCatalogs`。
+ */
+export function emrS3TablesCatalogParameters(jarS3Uri: string | undefined, routes: readonly LakeRoute[], opts: { account: string; defaultAlias?: string }): string {
+  if (!jarS3Uri || routes.length === 0) return ""; // 未配置 jar 则不注入(作业仍可跑纯 Spark)
+  return [
+    `--jars ${jarS3Uri}`,
+    `--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions`,
+    ...sparkCatalogConf(routes, { engine: "emr", account: opts.account, defaultAlias: opts.defaultAlias }).map((line) => `--conf ${line}`),
+    `--conf ${EMR_LAKE_CATALOGS_CONF}=${lakeCatalogsArgument(routes)}`,
+  ].join(" ");
 }
 
 /**
  * sparkSubmitParameters(**唯一作者**):平台规格(保留键)+ 平台注入 S3 Tables catalog + 该区落点事实 + 用户自定义 conf。
  * 🔴 与 provider.submit 的 `[specParams, s3tParams, bgpParams, userParams].filter(Boolean).join(" ")` 逐项同序同值
  *    (漏改一处 = 定时 / 工作流那条路依然 NoRegionError / permission denied)。
+ * 数据湖表桶路由:用户 sparkConf 先过 `rejectUserCatalogConf`(与平台路由同名同桶的目录被接管;同名不同桶 ⇒ 抛 LAKE_ROUTE_ALIAS_CONFLICT)。
  */
 export function emrSparkSubmitParametersFor(
   job: Pick<EmrEngineJob, "spec" | "sparkConf">,
   landing: TargetSparkLanding,
   s3tJar: string,
-  rsFacts: EmrRedshiftFacts
+  rsFacts: EmrRedshiftFacts,
+  lake: EmrLakeSelection
 ): string {
-  const s3tParams = s3TablesCatalogParameters(s3tJar, emrS3TablesWarehouseArnFor(landing));
+  const account = process.env.AWS_ACCOUNT_ID || "";
+  const s3tParams = emrS3TablesCatalogParameters(s3tJar, lake.selected, { account, defaultAlias: lake.defaultAlias });
   const bgpParams = bgpLandingParameters({ ...landing, ...rsFacts });
-  return [toSparkSubmitParameters(job.spec), s3tParams, bgpParams, userSparkConfToParameters(job.sparkConf)].filter(Boolean).join(" ");
+  const verdict = rejectUserCatalogConf(userEmrConfEntries(job.sparkConf), lake.selected, { defaultDeclared: !!lake.defaultAlias });
+  const keptConf: Record<string, string> = {};
+  for (const entry of verdict.kept) {
+    const eq = entry.indexOf("=");
+    if (eq > 0) keptConf[entry.slice(0, eq)] = entry.slice(eq + 1);
+  }
+  return [toSparkSubmitParameters(job.spec), s3tParams, bgpParams, userSparkConfToParameters(keptConf)].filter(Boolean).join(" ");
 }
 
 /** 调用方解析好的事实(spec 的输入;本文件不去解析它们)。 */

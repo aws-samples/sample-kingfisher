@@ -36,6 +36,8 @@ import { ROLE_APPLY_HOW_TO } from "./labels";
 import { rolePathAndNameOfArn, roleNameOfArn } from "@/lib/execution-role/resolve";
 import { parseS3Uri } from "@/lib/execution-role/s3-uris";
 import { trustsService } from "@/lib/execution-role/trust";
+// 数据湖表桶路由:数据湖路由探针的 sid 前缀(文案按它给第 ④ 条出路;探针本体由调用方经 lakeRouteProbes 派生后传进来)
+import { LAKE_ROUTE_SID_PREFIX } from "./lake-probes";
 
 const iam = sdkClient("control-plane", IAMClient, { region: homeRegion() });
 
@@ -98,6 +100,11 @@ export async function preflightRole(opts: {
   extraS3Uris?: string[];
   /** 模拟上下文 aws:RequestedRegion(落点区)。 */
   requestedRegion?: string;
+  /**
+   * 数据湖表桶路由:调用方按作业声明派生的额外探针(数据湖路由的 s3tables / 联邦目录 glue 动作,
+   * 唯一作者 lib/role-advisor/lake-probes.ts#lakeRouteProbes;sid 以 `LakeRoute:` 开头 ⇒ 文案给出第 ④ 条出路)。
+   */
+  extraProbes?: ReadonlyArray<{ sid: string; action: string; resource: string; why: string }>;
 }): Promise<PreflightResult> {
   const { engine, roleArn } = opts;
   const pathAndName = rolePathAndNameOfArn(roleArn);
@@ -157,6 +164,8 @@ export async function preflightRole(opts: {
   const needs = [
     ...engineBaseline(engine, bctx).map((n) => ({ sid: n.sid, why: n.why, action: n.probe.action, resource: n.probe.resource })),
     ...dependencyProbes(opts.extraS3Uris ?? []),
+    // 数据湖表桶路由:数据湖路由按桶的探针(调用方由 lakeRouteProbes 派生;没声明路由 ⇒ 空)
+    ...(opts.extraProbes ?? []),
   ];
   type ResEntry = { actions: string[]; sids: Map<string, { sid: string; why: string }> };
   const byResource = new Map<string, ResEntry>();
@@ -206,12 +215,20 @@ export async function preflightRole(opts: {
     const depHint = depGaps.length
       ? `\n③ 依赖库 / 脚本引用的桶读不到:给这个角色补上面列出的 s3:GetObject / s3:ListBucket,或把依赖库改走作业页面的「上传依赖文件」(落到平台脚本桶,平台默认角色能读)。`
       : "";
+    // 数据湖表桶路由(设计稿 §6.6):数据湖路由那一类缺口的第 ④ 条出路(点名桶与别名,给三个可做的动作)
+    const lakeGaps = gaps.filter((g) => g.sid.startsWith(LAKE_ROUTE_SID_PREFIX));
+    const lakeHint = lakeGaps.length
+      ? `\n④ 数据湖表桶权限不够:${Array.from(new Set(lakeGaps.map((g) => g.sid.slice(LAKE_ROUTE_SID_PREFIX.length).split(":")[0]))).map((alias) => {
+          const bucket = lakeGaps.find((g) => g.sid.startsWith(`${LAKE_ROUTE_SID_PREFIX}${alias}:`))?.resource.split(":bucket/").pop()?.split("/")[0] ?? "";
+          return `给这个角色补上面列出的 s3tables 动作(表桶 ${bucket}),或把「${alias}」从作业的「数据湖表桶」声明里移除,或把它的访问改成「读」`;
+        }).join(";")}。`
+      : "";
     return {
       ok: false, roleExists: true, gaps, checked, trusted,
       message: `作业**没有保存 / 提交**:执行角色 \`${roleName}\` 缺 ${gaps.length} 条必备权限 ——\n`
         + lines.join("\n")
         + `\n出路:① ${ROLE_APPLY_HOW_TO}(它会按必备权限清单对账写回这个角色);`
-        + `② 把作业规格里的「执行角色」**留空** ⇒ 用平台默认角色。${depHint}\n`
+        + `② 把作业规格里的「执行角色」**留空** ⇒ 用平台默认角色。${depHint}${lakeHint}\n`
         + `🔴 这些权限不是我猜的:它们来自平台的必备权限清单(引擎基线 + 作业实际引用的 S3 对象),`
         + `与作业真正会用到的落点是同一个真值源。`,
     };

@@ -1,15 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Card, Descriptions, Tag, Button, Space, Spin, Input, Popconfirm, Table, message } from "antd";
-import { SettingOutlined, ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined, PlusOutlined } from "@ant-design/icons";
+import { Card, Descriptions, Tag, Button, Space, Spin, Popconfirm, Table, message } from "antd";
+import { SettingOutlined, ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
-import type { ColumnsType } from "antd/es/table";
 
-/** 外部表桶登记行(与 /api/admin/lake-buckets 的应答同形) */
-type ExtBucketRow = { bucket: string; label?: string; addedBy: string; addedAt: string; region: string };
 /** 平台为数据源自建的安全组一行(与 /api/admin/datasource-network-objects 的应答同形) */
 type NetObjectRow = {
   sgId: string; groupName: string; region: string; targetId: string; vpcId?: string; tagged: boolean; taggedDatasourceId?: string;
@@ -22,7 +19,7 @@ type NetObjectsView = { generatedAt: string; objects: NetObjectRow[]; unreadable
 // 「AI 模型」卡(51 INTERACTION §2/§3;不新建页面、routes.tsx 零改)。
 import AiModelCard from "@/components/settings/AiModelCard";
 import BuildInfoCard from "@/components/common/BuildInfo"; // 平台版本(发版 tag / 产品提交)
-import TableBucketPicker from "@/components/lake/TableBucketPicker"; // S3 Tables 表桶下拉(唯一作者)
+import LakeRoutesCard from "@/components/lake/LakeRoutesCard"; // 数据湖表桶与路由卡(唯一作者;内含表桶下拉)
 // 执行范围。🔴🔴 原来这一页声明「不受执行范围影响」,
 // 却把主控区的工作组 / 桶 / VPC 当「平台配置」给所有区看 —— 那是本平台唯一一处明确否认自己与区
 // 有关的撒谎。现在逐项显示**当前执行范围那个区自己的**资源,并把真正与区无关的项单独标出来。
@@ -48,45 +45,11 @@ export default function SettingsPage() {
     setConfig(d.success ? d.data : d);
   };
 
-  // 数据湖外部表桶登记(该执行环境):登记后直查表树 / 治理目录同步 / 问数都能看见那个桶里的表;平台只读它。
+  // 数据湖表桶与路由(该执行环境):读写都在 components/lake/LakeRoutesCard 里,这里只给它落点与身份。
   const lakeTargetId = landingOfScope(scope);
-  const [extBuckets, setExtBuckets] = useState<ExtBucketRow[]>([]);
-  const [extBucketInput, setExtBucketInput] = useState("");
-  const [extLabelInput, setExtLabelInput] = useState("");
-  const [extBusy, setExtBusy] = useState(false);
   const { getToken } = useAuth();
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   useEffect(() => { (async () => { try { setIsPlatformAdmin(groupsFromToken(await getToken()).includes("bgp-admin")); } catch { /* 忽略 */ } })(); }, [getToken]);
-  const fetchExtBuckets = async () => {
-    try {
-      const res = await fetch(`/api/admin/lake-buckets?targetId=${encodeURIComponent(lakeTargetId)}`);
-      const d = await res.json();
-      setExtBuckets(d.success && Array.isArray(d.data) ? d.data : []);
-    } catch { setExtBuckets([]); }
-  };
-  const registerExtBucket = async () => {
-    const bucket = extBucketInput.trim();
-    if (!bucket) { message.warning(t("请输入表桶名")); return; }
-    setExtBusy(true);
-    try {
-      const res = await fetch("/api/admin/lake-buckets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ targetId: lakeTargetId, bucket, label: extLabelInput.trim() || undefined }) });
-      const d = await res.json();
-      if (!res.ok || !d.success) { message.error(d?.error?.message || d?.error || `HTTP ${res.status}`); return; }
-      message.success(t("已登记外部表桶 {b}:直查表树 / 治理目录 / 问数都会看到它", { b: bucket }));
-      setExtBucketInput(""); setExtLabelInput("");
-      await fetchExtBuckets();
-    } finally { setExtBusy(false); }
-  };
-  const unregisterExtBucket = async (bucket: string) => {
-    setExtBusy(true);
-    try {
-      const res = await fetch(`/api/admin/lake-buckets?targetId=${encodeURIComponent(lakeTargetId)}&bucket=${encodeURIComponent(bucket)}`, { method: "DELETE" });
-      const d = await res.json();
-      if (!res.ok || !d.success) { message.error(d?.error?.message || d?.error || `HTTP ${res.status}`); return; }
-      message.success(t("已撤销登记(表桶与里面的表一个不动)"));
-      await fetchExtBuckets();
-    } finally { setExtBusy(false); }
-  };
 
   const loadCleanups = async () => {
     try {
@@ -163,7 +126,7 @@ export default function SettingsPage() {
   };
 
   // 切区不重载页面,靠 deps 重拉(护栏 4)
-  useEffect(() => { fetchConfig(); checkHealth(); fetchExtBuckets(); /* eslint-disable-next-line */ }, [scopeQs]);
+  useEffect(() => { fetchConfig(); checkHealth(); /* eslint-disable-next-line */ }, [scopeQs]);
   useEffect(() => { if (isPlatformAdmin) { loadCleanups(); loadNetObjects(); } /* eslint-disable-next-line */ }, [isPlatformAdmin]);
 
   const statusIcon = (s: string) => s === "ok" ? <CheckCircleOutlined style={{ color: "#52c41a" }} /> : s === "warning" ? <WarningOutlined style={{ color: "#faad14" }} /> : <CloseCircleOutlined style={{ color: "#ff4d4f" }} />;
@@ -236,40 +199,11 @@ export default function SettingsPage() {
         ) : <Spin />}
       </Card>
 
-      {/* 数据湖外部表桶(该执行环境):客户自有的 S3 Tables 表桶登记进来,直查 / 目录 / 问数才看得见;
-          登记同时也是该执行环境**可写**的事实源:非主控区的同步任务选自有表桶必须先登记(id 锚点供向导里的「去登记 →」直达)*/}
-      <Card
-        id="lake-ext-buckets"
-        title={`${t("数据湖外部表桶")} · ${config?.displayName || lakeTargetId}${config?.region ? ` (${config.region})` : ""}`}
-        size="small" style={{ marginBottom: 16 }} data-testid="settings-lake-ext-buckets"
-        extra={<Tag color="purple">{t("登记 = 可见 + 可写:平台不主动写它,只有把它选为 Table Bucket 的同步任务才在里面建命名空间 / 表")}</Tag>}
-      >
-        <div style={{ color: "#888", fontSize: 12, marginBottom: 8 }}>
-          {t("该区的平台表桶 {b} 默认就在表树里;客户自己的表桶登记后:直查表树 / 治理目录同步 / 问数都能看到里面的表,且该执行环境的同步任务可以把它选为 Table Bucket 写入(非主控区不登记就不能写,保存时即提示)。", { b: config?.tableBucket || "—" })}
-        </div>
-        <Table<ExtBucketRow> size="small" pagination={false} rowKey="bucket" dataSource={extBuckets} data-testid="lake-ext-bucket-table"
-          locale={{ emptyText: t("这个执行环境还没有登记外部表桶") }}
-          columns={([
-            { title: t("表桶"), dataIndex: "bucket", render: (v: string) => <code data-testid="lake-ext-bucket-name">{v}</code> },
-            { title: t("备注"), dataIndex: "label", render: (v?: string) => v || "—" },
-            { title: t("登记人 / 时间"), key: "who", render: (_: unknown, r: ExtBucketRow) => `${r.addedBy} · ${String(r.addedAt).slice(0, 19).replace("T", " ")}` },
-            ...(isPlatformAdmin ? [{ title: t("操作"), key: "op", width: 110, render: (_: unknown, r: ExtBucketRow) => (
-              <Popconfirm title={t("撤销登记?表桶与里面的表不会被动,只是平台不再列出它")} onConfirm={() => unregisterExtBucket(r.bucket)}>
-                <Button size="small" danger loading={extBusy} data-testid="lake-ext-bucket-remove">{t("撤销登记")}</Button>
-              </Popconfirm>
-            ) }] : []),
-          ] as ColumnsType<ExtBucketRow>)} />
-        {isPlatformAdmin ? (
-          <Space style={{ marginTop: 12 }} wrap>
-            {/* (客户待改进项):原来只能手填 ⇒ 下拉列出该区账号内的 S3 Tables 表桶(去掉平台表桶与已登记的,选了也只会 409),仍可手填 */}
-            <TableBucketPicker targetId={lakeTargetId} value={extBucketInput} onChange={(v) => setExtBucketInput(v || "")} excludePlatform excludeRegistered reloadToken={extBuckets.length}
-              placeholder={t("表桶名,如 bigdata-test-sg-tables")} style={{ width: 300 }} data-testid="lake-ext-bucket-input" />
-            <Input placeholder={t("备注(可选)")} value={extLabelInput} onChange={(e) => setExtLabelInput(e.target.value)} style={{ width: 220 }} data-testid="lake-ext-bucket-label" />
-            <Button type="primary" icon={<PlusOutlined />} loading={extBusy} onClick={registerExtBucket} data-testid="lake-ext-bucket-add">{t("登记到 {t}", { t: config?.displayName || lakeTargetId })}</Button>
-          </Space>
-        ) : (
-          <div style={{ color: "#999", fontSize: 12, marginTop: 8 }}>{t("登记 / 撤销需要平台管理员(bgp-admin)")}</div>
-        )}
+      {/* 数据湖表桶与路由(该执行环境):客户自有的 S3 Tables 表桶登记为**路由**(别名 / 分层 /
+          命名空间归属 / 可写),作业按别名注入 Spark 目录、同步可写入、直查 / 目录 / 问数可见;卡片实现在 components/lake/LakeRoutesCard
+          (id 锚点供向导里的「去登记 →」直达) */}
+      <Card id="lake-ext-buckets" size="small" style={{ marginBottom: 16 }}>
+        <LakeRoutesCard targetId={lakeTargetId} displayName={config?.displayName} region={config?.region} isPlatformAdmin={isPlatformAdmin} />
       </Card>
 
       {/* 真正与区无关的那一项单独一张卡:混在上面会让用户以为它也是「这个区的」*/}

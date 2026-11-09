@@ -58,9 +58,11 @@ describe("② 接线", () => {
   it("同步向导的 Table Bucket 传 writeIntent;系统设置的登记入口不传", () => {
     const modal = strip(read("app/sync/SyncTaskModal.tsx"));
     expect(modal).toMatch(/<TableBucketPicker targetId=\{watchDsOwnerTarget\}[^\n]*\bwriteIntent\b[^\n]*data-testid="sync-s3t-bucket-picker"/);
-    const settings = strip(read("app/settings/page.tsx"));
-    expect(settings).toMatch(/<TableBucketPicker targetId=\{lakeTargetId\}[^\n]*excludePlatform excludeRegistered/);
-    expect(settings).not.toMatch(/<TableBucketPicker targetId=\{lakeTargetId\}[^\n]*writeIntent/);
+    // 数据湖表桶路由:系统设置的登记入口搬进 LakeRoutesCard(系统设置页只给它落点),仍不传 writeIntent
+    const card = strip(read("components/lake/LakeRoutesCard.tsx"));
+    expect(card).toMatch(/<TableBucketPicker targetId=\{targetId\}[^\n]*excludePlatform excludeRegistered/);
+    expect(card).not.toMatch(/<TableBucketPicker targetId=\{targetId\}[^\n]*writeIntent/);
+    expect(strip(read("app/settings/page.tsx"))).toMatch(/<LakeRoutesCard targetId=\{lakeTargetId\}/);
   });
 
   it("去登记链接锚到系统设置那张卡(Card id 与 LAKE_EXT_BUCKETS_ANCHOR 同值);选项带 data-unregistered;提示带 testid", () => {

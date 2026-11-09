@@ -12,6 +12,12 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
   return { ...real, glueClientFor: async () => fake, s3ClientFor: async () => fake };
 });
 
+// 数据湖表桶路由:ensureGlueJob 按本区路由表注入目录(真外部 DDB:bgp-settings 的路由行;本判据没有外部路由 ⇒ 只有平台路由)
+vi.mock("@/lib/aws/dynamodb", async (orig) => {
+  const real: any = await orig();
+  return { ...real, docClient: { send: async (cmd: any) => (cmd.constructor.name === "QueryCommand" ? { Items: [] } : {}) } };
+});
+
 vi.mock("@/lib/exec-env/data-plane-target", async (orig) => {
   const real: any = await orig();
   return {

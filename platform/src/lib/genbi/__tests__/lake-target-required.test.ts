@@ -70,8 +70,11 @@ vi.mock("@aws-sdk/client-glue", async (orig) => {
   return { ...real, GlueClient: FakeGlue };
 });
 
-// 外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记任何外部桶,落点仍只有平台表桶
-vi.mock("@/lib/lake/external-table-buckets", () => ({ listExternalTableBuckets: vi.fn(async () => []) }));
+// 路由表(bgp-settings,真外部 DDB)—— 本判据不登记任何外部路由,落点仍只有平台路由(作者直读 DDB,这里 mock 真外部)
+vi.mock("@/lib/aws/dynamodb", async (orig) => {
+  const real = (await orig()) as Record<string, unknown>;
+  return { ...real, docClient: { send: vi.fn(async (cmd: { constructor: { name: string } }) => (cmd.constructor.name === "QueryCommand" ? { Items: [] } : {})) } };
+});
 
 vi.mock("@/lib/exec-env/registry", () => ({
   requireReadyTarget: vi.fn(async (id: string) => ({

@@ -464,15 +464,15 @@
       "action": "s3tables:GetTableBucket",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/customer-own-tables-example",
-      "why": "登记外部表桶前核该区真有这个表桶(客户自有表桶,平台只读它:表树 / 目录 / 问数要能看见)(函数:registerExternalTableBucket)",
-      "source": "platform/src/lib/lake/external-table-buckets.ts"
+      "why": "登记数据湖路由前核该区真有这个表桶(客户自有表桶;登记 = 作业按别名注入目录 + 同步可写 + 表树 / 目录 / 问数可见)(函数:registerLakeRoute)",
+      "source": "platform/src/lib/lake/routes.ts"
     },
     {
       "action": "s3tables:ListNamespaces",
       "axis": "execution",
       "resource": "arn:aws:s3tables:{region}:{acct}:bucket/customer-own-tables-example",
-      "why": "外部表桶的命名空间进表树 / 问数按命名空间找桶(函数:listNamespaceTreeAll / resolveS3TablesPlaceForNamespace)",
-      "source": "platform/src/lib/athena/s3tables.ts"
+      "why": "路由的命名空间进表树;按命名空间找路由(routeForNamespace,fail-closed)与登记时的命名空间冲突守卫(函数:listNamespaceTreeAll / liveNamespacesOf)",
+      "source": "platform/src/lib/lake/routes.ts"
     },
     {
       "action": "s3tables:ListTables",

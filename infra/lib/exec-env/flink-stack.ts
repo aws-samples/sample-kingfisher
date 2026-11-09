@@ -18,6 +18,8 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import { Construct } from "constructs";
 import { resourceName } from "../shared/naming";
+// 数据湖表桶路由:「本区任意 S3 Tables 表桶」ARN 的唯一作者
+import { anyTableBucketArn } from "../shared/table-bucket-arn";
 import { ExecEnvStack, type ExecEnvStackProps } from "./exec-env-stack";
 
 export interface ExecEnvFlinkStackProps extends ExecEnvStackProps {
@@ -144,15 +146,13 @@ export class ExecEnvFlinkStack extends ExecEnvStack {
       })
     );
 
-    // S3 Tables(托管 Iceberg)sink:**限定到本 target 的表桶**(home 那份限定到 home 表桶)。
-    const tableBucket = nameOf("tableBucket");
+    // S3 Tables(托管 Iceberg)sink。数据湖表桶路由(设计稿 §6.7):从「只有本 target 的平台表桶」放到「本区**任意**表桶 bucket/*」
+    //   (与本区 Glue / EMR / Redshift-copy 角色 2026-10-27 起同一口径;Phase 3 的 Flink lakeRoute 选桶 sink 要它)。ARN 形态唯一作者
+    //   shared/table-bucket-arn.ts;region 段仍绑本区,synth-gate §9.8 断言不含任何桶名字面。
     role.addToPolicy(
       new iam.PolicyStatement({
         actions: ["s3tables:*"],
-        resources: [
-          `arn:${p}:s3tables:${region}:${account}:bucket/${tableBucket}`,
-          `arn:${p}:s3tables:${region}:${account}:bucket/${tableBucket}/*`,
-        ],
+        resources: anyTableBucketArn(p, region, account),
       })
     );
     // ⚠️ 与 home 逐字相同的宽授权(`glue:*` / `lakeformation:*` on `*`):S3Tables 经 Glue/Lake Formation

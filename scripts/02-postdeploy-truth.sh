@@ -5,7 +5,7 @@
 #   ./scripts/02-postdeploy-truth.sh <aws-profile> [region]
 #
 # 🔴 为什么(docs/DEPLOY-RUNBOOK.md §5):`deploy-all` 退出 0 只覆盖它自己想到的判据 ——
-#   「绿的只是当时想到的东西」。这 10 条是真值查询(加到 10),哪一条红就说明平台**装好了但不可用**。
+#   「绿的只是当时想到的东西」。这 11 条是真值查询(加到 11),哪一条红就说明平台**装好了但不可用**。
 #   这一串命令以前只写在手册里 ⇒ 换账号就得人肉敲(而人肉会漏)。
 #
 # 🔴 这**不是**无头页面验收的替代品:它查的是基础设施与接线的真值;
@@ -116,6 +116,16 @@ sec "10) S3 Tables 联邦目录 s3tablescatalog 在(没有它数据湖直查 / �
 CAT=$(aws glue get-catalog $P --catalog-id s3tablescatalog --query 'Catalog.FederatedCatalog.ConnectionName' --output text 2>/dev/null || true)
 [ "$CAT" = "aws:s3tables" ] && ok "s3tablescatalog 在(FederatedCatalog aws:s3tables)" \
   || bad "s3tablescatalog = ${CAT:-不存在 / 读不到} ⇒ 跑 scripts/redeploy-platform.sh(第 3c 步会对主控区与每个执行区开通)"
+
+sec "11) 主控区同步任务引用的自有表桶都已登记为数据湖路由(数据湖表桶路由;未登记 ⇒ 启动 409 LAKE_ROUTE_NOT_FOUND)"
+# 🔴 读的是 bgp-sync-tasks ∩ bgp-settings 的真值(scripts/lib/lake-routes-migrate.mjs --check:只读,退 0 = 没有未登记;退 1 = 有,stdout 每行一个桶;退 2 = 读不到)。
+#   读不到也算不过:判不了就不许说绿。修法 = 跑 scripts/redeploy-platform.sh(2c‴ 步)或单独跑该迁移脚本。
+UNREG=$(node "$HERE/lib/lake-routes-migrate.mjs" --profile "$PROFILE" --region "$REGION" --check 2>/tmp/kf-lake-routes-check.err); RC=$?
+case "$RC" in
+  0) ok "主控区同步任务没有引用未登记的自有表桶";;
+  1) bad "主控区同步任务引用了未登记的自有表桶:$(printf '%s' "$UNREG" | tr '\n' ' ') ⇒ 跑 scripts/redeploy-platform.sh(2c‴ 步)或 node scripts/lib/lake-routes-migrate.mjs --profile $PROFILE --region $REGION";;
+  *) bad "读不到同步任务 / 路由表($(head -c 200 /tmp/kf-lake-routes-check.err 2>/dev/null | tr '\n' ' '))⇒ 判不了,不算过";;
+esac
 
 printf '\n\033[1;36m== 真就位结论 ==\033[0m\n'
 if [ "$BAD" -gt 0 ]; then

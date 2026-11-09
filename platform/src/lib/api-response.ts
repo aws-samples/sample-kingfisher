@@ -90,6 +90,17 @@ export type ApiErrorCode =
   | "PREVIEW_DRIFT" // 影响清单在预览 / 申请之后变了 ⇒ 重新预览
   | "NOT_APPROVED" // 重试销毁时找不到已批准的删除审批
   | "BROKER_REJECTED" // broker 拒绝销毁(状态码随 broker 码映射)
+  // 数据湖表桶路由—— 数据湖表桶路由的五个拒因(设计稿 §6.3 / §6.10;唯一作者 lib/lake/routes.ts 的 LakeRouteError):
+  //   NOT_FOUND(400):别名 / 桶 / 命名空间匹配不到本执行环境的任何路由(**不回落**平台表桶)
+  //   AMBIGUOUS(400):命名空间同时存在于 ≥2 条路由且没人声明归属 ⇒ detail.buckets[]
+  //   ALIAS_CONFLICT(登记 / 修改 409;作业 / 同步保存 400):别名已被另一条路由占用,或手写目录同名不同桶
+  //   NOT_WRITABLE(保存 400;启动 409):把 writable=false 的路由当写目标
+  //   NAMESPACE_CONFLICT(409):登记 / 修改时命名空间重叠而无归属 ⇒ detail.conflicts[{ namespace, buckets }]
+  | "LAKE_ROUTE_NOT_FOUND"
+  | "LAKE_ROUTE_AMBIGUOUS"
+  | "LAKE_ROUTE_ALIAS_CONFLICT"
+  | "LAKE_ROUTE_NOT_WRITABLE"
+  | "LAKE_ROUTE_NAMESPACE_CONFLICT"
   | "INTERNAL"; // 兜底未分类错误
 
 export interface ApiErrorOptions {

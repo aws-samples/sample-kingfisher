@@ -204,6 +204,28 @@ function roleLidByName(tpl, roleName) {
   const hit = Object.entries(tpl.Resources || {}).find(([, r]) => r.Type === "AWS::IAM::Role" && r.Properties?.RoleName === roleName);
   return hit ? hit[0] : null;
 }
+/** CloudFormation 内建函数 ⇒ 字面(只认模板里 ARN 会遇到的三种 Ref;其余形态按原 JSON 文本返回让调用方的正则判红)。§7b / §9.8 共用。 */
+function arnText(v) {
+  if (typeof v === "string") return v;
+  if (v && typeof v === "object") {
+    if (v.Ref === "AWS::Partition") return "aws";
+    if (v.Ref === "AWS::Region") return REGION;
+    if (v.Ref === "AWS::AccountId") return ACCOUNT;
+    if (Array.isArray(v["Fn::Join"])) {
+      const [sep, parts] = v["Fn::Join"];
+      return (parts || []).map(arnText).join(sep);
+    }
+    if (Array.isArray(v["Fn::Sub"]) || typeof v["Fn::Sub"] === "string") {
+      const str = typeof v["Fn::Sub"] === "string" ? v["Fn::Sub"] : v["Fn::Sub"][0];
+      return String(str).replace(/\$\{AWS::Partition\}/g, "aws").replace(/\$\{AWS::Region\}/g, REGION).replace(/\$\{AWS::AccountId\}/g, ACCOUNT);
+    }
+  }
+  return JSON.stringify(v);
+}
+/** 某 Role 里含 s3tables: 动作的 Allow 语句(§7b / §9.8 共用)。 */
+function s3tablesStatements(tpl, roleLid) {
+  return roleStatements(tpl, roleLid).filter((st) => st.Effect !== "Deny" && [].concat(st.Action || []).some((a) => String(a).startsWith("s3tables:")));
+}
 /**
  * 🔴 三层绑定逐条打:① 名出自 SSOT;② 信任带 aws:SourceAccount(全部语句);③ 凡 Resource 含 "*" 的语句必带
  * aws:RequestedRegion=目标 region;④ 资源里不出现 home 桶名 / 不出现 `-*` 通配;⑤ 不挂任何 AWS 托管策略。
@@ -1279,10 +1301,24 @@ if (!FAST) {
       }
       if (typeof rn === "string" && !rn.includes(SLUG)) fail(`flink 角色名 ${rn} 里没有 slug ⇒ 多 target 会撞名`);
     }
-    // 策略里的桶必须是 **本 target 的**(指回 home 桶 = 数据出境 / 跨 region 读写)
+    // 策略里的桶必须是 **本 target 的**(指回 home 桶 = 数据出境 / 跨 region 读写)。
+    //   datalake / scripts 桶仍是单桶字面;表桶自数据湖表桶路由(设计稿 §6.7)起是「本区任意表桶」bucket/*(形态由 §9.8 断),
+    //   这里钉的事实改为「每条 s3tables 资源的 region / account 段 == 本 target」—— 不再找桶名字面(找字面 = 钉形态,与 §9.8 矛盾)。
     const flinkText = JSON.stringify(flinkTpl);
-    for (const kind of ["datalakeBucket", "scriptsBucket", "tableBucket"]) {
+    for (const kind of ["datalakeBucket", "scriptsBucket"]) {
       if (!flinkText.includes(expectName(kind))) fail(`flink 角色策略里找不到本 target 的 ${kind}(${expectName(kind)})—— 作业读写会指到别处`);
+    }
+    {
+      const flinkRoleLid = Object.entries(flinkTpl.Resources || {}).find(([, r]) => r.Type === "AWS::IAM::Role")?.[0] ?? null;
+      const s3t = flinkRoleLid ? s3tablesStatements(flinkTpl, flinkRoleLid) : [];
+      const wantArn = `arn:aws:s3tables:${REGION}:${ACCOUNT}:bucket/*`;
+      if (!s3t.length) fail("flink 角色策略里没有 s3tables 语句 —— 本 target 的表桶 sink 没放行");
+      for (const st of s3t) {
+        for (const r of [].concat(st.Resource ?? [])) {
+          const text = arnText(r);
+          if (text !== wantArn) fail(`flink 角色 s3tables 资源 ${text} 不是本 target 的「本区任意表桶」${wantArn} —— 作业读写会指到别处`);
+        }
+      }
     }
     for (const kind of ["datalakeBucket", "scriptsBucket", "tableBucket"]) {
       const homeName = naming.kinds[kind].home.split("{account}").join(ACCOUNT);
@@ -1622,7 +1658,8 @@ try {
   //    (试过用 `-c` 直接喂 AZ context:不行 —— context key 本身含 `=`,`-c k=v` 按**第一个** `=` 切,
   //     key 会被截成 `availability-zones:account`。这条弯路记下来,免得下一个人再试。)
   // 多 synth 一个 `BgpEmrStack`(-c enable-emr=1)—— 9.7 要断 home EMR 角色的 S3 面已收回。
-  execFileSync("npx", ["cdk", "synth", "BgpExecEnvDeployStack", "BgpPlatformStack", "BgpEmrStack", "-c", "enable-emr=1", "--quiet", "-o", CP_OUT], {
+  // 再多 synth 一个 `BgpFlinkStack`(-c enable-flink=1)—— §9.8 要断主控区 Flink 角色的 s3tables 面是「本区任意表桶」形态。
+  execFileSync("npx", ["cdk", "synth", "BgpExecEnvDeployStack", "BgpPlatformStack", "BgpEmrStack", "BgpFlinkStack", "-c", "enable-emr=1", "-c", "enable-flink=1", "--quiet", "-o", CP_OUT], {
     cwd: INFRA,
     env: { ...NO_CRED_ENV, CDK_DEFAULT_ACCOUNT: ACCOUNT, CDK_DEFAULT_REGION: "us-east-1" },
     encoding: "utf8",
@@ -1965,6 +2002,40 @@ if (cpOk) {
         if (/-\*(\/\*)?"/.test(t)) fail(`home EMR 角色的 S3 面仍带 -* 通配(W3-g 放宽未撤销):${t}`);
         if (!t.includes(`bgp-glue-scripts-${ACCOUNT}`) && !t.includes(`bgp-datalake-${ACCOUNT}`)) fail(`home EMR 角色的 S3 资源不是 home 两桶之一:${t}`);
       }
+    }
+  }
+
+  // ── 9.8 数据湖表桶路由(设计稿 §6.7):三份角色的 s3tables 资源面必须是「本区**任意**表桶」形态 ──────────────────────
+  //    主控区 EMR 角色(BgpEmrStack / bgp-emr-serverless-role)、主控区 Flink 角色(BgpFlinkStack / bgp-flink-role)、
+  //    执行区 Flink 角色(BgpExecEnv-<slug>-flink,§7b 全组件 synth 的产物)—— 每条含 s3tables: 动作的 Allow 语句,
+  //    其 **每个** Resource 经 token 解析后都必须匹配 ^arn:aws:s3tables:[^:]+:[^:]+:bucket/\*$,且不出现任何桶名字面;
+  //    语句**必须存在**(缺 = 红,不是绿)。变异:把任一栈改回单桶形态(bucket/bgp-table-bucket)⇒ 这里红。
+  {
+    const S3T_ANY = /^arn:aws:s3tables:[^:]+:[^:]+:bucket\/\*$/;
+    const assertAnyBucket = (label, tpl, roleLid) => {
+      if (!roleLid) { fail(`§9.8 ${label}:找不到角色`); return; }
+      const stmts = s3tablesStatements(tpl, roleLid);
+      if (!stmts.length) { fail(`§9.8 ${label}:角色里没有任何 s3tables 语句(缺 = 红,不是绿;数据湖表桶路由要求放到本区任意表桶)`); return; }
+      for (const st of stmts) {
+        const res = [].concat(st.Resource ?? []);
+        if (!res.length) { fail(`§9.8 ${label}:s3tables 语句没有 Resource`); continue; }
+        for (const r of res) {
+          const text = arnText(r);
+          if (!S3T_ANY.test(text)) fail(`§9.8 ${label}:s3tables 资源 ${text} 不是「本区任意表桶」形态 arn:aws:s3tables:<region>:<account>:bucket/*(单桶形态 = 2026-11-03 客户缺陷复发)`);
+          if (/bgp-table-bucket|bucket\/[a-z0-9][a-z0-9-]*[a-z0-9](\/|"|$)/.test(text)) fail(`§9.8 ${label}:s3tables 资源 ${text} 里出现了桶名字面`);
+        }
+      }
+    };
+    if (!existsSync(resolve(CP_OUT, "BgpEmrStack.template.json"))) fail("§9.8 控制面 synth 没产出 BgpEmrStack —— 无法判定主控区 EMR 角色的 s3tables 面");
+    else { const tpl = cpTpl("BgpEmrStack"); assertAnyBucket("BgpEmrStack / bgp-emr-serverless-role", tpl, roleLidByName(tpl, "bgp-emr-serverless-role")); }
+    if (!existsSync(resolve(CP_OUT, "BgpFlinkStack.template.json"))) fail("§9.8 控制面 synth 没产出 BgpFlinkStack(-c enable-flink=1)—— 无法判定主控区 Flink 角色的 s3tables 面");
+    else { const tpl = cpTpl("BgpFlinkStack"); assertAnyBucket("BgpFlinkStack / bgp-flink-role", tpl, roleLidByName(tpl, "bgp-flink-role")); }
+    const eeFlink = resolve(OUT, `BgpExecEnv-${SLUG}-flink.template.json`);
+    if (!existsSync(eeFlink)) fail(`§9.8 执行区 synth 产物里没有 BgpExecEnv-${SLUG}-flink.template.json(§7b 全组件 synth 该产出它)—— 无法判定执行区 Flink 角色的 s3tables 面`);
+    else {
+      const tpl = JSON.parse(readFileSync(eeFlink, "utf8"));
+      const lid = Object.entries(tpl.Resources || {}).find(([, r]) => r.Type === "AWS::IAM::Role")?.[0] ?? null;
+      assertAnyBucket(`BgpExecEnv-${SLUG}-flink / ${expectName("flinkRole")}`, tpl, lid);
     }
   }
 

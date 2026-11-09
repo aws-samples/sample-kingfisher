@@ -28,7 +28,7 @@ const ds = { datasourceId: "ds1", name: "src", type: "x-fixture", secretArn: "ar
 async function bindings(): Promise<GlueScriptBindings> {
   const landing = await resolveGlueBinding({ targetId: HOME_TARGET_ID });
   // 凭证 ARN 用真实形态(数仓落点以 PlaceWire 进脚本,生成期按 schema 自校验)
-  return { landing, rsb: { region: "us-east-1", workgroup: "wg", database: "dev", secretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:wg-admin-AbC" } };
+  return { landing, lakeCatalogAlias: "s3tablescatalog", rsb: { region: "us-east-1", workgroup: "wg", database: "dev", secretArn: "arn:aws:secretsmanager:us-east-1:123456789012:secret:wg-admin-AbC" } };
 }
 const task = (over: Record<string, unknown> = {}) => ({
   taskId: "t1", targetType: "redshift", sourceDatabase: "gamedb", sourceTables: ["Orders"],

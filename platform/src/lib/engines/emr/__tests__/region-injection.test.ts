@@ -38,7 +38,8 @@ describe("执行区注入", () => {
     const provider = stripComments(SRC("lib/engines/emr/provider.ts"));
     const fanout = stripComments(SRC("lib/engines/emr/schedule-fanout.ts"));
     const jobSpec = stripComments(SRC("lib/engines/emr/job-spec.ts"));
-    expect(provider, "provider.ts 必须调 bgpLandingParameters").toMatch(/bgpLandingParameters\(/);
+    // 数据湖表桶路由:provider.submit 也经 job-spec.ts#emrSparkSubmitParametersFor(三条路一个作者),bgpLandingParameters 只在那一跳里调
+    expect(provider, "provider.ts 必须经 emrSparkSubmitParametersFor(spark 参数的单一作者)").toMatch(/emrSparkSubmitParametersFor\(/);
     expect(fanout, "schedule-fanout.ts 必须经 emrSparkSubmitParametersFor(spark 参数的单一作者)").toMatch(/emrSparkSubmitParametersFor\(/);
     expect(jobSpec, "job-spec.ts 必须调 bgpLandingParameters").toMatch(/bgpLandingParameters\(/);
     for (const [f, src] of [["lib/engines/emr/provider.ts", provider], ["lib/engines/emr/schedule-fanout.ts", fanout], ["lib/engines/emr/job-spec.ts", jobSpec]] as const) {

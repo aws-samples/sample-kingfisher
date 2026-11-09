@@ -186,6 +186,16 @@ cd "$ROOT/infra"
 npx cdk deploy BgpOmDatabaseStack --require-approval never --profile "$PROFILE" \
   || die "BgpOmDatabaseStack 部署失败(OpenMetadata 库没升上去;实例本身与快照都在,按手册 §7ter.2 核对后重跑)"
 
+# ── 2c‴) 数据湖路由迁移(数据湖表桶路由,设计稿 §8 / D4)────────────────────────────────────────────
+# 🔴 为什么要这一步:数据湖表桶路由起**主控区**同步任务的 Table Bucket 也必须是「系统设置 → 数据湖表桶与路由」里的路由(原来主控区任意自有桶放行);
+#   不迁移,升级后这些任务**启动时 409 LAKE_ROUTE_NOT_FOUND**。运行时刻意不静默自动登记(安全网 = 409 指路)。这里把主控区存量同步任务
+#   写着的未登记自有表桶登记为路由(别名按桶名派生 / 分层 other / 可写 / 备注 auto-registered by upgrade,审计 actor=upgrade),幂等、秒级;
+#   表桶在该区已不存在的只告警不登记(那条任务本来就跑不起来)。写的行与平台作者同形(golden 判据 platform/src/lib/lake/__tests__/migrate-script.test.ts)。
+#   放在平台栈之前:新代码滚上去那一刻路由已在;真就位判据 02-postdeploy-truth.sh 第 11 条复核「没有主控区同步任务引用未登记的桶」。
+say "2c‴) 数据湖路由:主控区存量同步任务写着的自有表桶登记为路由(scripts/lib/lake-routes-migrate.mjs;幂等,已登记秒过)"
+node "$HERE/lib/lake-routes-migrate.mjs" --profile "$PROFILE" --region "$REGION" --actor upgrade \
+  || die "数据湖路由迁移失败(升级后主控区写自有表桶的同步任务启动会 409 LAKE_ROUTE_NOT_FOUND;修好后重跑本脚本,或单独跑 node scripts/lib/lake-routes-migrate.mjs --profile $PROFILE --region $REGION)"
+
 say "2d) OpenMetadata 加固(WAF / 回源校验头 / 管理员口令密钥)—— 生产上线批次 A"
 # 🔴 已上线的环境升级时这一步不可省:平台 om-client 不再回落出厂口令 admin,而 bgp/om/admin-password
 #   只由 BgpOmServiceStack 生成 ⇒ 不先部署它,平台读不到口令,治理目录 / 血缘等 OM 功能当场断。
@@ -205,6 +215,24 @@ say "2e) Flink 运行器 / 连接器模块 JAR(按内容哈希幂等上传到脚
 JARS_ACCOUNT=$(aws sts get-caller-identity --profile "$PROFILE" --query Account --output text 2>/dev/null) || JARS_ACCOUNT=""
 { [ -n "$JARS_ACCOUNT" ] && [ "$JARS_ACCOUNT" != "None" ]; } || die "读不到账号号(凭证过期?)—— Flink JAR 同步无法定位脚本桶"
 sync_flink_jars "$ROOT" "bgp-glue-scripts-$JARS_ACCOUNT"
+
+# ── 2f) 主控区 EMR / Flink 栈随 HEAD 刷新(数据湖表桶路由,设计稿 §6.7 / §8「Deployment」)──────────────────────────────────
+# 🔴 为什么要这一步:主控区 EMR Serverless 角色(BgpEmrStack)与 Flink 角色(BgpFlinkStack)的 s3tables 面从「只有平台表桶」放到「本区任意表桶
+#   bucket/*」(唯一作者 infra/lib/shared/table-bucket-arn.ts)。两栈都是 -c 门控的可选栈、平台栈对它们没有 CDK 依赖 ⇒ 第 3 步不会连带部署,
+#   只跑本脚本升级时主控区 EMR 作业 / Flink sink 写客户自有表桶仍 AccessDenied(2026-11-03 客户缺陷原样复发;2026-11-06 测试账号真撞:
+#   升级后两栈 LastUpdatedTime 仍停在安装日)。只刷新**已存在**的栈(安装时没开 EMR / Flink 的环境不会凭空多出常驻计费栈);无改动即 no-op;
+#   --exclusively:依赖栈 Kms / Vpc 在 2b 已部署过,不再连带。
+say "2f) 主控区 EMR / Flink 栈(存在才刷新;数据湖表桶路由的角色 s3tables 面随升级落下去,无改动即 no-op)"
+cd "$ROOT/infra"
+for pair in "BgpEmrStack:enable-emr" "BgpFlinkStack:enable-flink"; do
+  stack="${pair%%:*}"; flag="${pair##*:}"
+  if aws cloudformation describe-stacks --stack-name "$stack" --profile "$PROFILE" --region "$REGION" >/dev/null 2>&1; then
+    npx cdk deploy "$stack" --exclusively --require-approval never --profile "$PROFILE" -c "$flag=1" \
+      || die "$stack 部署失败(主控区 EMR / Flink 角色拿不到「本区任意表桶」放行,写客户自有表桶的作业会 AccessDenied;修好后重跑本脚本)"
+  else
+    info "  $stack 不存在(安装时未启用)⇒ 跳过"
+  fi
+done
 
 say "3) 部署平台栈(完整 -c 接线)"
 cd "$ROOT/infra"

@@ -53,11 +53,34 @@ TITLE_MAX = 40
 MARKER = "<!-- docs_restructure: generated -->"
 
 # ── 句界 ───────────────────────────────────────────────────────────────────────
-L1 = ("。", ";", "\uff1b")    # 句子级:总是切(括号深度 0);本仓文档用 ASCII `;` 当中文分号,全角 `;`(U+FF1B)也认
+L1 = ("。", ";", "\uff1b", ". ")    # 句子级:总是切(括号深度 0);本仓文档用 ASCII `;` 当中文分号,全角 `;`(U+FF1B)也认;英文句号见 _is_sentence_dot
 L2 = ("⇒",)                   # 只在仍超长时切;符号归到右片开头
 L3 = (" · ",)                  # 只在仍超长时切;「·」留在左片末
 L4 = (",", "\uff0c")
-L5 = ("、", " ")
+L5 = ("、",)
+#: 英文句号前常见缩写:后面的空格不是句界
+_ABBR = ("e.g", "i.e", "etc", "vs", "cf", "fig", "no", "approx", "al", "ca", "sec", "ver", "min", "max", "mr", "ms", "dr", "st")
+WRAP_SPACE = " "          # 贪心换行时额外认的边界:空格(不作切分级别 —— 逐空格切会把一段英文拆成一词一行,2026-11-04 格式刀真撞)
+
+
+def _is_sentence_dot(s: str, i: int) -> bool:
+    """s[i] == '.' 且 s[i+1] == ' ':只有「前面不是缩写 / 单字母 / 数字,后面以大写 / 数字 / 标记起头」才算句界。"""
+    if i + 2 > len(s) or s[i] != "." or s[i + 1] != " ":
+        return False
+    j = i + 2
+    while j < len(s) and s[j] == " ":
+        j += 1
+    if j >= len(s):
+        return True
+    nxt = s[j]
+    if not (nxt.isupper() or nxt.isdigit() or nxt in "*`([\"「【"):
+        return False
+    m = re.search(r"([A-Za-z0-9.]+)$", s[:i])
+    if m:
+        w = m.group(1).lower().rstrip(".")
+        if w in _ABBR or len(w) == 1 and w.isalpha() or w.isdigit():
+            return False
+    return True
 OPEN = {"(": ")", "\uff08": "\uff09", "[": "]", "「": "」", "【": "】", "《": "》", "{": "}"}
 CLOSE = {v: k for k, v in OPEN.items()}
 #: 逐级降格:先句子级(认括号深度),再 ⇒ / ·,再忽略深度,最后逗号 / 顿号 / 空格;都不成才硬切。
@@ -139,6 +162,8 @@ def _split_once(s: str, bounds, depth_aware: bool) -> list:
         hit = None
         for b in bounds:
             if s.startswith(b, i) and not any(in_code[i:i + len(b)]) and (not depth_aware or depth[i] == 0):
+                if b == ". " and not _is_sentence_dot(s, i):
+                    continue
                 hit = b
                 break
         if hit is None:
@@ -185,11 +210,49 @@ def _hard_wrap(p: str, limit: int) -> list:
     return out
 
 
+def _wrap_at(p: str, limit: int, bounds, depth_aware: bool) -> list:
+    """贪心换行:只在 bounds(分隔符留左片末)或空格(丢弃)处断,每行尽量装满到 limit。
+    与 _split_once 的区别:_split_once 在**每个**分隔符处切(句子级该这样),这里是**装满才断**(逗号 / 顿号 / 空格级该这样 ——
+    2026-11-04 格式刀把 L5 的空格当切分级别,一段 300+ 字符的英文被切成一词一行、6 份文档 400+ 行,本函数就是修它)。"""
+    in_code, depth = _scan(p)
+    cuts = []   # (切点位置, 左片结束位置)
+    for i, ch in enumerate(p):
+        if in_code[i] or (depth_aware and depth[i] != 0):
+            continue
+        for b in bounds:
+            if p.startswith(b, i) and not any(in_code[i:i + len(b)]):
+                cuts.append((i + len(b), i + len(b)))
+                break
+        else:
+            if ch == WRAP_SPACE:
+                cuts.append((i + 1, i))
+    out = []
+    start = 0
+    while len(p) - start > limit:
+        best = None
+        for nxt, end in cuts:
+            if nxt <= start or end - start > limit:
+                continue
+            if end - start <= 0:
+                continue
+            best = (nxt, end)
+        if best is None:
+            break
+        out.append(p[start:best[1]].rstrip())
+        start = best[0]
+        while start < len(p) and p[start] == " ":
+            start += 1
+    if p[start:].strip():
+        out.append(p[start:].strip())
+    return [q for q in out if q]
+
+
 def _fit(p: str, limit: int, level: int) -> list:
     if len(p) <= limit:
         return [p]
     for lv in range(level, len(LEVELS)):
-        parts = _split_once(p, *LEVELS[lv])
+        bounds, depth_aware = LEVELS[lv]
+        parts = _wrap_at(p, limit, bounds, depth_aware) if bounds in (L4, L5) else _split_once(p, bounds, depth_aware)
         if len(parts) >= 2:
             res = []
             for q in parts:
@@ -1000,6 +1063,22 @@ def self_test() -> int:
         ok("## 0. 版本记录" not in gnew and "| **B-1** | 高 |" in gnew, "generic:不动文件头、不建索引、条目表只按超长格处理")
         ok(not check_text(gnew) and not verify_texts(_LEDGER, gnew), "generic:check 0 违规 + verify 无损")
         ok(code_old in gnew, "generic:代码块不动")
+        # ── 切分器:英文按句、逗号 / 顿号 / 空格级贪心装满(2026-11-04 格式刀把一段英文切成一词一行的回归)──
+        en = ("This design replaces the single binding with a **lake route table** per execution target. "
+              "A route is `bucket → alias / tier / namespace ownership / writable`. Jobs use all routes, e.g. a job that only reads. "
+              "See v2.2.0 for details. ") * 3
+        efr = split_fragments(en, 300)
+        ok(all(len(f) <= 300 for f in efr) and not any(" " not in f for f in efr), "切分器:英文长段不产生一词一行的片段")
+        ok(efr[0] == "This design replaces the single binding with a **lake route table** per execution target." and
+           any(f.startswith("Jobs use all routes, e.g. a job that only reads.") for f in efr), "切分器:英文按句界切(e.g. 后不切)")
+        ok(not verify_texts(en, "\n".join(efr)), "切分器:英文切分无损")
+        zh = "数据集成(数据源管理、同步任务 Glue / DMS / Zero-ETL、实时计算 Flink)、数据开发(离线计算 Redshift SQL / Glue、ETL 编排)、" * 12
+        zfr = split_fragments(zh, 300)
+        ok(all(len(f) <= 300 for f in zfr) and len(zfr) <= 6 and zh.count("、") > 40, "切分器:顿号列表贪心装满(不是一个顿号一行)")
+        ok(not verify_texts(zh, "\n".join(zfr)), "切分器:顿号列表切分无损")
+        sp = "word " * 200
+        sfr = split_fragments(sp.strip(), 300)
+        ok(all(len(f) <= 300 for f in sfr) and len(sfr) <= 5 and all(len(f) > 200 for f in sfr[:-1]), "切分器:只有空格可断的长文按 300 贪心换行")
     print("  ⇒ " + ("自检全过" if not fails else f"🔴 {len(fails)} 条自检失败"))
     return 1 if fails else 0
 

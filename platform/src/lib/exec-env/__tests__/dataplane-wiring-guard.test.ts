@@ -30,9 +30,11 @@ describe("🔴 写入路径:targetId 必须过服务端校验(`{...body}` 展开
     const src = read("app/api/etl-jobs/route.ts");
     // 判据升到**按引擎**的入口(Glue 只许 home,理由见该函数注释)。
     expect(src, "创建路由没校验绑定 ⇒ 客户端可指定作业在哪些区域跑").toContain("assertBindableTargetsForEngine(");
-    const spread = src.indexOf("...body");
-    const assign = src.indexOf("targets: boundTargets");
-    expect(spread, "找不到 `...body`,判据锚点失效").toBeGreaterThan(-1);
+    // 锚点钉 item 字面里那一行 `...body,`(带逗号):路由里另有 `{ ...body.glueConfig, … }` 这种对子对象的展开,裸 `...body` 会先撞上它
+    const spread = src.indexOf("...body,");
+    expect(spread, "找不到 `...body,`,判据锚点失效").toBeGreaterThan(-1);
+    // 归一值可能先作为入参传给别的校验(如保存期路由校验的 `targets: boundTargets`),判的是 item 字面里展开**之后**那一次
+    const assign = src.indexOf("targets: boundTargets", spread);
     expect(assign, "没把归一后的 targets 写回 item").toBeGreaterThan(-1);
     expect(assign, "归一值写在展开**之前** ⇒ 会被 body 里的原值覆盖掉,校验白做").toBeGreaterThan(spread);
   });

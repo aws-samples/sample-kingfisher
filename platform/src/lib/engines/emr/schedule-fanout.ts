@@ -33,7 +33,7 @@ import { generateEmrJobDag } from "./dag-generator";
 import { persistApplicationId, s3LogUri, S3TABLES_JAR } from "./provider";
 import { ensureS3TablesJar, uploadScript } from "./script";
 // EMR 作业 serverless spec / spark 参数 / 该区数仓事实的唯一作者(工作流离线作业节点拼的是同一份)
-import { emrJobSpecFor, emrSparkSubmitParametersFor, emrRedshiftFactsFor } from "./job-spec";
+import { emrJobSpecFor, emrSparkSubmitParametersFor, emrRedshiftFactsFor, emrLakeRoutesFor } from "./job-spec";
 import type { EmrEngineJob } from "./types";
 
 const USER_ID = "default-user";
@@ -89,9 +89,11 @@ export async function publishEmrFanout(
           missingMessage: `目标 ${targetId} 没有 EMR 执行角色(描述符缺 emrExecutionRoleArn)`,
         });
         const execRoleArn = resolvedRole.roleArn;
+        // 数据湖表桶路由:作业在该区被选中的数据湖路由(与 provider.submit 同一作者;声明不合法 ⇒ 这一区如实记失败行)
+        const lake = await emrLakeRoutesFor(job, targetId, landing);
         if (resolvedRole.isCustom) {
           // 发布调度前按该区预检自定义角色(与 provider.submit 同一口径),缺 ⇒ 这一区如实记失败行
-          const pf = await preflightExecutionRole({ engine: "emr", roleArn: execRoleArn, targetId, scriptCode: job.script });
+          const pf = await preflightExecutionRole({ engine: "emr", roleArn: execRoleArn, targetId, scriptCode: job.script, lakeRoutes: lake.selected });
           assertPreflightPassed(pf, { engine: "emr", roleArn: execRoleArn, targetId, what: `emr-fanout ${job.jobId}` });
         }
         const targetNetwork = await targetEmrNetwork(targetId);
@@ -101,7 +103,7 @@ export async function publishEmrFanout(
         await persistApplicationId(job, targetId, applicationId);
         // 🔴 与手动提交同一个作者(漏改一处 = 定时调度那条路依然 NoRegionError / permission denied)
         //   spark 参数的拼法与该区数仓事实的解析收进唯一作者 `./job-spec.ts`(工作流离线作业节点拼同一份)
-        const sparkSubmitParameters = emrSparkSubmitParametersFor(job, landing, s3tJar, await emrRedshiftFactsFor(targetId));
+        const sparkSubmitParameters = emrSparkSubmitParametersFor(job, landing, s3tJar, await emrRedshiftFactsFor(targetId), lake);
         // serverless 分路:同一套落点解析与 spark 参数,产物换成 YAML + 运行时 + workflow
         if (isServerlessEndpoint(ep)) {
           const stamp = resolveRunStamp(job, targetId);

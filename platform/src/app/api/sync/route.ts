@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
   //   已登记的桶,否则 400 并指路去登记(改动前保存能成、启动才 409,登记了也仍 409)。主控区不变。
   if (writesS3Tables(item as never)) {
     const bucketReject = await tableBucketSaveRejection(item as never);
-    if (bucketReject) return apiError(bucketReject.message, bucketReject.status, { code: "VALIDATION_FAILED" });
+    if (bucketReject) return apiError(bucketReject.message, bucketReject.status, { code: bucketReject.code });
   }
   // 🔴 生产上线批次 A:这个任务一跑会整表清空「已存在且不是平台建的」表 ⇒ 先列给用户逐表确认(409),
   //   不落库。探不到(数仓暂不可达)不拦 —— 防线在 Glue 脚本清表前那道守卫(target-table-guard 规则 ②)。

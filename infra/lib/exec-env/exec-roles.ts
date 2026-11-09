@@ -17,6 +17,8 @@
 import * as iam from "aws-cdk-lib/aws-iam";
 import { Construct } from "constructs";
 import { resourceName } from "../shared/naming";
+// 数据湖表桶路由:「本区任意 S3 Tables 表桶」ARN 的唯一作者(主控区 EMR / Flink 栈与本文件同一口径)
+import { anyTableBucketArn } from "../shared/table-bucket-arn";
 import type { ExecEnvContext } from "./context";
 
 /** 本包落地的四类执行角色 kind(与 `platform/naming.json` 的 kind 名逐字一致)。 */
@@ -94,7 +96,8 @@ export function bucketArnPair(partition: string, bucketName: string): string[] {
  * IAM 不再是第二道按桶名的门。
  */
 export function tableBucketAnyArn(ctx: ExecEnvContext, partition: string): string[] {
-  return [`arn:${partition}:s3tables:${ctx.region}:${ctx.account}:bucket/*`];
+  // 数据湖表桶路由:ARN 形态搬到 shared/table-bucket-arn.ts(主控区 EMR / Flink 栈同一作者);这里只是执行区上下文的薄壳
+  return anyTableBucketArn(partition, ctx.region, ctx.account);
 }
 
 /** 读写一个桶的完整动作集(与 home flink/emr 角色对数据湖桶的口径逐字相同)。 */

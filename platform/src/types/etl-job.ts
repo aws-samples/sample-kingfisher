@@ -1,4 +1,6 @@
 import type { DeploymentRecord } from "@/lib/exec-env/deployments-shared";
+// 数据湖表桶路由:作业的数据湖表桶声明(闭合形状;唯一作者 lib/lake/routes.ts)
+import type { LakeBucketDeclaration } from "@/lib/lake/routes";
 // ETL 开发模块（作业开发）— 用户自写脚本的作业类型。
 // 引擎复用现有 Glue（PySpark 脚本作业）/ Redshift（SQL 作业），调度走 MWAA。
 
@@ -21,6 +23,11 @@ export interface GlueJobConfig {
   jobParameters?: Record<string, string>; // 自定义 Job parameters(--key → value)
   extraJars?: string; // 依赖 JAR 的 S3 URI,逗号分隔(--extra-jars)
   extraPyFiles?: string; // 依赖 Python 文件(.py/.whl/.zip)的 S3 URI,逗号分隔(--extra-py-files)
+  // 数据湖表桶路由(设计稿 §6.2 / D2 / D3):本作业用到的数据湖表桶路由。
+  //   不给 = 本区全部路由(访问随路由的 writable);给了 = 每桶一条 { bucket, access: read | write },平台按它注入 Spark 目录、按桶量权限。
+  lakeBuckets?: LakeBucketDeclaration[];
+  // 缺省目录别名(spark.sql.defaultCatalog):必须是本作业目录之一;单桶作业两段名走它,跨目录仍要三段名(Spark 语义)。
+  defaultCatalogAlias?: string;
 }
 
 export interface RedshiftJobConfig {

@@ -2,6 +2,8 @@
 
 import type { EmrSpec } from "@/lib/engines/emr/spec";
 import type { EmrNetwork } from "@/lib/engines/emr/network";
+// 数据湖表桶路由:数据湖表桶声明(浏览器安全的纯文法模块)
+import type { LakeBucketDeclaration } from "@/lib/lake/routes-grammar";
 
 export interface EngineJobView {
   userId: string;
@@ -13,6 +15,9 @@ export interface EngineJobView {
   spec: EmrSpec;
   network: EmrNetwork;
   sparkConf?: Record<string, string>;
+  // 数据湖表桶路由:数据湖表桶声明(与 lib/engines/emr/types.ts 的 EmrEngineJob 同形)
+  lakeBuckets?: LakeBucketDeclaration[];
+  defaultCatalogAlias?: string;
   entryPointArguments?: string[];
   applicationId?: string;
   applicationCreateError?: string;

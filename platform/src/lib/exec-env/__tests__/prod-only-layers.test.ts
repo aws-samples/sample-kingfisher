@@ -100,12 +100,24 @@ function discoverInfraNodeScripts(): string[] {
     .map((f) => `script:infra/scripts/${f}`);
 }
 
+/**
+ * 规则 ⑥(数据湖表桶路由):`scripts/lib/*.mjs` —— 被安装 / 升级脚本 `node` 调用的数据迁移 / 真值读取脚本
+ * (首例 lake-routes-migrate.mjs:redeploy-platform 2c‴ 步 + 02-postdeploy-truth 第 11 条都调它)。
+ * 🔴 按目录扫而不是 git 跟踪(与规则 ⑤ 同口径):这类脚本只有真部署才执行,新加一个没登记就该当场红 —— 不等它被 commit。
+ */
+function discoverScriptLibNodeScripts(): string[] {
+  return readdirSync(resolve(REPO, "scripts/lib"))
+    .filter((f) => f.endsWith(".mjs"))
+    .map((f) => `script:lib/${f}`);
+}
+
 describe("🔴🔴 台账必须**闭合**:门禁自己发现的层,一个都不许没登记", () => {
   const discovered = [
     ...discoverBuildspecPhases(),
     ...discoverLambdas(),
     ...discoverShellScripts(),
     ...discoverInfraNodeScripts(),
+    ...discoverScriptLibNodeScripts(),
     ...discoverCodegen(),
   ];
 
@@ -117,6 +129,8 @@ describe("🔴🔴 台账必须**闭合**:门禁自己发现的层,一个都不�
     expect(discovered.length).toBeGreaterThan(20);
     // 规则 ⑤ 的反向控制:P0-E 闸必须被发现(它是执行环境初始化/补装的命门)
     expect(discovered).toContain("script:infra/scripts/p0e-gate.mjs");
+    // 规则 ⑥ 的反向控制:数据湖路由迁移脚本必须被发现(升级步 2c‴ 的执行者)
+    expect(discovered).toContain("script:lib/lake-routes-migrate.mjs");
   });
 
   it("🔴 每个被发现的层都在台账里(新增一层没登记 ⇒ 红)", () => {

@@ -10,6 +10,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const h = vi.hoisted(() => ({
+  // 账号号是 Spark 目录 warehouse ARN 的一段(数据湖路由作者按 process.env.AWS_ACCOUNT_ID 拼);判据钉实值而不是让它漂成 "undefined" / ""
+  _env: (process.env.AWS_ACCOUNT_ID = "123456789012"),
   rows: {} as Record<string, Record<string, Record<string, unknown>>>, // table -> key json -> row
   reads: [] as string[],
   inputs: [] as Array<Record<string, unknown>>,
@@ -25,6 +27,8 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
         const t = cmd.input.TableName;
         h.reads.push(t);
         h.inputs.push(cmd.input as unknown as Record<string, unknown>);
+        // 数据湖路由表(bgp-settings)按前缀 Query:本判据不登记外部路由 ⇒ 作业只有本区平台路由(与下方 platformRouteOf 的期望同一份)
+        if (cmd.constructor.name === "QueryCommand") return { Items: [] };
         const k = Object.values(cmd.input.Key).map(String).join("|");
         return { Item: h.rows[t]?.[k] };
       },
@@ -67,6 +71,7 @@ const { serverlessJobSpecFor } = await import("@/lib/etl/job-spec");
 const { emrJobSpecFor, emrSparkSubmitParametersFor } = await import("@/lib/engines/emr/job-spec");
 const { entryPointUri, s3TablesJarUriFor } = await import("@/lib/engines/emr/script");
 const { glueJobNameFor } = await import("@/lib/etl/glue-job-name");
+const { platformRouteOf } = await import("@/lib/lake/routes");
 const { lockAttrFor } = await import("@/lib/etl/run-lock");
 const { splitSql } = await import("@/lib/etl/dag-generator");
 
@@ -197,7 +202,9 @@ describe("② spec 与单作业载体逐字段相等(同一个 spec 作者)", ()
     const expected = emrJobSpecFor(job as never, USW2, {
       dagId: "bgp_wf1", region: "us-west-2", applicationId: "00fabcd1234567890", executionRoleArn: `arn:aws:iam::1:role/emr-${USW2}`,
       entryPoint: entryPointUri(job.jobId, landing),
-      sparkSubmitParameters: emrSparkSubmitParametersFor(job as never, landing, s3TablesJarUriFor(landing, "s3://bgp-glue-scripts-x/emr-jars/s3-tables-catalog-for-iceberg-runtime-0.1.8.jar"), { redshiftWorkgroup: "bgp-workgroup-tgt-usw2-a", redshiftDatabase: "dev", redshiftSecretArn: h.bindings[USW2].secretArn }),
+      // 数据湖表桶路由:没声明 ⇒ 本区全部路由 = 只有平台路由(判据 DDB 里没有路由行),与解析器算出的同一份
+      sparkSubmitParameters: emrSparkSubmitParametersFor(job as never, landing, s3TablesJarUriFor(landing, "s3://bgp-glue-scripts-x/emr-jars/s3-tables-catalog-for-iceberg-runtime-0.1.8.jar"), { redshiftWorkgroup: "bgp-workgroup-tgt-usw2-a", redshiftDatabase: "dev", redshiftSecretArn: h.bindings[USW2].secretArn },
+        { selected: [{ ...platformRouteOf({ targetId: USW2, region: landing.region, tableBucket: landing.tableBucket }), access: "write" }] }),
       logUri: `s3://bgp-lake-${USW2}/emr-logs/${job.jobId}/`, runName: "spark-roi-wf",
     });
     expect(got).toEqual(expected);

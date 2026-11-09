@@ -18,7 +18,7 @@ import { bindingTargets, resolveEmrBinding, resolveRedshiftBinding } from "@/lib
 import { assertDefinitionRunsHere, DefinitionBindingMismatch } from "@/lib/exec-env/definition-binding";
 import { resolveRunStamp } from "@/lib/monitor/run-records";
 import { serverlessJobSpecFor } from "@/lib/etl/job-spec";
-import { emrJobSpecFor, emrRedshiftFactsFor, emrSparkSubmitParametersFor } from "@/lib/engines/emr/job-spec";
+import { emrJobSpecFor, emrLakeRoutesFor, emrRedshiftFactsFor, emrSparkSubmitParametersFor } from "@/lib/engines/emr/job-spec";
 import { applicationIdOf } from "@/lib/engines/emr/application";
 import { entryPointUri, s3TablesJarUriFor } from "@/lib/engines/emr/script";
 import { S3TABLES_JAR, s3LogUri } from "@/lib/engines/emr/provider";
@@ -164,7 +164,8 @@ export async function resolveJobNodeSpec(
       message: `离线作业节点「${nodeLabelOf(node)}」引用的 EMR 作业「${job.name}」在 ${wfTarget} 尚未建好 application —— 发布时会自动建好;比对定义请先发布一次`,
     });
   }
-  const sparkSubmitParameters = emrSparkSubmitParametersFor(job, landing, s3TablesJarUriFor(landing, S3TABLES_JAR), await emrRedshiftFactsFor(wfTarget));
+  // 数据湖表桶路由:该作业在工作流执行区被选中的数据湖路由(与 provider.submit / 扇出同一作者)
+  const sparkSubmitParameters = emrSparkSubmitParametersFor(job, landing, s3TablesJarUriFor(landing, S3TABLES_JAR), await emrRedshiftFactsFor(wfTarget), await emrLakeRoutesFor(job, wfTarget, landing));
   return emrJobSpecFor(job, wfTarget, {
     dagId: ctx.dagId,
     region: landing.region,

@@ -83,6 +83,7 @@ async function homeBindings(secretArn?: string | null): Promise<GlueScriptBindin
   const landing = await resolveGlueBinding({ targetId: HOME_TARGET_ID });
   return {
     landing,
+    lakeCatalogAlias: "s3tablescatalog", // 数据湖表桶路由:平台路由的固定别名(脚本与改动前逐字相同)
     rsb: {
       region: process.env.AWS_REGION || "us-east-1",
       workgroup: resolveWorkgroup(undefined),
@@ -141,6 +142,7 @@ const usw2: GlueScriptBindings = {
     datalakeBucket: "bgp-datalake-123456789012-usw2a",
     tableBucket: "bgp-table-bucket-usw2a",
   },
+  lakeCatalogAlias: "s3tablescatalog",
   rsb: {
     region: "us-west-2",
     workgroup: "bgp-exec-usw2a-wg",
@@ -184,10 +186,10 @@ describe("非 home binding 的判别力(双向)", () => {
   });
 
   it("写 Redshift 却没给 rsb ⇒ 当场拒(禁静默回落 home / env)", () => {
-    expect(() => generateGlueScript(baseTask, jdbcDs, { landing: usw2.landing, rsb: null })).toThrow(/rsb/);
+    expect(() => generateGlueScript(baseTask, jdbcDs, { landing: usw2.landing, rsb: null, lakeCatalogAlias: "s3tablescatalog" })).toThrow(/rsb/);
     // 不写 Redshift 的任务不需要 rsb(用不上的字段不逼调用方造)。
     expect(() =>
-      generateGlueScript({ ...baseTask, targetType: "s3-tables" }, jdbcDs, { landing: usw2.landing, rsb: null })
+      generateGlueScript({ ...baseTask, targetType: "s3-tables" }, jdbcDs, { landing: usw2.landing, rsb: null, lakeCatalogAlias: "s3tablescatalog" })
     ).not.toThrow();
   });
 });

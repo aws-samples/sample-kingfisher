@@ -17,6 +17,8 @@ import { assertBindableTargetsForEngine, TargetBindingRejected } from "@/lib/exe
 import { filterRowsByScope, requireScope } from "@/lib/exec-env/scope";
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
+// 数据湖表桶路由:作业的数据湖表桶声明(形状 / 按绑定区校验 / 错误整形)唯一作者
+import { checkLakeDeclarationForTargets, lakeRouteErrorResponse, normalizeLakeDeclaration, userEmrConfEntries } from "@/lib/lake/job-declaration";
 
 const USER_ID = "default-user";
 
@@ -65,19 +67,35 @@ export async function POST(req: NextRequest, props: { params: Promise<{ engine: 
   // 🔴 绑定区必须点名(缺 ⇒ 400)。原来两个字段都没给就**跳过校验**、
   //   作业行不带 targets(读侧 = 主控区)⇒ /etl-jobs 页在 us-west-2 视角新建的 EMR 作业在主控区建 application
   //   并从当前视角消失(段 wp31 W31-E1/E2 无头坐实)。
+  let boundTargets: string[];
   try {
-    body.targets = await assertBindableTargetsForEngine(
+    boundTargets = await assertBindableTargetsForEngine(
       params.engine,
       requestedTargets(body, "新建引擎作业"),
       "core",
       { scope: "per-project", projectId: ctx.projectId } // 项目白名单(scope 必填)
     );
+    body.targets = boundTargets;
     delete body.targetId; // 只保留一个真值源
   } catch (e) {
     const pr = placeErrorResponse(e);
     if (pr) return pr;
     if (e instanceof TargetBindingRejected) return apiError(e.message, 409, { code: "CONFLICT" });
     return apiError((e as Error)?.message ?? String(e), 400, { code: "VALIDATION_FAILED" });
+  }
+
+  // 数据湖表桶路由(设计稿 §6.10.6):EMR 作业顶层的数据湖表桶声明按每个绑定区校验(桶是路由 / 写只读 / 缺省目录 / 手写目录撞桶),
+  //   不过 ⇒ 400 带 code 不落库;被平台接管的手写 sparkConf 目录 ⇒ `_meta.notices`。归一后写回 body(不信客户端原样值)。
+  let lakeNotices: string[] = [];
+  try {
+    const decl = normalizeLakeDeclaration(body);
+    lakeNotices = (await checkLakeDeclarationForTargets({ engine: "emr", targets: boundTargets, decl, userConf: userEmrConfEntries(body.sparkConf), account: process.env.AWS_ACCOUNT_ID || "" })).notices;
+    if (decl.lakeBuckets) body.lakeBuckets = decl.lakeBuckets; else delete body.lakeBuckets;
+    if (decl.defaultCatalogAlias) body.defaultCatalogAlias = decl.defaultCatalogAlias; else delete body.defaultCatalogAlias;
+  } catch (e) {
+    const lr = lakeRouteErrorResponse(e);
+    if (lr) return lr;
+    throw e;
   }
 
   const now = new Date().toISOString();
@@ -117,9 +135,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ engine: 
     recordAudit(req, `engine.${params.engine}.create`, {
       resourceType: "engine-job",
       resourceId: jobId,
-      detail: { name: item.name, engine: params.engine, applicationId: item.applicationId || null },
+      // 数据湖表桶路由:审计带上数据湖表桶声明(设计稿 §7)
+      detail: { name: item.name, engine: params.engine, applicationId: item.applicationId || null, ...(item.lakeBuckets ? { lakeBuckets: item.lakeBuckets } : {}), ...(item.defaultCatalogAlias ? { defaultCatalogAlias: item.defaultCatalogAlias } : {}) },
     }).catch(() => {});
-    return apiOk(item, 201);
+    return apiOk(item, 201, lakeNotices.length ? { notices: lakeNotices } : undefined);
   } catch (e: any) {
     return apiError(e.message, 500, { code: "INTERNAL" });
   }

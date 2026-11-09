@@ -11,6 +11,8 @@ import {
   ListNamespacesCommand,
   ListTablesCommand,
 } from "@aws-sdk/client-s3tables";
+// 数据湖表桶路由:一个执行环境的全部落点 = 路由表(平台路由 + 外部路由),唯一作者 lib/lake/routes.ts;本文件只是它在 Athena 侧的薄壳
+import { forgetLakeRoutesMemo, resolveLakeRoutes, routeForNamespace, type LakeRoute, type LakeTier } from "@/lib/lake/routes";
 
 const region = homeRegion();
 const account = process.env.AWS_ACCOUNT_ID || "";
@@ -90,49 +92,33 @@ export async function resolveS3TablesPlace(targetId: string): Promise<S3TablesPl
   return { targetId: id, region: t.region, bucket, catalogRef: `${S3TABLES_CATALOG}/${bucket}`, home: false };
 }
 
-// ──:一个执行环境的**全部**S3 Tables 落点 = 平台表桶 + 已登记的外部表桶 ─────────────────
+// ── 一个执行环境的**全部**S3 Tables 落点 = 路由表(平台路由 + 已登记的外部路由)──────────
 //   缺陷原形:直查表树 / 治理目录 / 问数只认 resolveS3TablesPlace ⇒ 客户写进自己表桶的数据在平台里一张表都看不到。
 export interface S3TablesPlaceEx extends S3TablesPlace {
-  /** false = 该区平台表桶(部署期建);true = 平台管理员登记的外部表桶(平台只读它) */
+  /** false = 该区平台表桶(部署期建);true = 平台管理员登记的外部表桶 */
   external: boolean;
   label?: string;
+  /** 数据湖表桶路由:路由元数据(Spark 目录别名 / 分层 / 可写) */
+  alias: string;
+  tier: LakeTier;
+  writable: boolean;
 }
 
-/**
- * 登记表读缓存(进程内,15s):同一页 / 同一次问数会连着解析好几次落点,不必每次都查 DDB。
- * 🔴 挂在 globalThis(Symbol.for)而不是模块级变量:Next 产物里同一源文件在不同路由 bundle 里是**不同的模块实例**
- *   (记忆 next-bundle-duplicate-module-instances),模块级 Map 会让登记路由的 forget 对表树路由的缓存静默失明 ——
- *   2026-10-13 s38 单跑 71b 就是这样红的(登记后立刻查表树没看见,15s 后才有)。跨任务(多个 ECS task)仍靠 15s TTL 收敛。
- */
-const EXT_BUCKETS_TTL_MS = 15_000;
-type ExtBucketsMemo = Map<string, { at: number; rows: Array<{ bucket: string; label?: string }> }>;
-const EXT_MEMO_KEY = Symbol.for("bgp.lake.externalTableBuckets.memo");
-function extBucketsMemo(): ExtBucketsMemo {
-  const g = globalThis as unknown as Record<symbol, ExtBucketsMemo | undefined>;
-  return (g[EXT_MEMO_KEY] ??= new Map());
-}
-/** 登记 / 撤销外部表桶后调用:本进程内所有模块实例立刻看到新清单。 */
-export function forgetExternalBucketsMemo(): void { extBucketsMemo().clear(); }
+/** 登记 / 撤销路由后调用(兼容名;真缓存在 lib/lake/routes.ts)。 */
+export function forgetExternalBucketsMemo(): void { forgetLakeRoutesMemo(); }
 
+function placeOfRoute(route: LakeRoute, home: boolean): S3TablesPlaceEx {
+  return {
+    targetId: route.targetId, region: route.region, bucket: route.bucket, catalogRef: route.catalogRef, home,
+    external: !route.platform, ...(route.label ? { label: route.label } : {}),
+    alias: route.alias, tier: route.tier, writable: route.writable,
+  };
+}
+
+/** 平台表桶在前,外部桶按登记顺序(15s 读缓存在路由作者里;写侧判定请直接用 lib/lake/routes 的 fresh 读)。 */
 export async function resolveS3TablesPlaces(targetId: string): Promise<S3TablesPlaceEx[]> {
-  const primary = await resolveS3TablesPlace(targetId);
-  const store = extBucketsMemo();
-  const memo = store.get(primary.targetId);
-  let ext: Array<{ bucket: string; label?: string }>;
-  if (memo && Date.now() - memo.at < EXT_BUCKETS_TTL_MS) {
-    ext = memo.rows;
-  } else {
-    const { listExternalTableBuckets } = await import("@/lib/lake/external-table-buckets");
-    ext = (await listExternalTableBuckets(primary.targetId)).map((e) => ({ bucket: e.bucket, ...(e.label ? { label: e.label } : {}) }));
-    store.set(primary.targetId, { at: Date.now(), rows: ext });
-  }
-  return [
-    { ...primary, external: false },
-    ...ext.map((e) => ({
-      targetId: primary.targetId, region: primary.region, bucket: e.bucket,
-      catalogRef: `${S3TABLES_CATALOG}/${e.bucket}`, home: primary.home, external: true, ...(e.label ? { label: e.label } : {}),
-    })),
-  ];
+  const set = await resolveLakeRoutes(targetId);
+  return set.all.map((r) => placeOfRoute(r, set.home));
 }
 
 /** 全部落点的命名空间树(每个命名空间带 bucket / catalog / external;平台表桶在前,外部桶按登记顺序)。 */
@@ -147,23 +133,13 @@ export async function listNamespaceTreeAll(places: S3TablesPlaceEx[]): Promise<S
 
 /**
  * 按命名空间找到它所在的落点(问数 / 探查用:用户只选了「库」,目录由平台解析)。
- * 平台表桶优先;外部桶按登记顺序;哪个桶都没有这个命名空间 ⇒ 回平台表桶(Athena 会如实报 schema 不存在,与改动前一致)。
+ * 🔴 数据湖表桶路由:改走路由作者的 `routeForNamespace`,**fail-closed** —— 哪条路由都没有这个命名空间 ⇒ 抛 LAKE_ROUTE_NOT_FOUND;
+ *   两条都有且没人声明归属 ⇒ 抛 LAKE_ROUTE_AMBIGUOUS。原来「哪个桶都没有 ⇒ 回平台表桶」那条静默默认(外部表桶登记遗留)已删。
  */
 export async function resolveS3TablesPlaceForNamespace(targetId: string, namespace: string): Promise<S3TablesPlace> {
-  const places = await resolveS3TablesPlaces(targetId);
-  if (places.length === 1) return places[0];
-  for (const p of places) {
-    const c = clientForRegion(p.region);
-    const arn = tableBucketArnOf(p);
-    let tok: string | undefined;
-    do {
-      const r = await c.send(new ListNamespacesCommand({ tableBucketARN: arn, ...(tok ? { continuationToken: tok } : {}) }));
-      const names = (r.namespaces || []).map((n) => (Array.isArray(n.namespace) ? n.namespace[0] : undefined));
-      if (names.includes(namespace)) return p;
-      tok = r.continuationToken;
-    } while (tok);
-  }
-  return places[0];
+  const route = await routeForNamespace(targetId, namespace);
+  const set = await resolveLakeRoutes(targetId);
+  return placeOfRoute(route, set.home);
 }
 
 const s3tClients = new Map<string, S3TablesClient>();

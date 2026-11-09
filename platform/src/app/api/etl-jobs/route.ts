@@ -16,6 +16,8 @@ import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
 // 自定义执行角色保存期预检
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
+// 数据湖表桶路由:作业的数据湖表桶声明(形状 / 按绑定区校验 / 错误整形)唯一作者
+import { checkLakeDeclarationForTargets, lakeRouteErrorResponse, normalizeLakeDeclaration, resolveJobLakeRoutes, userGlueConfEntries, type LakeDeclaration } from "@/lib/lake/job-declaration";
 import { s3UrisFromGlueConfig } from "@/lib/execution-role/s3-uris";
 import { ulid } from "ulid";
 
@@ -82,13 +84,29 @@ export async function POST(req: NextRequest) {
   }
   // 自定义执行角色在保存那一刻就按每个绑定区预检(信任 glue.amazonaws.com + 引擎基线 + --extra-jars /
   //   --extra-py-files / 脚本 s3:// 引用的每个对象),缺 ⇒ 400 逐条指路、**不落库**(客户现网 2026-11-03:保存成功、Glue 启动期才 403)
+  // 数据湖表桶路由(设计稿 §6.10.6):数据湖表桶声明按每个绑定区校验(桶是路由 / 写只读 / 缺省目录 / 手写目录撞桶 / --conf 预算),
+  //   不过 ⇒ 400 带 code,不落库;手写目录被平台接管 ⇒ 响应 `_meta.notices`。预检按声明解析出的路由逐桶量 s3tables。
+  let lakeNotices: string[] = [];
   if (body.type === "glue") {
+    let decl: LakeDeclaration;
+    try {
+      decl = normalizeLakeDeclaration(body.glueConfig);
+      lakeNotices = (await checkLakeDeclarationForTargets({
+        engine: "glue", targets: boundTargets, decl, userConf: userGlueConfEntries(body.glueConfig?.jobParameters), account: process.env.AWS_ACCOUNT_ID || "",
+      })).notices;
+    } catch (e) {
+      const lr = lakeRouteErrorResponse(e);
+      if (lr) return lr;
+      throw e;
+    }
+    if (body.glueConfig) body.glueConfig = { ...body.glueConfig, ...decl, ...(decl.lakeBuckets ? {} : { lakeBuckets: undefined }), ...(decl.defaultCatalogAlias ? {} : { defaultCatalogAlias: undefined }) };
     const pfRes = await preflightCustomRoleForTargets({
       engine: "glue",
       customRoleArn: body.glueConfig?.executionRoleArn,
       targets: [...boundTargets],
       extraS3Uris: s3UrisFromGlueConfig(body.glueConfig),
       scriptCode: typeof body.script === "string" ? body.script : undefined,
+      lakeRoutesFor: async (targetId) => (await resolveJobLakeRoutes(targetId, decl)).selected,
     });
     if (pfRes) return pfRes;
   }
@@ -130,9 +148,10 @@ export async function POST(req: NextRequest) {
     recordAudit(req, "etl-job.create", {
       resourceType: "etl-job",
       resourceId: item.jobId,
-      detail: { name: item.name, type: item.type },
+      // 数据湖表桶路由:审计带上数据湖表桶声明(设计稿 §7)
+      detail: { name: item.name, type: item.type, ...(item.glueConfig?.lakeBuckets ? { lakeBuckets: item.glueConfig.lakeBuckets } : {}), ...(item.glueConfig?.defaultCatalogAlias ? { defaultCatalogAlias: item.glueConfig.defaultCatalogAlias } : {}) },
     }).catch(() => {});
-    return apiOk(item, 201);
+    return apiOk(item, 201, lakeNotices.length ? { notices: lakeNotices } : undefined);
   } catch (e: any) {
     return apiError(e.message, 500);
   }

@@ -82,6 +82,9 @@ import {
 import { resolveExecutionRoleArn } from "@/lib/execution-role/resolve";
 import { preflightExecutionRole, assertPreflightPassed } from "@/lib/execution-role/preflight";
 import { s3UrisFromGlueConfig, localizePlatformDepUris } from "@/lib/execution-role/s3-uris";
+// 数据湖表桶路由:数据湖表桶路由的唯一作者 —— Spark 目录属性只在它那里拼;作业声明按本区解析成被选中的路由
+import { GLUE_LAKE_CATALOGS_ARG, assertGlueConfBudget, lakeCatalogsArgument, rejectUserCatalogConf, sparkCatalogConf, splitGlueConfValue } from "@/lib/lake/routes";
+import { normalizeLakeDeclaration, resolveJobLakeRoutes } from "@/lib/lake/job-declaration";
 import { redshiftDataClientFor, glueClientFor, s3ClientFor } from "@/lib/exec-env/target-clients";
 import { HOME_TARGET_ID, isHome } from "@/lib/exec-env/target-id";
 // 补数标记字段的唯一作者
@@ -289,6 +292,10 @@ export async function ensureGlueJob(job: EtlJob, targetId: string = HOME_TARGET_
     fallback: landing.roleArn,
     missingMessage: "未指定执行角色:请在作业高级参数填写执行角色 ARN,或部署配置 GLUE_ROLE_ARN",
   });
+  // 数据湖表桶路由(设计稿 §6.5.1):作业用到的数据湖路由 = 声明的子集(没声明 ⇒ 本区全部路由),按**本区**路由表 fresh 解析;
+  //   桶不是路由 / 写只读路由 / 缺省目录不在目录里 ⇒ 抛 LakeRouteError(400 可修;运行路由按「被拒」回报,定时运行记失败行)。
+  //   放在预检之前:预检要按这些路由逐桶量 s3tables / 联邦目录权限。
+  const lake = await resolveJobLakeRoutes(landing.targetId, normalizeLakeDeclaration(job.glueConfig), { landing });
   if (isCustom) {
     const pf = await preflightExecutionRole({
       engine: "glue", roleArn, targetId,
@@ -297,6 +304,7 @@ export async function ensureGlueJob(job: EtlJob, targetId: string = HOME_TARGET_
         extraPyFiles: localizePlatformDepUris(job.glueConfig?.extraPyFiles, landing),
       }),
       scriptCode: job.script,
+      lakeRoutes: lake.selected,
     });
     assertPreflightPassed(pf, { engine: "glue", roleArn, targetId, what: `etl-job ${job.jobId}` });
   }
@@ -310,26 +318,23 @@ export async function ensureGlueJob(job: EtlJob, targetId: string = HOME_TARGET_
   const jobName = glueJobNameFor(job.jobId, targetId);
   const cfg = job.glueConfig || {};
   const scriptLocation = `s3://${landing.scriptsBucket}/${scriptKey}`;
-  // 注册 S3 Tables 的 Iceberg 目录 s3tablescatalog（与「数据同步」Glue 作业一致），
-  // 否则脚本里 spark.table("s3tablescatalog.<ns>.<表>") 会报
+  // 注册 S3 Tables 的 Iceberg 目录(与「数据同步」Glue 作业一致),否则脚本里 spark.table("s3tablescatalog.<ns>.<表>") 会报
   // [REQUIRES_SINGLE_PART_NAMESPACE]（Spark 把它当默认 hive 目录的两段命名空间）。
+  // 数据湖表桶路由:**每条被选中的路由一组目录**(别名 = 路由别名;平台路由仍是 s3tablescatalog ⇒ 没有外部路由的区
+  //   产出的 --conf 与改动前逐字节相同),属性字面只在唯一作者 lib/lake/routes.ts#sparkCatalogConf 里;声明了缺省目录再加
+  //   spark.sql.defaultCatalog。原来这里手写的五行 s3tablescatalog 字面已搬走(本文件不再出现 spark.sql.catalog. 字面)。
   const account = process.env.AWS_ACCOUNT_ID || "";
   const tableBucket = landing.tableBucket;
-  const s3tablesConf = [
-    "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog",
-    "spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog",
-    `spark.sql.catalog.s3tablescatalog.glue.id=${account}:s3tablescatalog/${tableBucket}`,
-    "spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO",
-    `spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:${landing.region}:${account}:bucket/${tableBucket}`,
-  ].join(" --conf ");
+  const platformConf = sparkCatalogConf(lake.selected, { engine: "glue", account, defaultAlias: lake.defaultAlias });
   // 参数齐全暴露:自定义 Job parameters(--key)合入 DefaultArguments。
   // 平台保留键不允许覆盖(会破坏 S3 Tables 目录注入/业务日期参数);用户的 --conf 追加到平台 conf 链后面。
   // 🔴 平台注入的这几项**用户不许覆盖**:`--bgp_*` 是"你这次跑在哪个区"的事实,
   //    让用户 jobParameters 盖掉它 = 允许把产物写到别的区(驻留承诺形同虚设)。
   // 业务日期参数(15 个)整组保留:运行时由 StartJobRun 的 Arguments 注入,用户 DefaultArguments 写了也会被盖掉,
   //   列进保留键让「写了没用」在定义阶段就被丢弃,而不是看起来接受了。清单来自单一作者 RUN_PARAM_ARG_NAMES(原来手抄 4 个 ⇒ 漏 2 个)。
+  // 数据湖表桶路由:`--bgp_lake_catalogs`(别名=桶 清单,脚本 getResolvedOptions 读)也是平台事实,保留。
   const RESERVED_ARGS = new Set(["--datalake-formats", "--TempDir", ...RUN_PARAM_ARG_NAMES, "--job-bookmark-option", "--extra-jars", "--extra-py-files",
-    "--bgp_target_id", "--bgp_region", "--bgp_datalake_bucket", "--bgp_table_bucket",
+    "--bgp_target_id", "--bgp_region", "--bgp_datalake_bucket", "--bgp_table_bucket", GLUE_LAKE_CATALOGS_ARG,
     // 本区数仓三事实同样是「你这次跑在哪个区」的事实,用户不许覆盖
     "--bgp_redshift_workgroup", "--bgp_redshift_database", "--bgp_redshift_secret_arn"]);
   // 🔴🔴 配方库原来教 AI「workgroup=bgp-workgroup、database=dev 直接写死」—— 因为 Glue 这边平台**从没注入过**
@@ -358,16 +363,24 @@ export async function ensureGlueJob(job: EtlJob, targetId: string = HOME_TARGET_
     "--bgp_target_id": landing.targetId,
     "--bgp_region": landing.region,
     "--bgp_datalake_bucket": landing.datalakeBucket,
-    "--bgp_table_bucket": landing.tableBucket,
+    "--bgp_table_bucket": tableBucket,
+    // 数据湖表桶路由:`别名=桶,别名=桶`(平台路由在前),脚本 `getResolvedOptions(sys.argv, ["bgp_lake_catalogs"])` 读回路由图
+    [GLUE_LAKE_CATALOGS_ARG]: lakeCatalogsArgument(lake.selected),
     ...rsFacts,
-    "--conf": s3tablesConf,
+    "--conf": platformConf.join(" --conf "),
   };
   for (const [k0, v] of Object.entries((cfg.jobParameters || {}) as Record<string, string>)) {
     const k = k0.startsWith("--") ? k0 : `--${k0}`;
     if (!k.slice(2).trim() || RESERVED_ARGS.has(k)) continue;
-    if (k === "--conf") defaultArgs["--conf"] = `${defaultArgs["--conf"]} --conf ${String(v).trim()}`;
-    else defaultArgs[k] = String(v ?? "");
+    if (k === "--conf") {
+      // 数据湖表桶路由(设计稿 §6.5.1 / D10):用户手写的 Spark 目录过一遍路由表 —— 与平台路由同名同桶的条目被接管(丢弃),
+      //   同名不同桶 ⇒ 抛 LAKE_ROUTE_ALIAS_CONFLICT(400),别名不在路由表里的手写目录原样追加(非路由桶仍允许,IAM 决定)
+      const verdict = rejectUserCatalogConf(splitGlueConfValue(String(v)), lake.selected, { defaultDeclared: !!lake.defaultAlias });
+      if (verdict.kept.length) defaultArgs["--conf"] = `${defaultArgs["--conf"]} --conf ${verdict.kept.join(" --conf ")}`;
+    } else defaultArgs[k] = String(v ?? "");
   }
+  // 数据湖表桶路由:--conf 单值超 Glue 上限 ⇒ 400 说清字节数(出路 = 只声明用到的路由),不让 Glue 在 CreateJob 时报一句离根因很远的错
+  assertGlueConfBudget(defaultArgs["--conf"]);
   if (cfg.jobBookmark && cfg.jobBookmark !== "job-bookmark-disable") defaultArgs["--job-bookmark-option"] = cfg.jobBookmark;
   const csv = (s?: string) => String(s || "").split(",").map((x) => x.trim()).filter(Boolean).join(",");
   // 平台「上传依赖文件」落在平台脚本桶(每个绑定区各一份、同 key),提交到哪个区就换成该区的脚本桶;客户自己的桶原样

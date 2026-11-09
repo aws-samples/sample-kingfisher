@@ -126,7 +126,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   // 按「改完之后」的整条任务判自带 Table Bucket 的准入(与 POST / 启动守卫同一份):非主控区只许平台表桶或已登记外部表桶,否则 400 指路
   if (writesS3Tables(merged as never)) {
     const bucketReject = await tableBucketSaveRejection(merged as never);
-    if (bucketReject) return apiError(bucketReject.message, bucketReject.status, { code: "VALIDATION_FAILED" });
+    if (bucketReject) return apiError(bucketReject.message, bucketReject.status, { code: bucketReject.code });
   }
   // **作业已存在**的任务(跑过至少一次)—— 原来保存只写 DDB,脚本只在平台启动时重生成,而调度载体只起旧作业
   //   ⇒ 改了 WHERE / 分区 / 合并键 / 逐表确认之后定时运行一直跑旧脚本(真环境 2026-10-12 坐实)。

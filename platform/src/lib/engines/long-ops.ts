@@ -14,6 +14,7 @@ import { recordAudit } from "@/lib/audit";
 import { forEachTargetPlace } from "@/lib/place/fanout";
 import { getProvider } from "@/lib/engines/registry";
 import { RunLockBusy, JobRowMissing } from "@/lib/etl/run-lock"; // 2026-11-04:作业行已删 ⇒ 用户可修的 409
+import { LakeRouteError } from "@/lib/lake/routes";
 import { TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
 import { AuditUnavailable, ResidencyAckRequired } from "@/lib/exec-env/residency";
 import { userActor } from "@/lib/exec-env/residency-audit";
@@ -47,8 +48,8 @@ const engineRun: LongOpExecutor<"engine-run"> = async (params, ctx) => {
         failures.push({
           targetId,
           error: String(e?.message ?? e),
-          // 🔴 抢不到运行锁 / 绑定被拒 / 需要跨法域同意 都是「用户可修」⇒ 409,不是平台故障
-          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy || e instanceof JobRowMissing,
+          // 🔴 抢不到运行锁 / 绑定被拒 / 需要跨法域同意 / 作业行已删 / 数据湖表桶声明按本区解析不过 都是「用户可修」⇒ 409,不是平台故障
+          rejected: e instanceof TargetBindingRejected || e instanceof ResidencyAckRequired || e instanceof RunLockBusy || e instanceof JobRowMissing || e instanceof LakeRouteError,
           auditUnavailable: e instanceof AuditUnavailable,
         });
         const w = await noteFanoutResult(runGroupId, targetId, { reason: String(e?.message ?? e).slice(0, 400) });

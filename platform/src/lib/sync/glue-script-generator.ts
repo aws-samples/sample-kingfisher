@@ -1,4 +1,6 @@
 import type { DataSource } from "@/types/datasource";
+// 目录别名文法的唯一作者(纯模块,不拉 AWS SDK)
+import { LAKE_ALIAS_RE } from "@/lib/lake/routes-grammar";
 // PlaceWire 生产者 + Python 读取函数(单一作者)
 import { buildPlaceWire } from "@/lib/place/wire";
 import { PLACE_WIRE_PY } from "@/lib/place/wire-py";
@@ -44,6 +46,11 @@ export interface GlueScriptBindings {
   landing: GlueScriptLanding;
   /** 写 Redshift 的任务必须带;不写 Redshift 传 null(用不上的字段不进脚本) */
   rsb: GlueScriptWarehouse | null;
+  /**
+   * 数据湖表桶路由(设计稿 §6.5.3):任务写的那条数据湖路由的 Spark 目录别名 —— 脚本里 `S3T_CATALOG` 与三段名的目录段都用它。
+   * 平台表桶 ⇒ `s3tablescatalog`(脚本与改动前逐字节相同);客户自有表桶 ⇒ 该路由登记的别名。必填:调用方从 `effectiveLakeRoute` 取,不猜。
+   */
+  lakeCatalogAlias: string;
 }
 
 // JDBC URL + driver 由数据源 SPI 的 buildConnection 产出(取代此前写死的 JDBC_URL 表 +
@@ -138,7 +145,11 @@ const S3_ALIGN_PY = `            # 写进**已有**表之前按**列名**对齐�
 `;
 
 export function generateGlueScript(task: any, ds: DataSource, bindings: GlueScriptBindings): string {
-  const { landing, rsb } = bindings;
+  const { landing, rsb, lakeCatalogAlias } = bindings;
+  // 数据湖表桶路由:目录别名文法(路由作者的同一正则;不合法 ⇒ 生成期就抛,不让一个坏别名进脚本)
+  if (!LAKE_ALIAS_RE.test(String(lakeCatalogAlias ?? ""))) {
+    throw new Error(`generateGlueScript: lakeCatalogAlias 不合法 ${JSON.stringify(lakeCatalogAlias)}(应由 effectiveLakeRoute 给出路由别名)`);
+  }
   const { jdbcUrl, driverClass } = jdbcConnFor(ds);
   const sourceParadigm = paradigmOf(ds);
   const isDynamoSource = sourceParadigm === "nosql"; // DynamoDB 走 Glue DDB 连接器读(非 JDBC)
@@ -330,7 +341,7 @@ PARTITION_KEYS = ${JSON.stringify(partitionKeys)}
 MERGE_KEYS = ${JSON.stringify(mergeKeys)}
 ` : ""}
 # S3 Tables catalog path (backtick bucket name with hyphens)
-S3T_CATALOG = "s3tablescatalog"
+S3T_CATALOG = "${lakeCatalogAlias}"
 S3T_BUCKET_RAW = "${tableBucketName}"
 BT = chr(96)
 S3T_BUCKET = BT + S3T_BUCKET_RAW + BT
@@ -517,7 +528,7 @@ ${writeS3 ? `
     # target_name(上方 re.sub 处理过)构造,保证视图名合法。真 bug:100万 DDB→S3Table 首次现形。
     temp_view = f"temp_{target_name}"
     df.createOrReplaceTempView(temp_view)
-    s3t_table = f"s3tablescatalog.{S3T_NAMESPACE}.{target_name}"
+    s3t_table = f"${lakeCatalogAlias}.{S3T_NAMESPACE}.{target_name}"
 ${isMerge ? `    # 合并键在目标表里的写法(表已存在时按列名对齐后改成目标表的写法;新建表 = 源的写法)
     _bgp_mk_t = list(_bgp_mk)
 ` : ""}

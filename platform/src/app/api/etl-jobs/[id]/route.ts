@@ -11,6 +11,8 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { assertBindableTargetsForEngine, TargetBindingRejected, bindingTargets } from "@/lib/exec-env/data-plane-target";
 // 自定义执行角色保存期预检
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
+// 数据湖表桶路由:作业的数据湖表桶声明(形状 / 按绑定区校验 / 错误整形)唯一作者
+import { checkLakeDeclarationForTargets, lakeRouteErrorResponse, normalizeLakeDeclaration, resolveJobLakeRoutes, userGlueConfEntries, type LakeDeclaration } from "@/lib/lake/job-declaration";
 import { s3UrisFromGlueConfig } from "@/lib/execution-role/s3-uris";
 import { offlineUnboundTargets, offlineFanout, offlineFailures, offlineFailureMessage } from "@/lib/etl/dag-fanout";
 import type { EtlJob } from "@/types/etl-job";
@@ -72,14 +74,31 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     }
   }
   // 按「改完之后」的整条作业预检自定义执行角色(只在角色 / 依赖 / 脚本 / 绑定被动到时量;与新建同一作者),缺 ⇒ 400 不落库
+  // 同一时机按「改完之后」的声明校验数据湖表桶(桶是路由 / 写只读 / 缺省目录 / 手写目录撞桶 / --conf 预算),
+  //   不过 ⇒ 400 带 code 不落库;被接管的手写目录 ⇒ `_meta.notices`;预检按声明解析出的路由逐桶量
+  let lakeNotices: string[] = [];
   if (String((current as { type?: unknown }).type || "") === "glue" && (body.glueConfig !== undefined || body.script !== undefined || newTargets !== undefined)) {
-    const merged = { ...(current as Record<string, unknown>), ...body } as { glueConfig?: { executionRoleArn?: unknown; extraJars?: unknown; extraPyFiles?: unknown }; script?: unknown };
+    const merged = { ...(current as Record<string, unknown>), ...body } as { glueConfig?: { executionRoleArn?: unknown; extraJars?: unknown; extraPyFiles?: unknown; jobParameters?: unknown; lakeBuckets?: unknown; defaultCatalogAlias?: unknown }; script?: unknown };
+    const targetsAfter = newTargets ?? bindingTargets(current as { targets?: unknown; targetId?: unknown });
+    let decl: LakeDeclaration;
+    try {
+      decl = normalizeLakeDeclaration(merged.glueConfig);
+      lakeNotices = (await checkLakeDeclarationForTargets({
+        engine: "glue", targets: targetsAfter, decl, userConf: userGlueConfEntries(merged.glueConfig?.jobParameters), account: process.env.AWS_ACCOUNT_ID || "",
+      })).notices;
+    } catch (e) {
+      const lr = lakeRouteErrorResponse(e);
+      if (lr) return lr;
+      throw e;
+    }
+    if (body.glueConfig !== undefined) body.glueConfig = { ...body.glueConfig, ...decl, ...(decl.lakeBuckets ? {} : { lakeBuckets: undefined }), ...(decl.defaultCatalogAlias ? {} : { defaultCatalogAlias: undefined }) };
     const pfRes = await preflightCustomRoleForTargets({
       engine: "glue",
       customRoleArn: merged.glueConfig?.executionRoleArn,
-      targets: newTargets ?? bindingTargets(current as { targets?: unknown; targetId?: unknown }),
+      targets: targetsAfter,
       extraS3Uris: s3UrisFromGlueConfig(merged.glueConfig),
       scriptCode: typeof merged.script === "string" ? merged.script : undefined,
+      lakeRoutesFor: async (targetId) => (await resolveJobLakeRoutes(targetId, decl)).selected,
     });
     if (pfRes) return pfRes;
   }
@@ -153,7 +172,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
         engine: "etl-redshift",
       }).catch(() => {});
     }
-    return apiOk(offlinedOnRebind.length ? { ...(Item as object), offlinedOnRebind } : Item);
+    return apiOk(offlinedOnRebind.length ? { ...(Item as object), offlinedOnRebind } : Item, 200, lakeNotices.length ? { notices: lakeNotices } : undefined);
   } catch (e: any) {
     return apiError(e.message, 500);
   }

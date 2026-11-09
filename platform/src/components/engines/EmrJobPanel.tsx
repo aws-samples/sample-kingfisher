@@ -26,6 +26,7 @@ import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPane
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
 // 执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
+import JobLakeBucketsBlock, { type JobLakeDeclarationValue } from "@/components/lake/JobLakeBucketsBlock"; // 数据湖表桶路由:数据湖表桶声明块(与离线计算页共用)
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { groupsFromToken } from "@/lib/auth/roles";
 import DiagnosisButton from "@/components/common/DiagnosisButton";
@@ -88,6 +89,8 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
   const [sparkConf, setSparkConf] = useState<Array<{ k: string; v: string }>>(
     Object.entries(job.sparkConf || {}).map(([k, v]) => ({ k, v: String(v) }))
   );
+  // 数据湖表桶路由:数据湖表桶声明(作业顶层 lakeBuckets / defaultCatalogAlias;不声明 = 本区全部路由)
+  const [lake, setLake] = useState<JobLakeDeclarationValue>({ lakeBuckets: job.lakeBuckets, defaultCatalogAlias: job.defaultCatalogAlias });
   const [args, setArgs] = useState<string>((job.entryPointArguments || []).join(" "));
   const [runDate, setRunDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [runs, setRuns] = useState<any[]>([]);
@@ -123,6 +126,7 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     setSpec(job.spec || EMR_SPEC_DEFAULT);
     setNetwork(job.network || { subnetIds: [], securityGroupIds: [] });
     setSparkConf(Object.entries(job.sparkConf || {}).map(([k, v]) => ({ k, v: String(v) })));
+    setLake({ lakeBuckets: job.lakeBuckets, defaultCatalogAlias: job.defaultCatalogAlias });
     setArgs((job.entryPointArguments || []).join(" "));
     setCron(job.cronExpression || "");
     setTargets(Array.isArray((job as any).targets) && (job as any).targets.length ? (job as any).targets : [HOME_TARGET]);
@@ -167,6 +171,9 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
     sparkConf.forEach(({ k, v }) => { const key = k.trim(); if (key) conf[key] = v; });
     return {
       script, spec, network, sparkConf: conf,
+      // 数据湖表桶路由:数据湖表桶声明(不声明 ⇒ 显式 null,让服务端把存量值清掉;服务端按绑定区校验)
+      lakeBuckets: lake.lakeBuckets ?? null,
+      defaultCatalogAlias: lake.defaultCatalogAlias ?? null,
       entryPointArguments: args.trim() ? args.trim().split(/\s+/) : [],
       // 🔴 绑定跟着保存一起走(服务端会过 `assertBindableTargetsForEngine` 校验)
       targets: targets.length ? targets : [HOME_TARGET],
@@ -410,6 +417,10 @@ export default function EmrJobPanel({ job, onChanged, onDeleted, activeTab, onTa
                   scriptCode={script}
                   advisorRequest={{ engine: "emr", resources: { needsS3Tables: true, needsGlueCatalog: true, needsRedshift: true, needsCloudWatchLogs: true } }}
                 />
+              </div>
+              {/* 数据湖表桶路由:数据湖表桶 —— 与离线计算 Glue 作业同一个块(S3TablesCatalog 目录按路由逐条注入;spark.bgp.lakeCatalogs 读回路由图) */}
+              <div style={{ marginBottom: 8 }}>
+                <JobLakeBucketsBlock engine="emr" targetId={targets[0] || HOME_TARGET} multiTargetHint={targets.length > 1} value={lake} onChange={setLake} />
               </div>
               <Collapse size="small" style={{ marginBottom: 8 }} items={[{
                 key: "spec", label: t("Driver / Executor 规格（CPU / 内存 / 磁盘）"),

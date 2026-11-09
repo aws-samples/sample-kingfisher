@@ -430,6 +430,18 @@
       }
     },
     {
+      "id": "script:lib/lake-routes-migrate.mjs",
+      "what": "数据湖表桶路由升级步 2c‴:把主控区存量同步任务写着的未登记自有 S3 Tables 表桶登记为数据湖路由(别名派生 / other / 可写 / actor=upgrade 审计);--check 模式给 02-postdeploy-truth 第 11 条读真值",
+      "executor": "redeploy-platform.sh 2c‴(node)→ aws CLI;02-postdeploy-truth.sh 第 11 条(--check)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "platform/src/lib/lake/__tests__/migrate-script.test.ts",
+        "marker": "planLakeRouteMigration",
+        "cases": 6
+      },
+      "note": "纯函数段(筛主控区任务 / 派生别名 / 行形状 / 审计行形状)被判据真跑:行键集与平台作者 lakeRouteItemOf 逐字同,aliasFromBucket 与 routes-grammar 的实现用同一组输入 parity 比对;aws CLI 包装段靠 redeploy 真跑(与同目录 .sh 一样)"
+    },
+    {
       "id": "script:install-hooks.sh",
       "what": "装 Claude hooks",
       "executor": "本机 bash",

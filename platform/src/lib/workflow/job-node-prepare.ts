@@ -11,6 +11,7 @@ import { resolveExecutionRoleArn } from "@/lib/execution-role/resolve";
 import { preflightExecutionRole, assertPreflightPassed } from "@/lib/execution-role/preflight";
 import { ensureApplication, targetEmrNetwork } from "@/lib/engines/emr/application";
 import { persistApplicationId, S3TABLES_JAR } from "@/lib/engines/emr/provider";
+import { emrLakeRoutesFor } from "@/lib/engines/emr/job-spec";
 import { ensureS3TablesJar, uploadScript } from "@/lib/engines/emr/script";
 import type { Workflow } from "@/types/workflow";
 import { loadJobNodeRow, type WorkflowNodeLike } from "./job-node-spec";
@@ -41,9 +42,11 @@ export async function prepareJobNodesForTarget(
       fallback: landing.executionRoleArn,
       missingMessage: `目标 ${wfTarget} 没有 EMR 执行角色(描述符缺 emrExecutionRoleArn)`,
     });
+    // 数据湖表桶路由:作业在工作流执行区被选中的数据湖路由(声明不合法 ⇒ 发布如实失败;与 provider.submit 同一作者)
+    const lake = await emrLakeRoutesFor(job, wfTarget, landing);
     if (resolvedRole.isCustom) {
       // 自定义角色按该区预检(与 provider.submit / 发布调度同一口径),缺 ⇒ 发布如实失败
-      const pf = await preflightExecutionRole({ engine: "emr", roleArn: resolvedRole.roleArn, targetId: wfTarget, scriptCode: job.script });
+      const pf = await preflightExecutionRole({ engine: "emr", roleArn: resolvedRole.roleArn, targetId: wfTarget, scriptCode: job.script, lakeRoutes: lake.selected });
       assertPreflightPassed(pf, { engine: "emr", roleArn: resolvedRole.roleArn, targetId: wfTarget, what: `workflow-job-node ${job.jobId}` });
     }
     const targetNetwork = await targetEmrNetwork(wfTarget);

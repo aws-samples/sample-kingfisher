@@ -38,6 +38,8 @@ import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 // 执行角色解析 / 预检的唯一作者
 import { resolveExecutionRoleArn } from "@/lib/execution-role/resolve";
 import { preflightExecutionRole, assertPreflightPassed } from "@/lib/execution-role/preflight";
+// 数据湖表桶路由:Flink 预检要量的数据湖路由(SQL 真写 S3 Tables sink 才量;纯函数)
+import { flinkLakeRoutesFor } from "@/lib/realtime/flink-lake-routes";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 // 🔴 凭证读取走 ARN 派生 region 的唯一出口:secret ARN 自带 region
 import { getSecretJson } from "@/lib/datasource-spi/secrets";
@@ -993,7 +995,8 @@ async function ensureApplication(ctx: FlinkCtx, jobId: string, finalSql: string,
     missingMessage: `目标 ${ctx.targetId} 没有 Flink 运行角色(描述符缺 flink 服务角色)`,
   });
   if (resolvedRole.isCustom) {
-    const pf = await preflightExecutionRole({ engine: "flink", roleArn: resolvedRole.roleArn, targetId: ctx.targetId });
+    // 数据湖表桶路由:SQL 真写 S3 Tables sink(s3t 目录 / ${TABLE_BUCKET_ARN})才按平台路由 write 量 s3tables(Phase 3 才有选桶)
+    const pf = await preflightExecutionRole({ engine: "flink", roleArn: resolvedRole.roleArn, targetId: ctx.targetId, lakeRoutes: flinkLakeRoutesFor(ctx, finalSql) });
     assertPreflightPassed(pf, { engine: "flink", roleArn: resolvedRole.roleArn, targetId: ctx.targetId, what: `flink-job ${jobId}` });
   }
   const svcRole = resolvedRole.roleArn;

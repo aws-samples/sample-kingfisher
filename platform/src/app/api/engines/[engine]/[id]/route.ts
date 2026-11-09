@@ -16,6 +16,9 @@ import { snapshotVersion } from "@/lib/versions/version-service";
 import { offlineEmrFanout } from "@/lib/engines/emr/schedule-fanout";
 import { offlineFailures, offlineFailureMessage } from "@/lib/etl/dag-fanout";
 import type { EmrEngineJob } from "@/lib/engines/emr/types";
+// 作业的数据湖表桶声明(形状 / 按绑定区校验 / 错误整形)唯一作者;绑定归一口 bindingTargets
+import { checkLakeDeclarationForTargets, lakeRouteErrorResponse, normalizeLakeDeclaration, userEmrConfEntries } from "@/lib/lake/job-declaration";
+import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 // 「运行」的提交段是长操作(engine-run,租约 engine-job:<jobId>)⇒ 提交进行中改 / 删这条作业 ⇒ 409 LONG_OP_IN_PROGRESS
 import { resourceBusyResponse } from "@/lib/long-ops/guard";
 import { resourceKey } from "@/lib/long-ops/kinds";
@@ -79,8 +82,24 @@ export async function PUT(
       return apiError((e as Error)?.message ?? String(e), 400, { code: "VALIDATION_FAILED" });
     }
   }
+  // 数据湖表桶路由(设计稿 §6.10.6):按「改完之后」的整条作业校验数据湖表桶声明(只在声明 / sparkConf / 绑定被动到时量),
+  //   不过 ⇒ 400 带 code 不落库;被平台接管的手写 sparkConf 目录 ⇒ `_meta.notices`;归一后写回 body(不信客户端原样值)
+  let lakeNotices: string[] = [];
+  if (body.lakeBuckets !== undefined || body.defaultCatalogAlias !== undefined || body.sparkConf !== undefined || hasTargetsPatch(body)) {
+    const merged = { ...(current as Record<string, unknown>), ...body } as { lakeBuckets?: unknown; defaultCatalogAlias?: unknown; sparkConf?: unknown; targets?: unknown; targetId?: unknown };
+    try {
+      const decl = normalizeLakeDeclaration(merged);
+      lakeNotices = (await checkLakeDeclarationForTargets({ engine: "emr", targets: bindingTargets(merged), decl, userConf: userEmrConfEntries(merged.sparkConf), account: process.env.AWS_ACCOUNT_ID || "" })).notices;
+      if (body.lakeBuckets !== undefined) body.lakeBuckets = decl.lakeBuckets ?? null;
+      if (body.defaultCatalogAlias !== undefined) body.defaultCatalogAlias = decl.defaultCatalogAlias ?? null;
+    } catch (e) {
+      const lr = lakeRouteErrorResponse(e);
+      if (lr) return lr;
+      throw e;
+    }
+  }
   // cronExpression/scheduleEnabled 由 schedule 路由维护,但也允许 PUT 编辑基础配置。
-  const editable = ["name", "description", "script", "spec", "network", "sparkConf", "entryPointArguments", "targets"];
+  const editable = ["name", "description", "script", "spec", "network", "sparkConf", "entryPointArguments", "targets", "lakeBuckets", "defaultCatalogAlias"];
   const sets: string[] = ["updatedAt = :now"];
   const names: Record<string, string> = {};
   const values: Record<string, unknown> = { ":now": new Date().toISOString() };
@@ -106,7 +125,7 @@ export async function PUT(
     );
     // 保存即快照一版(与 etl-job 一致,接入通用版本/晋升/回滚)。best-effort,失败不影响保存。
     await snapshotVersion("engine-job", params.id, Item as any, guard.identity.username, "保存").catch(() => {});
-    return apiOk(Item);
+    return apiOk(Item, 200, lakeNotices.length ? { notices: lakeNotices } : undefined);
   } catch (e: any) {
     return apiError(e.message, 500, { code: "INTERNAL" });
   }

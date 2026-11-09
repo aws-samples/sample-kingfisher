@@ -279,13 +279,13 @@ describe("搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面
     expect(seq().some((s) => s.startsWith("glue:"))).toBe(false);
   });
 
-  it("非 home 任务自带的表桶与落点不一致 ⇒ 409 CONFLICT,不建表桶不建作业", async () => {
+  it("非 home 任务自带的表桶不是该区路由 ⇒ 409 LAKE_ROUTE_NOT_FOUND(数据湖表桶路由起码点名「不是路由」,原 CONFLICT),不建表桶不建作业", async () => {
     S.task = { ...structuredClone(baseTask), targets: ["tgt_usw2_a"], s3Config: { namespace: "gamedb", tableBucket: "bgp-table-bucket" } };
     S.ds = { ...structuredClone(baseDs), ownerTargetId: "tgt_usw2_a" };
     S.landing = USW2_LANDING;
     const res = await POST(post(), { params: { id: baseTask.taskId } });
     expect(res.status).toBe(409);
-    expect((await res.json()).error.code).toBe("CONFLICT");
+    expect((await res.json()).error.code).toBe("LAKE_ROUTE_NOT_FOUND");
     expect(seq().some((s) => s.startsWith("glue:") || s.startsWith("s3tables:") || s.startsWith("s3:"))).toBe(false);
   });
 

@@ -8,6 +8,8 @@ import { Construct } from "constructs";
 //    `${cdk.Stack.of(this).region}`。「清单驱动的门禁,覆盖面就是判据本身」⇒ 门禁已同批改成
 //    **结构判定**(region 段只允许 `regionalStatement` 的回调参数),不再枚举拼法。
 import { regionalStatement } from "./shared/execution-regions";
+// 数据湖表桶路由:「本区任意 S3 Tables 表桶」ARN 的唯一作者(主控区 EMR / Flink 与执行区角色同一口径)
+import { anyTableBucketArn } from "./shared/table-bucket-arn";
 
 // (实时计算 Flink) — 门控基建(MSAF 引擎的耐久依赖)。
 //
@@ -120,17 +122,16 @@ export class FlinkStack extends cdk.Stack {
     }));
 
     // S3 Tables(托管 Iceberg)sink:S3TablesCatalog 经 s3tables API 建命名空间/表 + 读写
-    // 数据/元数据(限定到平台表桶 bgp-table-bucket);经 Glue/Lake Formation 联邦目录治理需 glue/
-    // lakeformation(与平台 glueRole 同源,已实证可访问 S3 Tables)。表桶静态加密为 SSE-S3,无需额外 KMS。
+    // 数据/元数据;经 Glue/Lake Formation 联邦目录治理需 glue/lakeformation(与平台 glueRole 同源,已实证可访问 S3 Tables)。
+    // 表桶静态加密为 SSE-S3,无需额外 KMS。
+    // 数据湖表桶路由(2026-11-04):从「只有平台表桶 bgp-table-bucket」放到「本区**任意**表桶 bucket/*」(后续的 Flink
+    //   lakeRoute 选桶 sink 要它;与执行区 Glue / EMR 角色 2026-10-27 起同一口径);ARN 形态唯一作者 shared/table-bucket-arn.ts,
+    //   synth-gate §9.8 断言不含任何桶名字面。region 段仍绑主控区(home 轴)。
     role.addToPolicy(regionalStatement(this, {
       axis: "home",
-      reason: "表桶 bgp-table-bucket 是**主控区**那一只;非 home 的表桶名在该 target 的资源袋里,"
-        + "由 per-target 的 flink 角色授权(实名资源,不按 bgp-* 约定猜)⇒ 本条不需要跨 region。",
+      reason: "主控区 Flink 应用只在主控区跑,表桶也在主控区;非 home 的 flink 角色由执行区 flink 栈建(同样放到该区任意表桶)⇒ 本条不需要跨 region。",
       actions: ["s3tables:*"],
-      resources: (r) => [
-        `arn:aws:s3tables:${r}:${acct}:bucket/bgp-table-bucket`,
-        `arn:aws:s3tables:${r}:${acct}:bucket/bgp-table-bucket/*`,
-      ],
+      resources: (r) => anyTableBucketArn("aws", r, acct),
     }));
     role.addToPolicy(new iam.PolicyStatement({
       actions: ["glue:*", "lakeformation:*"],

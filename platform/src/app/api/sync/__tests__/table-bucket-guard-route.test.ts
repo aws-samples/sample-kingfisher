@@ -28,11 +28,13 @@ vi.mock("@/lib/aws/dynamodb", () => ({
       h.ddb.push(n);
       if (n === "GetCommand") return { Item: cmd.input?.Key?.datasourceId ? h.ds : h.task };
       if (n === "PutCommand") { h.puts.push(cmd.input.Item); return {}; }
-      if (n === "UpdateCommand") { h.updates.push(cmd.input); return { Attributes: { ...h.task } }; }
+      // 只记任务行的回写(路由表存量行的派生回写是读侧行为,不是「保存写库」)
+      if (n === "UpdateCommand") { if (cmd.input.TableName === "bgp-sync-tasks") h.updates.push(cmd.input); return { Attributes: { ...h.task } }; }
       if (n === "QueryCommand" && cmd.input.TableName === "bgp-settings") {
         const prefix = String(cmd.input.ExpressionAttributeValues[":prefix"]);
         const tid = prefix.replace(/^lake-ext-bucket#/, "").replace(/#$/, "");
-        return { Items: (h.registered.get(tid) ?? []).map((b) => ({ pk: "settings", sk: `${prefix}${b}`, targetId: tid, bucket: b, region: "us-west-2", addedBy: "admin", addedAt: "2026-10-27T00:00:00.000Z" })) };
+        // 路由行与真落库同形(登记后的行带 alias / tier / writable;数据湖表桶路由起登记 = 路由)
+        return { Items: (h.registered.get(tid) ?? []).map((b) => ({ pk: "system", sk: `${prefix}${b}`, targetId: tid, bucket: b, region: tid === "tgt_home" ? "us-east-1" : "us-west-2", addedBy: "admin", addedAt: "2026-10-27T00:00:00.000Z", alias: b.replace(/-/g, "_"), tier: "other", writable: true })) };
       }
       return {};
     }),
@@ -95,13 +97,13 @@ beforeEach(() => {
 });
 
 describe("🔴 建任务 POST /api/sync:非主控区自带 Table Bucket 的准入", () => {
-  it("未登记的自有桶 ⇒ 400 VALIDATION_FAILED,文案点名桶 / 平台表桶 / 去登记;零落库", async () => {
+  it("未登记的自有桶 ⇒ 400 LAKE_ROUTE_NOT_FOUND(点名「不是路由」),文案点名桶 / 平台表桶 / 去登记;零落库", async () => {
     const r = await req("../route", { ...base, s3Config: { tableBucket: "cust-own" } });
     expect(r.status, JSON.stringify(r.body)).toBe(400);
-    expect(r.body.error.code).toBe("VALIDATION_FAILED");
+    expect(r.body.error.code).toBe("LAKE_ROUTE_NOT_FOUND");
     expect(r.body.error.message).toContain(`执行环境 ${USW2} 不能写入表桶「cust-own」`);
     expect(r.body.error.message).toContain(`平台表桶「${PLATFORM}」`);
-    expect(r.body.error.message).toContain("系统设置 → 数据湖外部表桶");
+    expect(r.body.error.message).toContain("系统设置 → 数据湖表桶与路由");
     expect(h.puts).toHaveLength(0);
   });
 
@@ -126,10 +128,16 @@ describe("🔴 建任务 POST /api/sync:非主控区自带 Table Bucket 的准�
     expect(h.ddb.filter((x) => x === "QueryCommand")).toHaveLength(0);
   });
 
-  it("主控区任务 + 未登记自有桶 ⇒ 201(主控区行为不变)", async () => {
+  it("🔴 数据湖表桶路由(D4):主控区任务 + 未登记自有桶 ⇒ 400 LAKE_ROUTE_NOT_FOUND(主控区不再任意桶放行;登记为路由后 ⇒ 201)", async () => {
     h.ds = { ...h.ds, [DATASOURCE_OWNER_TARGET_ATTR]: "tgt_home" };
     const r = await req("../route", { ...base, s3Config: { tableBucket: "cust-own" } });
-    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(r.status, JSON.stringify(r.body)).toBe(400);
+    expect(r.body.error.code).toBe("LAKE_ROUTE_NOT_FOUND");
+    expect(r.body.error.message).toContain("执行环境 tgt_home 不能写入表桶「cust-own」");
+    expect(h.puts).toHaveLength(0);
+    h.registered.set("tgt_home", ["cust-own"]);
+    const ok = await req("../route", { ...base, s3Config: { tableBucket: "cust-own" } });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
   });
 
   it("不写 S3 Tables(targetType=redshift)的任务带着陈旧的 s3Config.tableBucket ⇒ 不校验、201", async () => {
@@ -144,7 +152,8 @@ describe("🔴 改任务 PUT /api/sync/[id]", () => {
     h.task = { ...base, taskId: "T1", projectId: "p1", targets: [USW2] };
     const bad = await req("../[id]/route", { s3Config: { tableBucket: "cust-own" } }, "PUT", { id: "T1" });
     expect(bad.status, JSON.stringify(bad.body)).toBe(400);
-    expect(bad.body.error.message).toContain("系统设置 → 数据湖外部表桶");
+    expect(bad.body.error.code).toBe("LAKE_ROUTE_NOT_FOUND");
+    expect(bad.body.error.message).toContain("系统设置 → 数据湖表桶与路由");
     expect(h.updates).toHaveLength(0);
     h.registered.set(USW2, ["cust-own"]);
     const ok = await req("../[id]/route", { s3Config: { tableBucket: "cust-own" } }, "PUT", { id: "T1" });

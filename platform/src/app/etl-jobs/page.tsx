@@ -26,6 +26,7 @@ import VersionHistoryDrawer from "@/components/common/VersionHistoryDrawer";
 import ParamAdvisorPanel from "@/components/param-advisor/ParamAdvisorPanel";
 // 执行角色改为选择器(三组下拉 + 刷新 + 手填兜底 + 检查权限;角色顾问面板在其内)
 import ExecutionRolePicker from "@/components/exec-roles/ExecutionRolePicker";
+import JobLakeBucketsBlock from "@/components/lake/JobLakeBucketsBlock"; // 数据湖表桶路由:数据湖表桶声明块(与 EMR 面板共用)
 import NetworkAdvisorPanel from "@/components/network-advisor/NetworkAdvisorPanel";
 import EmrJobPanel from "@/components/engines/EmrJobPanel";
 // 运行历史「触发」格(工作流回链)唯一作者;`?jobId=&tab=runs` 深链(工作流节点详情点回来)
@@ -775,6 +776,14 @@ export default function EtlJobsPage() {
                                   advisorRequest={{ engine: "glue", resources: { needsS3Tables: true, needsGlueCatalog: true, needsRedshift: true, needsCloudWatchLogs: true } }}
                                 />
                               </div>
+                              {/* 数据湖表桶路由:数据湖表桶 —— 本区路由多选(缺省全部)+ 每桶读 / 写 + 缺省目录 + 可用目录清单与三段名示例;落到 glueConfig.lakeBuckets / defaultCatalogAlias */}
+                              <JobLakeBucketsBlock
+                                engine="glue"
+                                targetId={targets[0] || HOME_TARGET}
+                                multiTargetHint={targets.length > 1}
+                                value={{ lakeBuckets: glueCfg.lakeBuckets, defaultCatalogAlias: glueCfg.defaultCatalogAlias }}
+                                onChange={(v) => setGlueCfg({ ...glueCfg, lakeBuckets: v.lakeBuckets, defaultCatalogAlias: v.defaultCatalogAlias })}
+                              />
                               <div>
                                 <Text type="secondary" style={{ fontSize: 12 }}>{t("Job parameters(自定义 --key 参数,脚本用 getResolvedOptions 读取;--conf 会追加到平台 Spark 配置后):")}</Text>
                                 {jobParams.map((p, i) => (

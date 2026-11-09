@@ -71,8 +71,11 @@ vi.mock("@/lib/exec-env/registry", () => ({
     resources: { athenaWorkgroup: "bgp-athena-tgt-usw2-a", datalakeBucket: "dl-usw2", tableBucket: "bgp-table-bucket-tgt-usw2-a" },
   })),
 }));
-// 外部表桶登记表(bgp-settings,真外部 DDB)—— 本判据不登记外部桶,湖目录仍只有该区平台表桶
-vi.mock("@/lib/lake/external-table-buckets", () => ({ listExternalTableBuckets: vi.fn(async () => []) }));
+// 数据湖路由表(bgp-settings,真外部 DDB)—— 本判据不登记外部路由,湖目录仍只有该区平台表桶;路由作者 lib/lake/routes.ts 直读 DDB(不再经薄壳 external-table-buckets,mock 那层拦不到)
+vi.mock("@/lib/aws/dynamodb", async (orig) => {
+  const real: any = await orig();
+  return { ...real, docClient: { send: async (cmd: any) => (cmd.constructor.name === "QueryCommand" ? { Items: [] } : {}) } };
+});
 
 vi.mock("@/lib/ai/model", () => ({
   resolveModelId: () => "m-test",

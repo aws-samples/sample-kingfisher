@@ -68,15 +68,15 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
     path: "/sync", title: "数据同步",
     what: "把数据源的数据同步到 S3 数据湖或 Redshift 数仓;支持全量 / 增量 / CDC 与流式(Kinesis / MSK)。",
     steps: ["点「新建同步任务」,选源与目标", "选「同步模式」与「同步通道」(Glue / EMR / DMS / Flink 等)", "保存后运行;状态列显示运行中 / 成功 / 失败", "要把 dev 里调好的任务发到 prod:进任务详情点「发布到环境」—— 发到 staging 直接生效,发到 prod 需审批(项目空间 owner 在「待我审批」批准后 prod 才有这一份);顶栏「环境」切到 prod 即可看到"],
-    tips: ["DMS 与 Zero-ETL 通道有持续计费,不用时及时停", "同步任务的绑定区域必须是源可达的区(网络方案 = 每区独立源)"],
-    related: ["/datasources", "/monitor"],
+    tips: ["DMS 与 Zero-ETL 通道有持续计费,不用时及时停", "同步任务的绑定区域必须是源可达的区(网络方案 = 每区独立源)", "Table Bucket 下拉只列可写路由(显示 桶 · 别名 · 分层);客户自有表桶要先在「系统设置 → 数据湖表桶与路由」登记,主控区与执行区同一规则"],
+    related: ["/datasources", "/monitor", "/settings"],
   },
   "/etl-jobs": {
     path: "/etl-jobs", title: "离线计算",
     what: "三种离线作业:Redshift SQL、Glue PySpark、EMR Serverless(PySpark);一个作业可绑多个执行区域,一次运行每区各跑一次。",
     steps: ["点「新建」,选作业类型(Glue PySpark 脚本作业 / Redshift SQL 作业 / EMR Serverless),填名称后「创建」", "在「执行区域(可多选)」勾区,或点「全选当前活跃区」", "在脚本编辑器写 SQL / PySpark(也可「AI 生成代码」),点「保存」", "点「立即运行(N 个区各跑一次)」;Redshift 作业可先「试运行」", "切到「运行历史」看每个区的一条 run;填 cron 后「发布到 MWAA 调度」", "要把 dev 里做好的作业发到 prod:作业卡「发布到环境」→「发布到 staging」直接生效;「发布到 prod(需审批)」会生成审批单,项目空间 owner 在「待我审批」批准后 prod 才有这一份,通知里的「切到 prod 环境查看」直达;作业卡的环境状态标写明 staging ✓ / prod ✓ 与版本号"],
-    tips: ["跨法域区首次操作会弹免责告知,同意后才执行", "运行历史的「审计」列可回查每次运行的区域审计记录", "「发布到环境」只带作业定义(脚本 / 绑定区 / 参数),不带运行历史;「发布到 MWAA 调度」是在当前环境挂定时,两者不是一回事"],
-    related: ["/workflow", "/monitor", "/exec-envs"],
+    tips: ["跨法域区首次操作会弹免责告知,同意后才执行", "运行历史的「审计」列可回查每次运行的区域审计记录", "「发布到环境」只带作业定义(脚本 / 绑定区 / 参数),不带运行历史;「发布到 MWAA 调度」是在当前环境挂定时,两者不是一回事", "「高级属性 → 数据湖表桶」:作业缺省能用本区全部路由的目录(别名见「本作业可用的目录」),跨桶读写直接写 <别名>.<命名空间>.<表> 三段名;只用部分桶或自建角色要最小权限时,勾选子集并给每个桶标读 / 写,保存时按桶量权限"],
+    related: ["/workflow", "/monitor", "/exec-envs", "/settings"],
   },
   "/workflow": {
     path: "/workflow", title: "ETL 编排",
@@ -244,9 +244,10 @@ export const PAGE_GUIDES: Record<string, PageGuide> = {
   },
   "/settings": {
     path: "/settings", title: "系统设置",
-    what: "平台级设置:AI 模型(所有 AI 能力共用,秒级生效)、接线健康状态。",
+    what: "平台级设置:AI 模型(所有 AI 能力共用,秒级生效)、接线健康状态、各执行环境的数据湖表桶与路由。",
     steps: ["「AI 模型」卡看当前生效模型与来源;管理员点「更换全局默认」,探测通过后保存", "出问题时「恢复出厂默认」", "「刷新状态」查看各接线是否健康"],
-    related: ["/genbi", "/copilot/plans"],
+    tips: ["「数据湖表桶与路由」卡:把客户自己的 S3 Tables 表桶登记为路由(别名 / 分层 / 命名空间归属 / 可写),作业脚本就能用 <别名>.<命名空间>.<表> 三段名读写它、同步任务能把它选为 Table Bucket,无需手写 Spark 配置;同一命名空间出现在两条路由里要声明归属"],
+    related: ["/genbi", "/copilot/plans", "/etl-jobs", "/sync"],
   },
 };
 

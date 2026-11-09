@@ -42,8 +42,10 @@ import { parseSyncRunMetrics } from "@/lib/sync/run-metrics";
 import { adoptExistingTargetsOnce } from "@/lib/sync/foreign-guard-adoption";
 // Glue 版本的唯一作者(缺省值 + 写 S3 Tables 的最低版本)
 import { GLUE_VERSIONS, isGlueVersion, glueVersionOfRecord, syncCompatSparkConf, glueVersionSupportsS3Tables, syncGlueVersionRejection } from "@/lib/sync/glue-version";
-// 任务写哪个表桶 / 自带桶的准入(唯一作者)
-import { effectiveTableBucket, tableBucketRejection } from "@/lib/sync/table-bucket";
+// 任务写哪个表桶 / 自带桶的准入(唯一作者);写哪条**路由**(别名进脚本 / 目录)
+import { effectiveTableBucket, effectiveLakeRoute, tableBucketRejection } from "@/lib/sync/table-bucket";
+// Spark 目录属性只在路由作者里拼(本文件不再出现 spark.sql.catalog. 字面);平台路由走纯函数不读 DDB
+import { platformRouteOf, sparkCatalogConf, type LakeRoute } from "@/lib/lake/routes";
 // 数据源外部网络对象(平台自建安全组 / 子网 / Glue 连接)核对自愈 + 运行失败原话分类(两处唯一作者)
 import { reconcileDatasourceNetwork, noteNetworkDriftFromRunError } from "@/lib/datasource/network-reconcile";
 import { classifyRunError, isNetworkDrift } from "@/lib/sync/run-error";
@@ -106,8 +108,11 @@ async function startJobRunWithRetry(
   }
 }
 
-/** 业务拒绝的错误码(路由原样透传;页面按码指路)。多一种:数据源的用户自带网络对象 / 密钥缺失,平台不代建。 */
-export type SyncRejectCode = "CONFLICT" | "DATASOURCE_NETWORK_BROKEN";
+/**
+ * 业务拒绝的错误码(路由原样透传;页面按码指路)。多一种:数据源的用户自带网络对象 / 密钥缺失,平台不代建。
+ * 数据湖表桶路由起多两种(启动 409):自带表桶不是本区路由 / 路由只读。
+ */
+export type SyncRejectCode = "CONFLICT" | "DATASOURCE_NETWORK_BROKEN" | "LAKE_ROUTE_NOT_FOUND" | "LAKE_ROUTE_NOT_WRITABLE";
 
 export type StartGlueSyncRunResult =
   | { started: true; jobName: string; jobRunId: string | undefined; runId: string }
@@ -187,11 +192,27 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
   const glue = await glueClientFor(landing.region);
   const s3 = await s3ClientFor(landing.region);
 
+  // Auto-create S3 Table Bucket & Namespace if target is S3 Tables
+  const writeS3 = task.targetType === "s3-tables" || task.targetType === "both";
+  // 写哪个表桶 = 唯一作者 lib/sync/table-bucket.ts(生成器 / 目标表守卫同一函数)
+  const tableBucketName = effectiveTableBucket(task, landing);
+  // 🔴 自带表桶的准入与保存路由**同一份判定**(数据湖表桶路由 / 设计稿 §6.5.3 / D4):自带桶必须是本区**可写路由**(平台表桶,或在
+  //   「系统设置 → 数据湖表桶与路由」登记且 writable 的桶),主控区与执行区同一条规则 —— 原来主控区任意桶放行、执行区只认描述符
+  //   (登记了也 409,客户 2026-10-27 反馈)。不是路由 ⇒ 409 LAKE_ROUTE_NOT_FOUND;只读 ⇒ 409 LAKE_ROUTE_NOT_WRITABLE。
+  //   不静默取一个(与 resolveRedshiftBinding 的 assertNoWarehouseConflict 同一语义:用户看到自己填的值、真写的是另一个桶,正是要消灭的形态)。
+  //   放在角色预检之前:预检要按这条路由量 s3tables 写权限。不写 S3 Tables 的任务不读路由表(平台路由是纯函数)。
+  let lakeRoute: LakeRoute = platformRouteOf({ targetId: landing.targetId, region: landing.region, tableBucket: landing.tableBucket });
+  if (writeS3) {
+    const bucketReject = await tableBucketRejection(task, landing);
+    if (bucketReject) return ensureReject(409, bucketReject.message, bucketReject.code);
+    lakeRoute = await effectiveLakeRoute(task, landing);
+  }
+
   // 执行角色:任务自定义 executionRoleArn 优先(最小权限),留空回退**该落点的**执行角色
   // (home = 既有 GLUE_ROLE_ARN env;非 home = 该 target 自己的 glue role,resolveTargetGlue
   // 已 fail-closed 断言 —— 🔴 非 home 绝不回落 env:那是拿主控区的执行身份去别的区跑)。
   // 单一作者 resolveExecutionRoleArn;自定义角色在建 / 改 Glue 作业之前按本落点预检(信任 glue + 引擎基线 + 依赖引用),
-  //   缺 ⇒ 400 指路、不动 Glue 作业(与离线计算同一口径)。
+  //   缺 ⇒ 400 指路、不动 Glue 作业(与离线计算同一口径)。写 S3 Tables 的任务再按它写的那条路由量 s3tables 写集 + 联邦目录。
   let roleArn: string;
   try {
     const resolved = resolveExecutionRoleArn({
@@ -201,7 +222,10 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
     });
     roleArn = resolved.roleArn;
     if (resolved.isCustom) {
-      const pf = await preflightExecutionRole({ engine: "glue", roleArn, targetId: tid, extraS3Uris: s3UrisFromGlueConfig(task.glueConfig) });
+      const pf = await preflightExecutionRole({
+        engine: "glue", roleArn, targetId: tid, extraS3Uris: s3UrisFromGlueConfig(task.glueConfig),
+        lakeRoutes: writeS3 ? [{ ...lakeRoute, access: "write" }] : [],
+      });
       if (!pf.ok) return ensureReject(400, pf.message || "执行角色预检未通过");
       if (pf.unverifiable) console.warn(`[sync:preflight] ${tid} ${pf.unverifiable}`);
     }
@@ -209,9 +233,6 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
     if (e instanceof ExecRoleRejected) return ensureReject(400, e.message);
     throw e;
   }
-
-  // Auto-create S3 Table Bucket & Namespace if target is S3 Tables
-  const writeS3 = task.targetType === "s3-tables" || task.targetType === "both";
   const gcfg = (task.glueConfig || {}) as { workerType?: string; numberOfWorkers?: number; glueVersion?: string; timeoutMinutes?: number; maxRetries?: number };
   // 记录里存了版本就用它;没存 ⇒ 按「它被写下时的缺省」(5.1)跑,**不是**新缺省 6.0 —— 升级平台不许静默改任何已有任务的 Glue 版本
   //   (用户 2026-10-26:源库 / 生产环境不会跟着我们的支持版本升级)。存了清单外的值 ⇒ 400 如实拒,不替用户猜。
@@ -225,15 +246,6 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
   //   🔴 放在**任何副作用之前**(建命名空间 / 写脚本 / 建作业都还没发生)。
   if (writeS3 && !glueVersionSupportsS3Tables(glueVersion)) {
     return ensureReject(400, syncGlueVersionRejection(glueVersion));
-  }
-  // 写哪个表桶 = 唯一作者 lib/sync/table-bucket.ts(生成器 / 目标表守卫同一函数)
-  const tableBucketName = effectiveTableBucket(task, landing);
-  // 🔴 自带表桶的准入与保存路由**同一份判定**:非主控区只许平台表桶或「系统设置 → 数据湖外部表桶」已登记的桶,拒绝即指路;主控区不变。
-  //   改动前这里按「非 home 只认描述符」写死(登记了也 409)⇒ 执行区只能写平台表桶。
-  //   不静默取一个(与 resolveRedshiftBinding 的 assertNoWarehouseConflict 同一语义:用户看到自己填的值、真写的是另一个桶,正是要消灭的形态)。
-  if (writeS3) {
-    const bucketReject = await tableBucketRejection(task, landing);
-    if (bucketReject) return ensureReject(409, bucketReject, "CONFLICT");
   }
   // 数据源依赖的外部网络对象(平台自建安全组 / 平台选的子网 / Glue 连接)核对与自愈,🔴 仍在**任何副作用之前**
   //   (建命名空间 / 写脚本 / 建作业都还没发生;启动 / 保存 / 调度扇出 / 补数四条路都经过这里)。
@@ -257,8 +269,9 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
   if (args.beforeGenerate) await args.beforeGenerate(task);
 
   // Generate script —— 脚本里的区位值(区/桶/workgroup/库/凭证)全部由 binding 生成期注入,
-  // Python 侧不再按 env / home 命名猜(落的,glue-script-landing 单测钉住)。
-  const script = generateGlueScript(task, ds as DataSource, { landing, rsb });
+  // Python 侧不再按 env / home 命名猜(glue-script-landing 单测钉住)。
+  // 脚本里的目录名 = 任务写的那条路由的别名(平台路由仍是 s3tablescatalog ⇒ 脚本逐字节不变)
+  const script = generateGlueScript(task, ds as DataSource, { landing, rsb, lakeCatalogAlias: lakeRoute.alias });
   const bucket = landing.scriptsBucket;
   const scriptKey = `glue-scripts/${task.taskId}.py`;
   await s3.send(new PutObjectCommand({ Bucket: bucket, Key: scriptKey, Body: script }));
@@ -279,11 +292,8 @@ export async function ensureGlueSyncJob(args: EnsureGlueSyncJobArgs): Promise<En
       "--datalake-formats": "iceberg",
       "--TempDir": `s3://${bucket}/temp/`,
       "--conf": [
-        "spark.sql.catalog.s3tablescatalog=org.apache.iceberg.spark.SparkCatalog",
-        "spark.sql.catalog.s3tablescatalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog",
-        `spark.sql.catalog.s3tablescatalog.glue.id=${process.env.AWS_ACCOUNT_ID}:s3tablescatalog/${tableBucketName}`,
-        "spark.sql.catalog.s3tablescatalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO",
-        `spark.sql.catalog.s3tablescatalog.warehouse=arn:aws:s3tables:${landing.region}:${process.env.AWS_ACCOUNT_ID}:bucket/${tableBucketName}`,
+        // 任务写的那条路由的 Iceberg GlueCatalog 五项(唯一作者 sparkCatalogConf;平台路由 ⇒ 与改动前逐字相同)
+        ...sparkCatalogConf([lakeRoute], { engine: "glue", account: process.env.AWS_ACCOUNT_ID ?? "" }),
         // Glue ≥ 6.0(Spark 4)的平台同步脚本钉兼容开关(ANSI 关 + JDBC legacy 类型映射),让同一张源表在 5.1 / 6.0 下读出同样的类型;
         //   < 6.0 为空数组 ⇒ 作业定义逐字节不变(单一作者 lib/sync/glue-version.ts)
         ...syncCompatSparkConf(glueVersion),
