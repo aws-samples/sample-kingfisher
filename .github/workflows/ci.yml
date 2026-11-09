@@ -80,6 +80,9 @@ jobs:
         env:
           # The build does not contact a real Cognito pool; authentication variables are deliberately unset for this CI build.
           NEXT_TELEMETRY_DISABLED: "1"
+          # The default Node heap on a standard GitHub-hosted runner is about 2 GB, which the webpack compile of this
+          # application exceeds (peak RSS about 4.9 GB measured locally); give the build an explicit 5 GB heap.
+          NODE_OPTIONS: "--max-old-space-size=5120"
 
   infra:
     name: Infrastructure (tsc + cdk synth)
