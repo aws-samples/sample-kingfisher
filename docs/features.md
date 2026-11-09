@@ -128,7 +128,7 @@ Every run records row counts, duration and logs, and tasks can be scheduled on t
 - Wizard whose first step only asks for source and target; everything else has defaults. Drafts are kept locally for seven days.
 - Table picker with filtering, "selected only" and bulk selection.
 - Load modes: full, incremental by watermark column, business-date variables (15 date variables), WHERE filter, atomic overwrite, merge by key, derived partitions and monthly tables.
-- Saving a task refreshes its script and Glue job immediately; the target table bucket is chosen from a dropdown, and customer-owned buckets must first be registered in Settings.
+- Saving a task refreshes its script and Glue job immediately; the target table bucket is chosen from a dropdown, and customer-owned buckets must first be registered as routes in Settings — a bucket that is not a writable route is rejected at save time with the next action.
 - Start now, run for a given date, schedule by cron, or backfill a date range.
 - Post-write reconciliation, row-count metrics and column-level lineage pushed to OpenMetadata.
 - A guard that asks for confirmation before overwriting a table the platform did not create.
@@ -162,6 +162,7 @@ Jobs run immediately or on a cron schedule published to the region's scheduler; 
 - Three engines with their own configuration panels; EMR Serverless applications are created per job and removed afterwards.
 - Script generation from engine recipes with an AI code generator, and a parameter advisor for tuning.
 - Execution role selection from a dropdown with three groups: platform default, advisor-generated and custom roles. A refresh button picks up roles created in IAM without leaving the page.
+- Lake table buckets: a job declares which S3 Tables buckets it reads and writes (default: every route of the region); the platform registers one Spark catalog per bucket, so scripts address tables as `alias.namespace.table` without a hand-written `--conf`, and the save-time preflight checks the chosen role against each declared bucket.
 - Run, rerun, backfill, run groups, logs and dependency view.
 - Job submission runs as a background task, so an EMR application cold start cannot time out the page.
 - The job detail names its execution region, and the run button repeats "run now in <region>".
@@ -674,7 +675,7 @@ Settings shows the resource facts of the current scope and holds the platform-wi
 **Key capabilities**
 
 - Resource facts: region, components, warehouse, buckets, workgroups and VPC.
-- Registration of customer-owned S3 Tables buckets so that they become visible and writable.
+- Lake table buckets and routes: customer-owned S3 Tables buckets are registered as routes (alias, tier, namespace ownership, writable); routes feed the sync wizard's bucket dropdown and the batch job's catalog list, and a route still used by a job or task cannot be revoked.
 - AI model: switch the default model at runtime among the Claude Opus, GPT, GLM and Kimi families.
   A server-side probe (and a tool-use probe for non-Claude families) must pass before the change takes effect.
 - Data source network objects with one-click orphan cleanup, background cleanup tasks, global identity and service status.

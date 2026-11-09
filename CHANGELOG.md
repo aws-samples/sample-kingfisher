@@ -21,12 +21,19 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - Dependency libraries of multi-region jobs are uploaded once per bound region and submitted from that region's bucket.
 - System Settings shows platform-created data-source network objects (security groups, Glue connections) with ownership and in-use status, and a background cleanup card.
 - Design specification for an offline job node in workflow orchestration, so sync tasks and offline jobs can form one DAG published to the serverless scheduler (implementation planned).
-- Design specification for lake table-bucket routing, letting one job read and write several S3 Tables buckets per region (core and read-side phases planned for the next release).
+- Lake table-bucket routing, phase 1: "Settings → Lake table buckets and routes" registers customer-owned S3 Tables buckets as routes (alias, tier, namespace ownership, writable). No new table; the external-bucket registry rows are reused.
+- Batch Glue and EMR Serverless jobs declare the table buckets they read and write (default: every route of the region); the platform registers one Spark catalog per bucket plus a default catalog, so scripts address tables as `alias.namespace.table` without hand-written `--conf`.
+- Sync tasks must target a writable route; a save with an unregistered bucket is rejected with the bucket name and the next action.
+- The save-time role preflight probes every declared bucket (S3 Tables and federated-catalog actions) and lists each missing permission with action, resource and reason.
+- The upgrade script registers the external buckets that existing home-region sync tasks write to as routes and refreshes the home EMR / Flink stacks; the post-deploy truth check gains an eleventh item.
+- Design specification for lake table-bucket routing with implementation notes and acceptance record (`docs/design/lake-bucket-routing.md`, revision 1.2-en); the read-side phase is planned for the next release.
 - Supported versions matrix (`docs/supported-versions.md`), feature tour with screenshots, and architecture diagrams drawn with official AWS icons.
 - Complete English translations of all module design documents (71 files under `docs/design/`, index in `docs/design/README.md`); the six design pages that were previously condensed summaries are replaced by the full translations, and the modules overview links to every design document.
 
 ### Changed
 
+- Home-region EMR / Flink roles and execution-region Flink roles may access any S3 Tables bucket of their region (`bucket/*`) instead of the platform bucket only; every execution region must be redeployed from the console once to pick up the Flink role change.
+- The engine baseline of the role preflight no longer demands write access to the platform data-lake bucket (the TempDir probe targets the scripts bucket), and advisor-generated Glue roles no longer carry that blanket write grant.
 - Product source no longer carries internal tracking identifiers (defect, schedule, module, work-package, phase, batch and acceptance ids) in comments, test titles, annotations or operator-facing text.
   A repository guard (`internal-identifier-guard`) keeps it that way across all code, tests and offline judges.
 - The execution-scope banner on pages that are not yet scope-filtered no longer shows an internal ticket number; it states what is missing. The `ticket` field and its type were removed from the scope declarations.
@@ -39,6 +46,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Fixed
 
+- The route list and the bucket-candidate list are served outside the admin prefix (`GET /api/lake-routes`, `GET /api/lake-buckets/candidates`, signed-in user with an explicit place), so developers see the sync wizard's table-bucket dropdown and the job's catalog list instead of an empty list with an analyst-only message; the admin paths remain as read aliases for one release and the gateway rule is unchanged.
 - Deleting an offline job while one of its runs is still in flight is refused with `409 JOB_RUN_IN_PROGRESS` that lists the run ids, so a Glue job definition is no longer removed under a running job and its run record no longer stays "running" forever in the task monitor. The job-row delete is conditional on no live run lock, which also closes the narrow window between the check and the delete; EMR engine jobs apply the same check and refuse while the application still has running jobs.
 - The run poller distinguishes "lock taken over by another run" from "job row gone": when the job row disappears it stops renewing the lock but keeps tracking the run to its real terminal state, and when Glue or EMR report the definition itself gone it closes the run as failed with an explicit message and releases the lock. Job-row status writes are conditional everywhere (TypeScript and the Python scheduler carriers), so a deleted job is never recreated as a ghost row, and running a deleted job returns 409.
 - Scheduler and workflow job-node carriers record a `running` run row as soon as a run starts (runtime package v12), so scheduled and node runs are visible to the delete check, and `timeout-pending` is recognised as an in-flight state. Upgrade note: republish existing DAGs and workflow packages to pick up the new carriers; until republished, their runs are only protected by the lock held by the platform process.

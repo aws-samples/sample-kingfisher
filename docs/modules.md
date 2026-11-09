@@ -130,6 +130,7 @@
 *Data Sync module architecture (source `docs/diagrams/src/mr-module-sync.mmd`; re-render with mermaid-cli after changes).*
 
 - **Key mechanisms**: **saving refreshes** the script and the Glue job (no need to run the task once more by hand); a whole-table overwrite of a table **the platform did not create** must be confirmed table by table
+- **Target table bucket must be a route** (lake table-bucket routing, ships with 2.2.0): the bucket entered in the wizard's "S3 Tables Data Lake Configuration → Table Bucket" must already be registered in "Settings → Lake table buckets and routes" and be writable; otherwise the save is rejected with a 400 that names the bucket and the next action. The upgrade script registers the external buckets referenced by existing home-region sync tasks as routes.
   (foreign-table guard; the same rule for Redshift and S3 Tables; tasks that had already succeeded before the upgrade are adopted once); Merge really merges by key (refused when the merge key is missing);
   run records carry `triggeredBy` to distinguish manual runs from backfill, and baselines and SLA exclude backfill on that basis; OM pushes for non-home regions are keyed by a per-region service; S3 Tables identifier sanitizing is aligned with the Glue catalog FQN.
 - **Switching the data source while editing** (released on 2026-10-27; fix for the 2026-10-15 report that a task could not be saved after switching its source): the wizard only accepts the table list of the last selected source
@@ -163,6 +164,7 @@
   - `emr/` is the EMR Serverless implementation: application · scripts · network · logs · run records · schedule fan-out) · `src/lib/cookbook/` (script recipes: retrieval · guards · capability vocabulary) · `src/lib/param-advisor/`.
 - **AWS dependencies**: Glue · Redshift Data API · EMR Serverless (shared base `BgpEmrStack` + the per-region `-core` execution role) · S3 · CloudWatch Logs.
 - **Key mechanisms**: run records are written uniformly to `bgp-task-runs` and reused by the monitor page; a scheduled job is published as a workflow on the region's MWAA Serverless (the artifact is generated at publish time, so after changing parameters the job must be republished);
+- **Lake table-bucket routing** (ships with 2.2.0): a job declares under "Advanced Properties → Lake table buckets" which S3 Tables buckets it reads and writes (default: every route of the region); Glue and EMR Serverless each get one Spark catalog per bucket (the alias is the catalog name) plus a default catalog, so scripts address tables as `alias.namespace.table` without a hand-written `--conf`. The route list is read from `GET /api/lake-routes?targetId=` (any signed-in user); the save-time preflight of a custom role probes the declared buckets (s3tables and federated-catalog actions); Glue job definitions are materialised at run / schedule / orchestration time, not on save.
   EMR scripts read `sys.argv` by parameter name (the template was changed accordingly), so adding a parameter no longer raises "unknown parameter".
 - **Design note**: the [offline jobs](design/etl-jobs.md), [job run parameters](design/etl-run-parameters.md), [parameter advisor](design/param-advisor.md) and [engine cookbook](design/engine-cookbook.md) designs (single-region stage).
 
@@ -202,7 +204,7 @@
   The release in production creates it only as a side effect of the start path of a sync task that writes S3 Tables, so an environment that has never run such a sync always gets `CATALOG_NOT_FOUND` on direct query.
 - **Table-bucket dropdown** (implemented after this baseline and released on 2026-10-27; a customer improvement request of 2026-10-16): the sync-task wizard's
   "S3 Tables Data Lake Configuration → Table Bucket" and "Settings → Data lake external table buckets → Register" share `src/components/lake/TableBucketPicker.tsx` (AutoComplete, manual entry still possible),
-  - the list comes from `GET /api/admin/lake-buckets/candidates?targetId=` (`src/lib/lake/table-bucket-candidates.ts` reads all pages of ListTableBuckets read-only in the region of the place and marks "Platform table bucket of this region" and "Registered";
+  - the list comes from `GET /api/lake-buckets/candidates?targetId=` (readable by any signed-in user with an explicit place since the lake-routing release; the admin path `/api/admin/lake-buckets/candidates` stays one release as an alias; `src/lib/lake/table-bucket-candidates.ts` reads all pages of ListTableBuckets read-only in the region of the place and marks "Platform table bucket of this region" and "Registered";
   - if the list cannot be fetched ⇒ 502 with an honest notice and a fallback to manual entry).
 - **Known boundaries (this release)**: the table tree lists only **the platform's own table bucket** in each region; tables in customer-owned table buckets must be queried with a hand-written three-part name.
 - **Design note**: the [Athena / S3 Tables design](design/athena-s3tables.md).
@@ -448,6 +450,7 @@
     - Converse requests are shaped per vendor profile (Kimi: strip temperature / topP / stopSequences, maxTokens ×2; GLM: strip stopSequences; Claude: identity) + one same-layer retry at run time that learns from Bedrock's verbatim error message,
       located in `src/lib/ai/invoke.ts` and in the `core-dist/ai` of the three agent containers;
     - at deployment the default model is chosen by really invoking, one by one, the candidate chain `candidateModelIds` of `platform/ai-model.json` (Claude Opus 4.5 → GLM 5.3 → Kimi K3) (`scripts/resolve-home-model.sh`).
+- **Settings → Lake table buckets and routes** card (ships with 2.2.0; `src/components/lake/LakeRoutesCard.tsx`): customer-owned S3 Tables buckets are registered as route entries (alias / tier / namespace ownership / writable; no new table — the external-bucket registry rows are reused, single author `src/lib/lake/routes.ts`); writes go through `POST / PATCH|PUT / DELETE /api/admin/lake-routes` (platform admin), reads through `GET /api/lake-routes` (any signed-in user); revoking a route still used by a job or task is refused with 409 naming them; an alias conflict is 409; the platform bucket is always an implicit route and cannot be revoked.
 
 ## 8. Cross-cutting mechanisms
 
@@ -478,4 +481,7 @@
 | Ask-Your-Data session cards | [`design/genbi-session-cards.md`](design/genbi-session-cards.md) | Current |
 | Long-running-operation framework (automatic switch to 202 + polling after 45 s; root fix for the 504 on cold-start landings, absorbs the hybrid AI-response protocol, object leases) | [`design/long-running-operations.md`](design/long-running-operations.md) | Design note published; the first and second batches were merged to the development branch and released on 2026-10-27; the third-batch list is in the design note |
 | Data Sync (capability completion of the 2026-10-13 release) | [`CHANGELOG.md`](../CHANGELOG.md), entry for the 2026-10-13 release | Current record |
+| Per-job execution role selection | [`design/execution-role-binding.md`](design/execution-role-binding.md) | Current (ships with 2.2.0) |
+| Offline job node in workflow orchestration | [`design/workflow-job-node.md`](design/workflow-job-node.md) | Current (ships with 2.2.0; node panel filtering by place and business-date pass-through follow) |
+| Lake table-bucket routing (one job across several S3 Tables buckets) | [`design/lake-bucket-routing.md`](design/lake-bucket-routing.md) (revision 1.2-en) | Phase 1 (core routing) ships with 2.2.0; Phase 2 (read side) planned; Phase 3 (governance) next release |
 | All other modules | the design documents of the single-region stage, each with a scope header; index in [`design/README.md`](design/README.md) | Single-region-stage designs; current behavior is defined by this document and the code |

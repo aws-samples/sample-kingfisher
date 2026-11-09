@@ -1,6 +1,9 @@
 # Lake Table-Bucket Routing · Decoupling Execution Environments from a Single Table Bucket
 
-> Revision **1.0-en** (2026-11-03). Status: **design, authoritative**. This English document supersedes the earlier Chinese draft (revision 1.0) of this design. Where the two differ, this document wins. Decisions in §13 are **proposed** and await product-owner sign-off.
+> Revision **1.2-en** (2026-11-09). Status: **authoritative; Phase 1 implemented and verified by headless page-driven acceptance on a two-region test account**. This English document supersedes the earlier Chinese draft of this design. Where the two differ, this document wins.
+> Decisions D1–D13 in §13 were signed off on 2026-11-03 and are binding. §15 records where the Phase 1 implementation deviates from §6 and why; where §15 and §6 differ, the implementation (§15) is the fact.
+> Revision history: 1.2-en (2026-11-09) — the two read-only endpoints (route list, bucket candidates) moved out of the `/api/admin` prefix so that any signed-in user can read them (§6.10.1, §6.10.5, §15 item 14); Phase 1 acceptance recorded in §15 item 15.
+> 1.1-en (2026-11-06) — Phase 1 implemented; §13 decisions recorded as binding; §15 implementation notes 1–13. 1.0-en (2026-11-03) — initial authoritative design, four static diagrams, decisions proposed.
 >
 > Vocabulary follows the multi-region execution design ([`multi-region-execution-design.md`](./multi-region-execution-design.md) §0–§3): an **execution target** (`targetId`, home is `tgt_home`) is one region's data plane; a **place** is the explicit target a request runs against; a **scope** is the page-level "all regions / one region" view filter. The execution role binding design ([`execution-role-binding.md`](./execution-role-binding.md)) supplies the per-job execution role and the save-time IAM preflight that this design extends.
 
@@ -58,7 +61,7 @@ Facts were re-verified against the working tree on 2026-11-03 (`platform/src` an
 | Spark landing resolver | `lib/exec-env/target-clients.ts:117-147` `resolveTargetGlue` returns a single `tableBucket` (home from env at `:126`, non-home from the descriptor at `:145`) | Single value, no notion of additional buckets |
 | Athena / catalog resolver | `lib/athena/s3tables.ts:73-93` `resolveS3TablesPlace` (one bucket); `:117-134` `resolveS3TablesPlaces` = platform bucket + registered rows with a 15 s `globalThis` memo (`:101-115`); `:149-165` `resolveS3TablesPlaceForNamespace` probes `ListNamespaces` per bucket and **falls back to the platform bucket** when nothing matches (`:164`) | Two resolvers, and a silent default (violates engineering rule 3 of the [development guide](../development.md), no silent legal defaults) |
 | External bucket registry | `lib/lake/external-table-buckets.ts`: one `SETTINGS` row per bucket, `pk="system"` (`lib/settings/model-store.ts:31`), `sk=lake-ext-bucket#<targetId>#<bucket>` (`:18-19`, `:40-42`), fields `{targetId,bucket,region,label?,addedBy,addedAt}` (`:22-29`); registration checks name grammar, "not the platform bucket", `GetTableBucket` in the target region (`:92-127`); no IAM or Lake Formation action | Registration = visibility + sync write, not routing; no alias / tier / namespace ownership / writable flag |
-| Registry API | `app/api/admin/lake-buckets/route.ts` GET / POST / DELETE (platform admin for writes); `app/api/admin/lake-buckets/candidates/route.ts` lists the region's buckets with `platform` / `registered` flags (`lib/lake/table-bucket-candidates.ts:10-28`) | No update verb, no alias / tier fields |
+| Registry API | `app/api/admin/lake-buckets/route.ts` GET / POST / DELETE (platform admin for writes); `app/api/admin/lake-buckets/candidates/route.ts` lists the region's buckets with `platform` / `registered` flags (`lib/lake/table-bucket-candidates.ts:10-28`) — Phase 1 moved this file to `app/api/lake-buckets/candidates/route.ts` and left the admin path as a re-export (§15 item 14) | No update verb, no alias / tier fields |
 | Read side consumers | Query tree `app/api/athena/tables/route.ts:17-26` (per-namespace `bucket` / `external`); NL2SQL `lib/genbi/athena.ts:39` (namespace → bucket via the fallback resolver); home governance push `lib/openmetadata/om-push.ts:387` (`resolveS3TablesPlaces(HOME_TARGET_ID)` only) | Non-home regions never reach the governance catalog; namespace resolution can silently pick the platform bucket |
 | Sync write guard | `lib/sync/table-bucket.ts:77-83` `tableBucketRejection`: own bucket must be the platform bucket or a registered row for non-home targets; **home accepts any bucket** (`:80`); `effectiveTableBucket` at `:45-47` | Home and non-home differ; the registry is not the single source of truth |
 | Offline Glue jobs | `lib/etl/job-service.ts:310-317` injects exactly one catalog (`s3tablescatalog` → platform bucket, five properties, `GlueCatalog` implementation); user `--conf` is appended unchecked (`:360-364`); `--bgp_table_bucket` is a single value (`:356`); `--TempDir` is `s3://<scriptsBucket>/temp/` (`:346`); reserved argument set at `:324-327` | Cross-bucket requires hand-typed configuration; alias collisions are not detected |
@@ -393,7 +396,7 @@ Friendliness rules: no field requires an account id, region or ARN; alias and ti
 
 All responses use the platform envelope: success `{ "success": true, "data": … }`; error `{ "success": false, "error": { "message", "code", "detail"? } }` (`lib/api-response.ts:99-110`). The five codes below are added to `ApiErrorCode`. Every route requires an explicit `targetId` (`requestedTargetId`, `lib/place/resolve.ts:41`): missing ⇒ 400 `PLACE_UNDECIDABLE`. Write verbs require a platform admin (403 `RBAC_DENIED` otherwise).
 
-#### 6.10.1 `GET /api/admin/lake-routes?targetId=<id>` — list (any signed-in user)
+#### 6.10.1 `GET /api/lake-routes?targetId=<id>` — list (any signed-in user; `GET /api/admin/lake-routes` stays for one release as an admin-only alias of the same handler, §15 item 14)
 
 ```json
 { "success": true, "data": {
@@ -449,7 +452,7 @@ Request `{ "targetId", "bucket", "alias"?, "tier"?, "writable"?, "namespaces"?, 
 
 #### 6.10.5 Compatibility alias
 
-`/api/admin/lake-buckets` (GET / POST / DELETE) stays for one release as a thin alias: GET returns the external routes as an array (new fields included); POST registers with a derived alias, tier `other`, `writable=true`; DELETE revokes. `/api/admin/lake-buckets/candidates` is unchanged and additionally reports `alias` / `tier` on registered candidates.
+`/api/admin/lake-buckets` (GET / POST / DELETE) stays for one release as a thin alias: GET returns the external routes as an array (new fields included); POST registers with a derived alias, tier `other`, `writable=true`; DELETE revokes. The bucket-candidates list is served at `GET /api/lake-buckets/candidates?targetId=` (any signed-in user) and additionally reports `alias` / `tier` on registered candidates; `/api/admin/lake-buckets/candidates` re-exports the same handler for one release (§15 item 14).
 
 #### 6.10.6 Job declaration fields
 
@@ -621,7 +624,9 @@ Judges read user-visible text and `data-testid`s, never antd internals; locale i
 
 ---
 
-## 13. Decisions (proposed, pending product-owner sign-off)
+## 13. Decisions (signed off by the product owner on 2026-11-03; binding)
+
+All decisions below were accepted as proposed. D1 fixes the release split (Phases 1 and 2 in 2.2.0, Phase 3 in the next release); §15 records how Phase 1 implemented them.
 
 | # | Decision | Rationale |
 |---|---|---|
@@ -653,6 +658,35 @@ Judges read user-visible text and `data-testid`s, never antd internals; locale i
 | Q6 | Should the Flink SQL template expose one catalog per route (Phase 3) instead of a single `lakeRoute`? | Start with one sink route; extend if asked |
 | Q7 | Exact Glue `DefaultArguments` per-value ceiling | Confirm against the API reference; encode as a constant in the author with a test |
 | Q8 | Should the permission matrix include roles of jobs in other targets? | No: a matrix is per target, like the routes |
+
+---
+
+## 15. Implementation notes (Phase 1 implemented 2026-11-06, accepted 2026-11-09)
+
+Phase 1 (core routing, §10) is implemented. The items below are the places where the shipped code deviates from §6–§9, each with the reason. Everything not listed here matches the design text.
+
+1. **Update verb.** `PATCH` (this design) and `PUT` (an earlier revision of this design) land on the same handler of `/api/admin/lake-routes`; both are accepted and behave identically.
+2. **Namespace-ownership guard.** Exactly one route declaring ownership of a namespace lets a registration pass.
+   The literal §6.3 rule ("an existing route already declares the namespace and the new bucket also contains it ⇒ conflict") would make a new bucket that legitimately shares a namespace name unregistrable; ownership declared on either side resolves it.
+3. **EMR parameter string.** It gains one extra `--conf spark.bgp.lakeCatalogs=…` (§6.5.2), so the EMR string is no longer byte-identical to the pre-routing string. The Glue `--conf` value stays byte-identical to the pre-routing five lines when the region has no external route.
+4. **Flink entry point.** The platform route's write probe is added only when the SQL references `s3t.` or `${TABLE_BUCKET_ARN}`. Phase 1 Flink has no bucket picker; probing unconditionally would false-fail custom roles that never write to the lake.
+5. **`BaselineGlueDatalake` removal also changes the role advisor.** `policy-builder` shares `engineBaseline`, so advisor-generated Glue roles no longer carry a blanket write grant on the platform data-lake bucket; writes come from the resource profile and the per-bucket route probes.
+6. **Legacy-row normalisation** writes back with `attribute_exists(sk)`, so a route revoked while a normalisation is in flight cannot be resurrected.
+7. **Probe author.** `lakeRouteProbes` lives in `lib/role-advisor/lake-probes.ts`; `lib/lake/routes.ts` only re-exports it (the design listed both files as authors).
+8. **Error codes.** `LakeRouteError` carries the five design codes plus `VALIDATION_FAILED`, `NOT_FOUND`, `CONFLICT` and `DECISION_REQUIRED` for the generic rejections of register, revoke and alias change.
+9. **Residual `spark.sql.catalog.` literals** remain in `cookbook/seed/emr.ts`, `seed/s3tables.ts` and `diagnostics/evidence.ts` (user-script examples; a Phase 2 §6.8 item). The single-author ratchet exempts these three files explicitly.
+10. **Glue single-value limit** is a constant of 10240 bytes with a comment; it was not re-verified against the Glue API reference (open question Q7).
+11. **Migration script** `scripts/lib/lake-routes-migrate.mjs` uses only the `aws` CLI (zero dependencies, no platform `node_modules`). The platform bucket name comes from `--platform-bucket` (default `bgp-table-bucket`).
+    Its summary line reports buckets registered concurrently by another writer separately from the ones it registered itself.
+12. **Synth gate.** A pre-existing assertion required the per-target Flink role template to contain the target's table-bucket name literal, which contradicts §6.7 and §9.8 (`bucket/*`, no bucket-name literal).
+    It now asserts the fact instead of the shape: every `s3tables:` resource of that role resolves to `arn:aws:s3tables:<target region>:<account>:bucket/*`.
+13. **Settings card revoke** goes through the platform's single DELETE reader (`lib/http/delete-json.ts`) and shows the server's message verbatim on failure.
+14. **Read paths outside the admin prefix (2026-11-09).** The gateway (`middleware.ts`) requires `bgp-admin` for every method under `/api/admin/**`, so the two read-only endpoints this design placed there were 403 for developers:
+    the sync wizard's bucket picker and the job's lake-bucket block showed empty lists with the analyst-only message.
+    Phase 1 therefore serves `GET /api/lake-routes` and `GET /api/lake-buckets/candidates` outside the prefix (signed-in + explicit `targetId`, same handlers),
+    the three components read the new paths, the old admin GET paths re-export the same functions for one release, write verbs and the gateway are unchanged.
+    A route-level guard pins: alias identity, GET-only exports, no component read under `/api/admin/lake-*`, and the gateway's admin rule verbatim.
+15. **Phase 1 acceptance (2026-11-09).** Phase 1 was accepted by headless, page-driven tests on a two-region test deployment covering: route registration, alias conflict, the sync wizard's rejection of an unregistered bucket, cross-bucket Glue and EMR Serverless jobs with zero hand-written `--conf`, revoke-in-use, the upgrade step's automatic registration of a legacy bucket, and the developer read paths (with a control run on the pre-fix build).
 
 ---
 

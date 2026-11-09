@@ -420,7 +420,7 @@ All buckets block public access and are encrypted. Data buckets are retained whe
 
 - Each region has one platform table bucket: `bgp-table-bucket` at home and `bgp-table-bucket-<slug>` elsewhere. Tables are Iceberg.
 - Athena reads table buckets through the federated catalog `s3tablescatalog/<table-bucket>`; the platform enables it per region during install and probe.
-- Customers can register their own table buckets as writable external buckets; the registration is the single source used to validate sync targets.
+- Customers register their own table buckets as **routes** (alias, tier, namespace ownership, writable). The route table is the single source used to validate sync targets, to register one Spark catalog per bucket for batch jobs, and to list buckets in the console; the platform bucket is always an implicit route.
 - Athena workgroups are `bgp-athena` and `bgp-athena-<slug>`; Redshift namespaces and workgroups are `bgp-namespace[-<slug>]` and `bgp-workgroup[-<slug>]`.
 
 ### 7.4 Secrets and keys
