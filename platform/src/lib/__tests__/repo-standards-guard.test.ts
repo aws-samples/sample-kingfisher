@@ -35,8 +35,13 @@ function withoutFencedCode(markdown: string): string {
 
 /** GitHub's heading-to-anchor rule: strip inline markup, lower-case, drop punctuation, spaces to hyphens, number repeats. */
 function headingSlug(text: string): string {
-  const plain = text
-    .replace(/<[^>]+>/g, "")
+  // Strip HTML tags until nothing changes, so that nested or split tags cannot survive a single pass.
+  let untagged = text;
+  for (let previous = ""; previous !== untagged; ) {
+    previous = untagged;
+    untagged = untagged.replace(/<[^<>]*>/g, "");
+  }
+  const plain = untagged
     .replace(/`([^`]*)`/g, "$1")
     .replace(/\*\*|\*|__|~~/g, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
