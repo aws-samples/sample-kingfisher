@@ -277,7 +277,7 @@ type WorkflowNode =
 
 ---
 
-# In-Depth Design (sections 10–14, implementation-level precision, added 2026-08-02)
+## In-Depth Design (sections 10–14, implementation-level precision, added 2026-08-02)
 
 ## 10. The Exact Shape of the Runtime Library
 
@@ -426,7 +426,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeTypeDef> = { ... };
 
 ---
 
-# §15 Abstract Design: The Invariant System of Generated Artifacts (production deep dive of 2026-08-05, global-grade hardening)
+## §15 Abstract Design: The Invariant System of Generated Artifacts (production deep dive of 2026-08-05, global-grade hardening)
 
 > **Motivation**: runtime-lib turns the DAG from "self-contained" into "minimal shell + external library + spec-driven", introducing **a whole class** of new failure modes: "can the generated artifact be correctly loaded / executed by MWAA". The first round patched them one by one (D1 airflowignore / D2 versioning / D3 safe_mode), and **the verification used simplified data (nodeId="j") that masked a real bug**. This section converges them into **systematic invariants + self-validation at generation time**, so that we no longer "discover the next pitfall only after publishing to MWAA".
 
