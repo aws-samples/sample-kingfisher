@@ -1,6 +1,7 @@
 # Kingfisher — a big-data governance and development platform deployed into the customer's own AWS account (single account × multiple regions)
 
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
+[![User guide](https://img.shields.io/badge/docs-user%20guide-2ea44f)](docs/user-guide/README.md)
 [![AWS CDK](https://img.shields.io/badge/AWS%20CDK-v2-orange)](https://aws.amazon.com/cdk/)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb)](https://react.dev/)
@@ -34,10 +35,27 @@ switch the "execution scope" in the top bar and you are working in another regio
 <td>Workspace RBAC · execution environments (add a region with a page wizard) · user management · audit log · system settings (the platform's AI model can be switched at runtime: Claude Opus / GPT / GLM / Kimi)</td></tr>
 </table>
 
+> 📖 **User guide (from first login to proficiency)**: **[`docs/user-guide/README.md`](docs/user-guide/README.md)** — a 30-minute quick start, core concepts, three role paths (administrator / data engineer / analyst), ten end-to-end scenarios, rule / configuration / API references, FAQ and glossary; first time here, start with [`01-quick-start.md`](docs/user-guide/01-quick-start.md) (every step was run on a two-region demo deployment and the wording follows the console).
 > 📸 **Screenshots and a description of every feature**: [`docs/features.md`](docs/features.md) (feature tour, page by page following the menu).
 > 📚 **Pages / APIs / code / AWS dependencies of every module**: [`docs/modules.md`](docs/modules.md) (module overview, seven menu groups module by module); components, core concepts and code layout in [`docs/architecture.md`](docs/architecture.md).
 > 🤖 **Taking over this project with an AI tool? Have it read [`AGENTS.md`](AGENTS.md) first** (the project index: overview / deployment relationships /
 > documentation map / red lines; Codex reads `AGENTS.md` natively, Claude Code, Kiro, Cursor and other tools load it as the project rules file).
+
+---
+
+## 0. Start here: the user guide
+
+The user guide lives in **[`docs/user-guide/`](docs/user-guide/README.md)** (26 documents). It is written for people who operate the console, not for people who read the code: every step is "which page → what to click → what to enter → what you should see", the scenarios share one demo dataset, and each one can be reproduced step by step on a demo installation. Pick your row:
+
+| You are… | Read first | Then |
+|---|---|---|
+| New to the platform | [`01-quick-start.md`](docs/user-guide/01-quick-start.md) (30 minutes: sign in and change the password → the top bar → create a data source → sync to S3 Tables → query the rows in Athena → ask one question → task monitor) | [`02-concepts.md`](docs/user-guide/02-concepts.md) core concepts · [`33-glossary.md`](docs/user-guide/33-glossary.md) glossary |
+| Platform administrator / operations | [`05-plan-deployment.md`](docs/user-guide/05-plan-deployment.md) planning → [`06-deployment.md`](docs/user-guide/06-deployment.md) deployment → [`10-guide-admin.md`](docs/user-guide/10-guide-admin.md) everything to do after go-live · [`13-identity-management.md`](docs/user-guide/13-identity-management.md) identity management | [`22`](docs/user-guide/22-scenario-multi-region-residency.md) multi-region data residency · [`27`](docs/user-guide/27-scenario-ops-alerting.md) operations and alerting · [`28`](docs/user-guide/28-scenario-finops.md) FinOps · [`29`](docs/user-guide/29-scenario-projects-permissions.md) workspaces and permissions · [`41`](docs/user-guide/41-upgrade-and-uninstall.md) upgrade and decommissioning |
+| Data engineer | [`11-guide-data-engineer.md`](docs/user-guide/11-guide-data-engineer.md) (data sources → sync → three kinds of batch jobs → orchestration → scheduling / publishing → backfill → monitoring → running in several regions) | [`20`](docs/user-guide/20-scenario-detail-to-daily-report.md) from detail tables to a daily report · [`21`](docs/user-guide/21-scenario-cross-bucket-layering.md) detail / aggregate bucket layering · [`23`](docs/user-guide/23-scenario-realtime-cdc.md) real-time pipeline · [`25`](docs/user-guide/25-scenario-governance-loop.md) governance loop · [`26`](docs/user-guide/26-scenario-modeling-metrics-report.md) modeling → metrics → reports |
+| Data analyst | [`12-guide-analyst.md`](docs/user-guide/12-guide-analyst.md) (Ask-Your-Data · the generated SQL · cards · skills · business definitions · report builder · requests · read-only queries) | [`24`](docs/user-guide/24-scenario-genbi-rollout.md) handing Ask-Your-Data to the business |
+| Looking up a rule / a setting / an API | [`30-reference-rules.md`](docs/user-guide/30-reference-rules.md) rules and rejection messages · [`31-reference-config.md`](docs/user-guide/31-reference-config.md) settings · [`40-api-reference.md`](docs/user-guide/40-api-reference.md) API reference | [`32-faq.md`](docs/user-guide/32-faq.md) FAQ · [`04-architecture.md`](docs/user-guide/04-architecture.md) architecture (with the Well-Architected mapping) |
+
+The full document map, the reading paths and how the guide works together with the in-console ❓ help are in [`docs/user-guide/README.md`](docs/user-guide/README.md).
 
 ---
 
@@ -193,6 +211,7 @@ Key points:
 
 | I want to… | Read this |
 |---|---|
+| 📖 **Learn the platform from first login to proficiency** (26 documents: quick start · core concepts · administrator / data engineer / analyst paths · ten end-to-end scenarios · rule / configuration / API references · FAQ · glossary; also section 0 above) | **[`docs/user-guide/README.md`](docs/user-guide/README.md)** |
 | **See what every feature looks like and how to use it** (screenshots page by page) | [`docs/features.md`](docs/features.md) |
 | **Know what every module does today** (pages / APIs / core code / AWS dependencies / mechanisms / boundaries / where the design note went) | [`docs/modules.md`](docs/modules.md) |
 | Current architecture: components / request flow / data flow / stack list | [`docs/architecture.md`](docs/architecture.md) · figures [`docs/diagrams/README.md`](docs/diagrams/README.md) |
