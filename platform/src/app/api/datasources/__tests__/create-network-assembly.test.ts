@@ -192,6 +192,19 @@ describe("① 老路径(没指定网络)= 自动探测 + 新建 bgp-ds-*:AWS 调
     expect(h.puts[0].networkConfig).toStrictEqual({ vpcId: "vpc-default", subnetId: "subnet-default", availabilityZone: "us-east-1a", securityGroupId: "sg-plat-new", isRds: false, rdsInstanceId: undefined });
   });
 
+  it("主机名只是**包含** rds.amazonaws.com 而不以它结尾 ⇒ 不当 RDS、不查 DescribeDBInstances(2026-11-09 代码扫描:子串判定改域名后缀判定)", async () => {
+    const res = await post({ host: "mydb.abc123.us-east-1.rds.amazonaws.com.evil.example" });
+    expect(res.status).toBe(201);
+    expect(netCalls().map((c) => c.cmd)).not.toContain("DescribeDBInstancesCommand");
+    expect(h.puts[0].networkConfig.isRds).toBe(false);
+  });
+
+  it("RDS 主机名大小写不敏感(端点域名按后缀判)", async () => {
+    const res = await post({ host: RDS_HOST.toUpperCase() });
+    expect(res.status).toBe(201);
+    expect(netCalls().map((c) => c.cmd)).toContain("DescribeDBInstancesCommand");
+  });
+
   it("组已存在(InvalidGroup.Duplicate):按名 + VPC 查回那个组,不再放行", async () => {
     h.dupSg = true;
     const res = await post();

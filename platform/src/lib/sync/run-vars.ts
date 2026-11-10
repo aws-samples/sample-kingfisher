@@ -72,7 +72,8 @@ export function syncRunVars(ds: string): Record<string, string> {
 /** 全部合法变量名(顺序即界面展示顺序)。 */
 export const SYNC_RUN_VAR_NAMES: readonly string[] = Object.keys(syncRunVars("2026-01-15"));
 
-const VAR_RE = /\$\{([^}]*)\}/g;
+// 变量名段不吃 `$` / `{` / `}`:既是文法(变量名只会是字母数字),也让匹配线性 —— `[^}]*` 会越过下一个 `${` 再回溯,用户可控文本上多项式。
+const VAR_RE = /\$\{([^${}]*)\}/g;
 
 /** 文本里出现的 `${...}` 变量名(含非法的)。 */
 export function templateVarNames(text: unknown): string[] {

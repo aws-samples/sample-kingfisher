@@ -34,6 +34,12 @@ import { assertDagPlace, ctrlRegionOf, hasSqlNode, type WorkflowDagPlace } from 
 //    workgroup / database / secret(不碰节点语义、不碰那处裸 exec、不改依赖与回调结构)。
 //  · home 语义**逐字守恒**:EXEC_REGION == CTRL_REGION == home region、workgroup/database 仍取
 //    `homeWorkgroup()`/`homeDatabase()`(门禁 `workflow-dag-region-guard` 钉住这一点)。
+/** 用户文本 ⇒ Python 字符串字面量:JSON 字符串字面量在 Python 3 里逐字合法(引号 / 反斜杠 / 控制字符全部转义),
+ *  不再只换引号和换行 —— 原写法漏掉反斜杠,含 `\\` 的 SQL 会把生成的 DAG 写坏(2026-11-09 代码扫描抓到)。 */
+function pyStringLiteral(text: string): string {
+  return JSON.stringify(text);
+}
+
 export function generateAirflowDag(
   workflow: Workflow,
   opts: WorkflowDagPlace = {}
@@ -78,21 +84,21 @@ export function generateAirflowDag(
     )
 `;
     } else if (node.type === "sql") {
-      const sql = (data.sql || "SELECT 1").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+      const sql = pyStringLiteral(data.sql || "SELECT 1");
       tasks += `
     ${taskId} = PythonOperator(
         task_id="${taskId}",
         python_callable=execute_redshift_sql,
-        op_kwargs={"sql": "${sql}"},
+        op_kwargs={"sql": ${sql}},
     )
 `;
     } else if (node.type === "python") {
-      const script = (data.script || "pass").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+      const script = pyStringLiteral(data.script || "pass");
       tasks += `
     ${taskId} = PythonOperator(
         task_id="${taskId}",
         python_callable=run_custom_script,
-        op_kwargs={"script": "${script}"},
+        op_kwargs={"script": ${script}},
     )
 `;
     }

@@ -16,6 +16,7 @@
  * (`SlaPanel` 里它指 SLA 绑的任务 id),按整段调用匹配会把那种页面判成「已带范围」——
  * 那正是「没有判别力的判据 = 空断言」这条教训的又一次现形。
  */
+import { escapeRegExp } from "@/lib/text/escape-regexp";
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { resolve, relative } from "node:path";
@@ -102,7 +103,7 @@ function scopeCarriers(text: string): Set<string> {
     for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=([^\n;]*)/g)) {
       if (names.has(m[1])) continue;
       for (const n of names) {
-        if (new RegExp(`\\b${n.replace(/\$/g, "\\$")}\\b`).test(m[2])) { names.add(m[1]); break; }
+        if (new RegExp(`\\b${escapeRegExp(n)}\\b`).test(m[2])) { names.add(m[1]); break; }
       }
     }
   }
@@ -126,7 +127,7 @@ function collectUnscopedReads(files: Map<string, string>): Site[] {
         ?? (/method:\s*\w/.test(call) ? "VAR" : "GET");
       if (method !== "GET") continue; // 写与执行走 body.targetId,由 `scope-write-guard` 管
       const scoped = SCOPE_MARK.test(url)
-        || Array.from(carriers).some((n) => new RegExp(`\\b${n.replace(/\$/g, "\\$")}\\b`).test(url));
+        || Array.from(carriers).some((n) => new RegExp(`\\b${escapeRegExp(n)}\\b`).test(url));
       if (scoped) continue;
       const api = url.replace(/^[`"']|[`"']$/g, "").split("?")[0].split("${")[0].replace(/\/$/, "");
       out.push({ file, api });

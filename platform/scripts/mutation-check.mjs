@@ -24,7 +24,7 @@
  * 收尾再跑一次基线,确认工作区已复原(退出码非 0 时**必须**人工 `git status` 复核)。
  */
 import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const ROOT = process.cwd();
@@ -145,7 +145,7 @@ function runSuites() {
     // 🔴 `stdio:"ignore"` + 大 maxBuffer:execSync 默认 maxBuffer 只有 1MB,
     // **输出多的变异会把子进程打死**,只留下半份 JSON ⇒ 表现为"13 个文件收集期报错、断言红 0"。
     // 这就是 M8 一直"测不出"的真因:量具被自己的缓冲区限制打断了,而不是产品或 vitest 的问题。
-    execSync(`npx vitest run ${SUITES} --reporter=json --outputFile=${out}`, {
+    execFileSync("npx", ["vitest", "run", ...SUITES.split(/\s+/).filter(Boolean), "--reporter=json", `--outputFile=${out}`], {
       cwd: ROOT,
       stdio: "ignore",
       maxBuffer: 256 * 1024 * 1024,

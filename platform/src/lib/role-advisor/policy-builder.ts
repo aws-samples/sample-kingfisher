@@ -25,9 +25,18 @@ const ENGINE_LABEL: Record<RoleEngine, string> = {
 
 export const ROLE_NAME_PREFIX = "bgp-job-role-";
 
+/** 去掉首尾的 `-`(下标扫描;不用 `/^-+|-+$/` —— 用户可控文本上那个正则会多项式回溯)。 */
+function trimDashes(s: string): string {
+  let a = 0;
+  let b = s.length;
+  while (a < b && s.charCodeAt(a) === 45) a++;
+  while (b > a && s.charCodeAt(b - 1) === 45) b--;
+  return s.slice(a, b);
+}
+
 // 规范化角色名:强制受控前缀 + 仅安全字符(防注入/防越权命名)。
 export function normalizeRoleName(hint: string | undefined, engine: RoleEngine): string {
-  const base = (hint || "").replace(/[^a-zA-Z0-9-]/g, "").replace(/^-+|-+$/g, "").slice(0, 40);
+  const base = trimDashes((hint || "").replace(/[^a-zA-Z0-9-]/g, "")).slice(0, 40);
   const safe = base || `${engine}`;
   return safe.startsWith(ROLE_NAME_PREFIX) ? safe : `${ROLE_NAME_PREFIX}${safe}`;
 }

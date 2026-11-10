@@ -163,6 +163,15 @@ class CfnPathTests(unittest.TestCase):
         self.assertNotIn(SECRET_MARK, out)
         self.assertNotIn(SECRET_MARK, json.dumps(sent[0]["body"]))
 
+    def test_log_line_does_not_echo_reason(self):
+        """2026-11-09 代码扫描:回执原因与口令字典同源(用户名 / 参数名),只回给 CloudFormation、不进日志。"""
+        idp, ssm, sent, out, raised = self.run_cfn(ssm=FakeSsm("not json at all"))
+        self.assertIsNone(raised)
+        self.assertEqual(sent[0]["body"]["Status"], "FAILED")
+        self.assertIn("/bgp/bootstrap-passwords", sent[0]["body"]["Reason"], "原因仍完整回给 CloudFormation")
+        self.assertIn("[cfn] responded FAILED", out)
+        self.assertNotIn("/bgp/bootstrap-passwords", out, "日志里不许出现原因文本")
+
     def test_param_missing_is_loud_failure_and_touches_nothing(self):
         idp, _ssm, sent, _out, raised = self.run_cfn(ssm=FakeSsm(raise_on_get=True))
         self.assertIsNone(raised)

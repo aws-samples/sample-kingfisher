@@ -12,6 +12,7 @@
 //   `searchCatalog` 原本是 `const d = await fetch(...); setCatalogData(...)` ——
 //   没有序号、没有 AbortController、没有「只认最后一次」⇒ 用户连着搜两次（或切区与搜索同时发生），
 //   两个请求并发，**谁晚回来谁写进 state**：搜了新词，列表显示的却是上一次的结果。
+import { escapeRegExp } from "@/lib/text/escape-regexp";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -220,7 +221,7 @@ describe("治理页:`catalogData` 只有一个语义", () => {
       const nx = rest.search(/\n  const [A-Za-z_$]/);
       const body3 = rest.slice(0, nx > 0 ? nx : rest.length);
       // 🔴 数的是**调用**(`setXxx(`);`useState` 那一行里是 `setXxx]`,压根不匹配 ⇒ 不用扣。
-      const pat = new RegExp(setter.replace(/[()]/g, "\\$&"), "g");
+      const pat = new RegExp(escapeRegExp(setter), "g");
       const inside = (body3.match(pat) || []).length;
       const total = (code.match(pat) || []).length;
       expect(inside, `${applier} 里一次都没写 ${setter} ⇒ 判据在空转`).toBeGreaterThan(0);

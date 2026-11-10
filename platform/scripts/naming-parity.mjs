@@ -11,7 +11,7 @@
 //       platform 侧用 tsx/vitest 环境直接 import;两份结果逐条比对。
 //       任一侧抛错也算结果的一部分(错误"是否抛"必须一致,不然一侧 fail-closed 一侧放行)。
 import { execFileSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -119,7 +119,7 @@ try {
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "ignore", "pipe"],
   });
-  runtimeSide = JSON.parse(execFileSync("cat", [emitPath], { encoding: "utf8" }));
+  runtimeSide = JSON.parse(readFileSync(emitPath, "utf8"));
 } finally {
   for (const p of [runnerPath, emitPath]) {
     try {
@@ -206,7 +206,7 @@ const sides = [
 let anchorCount = 0;
 for (const [label, file] of sides) {
   // 先剥注释,免得"注释里提到守卫"被当成守卫还在(与 cross-module cast 门禁同一教训)。
-  const text = execFileSync("cat", [file], { encoding: "utf8" })
+  const text = readFileSync(file, "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .split("\n")
     .filter((l) => !l.trim().startsWith("//"))

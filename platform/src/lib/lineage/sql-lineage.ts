@@ -13,6 +13,8 @@
 // Granularity: TABLE level. (Column-level SQL lineage is out of scope this release; the sync
 // path already pushes column-level lineage.)
 
+import { stripSqlComments } from "@/lib/genbi/core/sql-comments";
+
 export interface TableRef {
   database: string;
   schema: string;
@@ -70,11 +72,8 @@ const KEYWORDS = new Set([
   "over", "partition", "lateral", "tablesample", "fetch", "for",
 ]);
 
-function stripComments(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
-    .replace(/--[^\n\r]*/g, " "); // line comments
-}
+// 注释剥除唯一作者 lib/genbi/core/sql-comments(与问数只读闸共用;块注释下标扫描,不用会多项式回溯的正则)。
+const stripComments = stripSqlComments;
 
 // Replace single-quoted string literals (incl. doubled '' escapes) with empty literals so
 // keywords/table-like tokens inside strings can't be mis-parsed. Double quotes are SQL

@@ -10,6 +10,11 @@ function send(res, code, obj) {
   res.end(body);
 }
 
+// 只回异常的 message(不回整个异常对象 / 堆栈);非 Error 的抛出物给固定文案,细节只进容器日志。
+function errorMessage(e) {
+  return e && typeof e.message === "string" && e.message ? e.message : "internal error";
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/ping") {
     return send(res, 200, { status: "healthy" });
@@ -45,7 +50,8 @@ const server = http.createServer((req, res) => {
         });
         return send(res, 200, { output: out });
       } catch (e) {
-        return send(res, 500, { error: e && e.message ? e.message : String(e) });
+        console.error("[invocations] failed:", e);
+        return send(res, 500, { error: errorMessage(e) });
       }
     });
     return;

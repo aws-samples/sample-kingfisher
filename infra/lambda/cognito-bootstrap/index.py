@@ -149,7 +149,7 @@ def _cfn_send(event, status, reason, data=None):
         headers={"content-type": "", "content-length": str(len(body))},
     )
     urllib.request.urlopen(req, timeout=20).read()  # nosec B310 # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected —— 上面已钉 https,且 URL 来自 CFN 事件而非用户
-    print(f"[cfn] responded {status}: {(reason or '')[:200]}")
+    print(f"[cfn] responded {status}")  # 原因只回给 CloudFormation 事件,不进日志(与口令同源的内容一律不落日志)
 
 
 def _handle_cfn(event):

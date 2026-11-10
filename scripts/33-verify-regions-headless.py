@@ -1956,7 +1956,17 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
     ev, honest = "", False
     try:
         await goto_scope(pg, base, SCHED_PATH, tid, settle=sync_name, budget_s=30)
-        row = pg.locator("tr", has_text=sync_name).first
+        # 🔴 2026-11-09 …3558 两区同红的真因(判据缺陷):监控页自 2026-11-02 起首帧固定「运行」页签、挂载后才按
+        #   `?tab=schedule` 切换;按任务名等到文字出现就抓第一行 `tr`,抓到的是**运行实例行**(手动 · 成功 · 耗时),
+        #   cron 标签 / 启用开关都不在那一行 ⇒ 同步定时根本没装上,收弹必红;而「绿标」用整页选择器,被别的行放行。
+        #   ⇒ 行锚定到**调度表**(该行带「同步任务」类型标),等页签真切过来;绿标 / 橙标按**这一行**取。
+        sched_rows = pg.locator("tr", has_text=sync_name).filter(has_text=re.compile(r"同步任务|Sync task"))
+        t0 = time.time()
+        while await sched_rows.count() == 0 and time.time() - t0 < 25:
+            await pg.wait_for_timeout(1000)
+        if await sched_rows.count() == 0:
+            raise RuntimeError(f"调度配置页 {int(time.time() - t0)}s 内没出现「{sync_name} · 同步任务」那一行(页签没切到 schedule?)")
+        row = sched_rows.first
         # 先把 cron 配上并启用 —— 要验的正是「配了之后页面怎么说」
         tag = row.locator(".ant-tag").filter(has_text=re.compile(r"\*|未配置|Not")).first
         if await tag.count():
@@ -1968,13 +1978,13 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
                     await pg.wait_for_timeout(500)
                 await click_btn(modal, "确 定", "确定", "OK")
                 await pg.wait_for_timeout(4000)
-        row = pg.locator("tr", has_text=sync_name).first
+        row = sched_rows.first
         sw = row.locator(".ant-switch").first
         if await sw.count() and "ant-switch-checked" not in (await sw.get_attribute("class") or ""):
             await sw.click()
             await pg.wait_for_timeout(5000)
-        rows_ = await row_texts(pg, sync_name)
-        line = " ".join((rows_[0] if rows_ else "").split())
+        row = sched_rows.first
+        line = " ".join((await row.inner_text()).split()) if await sched_rows.count() else ""
         # 🔴 **载体已交付,这一格从「如实登记」改回真跑**。
         #   旧判据钉的是**诚实**(页面必须说「定时未交付」),并刻意写成「载体一交付就变红,逼着改回真跑」
         #   —— 它在 2026-09-20 真的红了,所以现在按设计改判。
@@ -1985,8 +1995,8 @@ async def dispatch_arm(pg, base: str, t: dict, rep: Rep, shots: str) -> dict:
         #        「触发=自动 + 区域=该区 + 成功」的那一行(与编排那一格同一条口径)。
         #   🔴 负向同时钉住:旧的「定时未交付」文案不许再出现(载体已交付,留着就是另一种说谎);
         #     而「待发布载体」出现 = 载体没发成(存量行 / 发布失败),那是真红不是登记。
-        armed_tag = await pg.locator('[data-testid="schedule-armed"]').count()
-        not_armed = await pg.locator('[data-testid="sync-schedule-not-armed"]').count()
+        armed_tag = await row.locator('[data-testid="schedule-armed"]').count()        # 🔴 按行取,不许整页数
+        not_armed = await row.locator('[data-testid="sync-schedule-not-armed"]').count()
         ok_arm = armed_tag > 0 and not_armed == 0 and ("定时未交付" not in line)
         ev = (f"行上文本={line[:140]!r} · 绿标(有产物)={armed_tag} · 待发布载体={not_armed} · "
               f"旧文案「定时未交付」={'定时未交付' in line}")
@@ -2202,7 +2212,14 @@ async def dispatch_restore(pg, base: str, t: dict, armed: dict) -> None:
     if sync_name in armed:
         try:
             await goto_scope(pg, base, SCHED_PATH, tid, settle=sync_name, budget_s=30)
-            row = pg.locator("tr", has_text=sync_name).first
+            # 同装弹段:监控页首帧是「运行」页签,按任务名抓第一行 tr 会抓到运行实例行 ⇒ 锚定到带「同步任务」类型标的调度行
+            sched_rows = pg.locator("tr", has_text=sync_name).filter(has_text=re.compile(r"同步任务|Sync task"))
+            t0 = time.time()
+            while await sched_rows.count() == 0 and time.time() - t0 < 25:
+                await pg.wait_for_timeout(1000)
+            if await sched_rows.count() == 0:
+                raise RuntimeError("还原时调度配置页没出现「同步任务」那一行(页签没切到 schedule?)")
+            row = sched_rows.first
             tag = row.locator(".ant-tag").filter(has_text=re.compile(r"\*|未配置|Not")).first
             if not await tag.count():
                 tag = row.locator(".ant-tag").nth(1)

@@ -24,7 +24,7 @@ function walk(dir: string, out: string[] = []): string[] {
 /** 裸发 DELETE 的调用点(含 authedFetch 包装;不含 deleteJson 自身)。 */
 function rawDeleteFetches(file: string): number {
   const src = readFileSync(file, "utf8");
-  const re = /\b(?:authedFetch|fetch)\((?:[^;]|\n)*?method:\s*"DELETE"/g;
+  const re = /\b(?:authedFetch|fetch)\([^;]*?method:\s*"DELETE"/g; // `[^;]` 本就含换行;再写 `|\n` 会指数回溯
   return (src.match(re) ?? []).length;
 }
 

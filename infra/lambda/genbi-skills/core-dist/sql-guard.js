@@ -13,16 +13,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.readOnlySelect = readOnlySelect;
 exports.sanitizeSelect = sanitizeSelect;
 exports.sanitizeReadOnly = sanitizeReadOnly;
+const sql_comments_1 = require("./sql-comments");
 const FORBIDDEN = [
     "insert", "update", "delete", "drop", "create", "alter", "truncate",
     "grant", "revoke", "merge", "call", "copy", "unload", "vacuum", "analyze",
     "comment", "lock", "set", "reset", "begin", "commit", "rollback", "prepare", "execute",
 ];
-function stripComments(sql) {
-    return sql
-        .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
-        .replace(/--[^\n]*/g, " "); // line comments
-}
+// 注释剥除唯一作者 ./sql-comments(与 SQL 血缘解析共用;块注释下标扫描,不用会多项式回溯的正则)。
+const stripComments = sql_comments_1.stripSqlComments;
 /**
  * 只读判定(单条 + SELECT/WITH 开头 + 写类关键字整词扫描)。返回规整后的 SQL 或拒因。
  * 问数(sanitizeSelect)与数仓直查的非管理员只读闸(生产上线批次 A)共用这一份,不另写第二套词表。

@@ -10,7 +10,8 @@
     "platform/src/lib/genbi/core/place-wire.ts": "f1082aa04db588980d3f219bc1ce6e69f300170a7ddcf59d1687c0623d0a7b4a",
     "platform/src/lib/genbi/core/prompt.ts": "e310e5798fe7c97b68b8fa9dbebc915461160f87edddd221ca486e7c8e977539",
     "platform/src/lib/genbi/core/retrieval-core.ts": "be5797795728593a1192b6682d50afe1be579f4daa3448c0c40323d8cf3847e8",
-    "platform/src/lib/genbi/core/sql-guard.ts": "47568191e0a47069dd3e7ed9274ff0671b331480a18c970cb9be8f9588b9d8a2",
+    "platform/src/lib/genbi/core/sql-comments.ts": "81dc6022cb8e2a77bd71263f224ec49297148c65c71326eb120a8ce5ccb3acb7",
+    "platform/src/lib/genbi/core/sql-guard.ts": "8797edea855a8c21d634cf52f6140c394251220a619d8d57d32dabb4ee93a5ab",
     "platform/src/lib/genbi/core/types.ts": "ea7dc871e71ee87409f59881297cf7a03d36d28dba37269dcae824f9eb7228c8"
   }
 }

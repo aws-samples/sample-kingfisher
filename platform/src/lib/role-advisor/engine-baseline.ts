@@ -98,7 +98,7 @@ export function engineBaseline(engine: RoleEngine, ctx: BaselineCtx): BaselineNe
     resources: [`arn:aws:logs:${region}:${accountId}:log-group:${group}`,
                 `arn:aws:logs:${region}:${accountId}:log-group:${group}:*`],
     why: `写作业运行日志到 CloudWatch(${engine} 用的是 ${group} 这个日志组 —— 各引擎的组名不同,给错等于没给)`,
-    probe: { action: "logs:PutLogEvents", resource: `arn:aws:logs:${region}:${accountId}:log-group:${group.replace("*", "probe")}:*` },
+    probe: { action: "logs:PutLogEvents", resource: `arn:aws:logs:${region}:${accountId}:log-group:${group.replace(/\*/g, "probe")}:*` },
   });
 
   if (engine === "emr") {

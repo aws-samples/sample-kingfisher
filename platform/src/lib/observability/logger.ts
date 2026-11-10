@@ -38,16 +38,23 @@ function minLevel(): LogLevel {
     : "info";
 }
 
-// crypto.randomUUID 在 Node18+ 与 Edge runtime 均可用;退化到时间无关的伪随机(不依赖 Date.now
-// 之外的全局),保证永不抛错。生产路径优先用 UUID。
+let correlationFallbackCounter = 0;
+
+// crypto.randomUUID 在 Node18+ 与 Edge runtime 均可用;没有它就退到 getRandomValues;两者都没有(理论上不存在)才退到
+// 时间 + 进程内计数,保证永不抛错。标识符不用 Math.random(弱随机不进任何会被当作令牌 / 关联键的值)。
 export function newCorrelationId(): string {
   try {
-    const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } };
+    const g = globalThis as unknown as { crypto?: { randomUUID?: () => string; getRandomValues?: (a: Uint8Array) => Uint8Array } };
     if (g.crypto?.randomUUID) return g.crypto.randomUUID();
+    if (g.crypto?.getRandomValues) {
+      const bytes = g.crypto.getRandomValues(new Uint8Array(16));
+      return `cid-${Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("")}`;
+    }
   } catch {
     /* fall through */
   }
-  return `cid-${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  correlationFallbackCounter = (correlationFallbackCounter + 1) % 0xffffff;
+  return `cid-${Date.now().toString(36)}-${correlationFallbackCounter.toString(36)}`;
 }
 
 // 从请求头取 correlation-id;缺失则生成一个(便于直接打到路由、无 middleware 的场景)。

@@ -125,8 +125,9 @@ export async function probeNetwork(host: string, place: DsPlace): Promise<Networ
   let isRds = false;
   let rdsInstanceId: string | undefined;
 
-  // Try to detect RDS instance
-  if (host.includes(".rds.amazonaws.com")) {
+  // Try to detect RDS instance:按域名后缀判是不是 RDS 端点(不做子串匹配),下面还要与 Endpoint.Address 精确对上才算 RDS。
+  const lowerHost = host.toLowerCase();
+  if (lowerHost.endsWith(".rds.amazonaws.com") || lowerHost.endsWith(".rds.amazonaws.com.cn")) {
     try {
       const { DBInstances = [] } = await rds.send(new DescribeDBInstancesCommand({}));
       const match = DBInstances.find((i) => i.Endpoint?.Address === host);

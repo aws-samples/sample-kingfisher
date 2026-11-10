@@ -7,7 +7,11 @@
 //    照样有结论,运维一眼看到红在哪(INTERACTION §1.3:每资源一行 + 红✗带原因);
 // ③ **未装组件不探;已装但探活未实现的组件 = 红,不是跳过**:跳过会造出"探过了且全绿"的假象,
 //    而 probe.ok 是 `enableTarget` 的前置 —— fail-closed 是这里唯一安全的方向。
+import { trustsService } from "@/lib/execution-role/trust";
 import { homeRegion } from "@/lib/place/home-region";
+
+/** MWAA Serverless 执行角色必须信任的服务主体(与 infra 的 airflow-serverless 栈同值)。 */
+const AIRFLOW_SERVERLESS_PRINCIPAL = "airflow-serverless.amazonaws.com";
 import { S3Client, HeadBucketCommand, GetBucketReplicationCommand } from "@aws-sdk/client-s3";
 // residency-api 片 1 的区域表真探
 import { DynamoDBClient, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
@@ -325,8 +329,8 @@ export async function runProbe(target: ExecutionTarget): Promise<ProbeResult> {
         const roleName = rarn.split("/").pop() ?? "";
         jobs.push(probeOne("airflow-serverless:role", async () => {
           const out = await iamc.send(new GetRoleCommand({ RoleName: roleName }));
-          const doc = decodeURIComponent(String(out.Role?.AssumeRolePolicyDocument ?? ""));
-          if (!doc.includes("airflow-serverless.amazonaws.com")) throw new Error(`角色 ${roleName} 未信任 airflow-serverless.amazonaws.com`);
+          // 解析信任策略后按 Principal.Service 精确比对(与执行角色候选分组共用 trustsService;不做子串匹配)
+          if (!trustsService(out.Role?.AssumeRolePolicyDocument, AIRFLOW_SERVERLESS_PRINCIPAL)) throw new Error(`角色 ${roleName} 未信任 ${AIRFLOW_SERVERLESS_PRINCIPAL}`);
         }));
       }
       const sgId = res.airflowServerlessSgId;

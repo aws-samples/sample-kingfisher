@@ -9,6 +9,8 @@
 // （阶段1:platform 经 re-export；阶段2/3:容器/Lambda 编译成 CJS 后 require）。
 // 与 Lambda infra/lambda/genbi-skills/rs.js 的 sanitizeSelect 曾逐字重复,收敛于此。
 
+import { stripSqlComments } from "./sql-comments";
+
 const FORBIDDEN = [
   "insert", "update", "delete", "drop", "create", "alter", "truncate",
   "grant", "revoke", "merge", "call", "copy", "unload", "vacuum", "analyze",
@@ -21,11 +23,8 @@ export interface GuardResult {
   error?: string;
 }
 
-function stripComments(sql: string): string {
-  return sql
-    .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
-    .replace(/--[^\n]*/g, " "); // line comments
-}
+// 注释剥除唯一作者 ./sql-comments(与 SQL 血缘解析共用;块注释下标扫描,不用会多项式回溯的正则)。
+const stripComments = stripSqlComments;
 
 /**
  * 只读判定(单条 + SELECT/WITH 开头 + 写类关键字整词扫描)。返回规整后的 SQL 或拒因。

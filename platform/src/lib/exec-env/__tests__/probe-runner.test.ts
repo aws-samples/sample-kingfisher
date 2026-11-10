@@ -644,6 +644,26 @@ describe("🔴 执行角色探活:键在才出项;非 home 的角色名必须是
     expect(it?.error).toMatch(/重新部署/);
     expect(r.ok).toBe(false);
   });
+  it("airflow-serverless 角色:信任策略解析后 Principal.Service 精确含 airflow-serverless.amazonaws.com 才算信任(2026-11-09 代码扫描:子串判定改解析)", async () => {
+    allHealthy();
+    const trust = (statements: unknown[]) => encodeURIComponent(JSON.stringify({ Version: "2012-10-17", Statement: statements }));
+    const airflowRes = { ...RESOURCES, workflowBucket: `bgp-workflow-${ACCT}-tgt-usw2-a`, airflowServerlessRoleArn: `arn:aws:iam::${ACCT}:role/BgpExecEnv-tgt-usw2-a-airflow-role`, airflowServerlessSgId: RESOURCES.emrSecurityGroupId };
+    // ① 真信任:Allow + sts:AssumeRole + Principal.Service 恰好是它
+    iamSend.mockResolvedValue({ Role: { AssumeRolePolicyDocument: trust([{ Effect: "Allow", Principal: { Service: "airflow-serverless.amazonaws.com" }, Action: "sts:AssumeRole" }]) } });
+    const ok = await runProbe(target({ components: ["core", "airflow-serverless"], resources: airflowRes }));
+    expect(ok.items.find((i) => i.name === "airflow-serverless:role")?.ok).toBe(true);
+    expect(iamSend.mock.calls.map((c) => c[0].input.RoleName)).toContain("BgpExecEnv-tgt-usw2-a-airflow-role");
+    // ② 文档里**出现过**那串字但并不信任(Deny 那条带它、Allow 的是别的服务)⇒ 改前的子串判定会放行,现在必须红
+    iamSend.mockResolvedValue({ Role: { AssumeRolePolicyDocument: trust([
+      { Effect: "Deny", Principal: { Service: "airflow-serverless.amazonaws.com" }, Action: "sts:AssumeRole" },
+      { Effect: "Allow", Principal: { Service: "glue.amazonaws.com" }, Action: "sts:AssumeRole" },
+    ]) } });
+    const bad = await runProbe(target({ components: ["core", "airflow-serverless"], resources: airflowRes }));
+    const item = bad.items.find((i) => i.name === "airflow-serverless:role");
+    expect(item?.ok).toBe(false);
+    expect(item?.error).toMatch(/未信任 airflow-serverless\.amazonaws\.com/);
+  });
+
   it("redshift / dms 组件的可选角色键:有才探,项名 redshift:copy-role / dms:kinesis-role", async () => {
     allHealthy();
     rssSend.mockResolvedValue({ workgroup: { status: "AVAILABLE" } });

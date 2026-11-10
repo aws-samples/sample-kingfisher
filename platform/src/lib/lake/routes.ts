@@ -476,9 +476,19 @@ export function lakeCatalogsArgument(routes: readonly LakeRoute[]): string {
 
 const CATALOG_KEY_RE = /^spark\.sql\.catalog\.([A-Za-z_][A-Za-z0-9_]*)(?:\.(.+))?$/;
 
-/** Glue `--conf` 参数值 ⇒ 条目列表(`k=v --conf k=v` 形态,用户在页面里就是这样填的)。 */
+/** Glue `--conf` 参数值 ⇒ 条目列表(`k=v --conf k=v` 形态,用户在页面里就是这样填的)。
+ *  线性扫描:按空白切词,遇到独立的 `--conf` 词就切一刀。不用 `/\s+--conf\s+/` —— 用户可控文本上那种式子会多项式回溯(2026-11-09 代码扫描抓到)。 */
 export function splitGlueConfValue(value: string | undefined): string[] {
-  return String(value ?? "").split(/\s+--conf\s+/).map((s) => s.trim()).filter(Boolean);
+  const text = String(value ?? "");
+  const out: string[] = [];
+  let start = 0;
+  for (const m of Array.from(text.matchAll(/\S+/g))) {
+    if (m[0] !== "--conf" || m.index === undefined) continue;
+    out.push(text.slice(start, m.index));
+    start = m.index + m[0].length;
+  }
+  out.push(text.slice(start));
+  return out.map((s) => s.trim()).filter(Boolean);
 }
 
 export interface UserCatalogConfVerdict {

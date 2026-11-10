@@ -220,7 +220,10 @@ const TYPE_REGISTRIES: Record<string, Record<string, { type: string; compat: "co
 
 export function mapColumnType(sourceDb: string, sourceType: string): { targetType: string; compatibility: string } {
   const normalized = sourceType.toLowerCase().replace(/\s+/g, " ").trim();
-  const baseType = normalized.replace(/\(.*\)/, "").trim();
+  // 去掉首个「(」到末个「)」之间的长度 / 精度段:与贪心 `\(.*\)` 等价,但用下标扫描 —— 用户可控文本上那个正则会多项式回溯。
+  const open = normalized.indexOf("(");
+  const close = normalized.lastIndexOf(")");
+  const baseType = (open >= 0 && close > open ? normalized.slice(0, open) + normalized.slice(close + 1) : normalized).trim();
   const sizeMatch = normalized.match(/\((\d+(?:,\d+)?)\)/);
   const size = sizeMatch ? sizeMatch[1] : "";
 
