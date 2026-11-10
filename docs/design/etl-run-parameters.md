@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.7.0 | Date: 2026-06-14 | Status: implemented and verified online
-> Addresses the developer-experience item of the gap-analysis re-check (group C, priority 1): "schedule parameters / backfill / rerun / dry run". This is the first item of the priority-1 tier.
+> - Revision: 1.7.0 | Date: 2026-06-14 | Status: implemented and verified online
+> - Addresses the developer-experience item of the gap-analysis re-check (group C, priority 1): "schedule parameters / backfill / rerun / dry run". This is the first item of the priority-1 tier.
 
 ---
 

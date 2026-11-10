@@ -3,10 +3,11 @@
 > 🔴 **Scope note (2026-10-13)**: this document is the lecture-notes projection of `deep-dive.md`; like it, it was written in the single-region stage and covers only the components inside the home region.
 > For the multi-region architecture, see [`architecture.md`](architecture.md) and the multi-region execution design note [`design/multi-region-execution.md`](design/multi-region-execution.md).
 
-> **Purpose**: the **on-stage lecture notes** for a 2-hour sharing session with an AWS architect team — for every section, "must-say points + key numbers / APIs + which figure to show + frequent Q&A + source-code anchors".
-> **Depth and source code live in the full manuscript [`deep-dive.md`](deep-dive.md)** (§15 is source-level); this document is its condensed projection and **does not repeat the detail — it only says "what to talk about, how to answer, where to look"**.
+> - **Purpose**: the **on-stage lecture notes** for a 2-hour sharing session with an AWS architect team — for every section, "must-say points + key numbers / APIs + which figure to show + frequent Q&A + source-code anchors".
+> - **Depth and source code live in the full manuscript [`deep-dive.md`](deep-dive.md)** (§15 is source-level); this document is its condensed projection and **does not repeat the detail — it only says "what to talk about, how to answer, where to look"**.
 >
 > **Last updated: 2026-08-02 · Corresponding platform progress: every feature module delivered up to that date (from data integration through the unified Copilot, Engine Cookbook and the Strands framework)**.
+>
 > Honesty legend: 🟢 runs for real in production / 🔵 code landed, not yet proven in a real environment / 🔒 intentionally left blank.
 >
 > Priority order: **GenAI ≈ GenBI ≈ AgentCore ≈ observability > big data > everything else**. 🔒 No real account ids / ARNs / URLs / ids (placeholders only).
@@ -53,6 +54,7 @@
 ## 3. The Eight Point Cards
 
 ### 🃏 Card 1 · Architecture Overview (0–10 min)
+
 - **What to say**: CloudFront (the only entry point) → ALB (security group admits only the CloudFront prefix list) → ECS (Next.js full stack); control plane Cognito / DynamoDB / Secrets;
   data plane source → Glue → S3 Tables + Redshift; MWAA scheduling; OpenMetadata governance; Bedrock / AgentCore / DevOps Agent.
 - **Must say**: ① keep **data plane vs. control plane** clearly separated; ② the **single source of truth for governance metadata = OpenMetadata**;
@@ -61,6 +63,7 @@
 - **Q&A anchor**: why a Next.js full stack? → front end and back end in one repository, the API is the BFF, and a single ECS service is easy to operate.
 
 ### 🃏 Card 2 · GenAI Capability Map (10–20 min)
+
 - **What to say**: not one isolated feature but **one Converse kernel + Strands assembly driving 7 user-visible AI capabilities + 3 enabling layers**;
   the model comes from a single source of truth, `ai-model.json` (opus-4-6 at the time of writing; the model generation can be swapped without locking in a family).
 - **Must say**: converge "calling the model" into one place (dialect / method / credentials unified); trade **tools (MCP) + data-catalog grounding + iron rules in the system prompt**
@@ -69,6 +72,7 @@
 - **Code anchors**: the §3 table (7 capabilities + 3 enabling layers → files).
 
 ### 🃏 Card 3 · GenBI Ask-Your-Data / NL→SQL (20–45 min) ★ key topic
+
 - **What to say**: a business user asks in plain Chinese "customer count by region" → the platform generates **read-only SQL** → Redshift / Athena executes it → a conclusion in Chinese plus a recommended chart.
   **Core promise: 100% of the numbers come from a real query; the model is never allowed to do mental arithmetic**.
 - **End to end in 5 steps**: ① inject the materialized tables → ② `introspectSchema` probes the schema → ③ **semantic retrieval selects the tables**
@@ -80,6 +84,7 @@
 - **Code anchors**: §15.1 orchestration / §15.2 wire format of the loop / §15.3 retrieval / §15.4 guard / §15.5 chart recommendation and masking.
 
 ### 🃏 Card 4 · AgentCore (45–75 min) ★ key topic
+
 - **What to say**: move GenBI's "NL→SQL inference loop" from **in-process** into the **AgentCore Runtime** (ARM64 container, `/invocations` + `/ping`, :8080);
   skills are exposed through the **Gateway** as **MCP tools** (Lambda backend); the front-end contract is unchanged, with **one-step rollback**.
 - **Must say**: ① **inbound AWS_IAM (SigV4) instead of OAuth**; ② the agent is **generic and dynamic** — every call runs `tools/list` to discover all tools and forwards generically,
@@ -91,6 +96,7 @@
 - **Code anchors**: §15.6 CfnResource property tree / §15.7 mcp.js SigV4 + JSON-RPC / §15.8 skills Lambda (SSRF / EMF).
 
 ### 🃏 Card 5 · Context and Memory (75–90 min) ★ key topic · the architects' favorite question
+
 - **What to say**: context has **four layers** — ① the multi-turn `messages` inside a single inference (native to Converse) ② cross-turn short-term memory ③ cross-session long-term semantic memory
   ④ the business glossary (quasi-memory).
 - **Cache or storage?** (must answer): **not a volatile cache — persistent storage plus on-demand read and injection**. Short-term = temporary storage **with a TTL**
@@ -109,10 +115,10 @@
 - **Code anchors**: §15.9 (exact inputs and outputs + trigger arithmetic + `runtimeSessionId=sha256` + the cache-vs-storage clarification table).
 
 ### 🃏 Card 6 · DevOps Agent Diagnosis + Observability (90–105 min) ★ key topic
+
 - **DevOps Agent (what to say)**: hand a failed or successful task to the **AWS DevOps Agent** with one click (managed SRE, `aidevops`, us-east-1 only); it investigates autonomously
   → a structured report in Chinese.
-- **Must say**: ① it uses a real AWS managed service, **not a home-built agent**; ② **evidence-driven** — `buildIncidentContext` assembles real CloudWatch (`/aws-glue/jobs/error`)
-  + `GetJobRun.ErrorMessage` + Data API `DescribeStatement` sub-statement errors; ③ **asynchronous + polling** (an investigation takes 20–40 s > CloudFront 60 s);
+- **Must say**: ① it uses a real AWS managed service, **not a home-built agent**; ② **evidence-driven** — `buildIncidentContext` assembles real CloudWatch (`/aws-glue/jobs/error`) + `GetJobRun.ErrorMessage` + Data API `DescribeStatement` sub-statement errors; ③ **asynchronous + polling** (an investigation takes 20–40 s > CloudFront 60 s);
   ④ the Agent Space is **reused by name**, not hard-coded; ⑤ two prompts — success goes through a "retrospective", failure through "root cause". Measured on a real Glue failure: a 3,605-character RCA in 42 s.
 - **Observability (what to say)**: `/observability` aggregates **four sources** — AgentCore control-plane status + GenBI usage (history) + skills Lambda CloudWatch 24 h + **per-tool / per-skill EMF counters**.
 - **Must say · EMF**: on every invocation the skills Lambda writes one EMF JSON line with `console.log` (namespace `BGP/GenBI`, dimensions `ToolName`/`Skill`, metrics `Calls`/`Errors`)
@@ -121,6 +127,7 @@
 - **Code anchors**: §15.10 diagnosis / §15.11 observability (EMF queries + ListMetrics discovering the skill dimensions).
 
 ### 🃏 Card 7 · Big-Data Foundation (105–115 min)
+
 - **What to say**: source → Glue (Glue 5.1 + Iceberg, see [`supported-versions.md`](supported-versions.md); full load as overwrite / incremental append by watermark column)
   → S3 Tables (Iceberg) + Redshift (Data API); MWAA visual DAG scheduling; Athena queries the lake.
 - **Must-say highlights**: ① sync `recommendChannel` (glue / zero-etl / dms) + type mapping (compatibility flagged) + DDL (DISTKEY / SORTKEY);
@@ -133,6 +140,7 @@
 - **Code anchors**: §15.13 (`--conf` / control-character fix / `fireDownstreamOnce` / `run-params`).
 
 ### 🃏 Card 8 · Security / IAM / Evolvability (115–120 min)
+
 - **What to say**: read-only SQL guard / SSRF guard (HTTP skills) / SigV4 instead of OAuth / return-value-layer masking / five least-privilege roles / no hard-coded credentials
   (Secrets Manager + `fromGeneratedSecret`) / CloudFront prefix list / Cognito site-wide middleware + audit.
 - **Evolvability**: two one-step rollbacks (the question-answering backend + the memory backend); registered skills hot-load with zero deployment; CfnResource means no CDK upgrade is required.
@@ -174,6 +182,7 @@
 17. **Can cross-task dependencies fire twice?** → No. `fireDownstreamOnce` wins the race with a DynamoDB conditional write `attribute_not_exists(downstreamFired)`; only the winner fans out. → §15.13
 
 **Supplement · GenAI / GenBI / AgentCore / memory**
+
 18. **Why Claude Opus rather than a cheaper model?** → NL→SQL / retrieval / diagnosis demand high accuracy in reasoning and SQL dialects; the model id comes from the single source of truth `ai-model.json`
     (opus-4-6 at the time of writing), and the generation can be swapped without locking in a family. → §3
 19. **Why MCP instead of letting the agent call the Data API directly?** → Skills are standardized, can be rate-limited / governed / reused independently, and **hot-load**;
@@ -190,6 +199,7 @@
 27. **How are new AI capabilities added?** → Add an MCP tool (change Lambda + Gateway, the agent is untouched) or a registered skill (pure data, zero deployment). → §5.6 / §15.8
 
 **Supplement · big data / sync / ETL / scheduling**
+
 28. **How are full and incremental loads implemented?** → Full = whole-table overwrite; incremental = read only rows where "watermark column > last watermark" and append (Glue PySpark). → §10.2 / §15.13
 29. **Why dual-write S3 Tables (Iceberg) + Redshift?** → Lake (open table format / Athena / low cost) and warehouse (strong consistency / BI performance) both, with unified lineage governance. → §2 / §10
 30. **What about incompatible types?** → The MySQL/PG → Redshift mapping registry flags compatibility (compatible / converted / may truncate) and preserves lengths. → §10.2
@@ -199,6 +209,7 @@
 34. **Why must Glue register the catalog via `--conf`?** → Otherwise `spark.table("s3tablescatalog…")` fails with `[REQUIRES_SINGLE_PART_NAMESPACE]` (a real diagnosed root cause). → §15.13
 
 **Supplement · governance / OpenMetadata / lineage / quality / classification**
+
 35. **Why self-host OpenMetadata instead of Glue Catalog / DataZone?** → OM is the open single source of truth for "catalog + column-level lineage + business descriptions + quality";
     the platform treats OM as authoritative. → §10.8
 36. **How is lineage parsed? Why not an AST library?** → Heuristic table-level parsing (Redshift-dialect AST coverage is poor and throws on unsupported syntax); best-effort, never throws. → §10.6 / §15.13
@@ -209,11 +220,13 @@
 40. **How does the metrics store prevent injection?** → No free-form SQL; identifier allow-list + double quoting; executed uniformly through the admin credential, read-only. → §11.4
 
 **Supplement · multi-tenancy / RBAC / multi-environment / versions**
+
 41. **How are resources isolated?** → By `(project, env)`; every API passes `requireProject(role)` (viewer / editor / owner). → §11.1
 42. **How is dev → prod promotion done?** → promote takes the portable definition (stripping runtime bindings such as glueJobName / airflowDagId); dev → staging is direct, → prod goes through approval. → §11.6
 43. **Can a bad configuration change be rolled back?** → Every save leaves a version snapshot in `bgp-resource-versions`, which can be rolled back. → §11.5
 
 **Supplement · infrastructure / security / cost / operations / evolvability**
+
 44. **How many stacks? Deployment order?** → **21 stacks** (17 always-on + 4 gated: realtime / flink / emr / om-ingestion); OM before Platform (URL injection avoids a hard dependency);
     AgentCore in two phases (the three advisor stacks reuse the same protocol base class); MWAA depends on Platform. → §12
 45. **How are credentials / secrets managed?** → All in Secrets Manager; RDS `fromGeneratedSecret`; a unified Redshift admin secret (consistent ownership); nothing hard-coded. → §13

@@ -16,6 +16,7 @@ and in viewers without Mermaid support.
 > other figures there reflect the single-region deployment shape (for example "DynamoDB, 61 tables" was the number
 > at that time; today there are 71 tables). They are kept for traceability only. The DEEP-DIVE companion figures
 > (Ask-Your-Data, AgentCore, observability) describe mechanisms inside the home region and remain valid.
+>
 > Every figure in the repository is a static PNG; Markdown never embeds live Mermaid rendering (it fails on weak
 > network connections).
 
@@ -71,14 +72,14 @@ Where each figure is embedded: `README.md` (overview), `../architecture.md` (ser
 ![System architecture of the single-region stage: users reach the Next.js platform on ECS Fargate through CloudFront and ALB; data sources, compute engines, OpenMetadata governance, the lakehouse and the AI plane](system-architecture.png)
 
 - Users access the platform through **CloudFront (HTTPS)**;
-- the ALB security group admits only the CloudFront prefix list;
-- the application is a full-stack Next.js app on **ECS Fargate**.
+  the ALB security group admits only the CloudFront prefix list;
+  the application is a full-stack Next.js app on **ECS Fargate**.
 - The control plane uses **Cognito (per-workspace RBAC) / DynamoDB (61 tables) / Secrets Manager**.
 - Data integration covers **data sources of four paradigms and 8 providers** (the four JDBC siblings MySQL / PostgreSQL / Oracle / SQL Server,
   object storage S3, NoSQL DynamoDB, streams Kinesis / MSK), landing them in the lakehouse **S3 Tables (Iceberg) / Redshift Serverless / S3 data lake**
   through **batch (Glue ETL, full / incremental) plus real-time CDC (DMS / Zero-ETL / Flink)**;
-- compute engines form a **pluggable SPI** (Glue PySpark / SQL, EMR Serverless, Athena, Redshift SQL, MSAF Flink stream computing), scheduled by **MWAA**;
-- data governance is carried by **OpenMetadata** (ECS + its own RDS MySQL + OpenSearch).
+  compute engines form a **pluggable SPI** (Glue PySpark / SQL, EMR Serverless, Athena, Redshift SQL, MSAF Flink stream computing), scheduled by **MWAA**;
+  data governance is carried by **OpenMetadata** (ECS + its own RDS MySQL + OpenSearch).
 - On the right, the **AI plane** (Bedrock Claude Opus + 3 AgentCore stacks, carrying 7 user-visible AI capabilities: GenBI / Copilot /
   network and parameter advisors / DevOps diagnosis / AI codegen) runs **read-only SQL** on Redshift / Athena; see section 2.1 below.
 
@@ -107,10 +108,10 @@ stored in Secrets Manager throughout.
 - Underneath are **Amazon Bedrock (Converse / Claude Opus)** + **3 AgentCore stacks** (the GenBI Runtime is live; the network / parameter
   advisor stacks are defined but run in-process by default, and their Runtime is gated and not deployed);
 - GenBI skills run read-only SQL on Redshift / Athena through **Gateway (MCP, SigV4) → Skills Lambda (8 MCP tools, read-only guard + EMF)**;
-- conversation memory has **two back ends: managed AgentCore Memory and self-managed DynamoDB + S3**.
+  conversation memory has **two back ends: managed AgentCore Memory and self-managed DynamoDB + S3**.
 - The accompanying **end-to-end implementation details** are in **[`../deep-dive.md`](../deep-dive.md)** (concept layer sections 1–14 plus
   source-code layer section 15);
-- the **two-hour stage briefing** is **[`../deep-dive-brief.md`](../deep-dive-brief.md)**.
+  the **two-hour stage briefing** is **[`../deep-dive-brief.md`](../deep-dive-brief.md)**.
 
 > Reproduce: `python3 docs/diagrams/src/genai-architecture.py` from the repository root (requires `pip install diagrams` plus graphviz).
 

@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ delivered** (audit calibration of 2026-08-26: the original status header was outdated; it read "design → in implementation 2026-07-08")
-> Trigger: the "Metrics Hub (`/metrics`, the [metrics store](./metrics-store.md))" and "Data Modeling → Metric system ([data modeling](./data-modeling.md))" were found to be highly redundant, and it was decided to "take the modeling metric system as the authority and retire the Metrics Hub".
-> Red lines: **top-level design** (this platform is for users worldwide who freely fresh-clone, install and use it); **never affect other existing features**; pure consolidation without breakage; rollback possible.
+> - Status: **✅ delivered** (audit calibration of 2026-08-26: the original status header was outdated; it read "design → in implementation 2026-07-08")
+> - Trigger: the "Metrics Hub (`/metrics`, the [metrics store](./metrics-store.md))" and "Data Modeling → Metric system ([data modeling](./data-modeling.md))" were found to be highly redundant, and it was decided to "take the modeling metric system as the authority and retire the Metrics Hub".
+> - Red lines: **top-level design** (this platform is for users worldwide who freely fresh-clone, install and use it); **never affect other existing features**; pure consolidation without breakage; rollback possible.
 
 ## 1. Why it is redundant (factual comparison)
 

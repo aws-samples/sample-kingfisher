@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: **2.0 (fully isolated architecture, pending confirmation)** | Created: 2026-07-13 | Priority: high | Capability group: platform and openness — asset and cost governance
-> Upstream master plan: the 2026-08 product roadmap (historical, single-region stage), phase "platform and openness"
-> **Architecture red line (raised 2026-07-13): FinOps is a large feature and must be built as a fully independent module — directories / code / tables / infra stack all independent, with zero impact on existing features.**
+> - Revision: **2.0 (fully isolated architecture, pending confirmation)** | Created: 2026-07-13 | Priority: high | Capability group: platform and openness — asset and cost governance
+> - Upstream master plan: the 2026-08 product roadmap (historical, single-region stage), phase "platform and openness"
+> - **Architecture red line (raised 2026-07-13): FinOps is a large feature and must be built as a fully independent module — directories / code / tables / infra stack all independent, with zero impact on existing features.**
 
 ---
 
@@ -125,7 +125,7 @@ Four tabs (following the three-tab pattern of `/alerting`, with a collapsible `F
 |---|---|---|
 | `bgp-cost-daily` | `pk="cost#<yyyy-MM>"` / `sk="<date>#<service>"` | L1 daily cost snapshot per service (amount/usageQty/category); a meta item additionally records the collection watermark |
 | `bgp-cost-runs` | `pk="taskcost#<taskId>"` / `sk="<runId>"` | L3 run-level attribution (engine / usage detail / costUsd / priceVersion / startedAt); TTL 180 d; idempotent conditional writes |
-| `bgp-budgets` | `pk="budget#<projectId|global>"` / `sk=budgetId` | Budget definition + month-to-date consumption + latest alert state (version optimistic lock; threshold alerts idempotent by dedupeKey) |
+| `bgp-budgets` | `pk="budget#<projectId\|global>"` / `sk=budgetId` | Budget definition + month-to-date consumption + latest alert state (version optimistic lock; threshold alerts idempotent by dedupeKey) |
 
 The price list is not stored in a table: `lib/finops/pricing.ts` holds built-in us-east-1 unit prices (Glue $0.44/DPU-h, EMR vCPU $0.052624/h + memory $0.0057785/GB-h, Athena $5/TB, Redshift $0.375/RPU-h) with a `priceVersion`, so that every attribution record is auditable; they are compared automatically against the actual CE payment / usage, and a deviation >10% raises a reminder (in the advice list).
 

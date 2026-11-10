@@ -1,14 +1,17 @@
 # Unified platform Copilot (agentic data development · may create, must not execute)
 
-> 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
-> ⚠️ **Implementation differences**: the AgentCore edition of the Copilot described in this document (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform process (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`), and the "create only, never execute" guardrails of the Plan Center are documented in the [endpoint inventory](./unified-copilot-endpoint-inventory.md) that accompanies this document.
+> - 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path
+>   mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
+> - ⚠️ **Implementation differences**: the AgentCore edition of the Copilot described in this document (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform process
+>   (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`), and the "create only, never execute" guardrails of the Plan Center are documented in the [endpoint inventory](./unified-copilot-endpoint-inventory.md) that accompanies this document.
 
-> Status: **✅ implemented (in a form different from this document: an in-process Copilot, no AgentCore edition — see "Implementation differences" above)** (design baseline 2026-07-15) (documentation audit calibration of 2026-08-26: the original status header was out of date; it read "design draft / no product code written yet").
-> Rollback anchor: a pre-change `git tag` (= the head of the main branch at that time; live task definition revision 13) has been pushed.
-> Positioning: supplement the AI capabilities scattered across individual pages with **one conversational entry point that spans the whole platform (a centralized Copilot)** and supports **cross-module agentic orchestration**;
-> constrain it with one hard security line — **"create / generate / suggest" actions are allowed; "execute / run / publish / delete" actions are forbidden**.
-> Lineage: follows the platform standard [AI capabilities on Amazon Bedrock AgentCore](./agentcore-standard.md) (every AI capability = an independent Runtime + Gateway + Memory + a thin platform wrapper).
-> Related working notes: the AgentCore platform standard · the network advisor is read-only by design · tag before large changes · run the contract guard before and after every change
+> - Status: **✅ implemented (in a form different from this document: an in-process Copilot, no AgentCore edition — see "Implementation differences" above)** (design baseline 2026-07-15) (documentation audit calibration of 2026-08-26: the original status header was out of date; it read "design draft / no product code written yet").
+> - Rollback anchor: a pre-change `git tag` (= the head of the main branch at that time; live task definition revision 13) has been pushed.
+> - Positioning: supplement the AI capabilities scattered across individual pages with **one conversational entry point that spans the whole platform (a centralized Copilot)** and supports **cross-module agentic orchestration**;
+>   constrain it with one hard security line — **"create / generate / suggest" actions are allowed; "execute / run / publish / delete" actions are forbidden**.
+> - Lineage: follows the platform standard [AI capabilities on Amazon Bedrock AgentCore](./agentcore-standard.md) (every AI capability = an independent Runtime + Gateway + Memory + a thin platform wrapper).
+> - Related working notes: the AgentCore platform standard · the network advisor is read-only by design · tag before large changes · run the contract guard before and after every change
 
 ---
 
@@ -136,26 +139,7 @@ The Copilot's skill Lambda implements only "create / generate / suggest / read-o
 
 **(a) Audit-action suffix allow-list (permitted)**: `*.create` · `*.ai-generate` · `*.generate` · `*.issue` (with caution, see below) · `*.upload` · `*.bind` · `*.seed` · `classification.set` · `requirement.create-job` (creates a draft only, does not run it).
 
-- **(b) Suffix deny-list (hard block, even if a tool is added by mistake in the future)**: `*.run` ·
-- `*.start` ·
-- `*.stop` ·
-- `*.trigger` ·
-- `*.backfill` ·
-- `*.rerun` ·
-- `*.schedule*` ·
-- `*.apply` ·
-- `*.land` ·
-- `*.compute` ·
-- `*.scan` ·
-- `*.execute` ·
-- `*.produce` ·
-- `*.evaluate` ·
-- `promote.*` ·
-- `approval.decide` ·
-- `resource.rollback` ·
-- `*.delete` ·
-- `*.publish` ·
-- `data-api-key.issue` (grants external trust; downgraded to forbidden).
+**(b) Suffix deny-list (hard block, even if a tool is added by mistake in the future)**: `*.run` · `*.start` · `*.stop` · `*.trigger` · `*.backfill` · `*.rerun` · `*.schedule*` · `*.apply` · `*.land` · `*.compute` · `*.scan` · `*.execute` · `*.produce` · `*.evaluate` · `promote.*` · `approval.decide` · `resource.rollback` · `*.delete` · `*.publish` · `data-api-key.issue` (grants external trust; downgraded to forbidden).
 
 **(c) Path-level deny-list (covers the "execution endpoints without audit" that the action anchor cannot catch — a key finding of the endpoint survey)**:
 `POST /api/redshift/execute` (bare execution of arbitrary SQL with no guard) · `POST /api/sync/execute-ddl` (DDL against the real database) ·

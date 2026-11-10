@@ -1,8 +1,8 @@
 # Workflow Job Node · Batch Job Nodes in the Orchestration DAG (requirements + design)
 
-> Revision **1.0** (2026-11-03). Status: 🆕 design written, code pending (ships with the 2.2.0 release).
-> Decided on 2026-11-03: "Allow data sync tasks and batch development jobs to be chained into one DAG workflow and **published completely into Airflow Serverless**. This is a **basic capability; it must be fixed at the root, and to the highest global standard**."
-> Origin (the second question raised the same day): a Data Sync task's dependencies can only be other sync tasks; Batch Compute jobs cannot enter orchestration — to chain "sync → batch job → SQL" today, the only way is to paste the job's code once more into an inline SQL / Python node, losing the engine configuration, the execution role, the dependency libraries and the run history.
+> - Revision **1.0** (2026-11-03). Status: 🆕 design written, code pending (ships with the 2.2.0 release).
+> - Decided on 2026-11-03: "Allow data sync tasks and batch development jobs to be chained into one DAG workflow and **published completely into Airflow Serverless**. This is a **basic capability; it must be fixed at the root, and to the highest global standard**."
+> - Origin (the second question raised the same day): a Data Sync task's dependencies can only be other sync tasks; Batch Compute jobs cannot enter orchestration — to chain "sync → batch job → SQL" today, the only way is to paste the job's code once more into an inline SQL / Python node, losing the engine configuration, the execution role, the dependency libraries and the run history.
 
 ## 1. Current state and gaps (🔵 code facts, surveyed 2026-11-03 on the development tree of that day)
 

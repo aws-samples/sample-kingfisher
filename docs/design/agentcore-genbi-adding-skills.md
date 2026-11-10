@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written in the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place, execution scope, per-region scheduling and the like — is described in the [multi-region execution specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index; a path mentioned below that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Design goal: after a new skill is added, **subsequent sessions load it automatically — no agent rebuild or restart is needed**.
-> Key point: the GenBI agent (AgentCore Runtime) has been changed to be **generic and dynamic** — on every invocation it discovers all tools on the Gateway with `tools/list`, exposes them to the model dynamically, and forwards calls generically. Therefore **the agent never needs a code change or an image rebuild for a new skill**.
+> - Design goal: after a new skill is added, **subsequent sessions load it automatically — no agent rebuild or restart is needed**.
+> - Key point: the GenBI agent (AgentCore Runtime) has been changed to be **generic and dynamic** — on every invocation it discovers all tools on the Gateway with `tools/list`, exposes them to the model dynamically, and forwards calls generically. Therefore **the agent never needs a code change or an image rebuild for a new skill**.
 
 ## The two kinds of "skill" and how each is added
 

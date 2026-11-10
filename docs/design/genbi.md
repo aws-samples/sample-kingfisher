@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: code complete + build verification passed (`npm run build` / infra `tsc`); **not yet deployed, not yet verified online**.
-> Engine: Amazon Bedrock (Converse API + tool use) → Amazon Redshift (Redshift Data API, read-only).
-> Design reference: DataAgent (an Athena-based NL-to-SQL agent); this module ports its pattern to TypeScript / Redshift.
+> - Status: code complete + build verification passed (`npm run build` / infra `tsc`); **not yet deployed, not yet verified online**.
+> - Engine: Amazon Bedrock (Converse API + tool use) → Amazon Redshift (Redshift Data API, read-only).
+> - Design reference: DataAgent (an Athena-based NL-to-SQL agent); this module ports its pattern to TypeScript / Redshift.
 
 ---
 

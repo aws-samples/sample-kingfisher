@@ -1,13 +1,16 @@
 # Strands Platform Unification, Stage L3 — netadvisor onto Strands + Eliminating the Hand-Copied Text (Implementation Design)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
-> the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` + `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
-> `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer
+>   exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
+>   the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` +
+>   `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
+>   `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
 
-> Status: **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design, pending approval"). Follows the engineering discipline `design-first-no-code-until-approved` + a strict contract-guard closed loop.
-> Goal: verify that the ② runtime piece (agent-runner) extracted in stage L2 can really be reused by a second capability with [zero replication].
-> Prerequisite: L2 is fully live with its contract loop closed (agent-runner / mcp / core-prebuild all in place).
+> - Status: **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design, pending approval"). Follows the engineering discipline `design-first-no-code-until-approved` + a strict contract-guard closed loop.
+> - Goal: verify that the ② runtime piece (agent-runner) extracted in stage L2 can really be reused by a second capability with [zero replication].
+> - Prerequisite: L2 is fully live with its contract loop closed (agent-runner / mcp / core-prebuild all in place).
 
 ## 0. Similarities and differences with L2 (in one sentence)
 

@@ -1,37 +1,38 @@
 # Deployment Runbook — Pre-flight Checks Before Switching AWS Accounts and Workarounds for Restricted Accounts
 
-> 🔴 **Customer production deployments follow [`deployment.md`](deployment.md).** This runbook is the detailed explanation of the pre-flight checks, the restricted-account workarounds,
-> resuming after a failed step, and the post-deploy truth criteria; the demo / acceptance orchestration (moved to the development-environment runbook, which is not published
-> with this repository; one-command rebuild, seeding, all-region acceptance) is used only for demo / acceptance accounts.
-> Version: **v1.8** (2026-10-14, wording of the candidate-chain change on the development branch: pre-flight item 7 / row 5 of the table below now walks the **candidate chain**
-> with one real call per candidate (`scripts/resolve-home-model.sh`; how to read the stderr lines "✗ candidate → id —— verbatim message");
-> `BGP_MODEL_CANDIDATES` is for troubleshooting only), ships with the next release) · v1.7 (2026-10-14 02:xxZ, §6 pitfall table: the row "bare `cdk deploy` of AgentCore"
-> now says to use `scripts/redeploy-agents.sh`, and a new row "an upgrade that only runs redeploy-platform does not refresh the agents (defect identified 2026-10-14)" was added;
-> development-branch wording, ships with the next release) · v1.6 (2026-10-14, corrections after checking the document against the scripts item by item: §1 removed leftover
-> fragments of old commands, separated script segment numbers from table row numbers, marked the closing example command and the EIP wording as outdated ·
-> §3 path C gained the SSM parameter name, and the password file is explained per mode ·
-> §4 the re-run of user creation gained the warning "the script does not check the SSM mode" ·
-> §5 `x-cache` is only printed, not judged ·
-> §6 the AgentCore context key names were written precisely, and a row "a redeploy without `-c dataplane-creds=observe` silently falls back to taskrole" was added ·
-> **§2 and §4ante–§4quater, the demo / acceptance orchestration, were moved as a whole to the development-environment runbook (not published)**;
-> this document keeps only the production-relevant mechanisms) · v1.5 (2026-10-13, reconciled against release `release-2026-10-13`: §1 the model check command changed
-> to the `converse` form the script really uses ·
-> the number of pre-flight segments follows the script output ·
-> §3 Cognito user creation gained a third path (passwords written to SSM, then `cdk deploy BgpAuthStack -c bootstrapUsers=1`) · §4 the re-run of user creation must carry
-> the same `BGP_DEPLOY_MODE` as the first install ·
-> §5 gained item 9 (`tgt_home` in `bgp-execution-envs` is active) · removed the reference to `scripts/README.md`, which is not in the repository;
-> positioning: this document is about **mechanisms and troubleshooting**; §4ante–§4quater are demo / acceptance environment orchestration, **not production steps**;
-> production follows `deployment.md` only) · v1.4 (2026-10-12, reconciled against `release-2026-10-12`: every `deploy-all` command gained `BGP_DEPLOY_MODE` ·
-> the home region is chosen by the customer (no longer "only `us-east-1`") · §2 import-VPC gained the "not supported for multi-region" warning ·
-> password file path per profile · §5 changed to 9 items and points to the script · removed the outdated EIP statement)\
-> v1.3 (2026-09-19, night: the §4ter matrix extended from 7 to **9** capability classes (adding stream compute / Ask-Your-Data, whose semantics differ from batch jobs)
-> + 🆕 §4quater "the shortest path to bring an account up quickly and verify it quickly after switching" (five commands + three time-saving lessons:
-> where the password lands on disk / clear `cdk.out` first / 202 is not failure))\
-> v1.2 (2026-09-19, switching accounts in practice: new §4ante "bring up from zero and verify in one command" + §1 pre-flight and §5 truth criteria each consolidated
-> into a script + §4ter close-out through a headless browser)\
-> v1.1 (2026-08-31, **four deployment defects fixed at the root**: ① §5bis the "first-deployment blind spot" of the CDK empty zip,
-> ② §4 cascading abort, ③ §5 exit 0 false green, ④ §3 Cognito cannot be set up in a restricted account; all four verified in a temporary workshop account)
-> v1.0 | Date: 2026-08-31 | Status: ✅ verified in practice
+> - 🔴 **Customer production deployments follow [`deployment.md`](deployment.md).** This runbook is the detailed explanation of the pre-flight checks, the restricted-account workarounds,
+>   resuming after a failed step, and the post-deploy truth criteria; the demo / acceptance orchestration (moved to the development-environment runbook, which is not published
+>   with this repository; one-command rebuild, seeding, all-region acceptance) is used only for demo / acceptance accounts.
+> - Version: **v1.8** (2026-10-14, wording of the candidate-chain change on the development branch: pre-flight item 7 / row 5 of the table below now walks the **candidate chain**
+>   with one real call per candidate (`scripts/resolve-home-model.sh`; how to read the stderr lines "✗ candidate → id —— verbatim message");
+>   `BGP_MODEL_CANDIDATES` is for troubleshooting only), ships with the next release) · v1.7 (2026-10-14 02:xxZ, §6 pitfall table: the row "bare `cdk deploy` of AgentCore"
+>   now says to use `scripts/redeploy-agents.sh`, and a new row "an upgrade that only runs redeploy-platform does not refresh the agents (defect identified 2026-10-14)" was added;
+>   development-branch wording, ships with the next release) · v1.6 (2026-10-14, corrections after checking the document against the scripts item by item: §1 removed leftover
+>   fragments of old commands, separated script segment numbers from table row numbers, marked the closing example command and the EIP wording as outdated ·
+>   §3 path C gained the SSM parameter name, and the password file is explained per mode ·
+>   §4 the re-run of user creation gained the warning "the script does not check the SSM mode" ·
+>   §5 `x-cache` is only printed, not judged ·
+>   §6 the AgentCore context key names were written precisely, and a row "a redeploy without `-c dataplane-creds=observe` silently falls back to taskrole" was added ·
+>   **§2 and §4ante–§4quater, the demo / acceptance orchestration, were moved as a whole to the development-environment runbook (not published)**;
+>   this document keeps only the production-relevant mechanisms) · v1.5 (2026-10-13, reconciled against release `release-2026-10-13`: §1 the model check command changed
+>   to the `converse` form the script really uses ·
+>   the number of pre-flight segments follows the script output ·
+>   §3 Cognito user creation gained a third path (passwords written to SSM, then `cdk deploy BgpAuthStack -c bootstrapUsers=1`) · §4 the re-run of user creation must carry
+>   the same `BGP_DEPLOY_MODE` as the first install ·
+>   §5 gained item 9 (`tgt_home` in `bgp-execution-envs` is active) · removed the reference to `scripts/README.md`, which is not in the repository;
+>   positioning: this document is about **mechanisms and troubleshooting**; §4ante–§4quater are demo / acceptance environment orchestration, **not production steps**;
+>   production follows `deployment.md` only) · v1.4 (2026-10-12, reconciled against `release-2026-10-12`: every `deploy-all` command gained `BGP_DEPLOY_MODE` ·
+>   the home region is chosen by the customer (no longer "only `us-east-1`") · §2 import-VPC gained the "not supported for multi-region" warning ·
+>   password file path per profile · §5 changed to 9 items and points to the script · removed the outdated EIP statement)
+> - v1.3 (2026-09-19, night: the §4ter matrix extended from 7 to **9** capability classes (adding stream compute / Ask-Your-Data, whose semantics differ from batch jobs)
+>   + 🆕 §4quater "the shortest path to bring an account up quickly and verify it quickly after switching" (five commands + three time-saving lessons:
+>   where the password lands on disk / clear `cdk.out` first / 202 is not failure))
+> - v1.2 (2026-09-19, switching accounts in practice: new §4ante "bring up from zero and verify in one command" + §1 pre-flight and §5 truth criteria each consolidated
+>   into a script + §4ter close-out through a headless browser)
+> - v1.1 (2026-08-31, **four deployment defects fixed at the root**: ① §5bis the "first-deployment blind spot" of the CDK empty zip,
+>   ② §4 cascading abort, ③ §5 exit 0 false green, ④ §3 Cognito cannot be set up in a restricted account; all four verified in a temporary workshop account)
+> - v1.0 | Date: 2026-08-31 | Status: ✅ verified in practice
+>
 > Purpose: **before running `scripts/deploy-all.sh`**, complete the pre-flight checks in this document and pick the deployment path according to the results.
 > Companion documents: the development-environment runbook (development / acceptance environment orchestration, not production; not published with this repository),
 > the usage comments at the top of each script (there is no `scripts/README.md`; the script overview is in the repository index [`AGENTS.md`](../AGENTS.md)),
@@ -77,14 +78,14 @@ First set `P="--profile <your-profile>"` and `R=<target-region>`.
 | 7 | **Docker** | `docker version` + `docker buildx version` | Required: the ECS image and the 3 AgentCore ECR images are all built locally |
 | 8 | **Dependencies installed** | `ls infra/node_modules platform/node_modules` | A fresh clone **must run `npm ci` first** (once in infra, once in platform), otherwise CDK synth fails straight away with TSError |
 
-> Pre-flight all green ⇒ run `BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>` directly (about 60–90 minutes; the example command printed
-> at the end of the script lacks `BGP_DEPLOY_MODE`, this line is authoritative). 🔴 `BGP_DEPLOY_MODE` must be given explicitly (`production` / `demo`);
-> without it the script exits 2 immediately.
-> ❌ results that may be ignored in the pre-flight: the third argument defaults to us-west-2 and is blocked by the organization SCP ⇒ rerun with the execution region
-> you really intend to use. (Since the candidate-chain change on the development branch (released 2026-10-27), segment 7 / row 5 of the table above derives
-> the foundation model from the true home region and expands this region's inference profile, so a home region outside the United States **no longer** necessarily
-> reports ❌; the script on the release tag then in production, `release-2026-10-13`, still probes the factory `us.` id directly, so with a non-US home region
-> keep ignoring that one item and go by the model chosen in deployment step 2.)
+> - Pre-flight all green ⇒ run `BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>` directly (about 60–90 minutes; the example command printed
+>   at the end of the script lacks `BGP_DEPLOY_MODE`, this line is authoritative). 🔴 `BGP_DEPLOY_MODE` must be given explicitly (`production` / `demo`);
+>   without it the script exits 2 immediately.
+> - ❌ results that may be ignored in the pre-flight: the third argument defaults to us-west-2 and is blocked by the organization SCP ⇒ rerun with the execution region
+>   you really intend to use. (Since the candidate-chain change on the development branch (released 2026-10-27), segment 7 / row 5 of the table above derives
+>   the foundation model from the true home region and expands this region's inference profile, so a home region outside the United States **no longer** necessarily
+>   reports ❌; the script on the release tag then in production, `release-2026-10-13`, still probes the factory `us.` id directly, so with a non-US home region
+>   keep ignoring that one item and go by the model chosen in deployment step 2.)
 
 ## 2. Import an existing VPC (moved out)
 
@@ -204,11 +205,13 @@ the initial password the deployment wrote to disk). When the home region is not 
 ## 5bis. ✅ Fixed at the root: CDK "empty zip" → `BgpPlatformStack` ROLLBACK (formerly "every first deployment in a new account hits it")
 
 **Symptom** (measured in a brand-new account on 2026-08-31, same point as the 2026-08-24 occurrence):
+
 ```
 Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler  CREATE_FAILED
   AWS::Lambda::Function → "Uploaded file must be a non-empty zip" (400)
 ⇒ BgpPlatformStack ROLLBACK_COMPLETE (step 6)
 ```
+
 Some versions of the CDK CLI package the built-in `S3AutoDelete` handler as a **22-byte empty zip** and upload it to the bootstrap asset bucket;
 and CDK uses the S3Key (content hash) to decide "already exists, do not re-upload" ⇒ **once the bad zip is in the bucket, every retry reuses it = guaranteed recurrence**.
 
@@ -265,6 +268,7 @@ aws cloudformation wait stack-delete-complete --stack-name BgpPlatformStack --pr
 # 2) Rerun (the 10+ earlier stacks are already in place and are skipped idempotently; or rerun only the platform stack)
 BGP_DEPLOY_MODE=<same as first install> ./scripts/deploy-all.sh <profile> <region>      # or ./scripts/redeploy-platform.sh <profile> <region>
 ```
+
 **Criterion**: step 2.5 should print "provisioned/repaired zip: <hash>.zip (… → NNNN B)", and the closing line "manifest N, provisioned/repaired M, failed 0"
 (the script prints these lines in Chinese; they are rendered here in English).
 

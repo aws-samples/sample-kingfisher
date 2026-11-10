@@ -6,9 +6,11 @@
 >
 > 🟢 **Decided on 2026-07-24**: ① scope of this round = **phase 1 → phase 3** (the SPI foundation + all four JDBC siblings mysql/postgresql/oracle/sqlserver genuinely running end to end); ② priority of the new paradigms that follow = **S3 → MSK → DynamoDB** (all three are wanted; phases 4 / 5 / 6 in that order).
 > ③ Implementation discipline: before touching the core data-source chain, create a pre-change git tag + a contract-guard snapshot; in every phase, prove driver availability empirically first and only then write the provider (the native library of Oracle's oracledb is the biggest uncertainty).
+>
 > Benchmark: the data-integration module of a leading cloud data-development suite (50+ data sources) | Capability group: data source ecosystem | Master plan: the platform roadmap of 2026-08 (historical, single-region stage), section 1 (the capability group) and section 3 (this module)
 >
 > 🔴 Project red lines: ① use only `--profile temp-account-1`; ② no hard-coded secrets / account ids / ARNs anywhere (everything through Secrets Manager / IAM roles / env); ③ every new capability must be verified with headless Playwright; ④ no pushing without permission; ⑤ design first — this document is design only; code is touched only after sign-off, and the core chain is touched only after tag + contract-guard.
+>
 > This document contains no real account ids / ARNs; placeholders are used.
 
 ---
@@ -113,15 +115,15 @@
 2. **Introspection / liveness layer**: the MySQL-only branches of schema-reader (#7) + heartbeat (#8) → folded into the provider's `introspect()`/`ping()`; callers do `getProvider(ds.type).introspect(ds)`.
 3. **Channel-recommendation layer**: the isMySQL/isPG of recommendChannel (#10) → reads `provider.capabilities.syncChannels`; data-driven, a new source takes effect automatically.
 
-> 🟢 **Implementation decision (SPI foundation phase, 2026-07-24)**: phase 1 has eliminated 5 of the 6 scattered spots and delegated them to the providers — ① schema-reader.introspect, ② heartbeat.ping, ③ glue-script-generator (JDBC URL + driver resolved dynamically), ④ test/route (validateConfig + buildConnection), ⑤ datasource-service (JDBC_URL/DB_PORT tables deleted; getSecret extracted into `datasource-spi/secrets.ts` to break the circular dependency).
-> **The 6th spot, `recommendChannel` (#10), is deliberately left to phase 2**: what it encodes is "a channel-compatibility matrix + the realtime/incremental/full branches + rich Chinese copy", which a bare `syncChannels` cannot replace;
-> moreover, changing it carries regression risk for MySQL, while the iron rule of phase 1 is "MySQL behavior unchanged to the letter".
-> When phase 2 makes PG genuinely run, recommendChannel naturally has to let PG appear among the dms options — that is the most sensible moment to change it and verify it in a real scenario (avoiding an empty change with no scenario to verify it).
-> The path MySQL currently takes through recommendChannel is **completely untouched**.
-> **Handling of the circular dependency**: `registry→provider→jdbc-base→datasource-service(getSecret)→registry` would form a cycle.
-> Solution = extract the Secrets Manager credential read/write (create/get/update/deleteSecret) into an independent low-level module `lib/datasource-spi/secrets.ts` (type-agnostic; it never belonged in datasource-service in the first place), on which jdbc-base depends;
-> datasource-service re-exports it so that every other consumer stays untouched.
-> This also incidentally removes the code smell of "credential read/write and the JDBC_URL table crammed into one file".
+> - 🟢 **Implementation decision (SPI foundation phase, 2026-07-24)**: phase 1 has eliminated 5 of the 6 scattered spots and delegated them to the providers — ① schema-reader.introspect, ② heartbeat.ping, ③ glue-script-generator (JDBC URL + driver resolved dynamically), ④ test/route (validateConfig + buildConnection), ⑤ datasource-service (JDBC_URL/DB_PORT tables deleted; getSecret extracted into `datasource-spi/secrets.ts` to break the circular dependency).
+> - **The 6th spot, `recommendChannel` (#10), is deliberately left to phase 2**: what it encodes is "a channel-compatibility matrix + the realtime/incremental/full branches + rich Chinese copy", which a bare `syncChannels` cannot replace;
+>   moreover, changing it carries regression risk for MySQL, while the iron rule of phase 1 is "MySQL behavior unchanged to the letter".
+>   When phase 2 makes PG genuinely run, recommendChannel naturally has to let PG appear among the dms options — that is the most sensible moment to change it and verify it in a real scenario (avoiding an empty change with no scenario to verify it).
+>   The path MySQL currently takes through recommendChannel is **completely untouched**.
+> - **Handling of the circular dependency**: `registry→provider→jdbc-base→datasource-service(getSecret)→registry` would form a cycle.
+>   Solution = extract the Secrets Manager credential read/write (create/get/update/deleteSecret) into an independent low-level module `lib/datasource-spi/secrets.ts` (type-agnostic; it never belonged in datasource-service in the first place), on which jdbc-base depends;
+>   datasource-service re-exports it so that every other consumer stays untouched.
+>   This also incidentally removes the code smell of "credential read/write and the JDBC_URL table crammed into one file".
 
 ---
 
@@ -428,8 +430,8 @@ The 50+ sources of the benchmark suite rest on exactly this kind of "Reader/Writ
 
 ## 10. Design Addendum (revision 0.3, 2026-07-26) — Folding Flink Sources into the SPI + the Two-Layer Selection Model + the "Create a Source on Demand" Capability
 
-> Revision: 0.3 (addendum · pending sign-off) | Date: 2026-07-26 | Trigger: the requirement that Stream Compute support **multiple data sources** (currently Kinesis + MySQL CDC, MSK later), with **two-layer selection + the ability to create a source and then select it**.
-> Relationship: this chapter is the **root-fix design** for the "Kinesis source dead end" defect, and it is inserted ahead of the phasing table of section 7. **Design only; code is touched only after sign-off.**
+> - Revision: 0.3 (addendum · pending sign-off) | Date: 2026-07-26 | Trigger: the requirement that Stream Compute support **multiple data sources** (currently Kinesis + MySQL CDC, MSK later), with **two-layer selection + the ability to create a source and then select it**.
+> - Relationship: this chapter is the **root-fix design** for the "Kinesis source dead end" defect, and it is inserted ahead of the phasing table of section 7. **Design only; code is touched only after sign-off.**
 
 ### 10.1 The Real Shape of the Problem (deeper than "put the stream back")
 
@@ -554,9 +556,10 @@ The current `POST /api/datasources` (`route.ts:59-67`) **forces JDBC semantics**
 
 ## 11. Design addendum (revision 0.4, 2026-07-27) — MSK/Kafka stream source: detailed landing design
 
-> Revision: 0.4 (addendum · decided) | Date: 2026-07-27 | Trigger: the request to "carry on with the MSK source", with the requirement that the top-level design be thought through (for production users worldwide).
-> Relationship: this chapter is the **detailed landing design** of §6.4 (the MSK provider outline) + §10.3 (the sister item of the stream paradigm), and is the final text of the MSK/Kafka stream-source phase.
-> **Decisions (2026-07-27)**: ① authentication = **both IAM and SASL/SCRAM**; ② verification = **authorized to create a temporary cluster and really run it** (in production, users enter their own cluster); ③ topic = **hybrid mode** (the value entered on the page is injected as the `${KAFKA_TOPIC}` default + the SQL may change it / add tables); ④ reach = **managed MSK and self-hosted Kafka together** (one provider, two flavors).
+> - Revision: 0.4 (addendum · decided) | Date: 2026-07-27 | Trigger: the request to "carry on with the MSK source", with the requirement that the top-level design be thought through (for production users worldwide).
+> - Relationship: this chapter is the **detailed landing design** of §6.4 (the MSK provider outline) + §10.3 (the sister item of the stream paradigm), and is the final text of the MSK/Kafka stream-source phase.
+> - **Decisions (2026-07-27)**: ① authentication = **both IAM and SASL/SCRAM**; ② verification = **authorized to create a temporary cluster and really run it** (in production, users enter their own cluster); ③ topic = **hybrid mode** (the value entered on the page is injected as the
+>   `${KAFKA_TOPIC}` default + the SQL may change it / add tables); ④ reach = **managed MSK and self-hosted Kafka together** (one provider, two flavors).
 
 ### 11.0 Clearing up a misconception first: no ZooKeeper address is collected
 
@@ -588,12 +591,12 @@ The key to untangling the awkward question "once the page is configured, how is 
   - `canProvision: false` (Kinesis=true) → the second layer only "selects an existing cluster"; **the "➕ New" entry is not shown** (the platform does not create clusters on the user's behalf — a heavy operations decision).
   - `credentialKind` in two forms → IAM has no secret; SASL/SCRAM creates a secret. The `CredentialKind` union therefore already contains `"sasl-scram"` (present in types.ts today); this phase is the first to really use it.
 
-> 🔴 **CredentialKind is a static data-source-level flag, but the single MSK provider supports two authentication methods.**
-> Trade-off: `credentialKind` is used for the coarse-grained dispatch of "the authentication area of the source-creation form + whether to create a secret";
-> inside the provider, the SQL properties are refined according to the `auth` field of the connection bag.
-> That is, giving provider.capabilities.credentialKind a **dynamic value** does not fit the SPI (capabilities are static).
-> **Solution**: capabilities.credentialKind is fixed to `"sasl-scram"` (the widest superset: "may need a secret"), and the source-creation API is changed to **decide whether to really create a secret according to the connection bag's auth** (iam → skip) rather than looking only at capabilities.
-> Details in §11.6.
+> - 🔴 **CredentialKind is a static data-source-level flag, but the single MSK provider supports two authentication methods.**
+>   Trade-off: `credentialKind` is used for the coarse-grained dispatch of "the authentication area of the source-creation form + whether to create a secret";
+>   inside the provider, the SQL properties are refined according to the `auth` field of the connection bag.
+>   That is, giving provider.capabilities.credentialKind a **dynamic value** does not fit the SPI (capabilities are static).
+> - **Solution**: capabilities.credentialKind is fixed to `"sasl-scram"` (the widest superset: "may need a secret"), and the source-creation API is changed to **decide whether to really create a secret according to the connection bag's auth** (iam → skip) rather than looking only at capabilities.
+>   Details in §11.6.
 
 ### 11.3 Authentication → Flink SQL property mapping (what `${KAFKA_AUTH_PROPS}` expands to)
 
@@ -726,8 +729,9 @@ MSK brokers live in a private VPC (9098/9096), and the MSAF application must be 
 
 ## 12. Design addendum (revision 0.5, 2026-07-29) — DynamoDB (NoSQL) + S3 (object store): two new paradigms landed
 
-> Revision: 0.5 (addendum · code landed, real-run verification pending deployment) | Date: 2026-07-29 | Trigger: the question "how far are we from feature parity with a leading cloud data-development suite? DynamoDB is still not connected as a data source, is it?" → confirmed that DynamoDB + S3 are the only two paradigms not yet connected (kinesis/msk of the stream paradigm are complete).
-> **Decisions (2026-07-29)**: ① reach = **DDB + S3 in parallel**; ② IAM = **fully open with Resource=\*** (read any table / bucket of the user); ③ DDB sync targets = **verify both Redshift and S3Tables**.
+> - Revision: 0.5 (addendum · code landed, real-run verification pending deployment) | Date: 2026-07-29 | Trigger: the question "how far are we from feature parity with a leading cloud data-development suite? DynamoDB is still not connected as a data source, is it?" → confirmed that DynamoDB + S3
+>   are the only two paradigms not yet connected (kinesis/msk of the stream paradigm are complete).
+> - **Decisions (2026-07-29)**: ① reach = **DDB + S3 in parallel**; ② IAM = **fully open with Resource=\*** (read any table / bucket of the user); ③ DDB sync targets = **verify both Redshift and S3Tables**.
 
 ### 12.1 Why these two are the best proof of "one registry row + one provider file"
 
@@ -854,12 +858,12 @@ The `ConnectionField[]` dynamic-rendering contract (types.ts:42) is defined but 
 
 ## 14. Design addendum (revision 0.7, 2026-10-30) — three gaps in the delete-source path + drift model for data-source external network objects
 
-> Decided on 2026-10-28: "in the next release; root fix, not a patch".
-> Product code: three commits (the last being the second fix), **merged into the development mainline on 2026-10-30 at 00:3xZ**.
-> Real-environment acceptance: a two-region demo test account upgraded to the fixed build (product bytes plus the showcase script following the 202 long-operation protocol), page-driven: the delete-source segment **7/7 ✅** ·
-> the drift-model segment **8/8 ✅** (the first run scored 7/8 and caught the second fix; check 7 passed on the rerun) ·
-> the new stream-sample-ordering segment **4/4 ✅** (150 generated events ⇒ the two latest windows 00:05 / 00:06 in the page's "Aggregated result" each hold exactly 5 regions and agree with a full read on the read side; baseline 69 → 84 rows) · the new engine-run segment **4/4 ✅** ("Run now" returns 200 synchronously / the ledger gains exactly +1 succeeded / two concurrent clicks in the same millisecond ⇒ 200 + 409 LONG_OP_IN_PROGRESS "Run engine job is in progress") ·
-> showcase `--stage run --only realtime,emr` all green in both regions (49 aggregate rows in the home region, 24 in the execution region; the execution region's EMR run returned 200 synchronously ⇒ succeeded).
+> - Decided on 2026-10-28: "in the next release; root fix, not a patch".
+> - Product code: three commits (the last being the second fix), **merged into the development mainline on 2026-10-30 at 00:3xZ**.
+> - Real-environment acceptance: a two-region demo test account upgraded to the fixed build (product bytes plus the showcase script following the 202 long-operation protocol), page-driven: the delete-source segment **7/7 ✅** ·
+>   the drift-model segment **8/8 ✅** (the first run scored 7/8 and caught the second fix; check 7 passed on the rerun) ·
+>   the new stream-sample-ordering segment **4/4 ✅** (150 generated events ⇒ the two latest windows 00:05 / 00:06 in the page's "Aggregated result" each hold exactly 5 regions and agree with a full read on the read side; baseline 69 → 84 rows) · the new engine-run segment **4/4 ✅** ("Run now" returns 200 synchronously / the ledger gains exactly +1 succeeded / two concurrent clicks in the same millisecond ⇒ 200 + 409 LONG_OP_IN_PROGRESS "Run engine job is in progress") ·
+>   showcase `--stage run --only realtime,emr` all green in both regions (49 aggregate rows in the home region, 24 in the execution region; the execution region's EMR run returned 200 synchronously ⇒ succeeded).
 
 ### 14.1 Problems (four, one path in two directions)
 

@@ -143,13 +143,13 @@ Page: "Smart Analytics → Ask-Your-Data".
 2. For "Data source:" choose "Data Warehouse (Redshift)"; leave the workgroup at "Resolved automatically by execution target", and choose `dev` (or your database name) as the database.
 3. Click "New chat", then enter the questions below one at a time and press Enter to send each. While waiting you see "Thinking, generating, and running SQL..." and "Ns elapsed".
 
-| No. | Question | What to expect |
-|---|---|---|
-| Q1 | Which three channels in showcase.dws_channel_roi_daily have the highest roas? Give channel_name and roas. | A three-row table; "Matched tables:" includes dws_channel_roi_daily; "Execution path" may show `run_registered_skill` (your skill was called) |
-| Q2 | Use top_channels_by_roas to show the top 5 paid channels by ROAS | Five rows; one step of "Execution path" has the tool `run_registered_skill`, with topn among the input parameters |
-| Q3 | Count players, paying players and payment rate by channel type | Two rows, paid / organic; "Applied N business definition(s)" includes "Payment rate" |
-| Q4 | What is the total payment amount per day over the last 30 days? List it by day | A line chart; "Display mode:" can switch to "Table" to see the raw rows |
-| Q5 | Which country and OS do the 10 devices with the most clicks come from? | Ten rows: device, country, OS, clicks; §6 uses it to verify masking |
+   | No. | Question | What to expect |
+   |---|---|---|
+   | Q1 | Which three channels in showcase.dws_channel_roi_daily have the highest roas? Give channel_name and roas. | A three-row table; "Matched tables:" includes dws_channel_roi_daily; "Execution path" may show `run_registered_skill` (your skill was called) |
+   | Q2 | Use top_channels_by_roas to show the top 5 paid channels by ROAS | Five rows; one step of "Execution path" has the tool `run_registered_skill`, with topn among the input parameters |
+   | Q3 | Count players, paying players and payment rate by channel type | Two rows, paid / organic; "Applied N business definition(s)" includes "Payment rate" |
+   | Q4 | What is the total payment amount per day over the last 30 days? List it by day | A line chart; "Display mode:" can switch to "Table" to see the raw rows |
+   | Q5 | Which country and OS do the 10 devices with the most clicks come from? | Ten rows: device, country, OS, clicks; §6 uses it to verify masking |
 
 4. Follow up on Q4 with: "And broken down by iOS and Android?" — the platform keeps the context and splits the result by os.
 5. These questions appear under "Recent questions" at the bottom of the page; clicking any of them re-asks it as is.
@@ -278,13 +278,13 @@ Page: "System → Settings" → the "AI model" card. Non-admins only see the eff
    - Success: "Probe passed (N s)"; families that need tool-use are probed once more for a tool call.
    - Failure: the red "Probe failed" tag and the reason text are shown. Common reasons and remedies:
 
-| Probe result | Page text (excerpt) | Next step |
-|---|---|---|
-| Not enabled for the account | "This model is not enabled for this account (Bedrock says "not available for this account" - an account-level restriction unrelated to region / IAM / Marketplace). Ask your AWS account team to enable it, or pick another version or vendor." | Contact your AWS account team; switch model |
-| No permission to invoke | "This account cannot invoke this model. Request access in the Bedrock console or pick an enabled model." | Request model access in the Bedrock console |
-| Unavailable in this region | "This model is unavailable in the current region. …" | Switch to a model that is live in this region |
-| Timeout | "Probe timed out: the model did not respond within this family's budget (reasoning models can take tens of seconds to start; this is not throttling). …" | Test again; or switch to the global. inference profile |
-| Cannot call tools | "This model cannot call tools under Converse (tool-use probe failed); GenBI / Copilot / advisors would go silent, so it cannot be the global default" | Switch to a model that supports tool calling |
+   | Probe result | Page text (excerpt) | Next step |
+   |---|---|---|
+   | Not enabled for the account | "This model is not enabled for this account (Bedrock says "not available for this account" - an account-level restriction unrelated to region / IAM / Marketplace). Ask your AWS account team to enable it, or pick another version or vendor." | Contact your AWS account team; switch model |
+   | No permission to invoke | "This account cannot invoke this model. Request access in the Bedrock console or pick an enabled model." | Request model access in the Bedrock console |
+   | Unavailable in this region | "This model is unavailable in the current region. …" | Switch to a model that is live in this region |
+   | Timeout | "Probe timed out: the model did not respond within this family's budget (reasoning models can take tens of seconds to start; this is not throttling). …" | Test again; or switch to the global. inference profile |
+   | Cannot call tools | "This model cannot call tools under Converse (tool-use probe failed); GenBI / Copilot / advisors would go silent, so it cannot be the global default" | Switch to a model that supports tool calling |
 
 4. After "Probe passed; you can save. An impact preview will ask for confirmation first." click "Save" → the dialog "Change the global default model?" lists "Effective now", "Change to" and "Impact preview (takes effect platform-wide immediately)": Affected capabilities (9) · Scope (All tenants, all projects) · Takes effect (≤5s after saving) · Reversible → click "Confirm change".
 5. The message "Global default switched to <model>; effective platform-wide within 5s" appears.

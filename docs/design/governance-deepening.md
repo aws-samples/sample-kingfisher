@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.0 | Date: 2026-07-04 | Status: design → implementation → live verification
-> Addresses the roadmap's section 2 first-priority item **governance deepening** (capability groups: governance health score / workbench, automatic sensitive-data detection, row-level security). **This round's first phase**: automatic sensitive-data detection + governance health score / workbench.
-> **Row-level security (RLS) is scheduled for the second phase** (direction decided: both the application layer and the database layer, see section 9).
+> - Revision: 1.0 | Date: 2026-07-04 | Status: design → implementation → live verification
+> - Addresses the roadmap's section 2 first-priority item **governance deepening** (capability groups: governance health score / workbench, automatic sensitive-data detection, row-level security). **This round's first phase**: automatic sensitive-data detection + governance health score / workbench.
+> - **Row-level security (RLS) is scheduled for the second phase** (direction decided: both the application layer and the database layer, see section 9).
 
 ---
 
@@ -32,10 +32,10 @@ Fill two gaps of a leading cloud data-development suite in the existing governan
 
 ## 1. Sensitive-detection engine (detector SPI + globalization)
 
-> **Design red line (decided)**: the platform serves **global users**; detectors **never hard-code a single-country specialization**. The detection engine must be
-> **ignorant of "which detectors exist"** — it is only responsible for "running every detector in the registry against each column, computing the confidence, and picking the best suggestion".
-> **Adding a PII type = adding one configuration entry to the registry, with zero engine changes.** Copies the project's existing `lib/engines/{spi,registry}`
-> (engine SPI plug-ins) + `lib/versions/version-service.ts` (table-driven registry) templates.
+> - **Design red line (decided)**: the platform serves **global users**; detectors **never hard-code a single-country specialization**. The detection engine must be
+> - **ignorant of "which detectors exist"** — it is only responsible for "running every detector in the registry against each column, computing the confidence, and picking the best suggestion".
+> - **Adding a PII type = adding one configuration entry to the registry, with zero engine changes.** Copies the project's existing `lib/engines/{spi,registry}`
+>   (engine SPI plug-ins) + `lib/versions/version-service.ts` (table-driven registry) templates.
 
 ### 1.1 Detector SPI (highly abstract; `lib/governance/sensitive/types.ts`, isomorphic pure TS)
 

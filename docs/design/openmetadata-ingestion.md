@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Priority: highest | Module: Data Governance (OpenMetadata) | Status: design reviewed and approved, being implemented phase by phase
-> Revision: design revision 1 | Date: 2026-06-10
-> Target release: v1.0.3 and later (released iteratively, one phase at a time)
+> - Priority: highest | Module: Data Governance (OpenMetadata) | Status: design reviewed and approved, being implemented phase by phase
+> - Revision: design revision 1 | Date: 2026-06-10
+> - Target release: v1.0.3 and later (released iteratively, one phase at a time)
 
 ---
 
@@ -284,6 +284,7 @@ Phase 0 change to `OmServiceStack`: narrow the OM ALB SG (CloudFront prefix list
 - Added `platform/src/lib/openmetadata/om-client.ts` (token cache + retry on 401 + 409 tolerance + getEntityByName, accessed via `OPENMETADATA_URL` = the OM CloudFront distribution) and `om-push.ts` (type mapping, ensure service/db/schema/table, `PUT /api/v1/lineage` with columnsLineage).
 - FQNs are consistent with the ingestion connectors (`bgp-redshift`/`bgp-s3tables`/`bgp-sources`); services are create-if-absent and never clobber a service owned by a connector.
 - Measured: OM shows `bgp-sources.ecommerce.default.customers → bgp-s3tables.bgp-table-bucket.ecommerce.customers → bgp-redshift.dev.public.customers`, each edge carrying 6 column-level mappings; the S3 Tables `customers` now has real columns.
+
 ### Phase 4 (2026-06-10, completed in v1.0.8) — Governance pages read OM (closing the SoR loop)
 - `api/governance/catalog` now queries OM `/api/v1/tables` (mapped to front-end rows + a `type` field);
   - `api/governance/lineage` now queries OM `/api/v1/lineage/table/name/<fqn>` and converts `entity`/`nodes`/`upstream+downstreamEdges` (including `columnsLineage`) into the front-end ReactFlow `{nodes,edges,centerNode}`.

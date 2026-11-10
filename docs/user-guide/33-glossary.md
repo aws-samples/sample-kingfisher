@@ -154,7 +154,7 @@ Note: the "English term" column is the word that appears in the console's Englis
 | Governance Workbench | The overall governance health score (security / quality / SLA / lineage) and to-dos | Data Governance → Governance Workbench |
 | Warehouse layers / Data Domain / Data Standard / Code table / Dimensional modeling / Metric system | The six tabs of Data Modeling; code tables and dimension tables can be "landed" in each region's warehouse | Data Governance → Data Modeling tabs |
 | Land / Apply | Materialize a code table / dimension table in one region's warehouse; the board shows each region's status and drift | Data Modeling landing panel · "Land in this region" |
-| drift | Drift | After landing, the physical table no longer matches the definition | Data Modeling landing panel · Multi-Region Dashboard |
+| Drift | After landing, the physical table no longer matches the definition | Data Modeling landing panel · Multi-Region Dashboard |
 | Leftover | The physical table still left in the region after "Unbind only"; the panel shows it as is, never hides it | Data Modeling landing panel |
 | Unbind and clean up | DROP the region's physical table and remove the landing record; the physical table name must be typed exactly | Data Modeling landing panel |
 

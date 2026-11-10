@@ -105,7 +105,7 @@ Page path: **System → Execution Environments**, click "New execution environme
 - The note states that the platform deploys automatically through CodeBuild, no commands need to be typed, and the wizard shows live progress in place.
 - **Cross-jurisdiction only**: a yellow "Disclaimer (text v1)" block with the text below, followed by the checkbox "I have read and agree". While it is unchecked, "Start deployment" cannot be clicked.
 
-> This platform assumes no legal liability related to cross-border data transfer or data compliance. You are responsible for constraining and controlling data compliance in accordance with the laws and regulations of your local government. By clicking [Agree and continue] you acknowledge and agree to the above.
+  > This platform assumes no legal liability related to cross-border data transfer or data compliance. You are responsible for constraining and controlling data compliance in accordance with the laws and regulations of your local government. By clicking [Agree and continue] you acknowledge and agree to the above.
 
 - Click "Start deployment". You should see the messages "Registered: <targetId>" and "Deployment triggered (buildId …)" in turn, and then the wizard turns into a progress view in place: "Environment <targetId> created; deployment in progress".
   - If you chose a region flagged "ops must release it once after the build", one more yellow message appears here: "The control plane has not enabled this region yet: the deployment can finish, but Probe will fail until it is enabled". This is normal; §4.2 handles it.
@@ -173,10 +173,10 @@ Page path: **Data Development → Batch Compute**. First switch "Execution scope
   - The dropdown lists only regions that can receive work (enabled + warehouse installed + this project authorized). If only 1 is selectable and the orange "Only 1 region can be pushed to right now (more appear here after you create regions or add components under 'Execution Environments')" appears, go back and check §4.4.
 - In the script editor write (separate multiple statements with semicolons):
 
-```sql
-CREATE TABLE IF NOT EXISTS public.region_probe (at timestamp);
-INSERT INTO public.region_probe VALUES (getdate());
-```
+  ```sql
+  CREATE TABLE IF NOT EXISTS public.region_probe (at timestamp);
+  INSERT INTO public.region_probe VALUES (getdate());
+  ```
 
 - Click "Save".
 
@@ -225,9 +225,9 @@ Page path: **Data Development → Redshift Query**.
 - The "Database object" tree on the left shows only the structure of the first selected region (click "Load Schema"); when that region has no warehouse installed, the reason is stated here instead of an empty tree.
 - In the "SQL Editor" write:
 
-```sql
-SELECT count(*) AS n, max(at) AS last_at FROM public.region_probe;
-```
+  ```sql
+  SELECT count(*) AS n, max(at) AS last_at FROM public.region_probe;
+  ```
 
 - Click "Run (2 regions)". The region count on the button is the number of scans and billing units that will be produced; at most 8 regions per run.
 
@@ -279,15 +279,15 @@ SELECT count(*) AS n, max(at) AS last_at FROM public.region_probe;
 - The blue note states the coverage honestly: "This dashboard currently covers: etl-job, code-table, model-table"; sync tasks, EMR engine jobs, workflows, Redshift tasks and Flink jobs are **not covered yet**. Another "N unpublished task definitions" are not listed: the matrix is about the consistency of what has been "dispatched", and drafts have nothing to compare against.
 - Cell meanings (same source as the "Cell legend" at the bottom of the page):
 
-| Cell | Counts toward the verdict | Meaning and next step |
-|---|---|---|
-| ✓ (green) | Yes | Dispatched / landed and consistent with the current definition |
-| ⚠ Version mismatch (yellow) | Yes | Dispatched, but not the current version ⇒ click "Re-dispatch to this region" in the cell |
-| ⚠ Missed / ⚠ Not landed (yellow) | Yes | Bound to this region but never dispatched / landed ⇒ "Re-dispatch to this region" / "Land in this region" |
-| ✗ Failed (red) | Yes | Dispatch / landing failed; hover to see the original error (common: missing component / permissions / bucket policy) |
-| 🔴 Structure drift (red) | Yes | The region already has a same-named table with a different structure and the platform did not overwrite it ⇒ "Needs manual handling → 'Modeling' page" |
-| ⊘ Needs re-landing | No | A stale record (left from before the write channel was delivered) ⇒ land it once more for this region on the modeling page |
-| 🔶 Specialized / — / ⊘ Data unavailable | No | Meant to differ, never bound, or no dependency data in that region ⇒ normal, no alarm |
+  | Cell | Counts toward the verdict | Meaning and next step |
+  |---|---|---|
+  | ✓ (green) | Yes | Dispatched / landed and consistent with the current definition |
+  | ⚠ Version mismatch (yellow) | Yes | Dispatched, but not the current version ⇒ click "Re-dispatch to this region" in the cell |
+  | ⚠ Missed / ⚠ Not landed (yellow) | Yes | Bound to this region but never dispatched / landed ⇒ "Re-dispatch to this region" / "Land in this region" |
+  | ✗ Failed (red) | Yes | Dispatch / landing failed; hover to see the original error (common: missing component / permissions / bucket policy) |
+  | 🔴 Structure drift (red) | Yes | The region already has a same-named table with a different structure and the platform did not overwrite it ⇒ "Needs manual handling → 'Modeling' page" |
+  | ⊘ Needs re-landing | No | A stale record (left from before the write channel was delivered) ⇒ land it once more for this region on the modeling page |
+  | 🔶 Specialized / — / ⊘ Data unavailable | No | Meant to differ, never bound, or no dependency data in that region ⇒ normal, no alarm |
 
 - "Land in this region" is clickable only by platform admins (others see the button greyed out + "Only platform admins can land modeling artifacts").
 - "One-click fix for auto-alignable items (N)" first shows "Impact preview: N items pending, K of them auto-alignable", listing what will be done for each (definition × region) and which ones are "Skipped (manual)"; click "Confirm fix" to execute them one by one in series, and the result table shows ✓ / ✗ per row. Structure drift is deliberately excluded from the automatic scope.

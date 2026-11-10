@@ -259,9 +259,9 @@ The in-process agent (`inprocess` in §4.2) stuffs both "calling the model" and 
 
 On the platform side only a thin "invoke the Runtime" client was added, and **the in-process implementation is kept as a one-switch fallback**.
 
-> 📌 **This is not a one-off refactoring of GenBI; it is the platform standard**: "every AI capability = its own Gateway + Runtime + Memory + a thin platform wrapper" has been solidified into a reusable template; the network connectivity advisor and the
-> parameter advisor each built their own AgentCore stack following it (reusing the same protocol base class `infra/lib/shared/agentcore-base.ts`). GenBI is the template that is already running in production; the advisors' Runtime code has landed but
-> **the remote side is not deployed yet** (🔵 online, the default path is in-process). The full picture of the unified Strands assembly is in §11bis.4.
+> - 📌 **This is not a one-off refactoring of GenBI; it is the platform standard**: "every AI capability = its own Gateway + Runtime + Memory + a thin platform wrapper" has been solidified into a reusable template; the network connectivity advisor and the
+>   parameter advisor each built their own AgentCore stack following it (reusing the same protocol base class `infra/lib/shared/agentcore-base.ts`). GenBI is the template that is already running in production; the advisors' Runtime code has landed but
+>   **the remote side is not deployed yet** (🔵 online, the default path is in-process). The full picture of the unified Strands assembly is in §11bis.4.
 
 ### 5.2 IaC topology and deployment order (the CDK CfnResource escape hatch)
 
@@ -452,9 +452,9 @@ Once memory has been loaded it is injected along two paths (`agent.js` `runAgent
 
 - `buildIncidentContext(taskId, runId)`: `GetItem` fetches the run record from `bgp-task-runs` → `taskType` → `getDefinition` (reads the script from `bgp-etl-jobs` / `bgp-workflows` / `bgp-sync-tasks`) → assembles the "evidence-rich" prompt = runtime
   environment + failed task (name / type / status / business date / error) + script excerpt + **real logs** (Glue `GetJobRun.ErrorMessage` + CloudWatch `/aws-glue/jobs/error` with a regex filter for the relevant lines;
-- Redshift `DescribeStatement.SubStatements[].Error`).
+  Redshift `DescribeStatement.SubStatements[].Error`).
 - **The prompt forks on status**: failed → root-cause diagnosis in 4 sections;
-- succeeded → run review in 4 sections (added in v1.29.0 when the "failed only" restriction was lifted).
+  succeeded → run review in 4 sections (added in v1.29.0 when the "failed only" restriction was lifted).
 - **Full source in §15.10.**
 
 ### 7.4 Async orchestration + polling (avoiding the CloudFront 60 s limit)
@@ -641,8 +641,7 @@ Data sources also use a **pluggable SPI** (`lib/datasource-spi/`): a new data so
 - **Fat interface + capability flags** (isomorphic with the engine SPI): `capabilities` (paradigm / credentialKind / isVpcBound / canIntrospect / supportsCdc / needsGlueConnection / canProvision / syncChannels / analysisChannels); callers always face
   only `getProvider(type)`; creating a source / testing a connection / introspection are all delegated to the provider.
 
-**Status**: 🟢 all four paradigms implemented and verified by real runs in production — the four JDBC siblings end to end (Redshift target table row counts match exactly); S3 with 1,000,000 rows in 4 files matched value by value; DynamoDB via the Glue
-+ EMR dual channel, 250,000 rows each with no lost rows; MSK Kafka → S3 raw files match exactly; Kinesis provisioning creates streams on demand. **Pending (honestly marked)**: upload of user-defined driver jars (downgraded to an enhancement, since
+**Status**: 🟢 all four paradigms implemented and verified by real runs in production — the four JDBC siblings end to end (Redshift target table row counts match exactly); S3 with 1,000,000 rows in 4 files matched value by value; DynamoDB via the Glue + EMR dual channel, 250,000 rows each with no lost rows; MSK Kafka → S3 raw files match exactly; Kinesis provisioning creates streams on demand. **Pending (honestly marked)**: upload of user-defined driver jars (downgraded to an enhancement, since
 all four drivers are built into Glue 5.1), DynamoDB Streams increments (phase two).
 
 ---
@@ -650,35 +649,43 @@ all four drivers are built into Glue 5.1), DynamoDB Streams increments (phase tw
 ## 11. Remaining modules — implementation details
 
 ### 11.1 Multi-tenancy / workspaces / resource-level RBAC / approvals
+
 - Workspaces `bgp-projects` + members `bgp-project-members` (GSI `byUser` supports "my projects"); member roles owner / editor / viewer.
 - Resources are isolated by `(project, env)`; every API passes through `lib/projects/guard.ts` `requireProject(req, role)` (viewer / editor / owner), which returns `ctx.identity` (including `isPlatformAdmin` / `username`).
 - Access requests are approved through `bgp-approvals` (approved by the owner).
 
 ### 11.2 Data classification + masking + access requests
+
 - Classification table `bgp-data-classification` (pk = table FQN, sk = column name; levels L1–L4 + masking policy full / partial / email / hash), set only by platform administrators.
 - Grant table `bgp-data-grants` (pk = username, sk = table FQN): written when a data-access request is approved → that user's columns of that table are no longer masked.
 - Masking takes effect at the query return-value layer (§4.5–4.11 / §15.5); administrators and grantees are exempt.
 
 ### 11.3 Data quality (templates + scoring + SLA)
+
 - `lib/quality/templates.ts` has 6 templates: not-null / unique / range / enumeration / row count / freshness, validated against Redshift.
 - `lib/quality/service.ts`: weighted pass-rate score + per-dimension scores + freshness-SLA breach determination. Shown on the "Data Quality" tab of the governance page.
 
 ### 11.4 Metrics store
+
 - Business metrics are defined uniformly (table + aggregation count / count_distinct / sum / avg / min / max + measure column + dimension / time columns + unit / format).
 - `lib/metrics/service.ts`: **safe aggregation SQL** (identifier allow-list + double quoting, no free-form SQL, uniformly executed read-only as admin) + current value / dimension distribution / time trend + writes snapshots to `bgp-metric-values` and writes back `lastValue`. Dashboard `/metrics`.
 
 ### 11.5 Version management and rollback
+
 - Configuration-type resources (workflows / jobs / sync / Redshift tasks) keep a version snapshot in `bgp-resource-versions` on every save and can be rolled back.
 
 ### 11.6 Multiple environments and promotion (dev / staging / prod)
+
 - Resources carry `env` + `lineageId`; lists are isolated by `(project, env)` (environment selector in the header + `x-bgp-env`).
 - `lib/env/promote-service.ts` promotion: take the portable definition (stripping environment-bound runtime bindings such as glueJobName / airflowDagId), then update or create the target by `lineageId`; **dev → staging is direct, promotion to prod goes through approval** (`type:"deploy"`).
 
 ### 11.7 Authentication + audit
+
 - Cognito across the site: the central middleware validates the ID token of every `/api/*` request (`aws-jwt-verify`, 401/200); the frontend's global fetch carries the token and intercepts for login.
 - Operation audit `lib/audit.ts` → `bgp-audit` (who / when / did what).
 
 ### 11.8 Warehouse modeling — layers, domains, dimensional modeling, metrics
+
 Full-stack modeling with a DynamoDB metadata layer + a Redshift physical layer:
 - **Layers**: ODS / DWD / DWS / ADS provisioned with one click (each layer maps to one Redshift schema), idempotent `seedLayers`.
 - **Data domains / subject domains + data standards + code tables**: a two-level domain tree; code tables land as the Redshift physical table `dim_code_<code>` (DELETE + INSERT, idempotent reload).
@@ -688,6 +695,7 @@ Full-stack modeling with a DynamoDB metadata layer + a Redshift physical layer:
 - Files `lib/modeling/{service,dimensions,metric-sql,redshift}.ts`. **Status**: 🟢 real runs in production (hard evidence: the column structure of `dwd.dim_user_qa` + atomic GMV = 1649 / derived last-30-days paidGMV = 350 computed).
 
 ### 11.9 Governance depth (sensitive-data scanner + governance workbench)
+
 - **Sensitive-data detection** (`lib/governance/sensitive/`): detectors are **SPI-based and globalized** — 9 general detectors (email, credit card with **Luhn** check, IP v4 + v6, IBAN, phone **E.164**, credentials, personal name, address, date of
   birth) + pluggable regional samples (US SSN / CN national id / IN Aadhaar). Column-name + value double evidence scoring → **suggestions** with confidence → classification is written only after a person **adopts with one click**. 🔒 **Privacy hard
   rule**: sampled values are used in memory only to compute the hit rate and are **never persisted / never logged / never returned by the API**; findings store metadata only.
@@ -695,6 +703,7 @@ Full-stack modeling with a DynamoDB metadata layer + a Redshift physical layer:
 - **Status**: 🟢 real runs in production (first phase, headless-browser acceptance 18/18 including Luhn / SSN / zero sample leakage). 📐 Row-level security (RLS) is scheduled for phase two.
 
 ### 11.10 BI analytics dashboards (QuickSight-style)
+
 One canvas embeds N visuals + top filters bound to fields with scoped linkage + a field configurator (charts without writing SQL) + ECharts theming + grid drag-and-drop:
 - **Three data sources** (`WidgetSource.kind`): free-form SQL / a Data Service reference (Data Service was retired on 2026-09-05; the existing kind is kept) / a published GenBI question (stores the SQL, not a snapshot = refreshable); the engine `redshift|athena` is an orthogonal sub-axis.
 - **Filter linkage**: filters whose scope matches append `(field,value)` into builder.filters and the SQL is recompiled (this fixed a real bug: "configuration-style SQL has no placeholders → filters had no effect"); hand-written SQL still uses `{{key}}` placeholders.
@@ -702,12 +711,14 @@ One canvas embeds N visuals + top filters bound to fields with scoped linkage + 
 - **Status**: 🟢 real runs in production (v1 → v4, headless-browser acceptance 13/13, scoped linkage East = 19808 + hard evidence of isolation).
 
 ### 11.11 Compute lineage collection
+
 Collects **table-level** lineage (input tables → output tables) for four kinds of compute engines, double-written to OpenMetadata (the primary read source of the governance pages) + the platform table `bgp-lineage` (fallback):
 - SQL lineage = **heuristic regex / token scanning** (no AST library, because AST coverage of the Redshift dialect is poor); supports CTAS / VIEW / INSERT / MERGE / UPDATE…FROM; **best-effort, never throws**.
 - Four paths: Redshift SQL (on save), EMR PySpark (on submit, heuristic extraction), Flink (on start, source → sink) ✅ connected; **Glue ETL is deliberately not collected** (text parsing of arbitrary DataFrame code is unreliable).
 - Column level = a heuristic over shared same-named columns (derived columns are not mapped; nothing is invented). **Status**: 🟢 real runs in production (on the governance page `channel_ad_conversion` has upstreams: 11 nodes, 10 edges, and similar).
 
 ### 11.12 FinOps cost governance
+
 Task- / run-level cost attribution (a granularity AWS does not offer natively), in a fully isolated architecture (4 new directories + a separate stack, pull model with zero hooks):
 - **L1 account overview**: Cost Explorer real billing by service × day (`UnblendedCost`, T+1).
 - **L3 task- / run-level attribution**: a watermark-based read-only scan of `bgp-task-runs` → real values from Glue `DPUSeconds` / EMR `billedResourceUtilization` × **a built-in price table estimate** (with an auditable `priceVersion`) → idempotent conditional writes.
@@ -716,6 +727,7 @@ Task- / run-level cost attribution (a granularity AWS does not offer natively), 
   differs by $0.0000; L3 equals the hand calculation exactly).
 
 ### 11.13 Production-grade backfill center
+
 Batch dates × nodes expanded into instances + cascading backfill along the dependency chain topology:
 - Plan expansion (upper limits: day ≤62 / week ≤60 points / hour ≤7 days); the workflow scope derives the same-date upstreams as dependencies from the DAG topology; a concurrency gate + an instance ceiling, two protections against runaway runs; dry-run preview before persisting.
 - The idempotent driver `tick` (conditional writes + runToken to prevent duplicate spend); resume after failure (reruns only the failed instances + their blocked downstreams).
@@ -723,12 +735,14 @@ Batch dates × nodes expanded into instances + cascading backfill along the depe
   ceiling rejection and resume after failure all verified; 20 unit tests).
 
 ### 11.14 Smart baselines + SLA breach prediction
+
 - **Dynamic baseline learning**: learns p50 / p90 / p95 / EWMA from historical runs, **MAD outlier removal + exclusion of backfill / copilot runs** (otherwise p90 is distorted); fewer than 7 samples is marked lowConfidence (no false alarms during cold start).
 - **Critical-path ETA breach prediction**: rolls the ETA along the DAG's critical path against the SLA's promised time → willBreach + green / yellow / red + the bottleneck node; multi-window burn rate reduces false alarms (a single jitter does not
   alert); pushed through the Alerting Center channels (idempotent by dedupeKey).
 - **Status**: 🟢 real runs in production (hard evidence that baselines exclude backfill: samples = 3; breach prediction red / bottleneck node; 23 unit tests).
 
 ### 11.15 Incident knowledge base + diagnosis memory augmentation (the compounding-moat closed loop)
+
 - Structured incidents are merged and accumulated by **fault fingerprint signature** + manually verified fix runbooks (an ordered rule table hit → `engine::key`; no hit → normalized, de-identified FNV hash as fallback).
 - During diagnosis, "**verified** fixes of the same kind + business definitions" are injected into the RCA; 🔒 **safety hard rule**: only manually verified fix runbooks return their full text (prevents an unverified AI suggestion from being applied as if "verified").
 - 🔴 **Honest statement**: the solution the user approved for the diagnosis brain = **memory-augmenting the existing AWS DevOps Agent (the `aidevops` managed service), explicitly "not a self-built AgentCore Runtime"** (wrapping it in a Runtime would
@@ -743,25 +757,26 @@ This group is the platform's **differentiating moat** relative to traditional da
 framework. All of them follow the AgentCore platform standard of §5.
 
 ### 11bis.1 Unified platform Copilot
+
 A centralized conversational entry point across the whole platform (a drawer in the header), with one hard safety line running through it: **"create / generate / suggest" is allowed; "execute / run / publish / delete" is forbidden**.
 
 - **Two brains (always present them separately)**: ① **read-only Q&A** `/api/copilot/ask` runs a **hand-written Converse tool-use loop** (7 read-only tools + 4 create tools loaded by role); ② **cross-module planning** `/api/copilot/plan` runs on
   **Strands** (`Agent.invoke` + Zod structured output, read-only discovery tools), submitted asynchronously to avoid the CloudFront 60 s limit.
 - **The three gates of "may create, must not execute"** (`action-guard.ts`, defense in depth): gate 1, the capability surface (the tool `kind` type layer is only `read|create`, never execute) + gate 2, action-guard (deny by default + allow-list + a
   hard block on the suffixes `.run/.start/.delete`) + gate 3, RBAC (editor role) + audit. Everything created lands with `status:draft` / `scheduleEnabled:false` and never runs / schedules / touches the cloud.
-- 🔒 **Honest boundary**: **L3 step-by-step delegated execution is left open** — the `execute()` of every step handler is an empty interface and the executor's execution segment is dead code; "plan execution" actually only goes as far as "create drafts
-  + guidance", and a real run still requires the user to click manually; enabling L3 needs explicit configuration + the user's written approval. Remote AgentCore hosting = **decided against after capability tiering** (the read-only tools are inherently
+- 🔒 **Honest boundary**: **L3 step-by-step delegated execution is left open** — the `execute()` of every step handler is an empty interface and the executor's execution segment is dead code; "plan execution" actually only goes as far as "create drafts + guidance", and a real run still requires the user to click manually; enabling L3 needs explicit configuration + the user's written approval. Remote AgentCore hosting = **decided against after capability tiering** (the read-only tools are inherently
   coupled to the platform's semantic layer). **Status**: 🟢 Q&A + draft creation + three gates + Strands planning L2 verified online.
 
 ### 11bis.2 The platform-level engineering knowledge base: Engine Cookbook
+
 A platform-shared library of "verified engine engineering knowledge" (`lib/cookbook/`), maintained in one place and consumed in many, **a deterministic foundation with zero LLM calls**:
-- **Three layers**: ① deterministic **tag retrieval** (scored topK by engine / capability, controlling tokens); ② **prompt injection** (hard dialect rules rendered into the system prompt); ③ **guard validation on persist** (lexical safety after masking
-  + fixpoint iterative correction; if an error-level issue cannot be fixed the result is blocked).
+- **Three layers**: ① deterministic **tag retrieval** (scored topK by engine / capability, controlling tokens); ② **prompt injection** (hard dialect rules rendered into the system prompt); ③ **guard validation on persist** (lexical safety after masking + fixpoint iterative correction; if an error-level issue cannot be fixed the result is blocked).
 - **All 4 major AI codegen exits are connected**: batch ETL, real-time Flink, both GenBI backends, the Copilot planner.
 - 🔵 **Honest boundary**: **wiring the Cookbook guard into the remote GenBI container is fully coded and all green locally, but has not been deployed and verified in the nine-round online verification matrix** (the remote GenBI / AgentCore path is the
   default main chain online, so this is a blind spot on the main chain) — do not write "accepted". The guard reliably corrects only declarative SQL; for imperative PySpark it only warns.
 
 ### 11bis.3 GenBI dual-engine convergence
+
 The two GenBI brains that used to be duplicated word for word — TS (inprocess) and JS (remote image) — were converged into **a single pure-logic source `@genbi/core`**:
 - All 8 core files are "engine-agnostic pure logic / zero IO / zero AWS SDK" (prompt / retrieval / dual-dialect sql-guard / chart / catalog); the platform wrapper and the remote container are both thin adapter shells around it.
 - The remote container hosts the loop on **Strands** (`agent.js` `new Agent + agent.invoke`); the local inprocess path still hand-writes Converse as a direct-connect fallback shell around core.
@@ -769,11 +784,12 @@ The two GenBI brains that used to be duplicated word for word — TS (inprocess)
   path that can really stop compute / local development. **Status**: 🟢 stages 1–3 verified online with zero regression; both backends return the same result (898 persons).
 
 ### 11bis.4 Unifying the whole platform's AI framework on Strands
+
 All of the platform's AI capabilities converge on one architecture: a single pure-logic core + standard Strands assembly + the AgentCore Runtime as the remote main chain + the early hand-written code kept for disaster recovery. **The framework's four pieces**:
 - ① **core-build** (`scripts/core-prebuild.sh`: TS core → CJS → copied into the containers / Lambda; a CI diff prevents drift);
-  - ② **agent-runner** (`infra/agent/_runtime/agent-runner.js`: converges the identical loop skeleton of net / param, Strands assembly);
-  - ③ **the CDK protocol base class** (`infra/lib/shared/agentcore-base.ts`: assembles Gateway / gated Runtime / Memory; the three stacks synthesize byte-for-byte isomorphic);
-  - ④ **the model SSOT** (`platform/ai-model.json`: the platform-wide default modelId is traceable to one place; currently opus-4-6).
+  ② **agent-runner** (`infra/agent/_runtime/agent-runner.js`: converges the identical loop skeleton of net / param, Strands assembly);
+  ③ **the CDK protocol base class** (`infra/lib/shared/agentcore-base.ts`: assembles Gateway / gated Runtime / Memory; the three stacks synthesize byte-for-byte isomorphic);
+  ④ **the model SSOT** (`platform/ai-model.json`: the platform-wide default modelId is traceable to one place; currently opus-4-6).
 - 🔵 **Honest boundary (important)**: GenBI is the Strands template that really runs; but **the migration of paramadvisor / netadvisor to Strands stopped at "code landed + local docker build"; the remote Runtime is not deployed and has never really been
   invoked; online, the default is still in-process**. The Copilot decision is **not to go remote** (capability tiering, not unfinished work). Migration status: genbi ✅ running / param ✅ code · ❌ remote / net ✅ code · ❌ remote / copilot ❌ deliberately
   not migrated.
@@ -847,6 +863,7 @@ All of the platform's AI capabilities converge on one architecture: a single pur
 ## 14. Appendix: resources / tables / environment variables / glossary / briefing script
 
 ### 14.1 DynamoDB tables (control plane, 61 in total)
+
 All uniformly hardened: PAY_PER_REQUEST + CMK encryption + PITR 35 days + RemovalPolicy.RETAIN. 58 are in `BgpDatabaseStack` (40 created in a loop + 18 created individually), 3 are in `BgpFinOpsStack`. By subsystem:
 
 | Subsystem | Tables |
@@ -870,6 +887,7 @@ All uniformly hardened: PAY_PER_REQUEST + CMK encryption + PITR 35 days + Remova
 | FinOps (separate stack) | `bgp-cost-daily` · `bgp-cost-runs` (TTL) · `bgp-budgets` |
 
 ### 14.2 Key environment variables (GenAI / AgentCore related)
+
 | Variable | Meaning |
 |---|---|
 | `GENBI_BACKEND` | `agentcore` (production) / `inprocess` (fallback) — the execution vehicle of the Ask-Your-Data agent |
@@ -885,6 +903,7 @@ All uniformly hardened: PAY_PER_REQUEST + CMK encryption + PITR 35 days + Remova
 | `GATEWAY_URL` (inside the Runtime) | The Gateway MCP endpoint the agent calls |
 
 ### 14.3 Glossary
+
 - **Converse**: Bedrock's unified conversation / tool-calling API (tool-use loop, `stopReason`, `usage`).
 - **MCP** (Model Context Protocol): the tool protocol; this platform uses the Streamable HTTP transport (`initialize` / `tools/list` / `tools/call`).
 - **SigV4**: AWS request signing; Agent → Gateway signs with `service=bedrock-agentcore`, no OAuth.
@@ -895,6 +914,7 @@ All uniformly hardened: PAY_PER_REQUEST + CMK encryption + PITR 35 days + Remova
 - **Zero-ETL**: the managed near-real-time sync channel MySQL / Aurora → Redshift.
 
 ### 14.4 The 2-hour briefing script (replay of the key points)
+
 1. **Opening (architecture panorama)**: one AWS-icon figure explains "all AWS managed services + Next.js full stack + data pipeline + governance + generative AI".
 2. **GenAI master outline**: one Converse kernel + Strands assembly drives 7 user-visible AI capabilities + 3 enabling layers; stress that "tools + grounding + hard rules + Cookbook dialect guard" buys "trustworthy / read-only / explainable".
 3. **GenBI live demo**: ask "customers per region" → look at the generated read-only SQL, the real result, the automatic chart recommendation and the reasoning steps; explain the read-only guard + the row cap.
@@ -1362,9 +1382,7 @@ function emitToolMetric(dimName, dimVal, isError) {
   }));
 }
 ```
-**SSRF defense in depth**: static (at registration, `validateHttpConfig`: https only + no `{{}}` placeholders in the host segment + no private IPs / local names)
-+ dynamic (at execution, DNS resolution checked address by address + `redirect:"error"` + timeout + length cap + host allow-list)
-+ **only platform administrators may register HTTP skills**.
+**SSRF defense in depth**: static (at registration, `validateHttpConfig`: https only + no `{{}}` placeholders in the host segment + no private IPs / local names) + dynamic (at execution, DNS resolution checked address by address + `redirect:"error"` + timeout + length cap + host allow-list) + **only platform administrators may register HTTP skills**.
 
 ### 15.9 Memory / context `memory.ts` (source + exact wire formats + trigger mechanism)
 
@@ -1539,7 +1557,7 @@ export async function buildIncidentContext(taskId, runId) {
 ```
 - **Asynchronous orchestration `service.ts`**: `startDiagnosis` immediately `PutItem`s one `running` record (`bgp-diagnostics`, pk=`"diagnostic"` / sk=`ULID`)
   and runs `buildIncidentContext → investigate → UpdateCommand(done+report / failed+error)` in the background, fire-and-forget;
-- the front-end `DiagnosisButton` polls `GET /api/diagnostics/{id}` every 3s, at most 100 times.
+  the front-end `DiagnosisButton` polls `GET /api/diagnostics/{id}` every 3s, at most 100 times.
 - **Why asynchronous**: a DevOps Agent investigation takes 20–40s (measured: a real Glue `REQUIRES_SINGLE_PART_NAMESPACE` failure produced a 3,605-character RCA in 42s),
   which exceeds the CloudFront 60s origin timeout → it must be asynchronous with polling.
 
@@ -1564,7 +1582,7 @@ const perSkill = await Promise.all([...skillNames].map(async s => ({ skill:s, ca
 ```
 - **AgentCore control-plane status**: `ListAgentRuntimesCommand` / `ListGatewaysCommand` / `ListGatewayTargetsCommand` (`@aws-sdk/client-bedrock-agentcore-control`)
   fetch the Runtime (name / status / version), the Gateway (status / authorizer) and the Targets;
-- it also reports `backend` / `memoryBackend` / `memoryConfigured` (from env).
+  it also reports `backend` / `memoryBackend` / `memoryConfigured` (from env).
 - **GenBI usage**: `scanGenBiHistory(1000)` aggregates total / today / tokens / byEngine / byBackend / 7-day trend / latest 20.
 - **Lambda metrics**: `AWS/Lambda` with dimension `FunctionName=bgp-genbi-skills`, 24h Invocations / Errors / Duration.
 - Everything runs under `Promise.all` and is best-effort (a single failing point does not drag the rest down).

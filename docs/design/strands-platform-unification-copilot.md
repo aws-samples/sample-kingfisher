@@ -1,13 +1,16 @@
 # Strands platform unification, stage L4 — Copilot remote-hosting assessment → [Empirical closure: not remote-hosted; stays in the platform process]
 
-> 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
-> ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under this name;
-> the current agent code is distributed as follows: Ask-Your-Data `platform/src/lib/genbi/` + `infra/agent/genbi/`, parameter advisor `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, network advisor `platform/src/lib/network-advisor/` + `infra/agent/netadvisor/`, Copilot `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
-> `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
+> - 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path
+>   mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
+> - ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under this name;
+>   the current agent code is distributed as follows: Ask-Your-Data `platform/src/lib/genbi/` + `infra/agent/genbi/`, parameter advisor `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, network advisor `platform/src/lib/network-advisor/` + `infra/agent/netadvisor/`, Copilot
+>   `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
+>   `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
 
-> Status: **✅ Decided (2026-07-24). Decision: stage L4 does not remote-host the Copilot; only the real gap in the isolation marker (phase 0) is fixed. The Strands platform unification is hereby closed.**
-> Follows the engineering disciplines `design-first-no-code-until-approved` + `global-grade-design-discipline` + `verification-assertion-checklist-first` (verify before acting, to avoid premature solution judgments).
-> This document is a **design decision record**: it preserves in full the chain of reasoning "propose remote-hosting → verify layer by layer → conclude that it should not be remote-hosted", so that the future question "why does the Copilot not run on a remote Runtime" has a traceable answer.
+> - Status: **✅ Decided (2026-07-24). Decision: stage L4 does not remote-host the Copilot; only the real gap in the isolation marker (phase 0) is fixed. The Strands platform unification is hereby closed.**
+> - Follows the engineering disciplines `design-first-no-code-until-approved` + `global-grade-design-discipline` + `verification-assertion-checklist-first` (verify before acting, to avoid premature solution judgments).
+> - This document is a **design decision record**: it preserves in full the chain of reasoning "propose remote-hosting → verify layer by layer → conclude that it should not be remote-hosted", so that the future question "why does the Copilot not run on a remote Runtime" has a traceable answer.
 
 ---
 
@@ -48,6 +51,7 @@
 ## 1. Survey of the current state (verified first-hand, with file:line)
 
 ### 1.1 General Q&A ask — exactly the L-Read form, and the platform-side wiring is already in place
+
 | Dimension | Current state | file:line |
 |---|---|---|
 | Loop | hand-written `for(iter)` ConverseCommand (**can yield to agent-runner's Strands invoke**) | `lib/copilot/agent.ts:66-115` |
@@ -63,6 +67,7 @@
 **Conclusion**: the platform-side remote wiring (dual-backend route + client + config) **was already laid but never deployed** when the platform-side wiring of the [unified Copilot](./unified-copilot.md) was built (there was no producer of a Runtime ARN). L4 = add the last segment, "container + stack + deployment", and the wiring is powered up naturally.
 
 ### 1.2 Deployment infrastructure gaps (compared with what the 3 advisors already have)
+
 | Artifact | Advisor state | Copilot state | L4 |
 |---|---|---|---|
 | Container directory `infra/agent/<cap>/` | ✅ genbi/netadvisor/paramadvisor | ❌ **no copilot** | 🆕 create (modeled on the paramadvisor skeleton) |

@@ -2,10 +2,10 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented (stages 1–4 of the full-convergence plan complete)** (audit calibration of 2026-08-26: the original read "pure design"). The decision taken: **the full-convergence plan — extract a shared `@genbi/core` and converge to "one AgentCore shell"**.
-> Rollback anchor in place: `git tag pre-genbi-core-unification` (pointing at the commit preceding the refactoring; pushed to the remote).
-> Based on the factual baseline of three read-only surveys (all with `file:line` references), this document gives the target architecture + migration path + contract freeze + review findings.
-> **No product code is written in this round.** Follows the `design-first-no-code-until-approved` discipline.
+> - Status: **✅ implemented (stages 1–4 of the full-convergence plan complete)** (audit calibration of 2026-08-26: the original read "pure design"). The decision taken: **the full-convergence plan — extract a shared `@genbi/core` and converge to "one AgentCore shell"**.
+> - Rollback anchor in place: `git tag pre-genbi-core-unification` (pointing at the commit preceding the refactoring; pushed to the remote).
+> - Based on the factual baseline of three read-only surveys (all with `file:line` references), this document gives the target architecture + migration path + contract freeze + review findings.
+> - **No product code is written in this round.** Follows the `design-first-no-code-until-approved` discipline.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is [GenBI engine unification](./genbi-engine-unification.md). Retained as a historical implementation record.
 
@@ -109,6 +109,7 @@ execute.ts ──▶│ import core.brain     │───│ import core       
 - `systemPrompt` / the Converse loop skeleton (message orchestration / tool-result packaging / step recording / token accumulation / abort checks) / `catalogText` rendering / `sanitizeSelect` (Redshift) + `sanitizeReadOnly` (Athena) / the retrieval brain (catalog building / pre-filtering / tokenize / scoring / JSON parsing / fallback) / `contextToPromptText` + `contextToUsedItems` + label constants / `chart` heuristics / `SCHEMA_SQL` + the `SchemaTable` type / cookbook `guard` + `mask` + the `SYSTEM_DIALECT_RULES` seed / `parseSqlLineage`.
 
 ### 4.2 Interfaces (injection points for runtime coupling)
+
 | Interface | Responsibility | inprocess implementation | Container implementation | Lambda side |
 |---|---|---|---|---|
 | **ModelClient** | Call Bedrock Converse | direct | direct | (not needed; the Lambda does not run the loop) |

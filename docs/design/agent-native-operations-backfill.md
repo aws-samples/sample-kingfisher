@@ -1,11 +1,15 @@
 # Part C — Production-grade backfill (bulk backfill instances + dependency chain + concurrency / online isolation + retry of failures)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the `/backfill` page plus `platform/src/lib/backfill/`.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior —
+>   place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned
+>   in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the
+>   `/backfill` page plus `platform/src/lib/backfill/`.
 
-> Revision: 1.0 **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was out of date) | Created: 2026-07-12 | Priority: P1 | Capability group: backfill
-> Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: engine SPI `lib/engines/` (`submit(runDate,'backfill')` already supported) · `bgp-task-runs` (triggeredBy isolation) · `bgp-workflows.dagDefinition` (dependency chain) · the [GenBI asynchronous execution](./genbi-async-execution.md) paradigm (submit → poll → heartbeat → re-claim → forced finish) · `version-service`
-> **Purely additive `lib/backfill/` + two tables + a new page + a new API segment. Only calls the exported methods of the engine SPI; does not change providers / routes.**
+> - Revision: 1.0 **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was out of date) | Created: 2026-07-12 | Priority: P1 | Capability group: backfill
+> - Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: engine SPI `lib/engines/` (`submit(runDate,'backfill')` already supported) · `bgp-task-runs` (triggeredBy isolation) · `bgp-workflows.dagDefinition` (dependency chain) · the [GenBI asynchronous
+>   execution](./genbi-async-execution.md) paradigm (submit → poll → heartbeat → re-claim → forced finish) · `version-service`
+> - **Purely additive `lib/backfill/` + two tables + a new page + a new API segment. Only calls the exported methods of the engine SPI; does not change providers / routes.**
 
 ---
 
@@ -55,7 +59,7 @@ Prototype: antd Table / matrix + hand-drawn status color blocks, consistent with
 | POST | `/api/backfill/plan` | editor | Create a backfill plan: `{targetId, scope, dateRange, cascade, concurrency}` → expanded into an instance set (dry-run preview first, then persisted) |
 | GET | `/api/backfill` | viewer | Backfill plan list |
 | GET | `/api/backfill/[planId]` | viewer | Plan details + progress matrix (aggregate of instance states) |
-| POST | `/api/backfill/[planId]/control` | editor | `{action: "pause"|"resume"|"cancel"|"retry-failed"}` |
+| POST | `/api/backfill/[planId]/control` | editor | `{action: "pause"\|"resume"\|"cancel"\|"retry-failed"}` |
 | POST | `/api/backfill/[planId]/tick` | internal / front-end refresh | Idempotent advancer: claims pending instances (subject to the concurrency gate) → calls engine submit → writes the state back (see section 6.2) |
 
 ---
@@ -109,6 +113,7 @@ attempts, lastError?, startedAt?, finishedAt?, ttl
 ### 6.3 Online isolation (critical)
 - Every backfill run is written to `bgp-task-runs` with `triggeredBy='backfill'` (the engine SPI already supports this parameter).
 - **Online statistics / baselines / alerts exclude backfill**: the alerting module's monitoring / success rate, Part B's baseline learning and the SLA punctuality rate **already filter, or must filter, `triggeredBy!='backfill'`** (Part B's section 6.1 explicitly excludes it; if the monitoring page does not yet exclude it, its owner session handles it — this module only guarantees correct tagging and does not change their statistics code).
+
 > This is the mine most easily buried by backfill: if bulk backfill recomputation leaks into the online success rate, baselines and SLAs are all distorted. Tagging is a **hard constraint** of this module, with a dedicated acceptance assertion.
 
 ---

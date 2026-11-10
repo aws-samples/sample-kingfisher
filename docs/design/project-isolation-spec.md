@@ -1,25 +1,30 @@
 # Project Isolation — Technical Specification (SPEC): Completing Workspace Resource Isolation and Cross-Workspace Copy
 
-> Revision: **1.3** (🔴 2026-08-31, **rulings A and B synchronized**: the project-context branch of section 3.4 originally said "a missing credential is always refused, never falls back", which collided with [the multi-region execution specification](./multi-region-execution-spec.md), section 3.9 ⇒ unified by [state + time boundary] into **the multi-region execution specification, section 3.9b** [this section is word for word identical to it;
-> changing only one of the two copies = leaving the collision in place];
-> the admin-ddl branch **no longer issues credentials** and instead goes through the closed executor of the multi-region execution specification, section 3.9a.
-> 🔴 The 7 operations and capabilities such as the SQL editor are **all retained**) · revision 1.2 (implementation-level technical design: finalized tables / interface schemas / pseudo-code for the key mechanisms / list of change points / acceptance) | Date: 2026-08-28 (revision 1.1: 2026-08-29) | Status: ⬜ in design, pending review
-> 🎯 **Revision 1.1 changes (convergence review across all modules, 2026-08-29)**: ① 🔴 **the new table `bgp-table-ownership` (the table-creation ledger) is added** — the multi-region execution specification, section 1.3a-S12, had long stated "created by the project-isolation module; synchronized into section 1 of its specification", but that back-feed was never carried out, and until now this table had **zero hits** in the three documents of this module (sections 1 / 3.7);
-> ② the section 1 headline claim "all pure append-only attributes, zero table migration" is **narrowed** to "this module's own additions are pure append-only;
-> the key changes and back-fill of `bgp-task-runs` / `bgp-audit` are owned by the multi-region execution work", and the claim "no new control-plane tables" is withdrawn (there are now 2: this table + `bgp-query-handles`);
-> ③ the migration pseudo-code of section 3.7 gains the ledger's **table name** (it previously said only "the ledger", with no anchor).
-> Basis: [the design](./project-isolation.md), **revision 1.11** (decisions / gaps / risks) + **[the multi-region execution design](./multi-region-execution-design.md), revision 3.26 / [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.54** (the `targetId` identity, the four axes of its section 19, the foundation corrections of its section 20, the controlled admin-DDL executor of its section 3.9a). **This document is the single implementation-level contract of the project-isolation module**; decisions are in the design, interaction in [the interaction design](./project-isolation-interaction.md).
-> 🔴 Pure design (with pseudo-code); no implementation code is written and nothing is deployed without confirmation.
-> 🎯 **Revision 1.0 changes (two tracks of specification-level deep review confirmed by grep + ruling 2)**: completes the **8 P0 items that must be done before construction starts** — ① the sanitize rule of the authoritative `projectSchema()` is fixed (eliminating the fork of 3 existing functions);
-> ② **metadata-side FQN convergence** (9 occurrences of `||"public"`; prevents masking from silently failing after migration → PII exposed in clear text);
-> ③ **fail-closed split into three classes** (adding the "controlled admin-DDL provisioning identity"; otherwise DMS, modeling table landing and L3 provisioning itself are all cut off);
-> ④ **physical tables of the global-knowledge class land in the `shared` schema** (ruling 2: **two dimensions, region × project**);
-> ⑤ `statementId→projectId` is upgraded to the **queryHandle of the multi-region execution specification, section 3.7** (unified; includes fixing the IDOR in production);
-> ⑥ the definition of `isReadOnlyAction` + `isReadOnly(sql)` reusing the existing single source of truth;
-> ⑦ `copyToProject` gains multi-hit handling / COPY_EXCLUDE / compensation for partial writes;
-> ⑧ **replacement of the `public.` placeholder in the cookbook** (jointly with the multi-region execution specification, section 3.11).
-> Corrections: the fail-open ternary occurs at **16 sites (including only 3 in zeroetl**; the earlier "6" was an overestimate);
-> the read side of task-runs is split into two classes, **user view vs. platform aggregation**.
+> - Revision: **1.3** (🔴 2026-08-31, **rulings A and B synchronized**: the project-context branch of section 3.4 originally said "a missing credential is always refused, never falls back", which collided with [the multi-region execution specification](./multi-region-execution-spec.md), section 3.9
+>   ⇒ unified by [state + time boundary] into **the multi-region execution specification, section 3.9b** [this section is word for word identical to it;
+>   changing only one of the two copies = leaving the collision in place];
+>   the admin-ddl branch **no longer issues credentials** and instead goes through the closed executor of the multi-region execution specification, section 3.9a.
+>   🔴 The 7 operations and capabilities such as the SQL editor are **all retained**) · revision 1.2 (implementation-level technical design: finalized tables / interface schemas / pseudo-code for the key mechanisms / list of change points / acceptance) | Date: 2026-08-28 (revision 1.1: 2026-08-29) |
+>   Status: ⬜ in design, pending review
+> - 🎯 **Revision 1.1 changes (convergence review across all modules, 2026-08-29)**: ① 🔴 **the new table `bgp-table-ownership` (the table-creation ledger) is added** — the multi-region execution specification, section 1.3a-S12, had long stated "created by the project-isolation module; synchronized
+>   into section 1 of its specification", but that back-feed was never carried out, and until now this table had **zero hits** in the three documents of this module (sections 1 / 3.7);
+>   ② the section 1 headline claim "all pure append-only attributes, zero table migration" is **narrowed** to "this module's own additions are pure append-only;
+>   the key changes and back-fill of `bgp-task-runs` / `bgp-audit` are owned by the multi-region execution work", and the claim "no new control-plane tables" is withdrawn (there are now 2: this table + `bgp-query-handles`);
+>   ③ the migration pseudo-code of section 3.7 gains the ledger's **table name** (it previously said only "the ledger", with no anchor).
+> - Basis: [the design](./project-isolation.md), **revision 1.11** (decisions / gaps / risks) + **[the multi-region execution design](./multi-region-execution-design.md), revision 3.26 / [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.54** (the `targetId`
+>   identity, the four axes of its section 19, the foundation corrections of its section 20, the controlled admin-DDL executor of its section 3.9a). **This document is the single implementation-level contract of the project-isolation module**; decisions are in the design, interaction in [the
+>   interaction design](./project-isolation-interaction.md).
+> - 🔴 Pure design (with pseudo-code); no implementation code is written and nothing is deployed without confirmation.
+> - 🎯 **Revision 1.0 changes (two tracks of specification-level deep review confirmed by grep + ruling 2)**: completes the **8 P0 items that must be done before construction starts** — ① the sanitize rule of the authoritative `projectSchema()` is fixed (eliminating the fork of 3 existing functions);
+>   ② **metadata-side FQN convergence** (9 occurrences of `||"public"`; prevents masking from silently failing after migration → PII exposed in clear text);
+>   ③ **fail-closed split into three classes** (adding the "controlled admin-DDL provisioning identity"; otherwise DMS, modeling table landing and L3 provisioning itself are all cut off);
+>   ④ **physical tables of the global-knowledge class land in the `shared` schema** (ruling 2: **two dimensions, region × project**);
+>   ⑤ `statementId→projectId` is upgraded to the **queryHandle of the multi-region execution specification, section 3.7** (unified; includes fixing the IDOR in production);
+>   ⑥ the definition of `isReadOnlyAction` + `isReadOnly(sql)` reusing the existing single source of truth;
+>   ⑦ `copyToProject` gains multi-hit handling / COPY_EXCLUDE / compensation for partial writes;
+>   ⑧ **replacement of the `public.` placeholder in the cookbook** (jointly with the multi-region execution specification, section 3.11).
+> - Corrections: the fail-open ternary occurs at **16 sites (including only 3 in zeroetl**; the earlier "6" was an overestimate);
+>   the read side of task-runs is split into two classes, **user view vs. platform aggregation**.
 
 ---
 
@@ -37,9 +42,9 @@
 ## 1. Table design (final)
 
 - **Control plane**: 🔴 **wording corrected in revision 1.1** — the original "**all pure append-only attributes, zero table migration**" contradicted the cells right below it (`bgp-task-runs` explicitly says "making runId composite is owned by the multi-region execution specification, section 1.2", `bgp-audit` explicitly says "sharding per the multi-region execution specification, section 3.3", and both of these **are pk/sk key changes = breaking migrations**);
-- the multi-region execution work has already withdrawn the same claim (its design, sections 10 / 7.1a).
-- **The accurate statement = "everything this module adds itself is a pure append-only attribute; the key changes and back-fill of these two tables are owned by the multi-region execution work (via the home exemption + dual write / dual read + back-fill)";**
-- **there are also 2 new tables (see below)**, so this module **no longer claims "no new control-plane tables"** either.
+  the multi-region execution work has already withdrawn the same claim (its design, sections 10 / 7.1a).
+  **The accurate statement = "everything this module adds itself is a pure append-only attribute; the key changes and back-fill of these two tables are owned by the multi-region execution work (via the home exemption + dual write / dual read + back-fill)";**
+  **there are also 2 new tables (see below)**, so this module **no longer claims "no new control-plane tables"** either.
 
 | Table | Added | Notes |
 |---|---|---|
@@ -244,10 +249,10 @@ async function resolveCred(targetId, project, purpose) {
 }
 // 🔴 Classification is by [static categorization of the call site] (not by guessing from the SQL at run time); all three classes of calls are audited
 ```
-- 🔴 **Fix the fail-open ternary (count corrected)**: **16 sites** across the repository of `...(SecretArn ? {SecretArn} : {})` — distribution: `redshift/execute:22`, `etl/job-service:351,403`, `backfill/execute:95`, `genbi/schema:33`, `genbi/redshift:51`, `modeling/redshift:40,201`, `quality/service:151`, **`zeroetl-service:240,260,292` (only 3 sites;**
-- **the earlier draft's "6 sites" was an overestimate)**, `redshift/schemas/route:32`, `sensitive/scan:78`, `realtime/redshift-target:34`, `metrics/service:183`.
+- 🔴 **Fix the fail-open ternary (count corrected)**: **16 sites** across the repository of `...(SecretArn ? {SecretArn} : {})` — distribution: `redshift/execute:22`, `etl/job-service:351,403`, `backfill/execute:95`, `genbi/schema:33`, `genbi/redshift:51`, `modeling/redshift:40,201`, `quality/service:151`, **`zeroetl-service:240,260,292` (only 3 sites; the earlier draft's "6 sites" was an overestimate)**, `redshift/schemas/route:32`, `sensitive/scan:78`, `realtime/redshift-target:34`, `metrics/service:183`.
 - **Both single-value caches (`admin-secret:13 _arn`, `zeroetl:69 _secretArnCache`) are changed to composite keys**;
-- missing zeroetl would let zero-ETL workgroup queries bypass isolation.
+  missing zeroetl would let zero-ETL workgroup queries bypass isolation.
+
 🔴 **The four real closures of class ② "controlled global reader"**: (a) a read-only identity; (b) **a constrained return shape** — `sensitive-scan` returns only `{column, matched type, count}` and never rows; metrics return only scalars / aggregates and guard against enumeration through constructed aggregates; (c) strong RBAC (`model-metrics/compute` gains `isPlatformAdmin`); (d) full audit. Cross-jurisdiction use is additionally governed by the multi-region execution specification, section 8.5.7 ③.
 
 ### 3.5 Revoking GRANT PUBLIC (L1) + the execute read-only guard + the ban on cross-project data movement

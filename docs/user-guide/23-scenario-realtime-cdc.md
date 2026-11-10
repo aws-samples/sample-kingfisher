@@ -291,9 +291,9 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 1. Switch the top-bar "Execution scope" to the region of the streaming job.
 2. In the "S3 Tables Table" tree on the left (the card has "Refresh tables" at the top right), expand the 📁 `realtime` namespace and click `flink_region_agg`. The editor is filled in automatically:
 
-```sql
-SELECT * FROM "s3tablescatalog/<table-bucket>"."realtime"."flink_region_agg" LIMIT 100
-```
+   ```sql
+   SELECT * FROM "s3tablescatalog/<table-bucket>"."realtime"."flink_region_agg" LIMIT 100
+   ```
 
 3. Click "Execute". Above the result grid you see "Scanned … / Duration … / N rows returned". Each row is one 1-minute window × one region's amount and order count.
 4. To see the total per minute, change the SQL to aggregate by `window_start` and "Execute" again. The editor accepts any hand-written read-only SQL; the three-part name is always written as `"s3tablescatalog/<table-bucket>"."<namespace>"."<table>"`.

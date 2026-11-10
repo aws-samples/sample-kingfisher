@@ -35,11 +35,12 @@ switch the "execution scope" in the top bar and you are working in another regio
 <td>Workspace RBAC · execution environments (add a region with a page wizard) · user management · audit log · system settings (the platform's AI model can be switched at runtime: Claude Opus / GPT / GLM / Kimi)</td></tr>
 </table>
 
-> 📖 **User guide (from first login to proficiency)**: **[`docs/user-guide/README.md`](docs/user-guide/README.md)** — a 30-minute quick start, core concepts, three role paths (administrator / data engineer / analyst), ten end-to-end scenarios, rule / configuration / API references, FAQ and glossary; first time here, start with [`01-quick-start.md`](docs/user-guide/01-quick-start.md) (every step was run on a two-region demo deployment and the wording follows the console).
-> 📸 **Screenshots and a description of every feature**: [`docs/features.md`](docs/features.md) (feature tour, page by page following the menu).
-> 📚 **Pages / APIs / code / AWS dependencies of every module**: [`docs/modules.md`](docs/modules.md) (module overview, seven menu groups module by module); components, core concepts and code layout in [`docs/architecture.md`](docs/architecture.md).
-> 🤖 **Taking over this project with an AI tool? Have it read [`AGENTS.md`](AGENTS.md) first** (the project index: overview / deployment relationships /
-> documentation map / red lines; Codex reads `AGENTS.md` natively, Claude Code, Kiro, Cursor and other tools load it as the project rules file).
+> **Where to go next**
+>
+> - 📖 **User guide** (from first login to proficiency): **[`docs/user-guide/README.md`](docs/user-guide/README.md)** — a 30-minute quick start, core concepts, three role paths (administrator / data engineer / analyst), ten end-to-end scenarios, rule / configuration / API references, FAQ and glossary. First time here? Start with [`01-quick-start.md`](docs/user-guide/01-quick-start.md). Every step was run on a two-region demo deployment and the wording follows the console.
+> - 📸 **Feature tour**: [`docs/features.md`](docs/features.md) — screenshots and a description of every feature, page by page following the menu.
+> - 📚 **Module overview**: [`docs/modules.md`](docs/modules.md) — pages / APIs / code / AWS dependencies of every module, seven menu groups module by module; components, core concepts and code layout in [`docs/architecture.md`](docs/architecture.md).
+> - 🤖 **Taking over this project with an AI tool?** Have it read [`AGENTS.md`](AGENTS.md) first — the project index (overview / deployment relationships / documentation map / red lines). Codex reads `AGENTS.md` natively; Claude Code, Kiro, Cursor and other tools load it as the project rules file.
 
 ---
 
@@ -104,66 +105,66 @@ and run buttons repeat "which region this runs in". Each cell below is one scree
 <table>
 <tr>
 <td width="50%"><b>Data Integration · Data Sources</b><br>
-<img src="docs/screenshots/datasources.webp" width="440"><br>
+<img src="docs/screenshots/datasources.webp" width="440" alt="Data Integration · Data Sources"><br>
 JDBC / S3 / Kinesis / DynamoDB / MSK; a source is created in the selected execution region; browse tables, reachability check, network settings, create external tables</td>
 <td width="50%"><b>Data Integration · Data Sync</b><br>
-<img src="docs/screenshots/sync.webp" width="440"><br>
+<img src="docs/screenshots/sync.webp" width="440" alt="Data Integration · Data Sync"><br>
 Glue batch full / incremental → S3 Tables / Redshift; DMS / Zero-ETL real-time; pushed down to the region for execution; stop / delete really tear down the cloud objects</td>
 </tr>
 <tr>
 <td><b>Data Development · Batch Compute</b><br>
-<img src="docs/screenshots/etl-jobs.webp" width="440"><br>
+<img src="docs/screenshots/etl-jobs.webp" width="440" alt="Data Development · Batch Compute"><br>
 Three engines: Glue PySpark · Redshift SQL · EMR Serverless Spark; run now or on a cron schedule; really runs in each region</td>
 <td><b>Data Development · ETL Orchestration</b><br>
-<img src="docs/screenshots/workflow.webp" width="440"><br>
+<img src="docs/screenshots/workflow.webp" width="440" alt="Data Development · ETL Orchestration"><br>
 Visual DAGs; published to each region's own MWAA Serverless; one publish, execution in many regions</td>
 </tr>
 <tr>
 <td><b>Data Development · Redshift Query / Athena Query</b><br>
-<img src="docs/screenshots/athena.webp" width="440"><br>
+<img src="docs/screenshots/athena.webp" width="440" alt="Data Development · Redshift Query / Athena Query"><br>
 Direct per-region queries over the warehouse and the S3 Tables (Iceberg) data lake; Athena federated catalog <code>s3tablescatalog</code></td>
 <td><b>Data Development · Stream Compute</b><br>
-<img src="docs/screenshots/realtime-compute.webp" width="440"><br>
+<img src="docs/screenshots/realtime-compute.webp" width="440" alt="Data Development · Stream Compute"><br>
 Flink SQL streaming jobs (Managed Flink 1.20); Kinesis / MSK stream sources; results land in S3 Tables and can be queried directly</td>
 </tr>
 <tr>
 <td><b>Smart Analytics · Ask-Your-Data (GenBI)</b><br>
-<img src="docs/screenshots/genbi.webp" width="440"><br>
+<img src="docs/screenshots/genbi.webp" width="440" alt="Smart Analytics · Ask-Your-Data (GenBI)"><br>
 Natural language → read-only SQL, really executed against the region's warehouse / lake; AgentCore agent + 7 MCP skills; automatic masking by classification; session cards</td>
 <td><b>Smart Analytics · Observability / Skills</b><br>
-<img src="docs/screenshots/observability.webp" width="440"><br>
+<img src="docs/screenshots/observability.webp" width="440" alt="Smart Analytics · Observability / Skills"><br>
 AgentCore Runtime / Gateway status, question volume and tokens, engine distribution, skill Lambda metrics</td>
 </tr>
 <tr>
 <td><b>Data Governance · Data Governance</b><br>
-<img src="docs/screenshots/governance.webp" width="440"><br>
+<img src="docs/screenshots/governance.webp" width="440" alt="Data Governance · Data Governance"><br>
 Catalog (per region) · table- / column-level lineage · impact analysis · classification and masking · sensitive-data scan · quality rules · scheduled governance tasks</td>
 <td><b>Data Governance · Governance Workbench / Data Modeling</b><br>
-<img src="docs/screenshots/governance-workbench.webp" width="440"><br>
+<img src="docs/screenshots/governance-workbench.webp" width="440" alt="Data Governance · Governance Workbench / Data Modeling"><br>
 Governance health score and to-dos; layers / data domains / standards / code tables / dimensions and facts / metric system, deployable to any region</td>
 </tr>
 <tr>
 <td><b>Scheduling &amp; Ops · Task Monitor</b><br>
-<img src="docs/screenshots/monitor.webp" width="440"><br>
+<img src="docs/screenshots/monitor.webp" width="440" alt="Scheduling &amp; Ops · Task Monitor"><br>
 Every run, filtered by region / type / trigger; logs; one-click AI analysis (AWS DevOps Agent); scheduling configuration</td>
 <td><b>Scheduling &amp; Ops · Multi-Region Dashboard</b><br>
-<img src="docs/screenshots/multi-region.webp" width="440"><br>
+<img src="docs/screenshots/multi-region.webp" width="440" alt="Scheduling &amp; Ops · Multi-Region Dashboard"><br>
 Cross-region consistency matrix for task distribution and deployed modeling artifacts; one-click remediation of items that can be aligned automatically</td>
 </tr>
 <tr>
 <td><b>Scheduling &amp; Ops · FinOps</b><br>
-<img src="docs/screenshots/finops.webp" width="440"><br>
+<img src="docs/screenshots/finops.webp" width="440" alt="Scheduling &amp; Ops · FinOps"><br>
 Cost per region (reconciled with Cost Explorer by REGION) · task- / run-level attribution · anomaly detection · budget guardrails</td>
 <td><b>Scheduling &amp; Ops · Ops Dashboard</b><br>
-<img src="docs/screenshots/ops.webp" width="440"><br>
+<img src="docs/screenshots/ops.webp" width="440" alt="Scheduling &amp; Ops · Ops Dashboard"><br>
 Run-state distribution, success rate / on-time rate, 7-day trend, run Gantt chart, top slow tasks</td>
 </tr>
 <tr>
 <td><b>System · Execution Environments</b><br>
-<img src="docs/screenshots/exec-envs.webp" width="440"><br>
+<img src="docs/screenshots/exec-envs.webp" width="440" alt="System · Execution Environments"><br>
 Add a region with a page wizard: register → CodeBuild deployment → detect initialization → enable; the component set is complete and cannot be trimmed; jurisdiction tag</td>
 <td><b>System · Workspaces / Users / Audit / Settings</b><br>
-<img src="docs/screenshots/settings.webp" width="440"><br>
+<img src="docs/screenshots/settings.webp" width="440" alt="System · Workspaces / Users / Audit / Settings"><br>
 Workspace RBAC and approvals; Cognito users; every write operation audited; the platform's AI model can be switched at runtime</td>
 </tr>
 </table>
@@ -200,6 +201,7 @@ BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>
 ```
 
 Key points:
+
 - **The customer chooses the home region** and it never changes afterwards; it must offer Bedrock (the factory default is Claude Opus 4.5; the deployment script walks a candidate chain with real calls and picks the first available model, or you specify `BEDROCK_MODEL_ID=<id>`; after go-live it can be hot-switched under "System Settings → AI Model"), Redshift Serverless, S3 Tables, AgentCore and MWAA Serverless. Organisation SCPs must not block `us-east-1` (the WAF for CloudFront is created there).
 - 🔴 **Multi-region production cannot "import an existing VPC"**; one region allows exactly one execution environment, and the component set cannot be trimmed.
 - Always pass `--profile` explicitly to AWS; never run `cdk deploy` by hand (the deployment scripts handle wiring, the mode, the IAM simulation gate and the agent images).

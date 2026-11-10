@@ -2,15 +2,15 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.2 | Date: 2026-06-26 | Status: **both the first slice (warehouse layering + data domains / data standards / code tables) and the second slice (dimensional / fact modeling + metric system) have been delivered and verified end to end in the browser**.
-> First slice: layering / data domains / data standards / code tables + landing in Redshift.
-> **Second slice (dimensional / fact modeling + metric system + OM Glossary): design in section 11, implemented + all headless verification green**
-> (dimensional modeling: create a dimension table → DDL → apply, with hard evidence of the real table in Redshift; metric system: hard evidence of computed values — atomic GMV = 1649 / derived 30-day paidGMV = 350).
-> Benchmark: the data modeling / data governance — warehouse planning features of a leading cloud data-development suite. Capability groups: layering, data standards · dictionaries · code tables, dimensional modeling, metric system (first-priority roadmap item "data modeling").
-> Master plan: the capability roadmap of 2026-08 (a historical document that is not part of this repository), section 1 "data modeling": layering / data standards · dictionaries · code tables / dimensional modeling / metric system.
+> - Revision: 1.2 | Date: 2026-06-26 | Status: **both the first slice (warehouse layering + data domains / data standards / code tables) and the second slice (dimensional / fact modeling + metric system) have been delivered and verified end to end in the browser**.
+> - First slice: layering / data domains / data standards / code tables + landing in Redshift.
+> - **Second slice (dimensional / fact modeling + metric system + OM Glossary): design in section 11, implemented + all headless verification green**
+>   (dimensional modeling: create a dimension table → DDL → apply, with hard evidence of the real table in Redshift; metric system: hard evidence of computed values — atomic GMV = 1649 / derived 30-day paidGMV = 350).
+> - Benchmark: the data modeling / data governance — warehouse planning features of a leading cloud data-development suite. Capability groups: layering, data standards · dictionaries · code tables, dimensional modeling, metric system (first-priority roadmap item "data modeling").
+> - Master plan: the capability roadmap of 2026-08 (a historical document that is not part of this repository), section 1 "data modeling": layering / data standards · dictionaries · code tables / dimensional modeling / metric system.
 >
-> 🔴 Red lines: only `--profile temp-account` (account facts are always looked up live), no hard-coded secrets, every new feature verified headlessly / for real, no unauthorized push.
-> 💰 **Cost: this module is pure metadata + reuse of the existing Redshift Serverless (pay per use); zero new standing-charge components.**
+> - 🔴 Red lines: only `--profile temp-account` (account facts are always looked up live), no hard-coded secrets, every new feature verified headlessly / for real, no unauthorized push.
+> - 💰 **Cost: this module is pure metadata + reuse of the existing Redshift Serverless (pay per use); zero new standing-charge components.**
 
 ---
 
@@ -196,10 +196,10 @@ M7 Write back to the roadmap progress table (data modeling, first slice); reques
 
 ## 11. Detailed design of the second slice (dimensional / fact modeling + metric system + OM Glossary)
 
-> Revision 1.1 | 2026-06-26. The second slice adds a "modeling-entity layer" on top of the first-slice planning layer (layering / domains / standards / code tables):
-> **dimension table / fact table registration → one-click generation and application of Redshift DDL → lineage attachment**;
-> **metric system (atomic → derived, modifiers + time periods) → safe aggregate computation** (a governance modeling layer above the [metrics store](./metrics-store.md), which stays untouched).
-> 💰 Still pure metadata + reuse of the existing Redshift; **zero new standing charges**.
+> - Revision 1.1 | 2026-06-26. The second slice adds a "modeling-entity layer" on top of the first-slice planning layer (layering / domains / standards / code tables):
+> - **dimension table / fact table registration → one-click generation and application of Redshift DDL → lineage attachment**;
+> - **metric system (atomic → derived, modifiers + time periods) → safe aggregate computation** (a governance modeling layer above the [metrics store](./metrics-store.md), which stays untouched).
+> - 💰 Still pure metadata + reuse of the existing Redshift; **zero new standing charges**.
 
 ### 11.0 Slices and cadence
 - **Commit one = dimensional modeling** (dimension / fact modeling + DDL generation / application + lineage + front-end tab + headless verification), closed first.
@@ -207,6 +207,7 @@ M7 Write back to the roadmap progress table (data modeling, first slice); reques
 - Each of the two is deployed independently + verified headlessly end to end + committed locally (no push).
 
 ### 11.1 Reused foundation (new reuse in the second slice)
+
 | Reused | Source | How it is reused |
 |---|---|---|
 | Safe aggregate SQL (safeIdent / aggExpr / quoteTable / Redshift execSql) | `lib/metrics/service.ts` | Metric computation copies the same safety pattern directly |

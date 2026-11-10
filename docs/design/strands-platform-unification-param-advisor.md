@@ -1,13 +1,16 @@
 # Strands Platform Unification, Stage L2 — paramadvisor onto Strands + Eliminating the Hand-Copied Duplicate (Implementation Design)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
-> the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` + `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
-> `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer
+>   exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
+>   the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` +
+>   `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
+>   `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
 
-> Status: **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design"). Follows the engineering disciplines `design-first-no-code-until-approved` + `verify-to-docker-build-not-tsc` (verify down to the docker build layer).
-> Decision: do all of stage L2 for paramadvisor in one go (extract the core + CJS→ESM + Strands).
-> Preliminary test done: the `@/` dependencies of catalog.ts (worker-types / the EMR spec) are all [zero-import pure constants], so extracting a core is clean and feasible.
+> - Status: **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design"). Follows the engineering disciplines `design-first-no-code-until-approved` + `verify-to-docker-build-not-tsc` (verify down to the docker build layer).
+> - Decision: do all of stage L2 for paramadvisor in one go (extract the core + CJS→ESM + Strands).
+> - Preliminary test done: the `@/` dependencies of catalog.ts (worker-types / the EMR spec) are all [zero-import pure constants], so extracting a core is clean and feasible.
 
 ## 0. Goal (the two-part kit)
 
@@ -40,6 +43,7 @@ catalog.ts → types.ts(type) + etl/worker-types.ts(zero-import pure constants) 
 **core/catalog.ts inlines the values of these constants** (the Glue worker list / the EMR specification options). Rationale: they are **objective facts of AWS services**
 (G.1X / G.2X …, emr-7.5.0 …), not platform business logic; new tiers are added extremely rarely, and when one is added every place has to be updated anyway — a different order of drift risk from "the entire structured CATALOG_TEXT
 hand-copied". The inlined site carries a comment marking the source (`// source: @/lib/etl/worker-types, AWS fact constants`).
+
 **Trade-off**: accept "one copy of the AWS fact constants in the core" (low severity) in exchange for "the 6,401-character business parameter catalog CATALOG_TEXT is no longer hand-copied" (high severity eliminated). The net benefit is positive.
 
 ## 2. Generalizing the prebuild (echoing the core-build piece of the framework layer)

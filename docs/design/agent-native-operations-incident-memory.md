@@ -1,11 +1,15 @@
 # Part A — Incident knowledge base (Incident Memory) + diagnosis agent upgraded to AgentCore
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the `/backfill` page plus `platform/src/lib/backfill/`.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior —
+>   place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned
+>   in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the
+>   `/backfill` page plus `platform/src/lib/backfill/`.
 
-> Revision: 1.0 **✅ implemented (in-process path)** (documentation audit calibration of 2026-08-26: the original status header was out of date; the "diagnosis upgraded to AgentCore / independent devopsdiag stack" proposed by this document was not adopted) | Created: 2026-07-12 | Priority: **P0** (core of the moat) | Capability groups: diagnosis agent upgraded to AgentCore + incident memory (new)
-> Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: the fault-diagnosis module's `lib/diagnostics/` · `bgp-diagnostics` · the [AgentCore standard](./agentcore-standard.md) · [GenBI semantic retrieval](./genbi-semantic-retrieval.md) · `bgp-task-runs`
-> **Purely additive; does not change the main flow of the fault-diagnosis module.** A hook attached after diagnosis completion persists the incident; a new, independent AgentCore agent is added while the old in-process path is kept as the fallback.
+> - Revision: 1.0 **✅ implemented (in-process path)** (documentation audit calibration of 2026-08-26: the original status header was out of date; the "diagnosis upgraded to AgentCore / independent devopsdiag stack" proposed by this document was not adopted) | Created: 2026-07-12 | Priority: **P0**
+>   (core of the moat) | Capability groups: diagnosis agent upgraded to AgentCore + incident memory (new)
+> - Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: the fault-diagnosis module's `lib/diagnostics/` · `bgp-diagnostics` · the [AgentCore standard](./agentcore-standard.md) · [GenBI semantic retrieval](./genbi-semantic-retrieval.md) · `bgp-task-runs`
+> - **Purely additive; does not change the main flow of the fault-diagnosis module.** A hook attached after diagnosis completion persists the incident; a new, independent AgentCore agent is added while the old in-process path is kept as the fallback.
 
 ---
 
@@ -64,7 +68,7 @@ The prototype is a plain antd Table plus hand-drawn SVG cards, unrelated to Reac
 | POST | `/api/incidents/[signature]/silence` | editor | Silence this class (known harmless / scheduled for later), `silenceUntil` |
 | GET | `/api/incidents/health` | viewer | Knowledge-base health aggregate (number of classes / fix coverage / MTTR / top recurrences) |
 | GET | `/api/incidents/export` | admin | Redacted export (raw material of DataOps-Bench, see section 8), `?format=jsonl` |
-| POST | `/api/incidents/lookup` | internal / gateway | Callback for the AgentCore `lookup_incident_history` skill, `{signature|errorText}` → historical verified fixes |
+| POST | `/api/incidents/lookup` | internal / gateway | Callback for the AgentCore `lookup_incident_history` skill, `{signature\|errorText}` → historical verified fixes |
 
 > **No `POST /api/incidents` (create) is added**: incidents are written only internally by the diagnosis-completion hook; external creation is not exposed, which keeps the data source single and trustworthy.
 

@@ -1,9 +1,13 @@
 # Multi-Region Execution
 
 > One control plane, many execution regions, data stays where it is produced.
+>
 > This document is the overview of the multi-region execution model of the Kingfisher platform: concepts, architecture, interfaces, key flows and acceptance, with the figures.
+>
 > The full contracts it summarizes are the [specification](./multi-region-execution-spec.md) (table design, API contract, key-mechanism pseudocode, decisions), the [design document](./multi-region-execution-design.md) (requirements, architecture D1–D8, lifecycle, IAM and network, acceptance, decision record, correction ledger) and the [interaction design](./multi-region-execution-interaction.md) (scenarios, safety mechanisms, execution-scope rulings).
+>
 > Related designs: [Project isolation](./project-isolation.md) and [Model configuration](./model-configuration.md).
+>
 > Supported service and library versions are listed in [Supported versions](../supported-versions.md).
 
 ---

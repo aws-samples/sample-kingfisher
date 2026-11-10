@@ -1,55 +1,70 @@
 # Ask-Your-Data "Session Cards" (save a whole conversation / open and continue / delete, at most 100 per user)
 
 > Revision: **1.8** | Date: 2026-09-13 | 🔴 **Revision 1.8 = step 7 of the construction sequence closed (the headless acceptance segment passed 23/23 in a real environment; the only item still registered is GC-12) + a whole missing layer of tests added**
-> **Assembly layer (`cards-assembly.test.ts`)**: mocks **only true externals** (in-memory DDB / in-memory S3 / registry / model side);
-> **nothing is mocked between** `cards-service` ↔ `cards-store` ↔ `cards-body-store`.
-> The reason for creating it: the 4 self-inflicted defects of that day **all grew on the seams**, while `tsc` was self-consistent, 3000+ `vitest` tests were all green and **60 mutations were all red** —
-> 🔴 **mutation cannot create observational power that the criteria never had**: the mutations hit units that were equally isolated by mocks, so a broken seam stayed all green.
-> Accompanied by the shrink-only ratchet `mock-hygiene-guard` (number of cross-module mock pairs · any directory with cross-module mocks must have an assembly layer) + the corresponding rule of the change-safety protocol.
-> 🔴🔴 **Revision 1.7 = two structural rulings forced by the first run in a real environment** (details were recorded in the planning notes of the time):
-> **① The card collection has two identities, and they must be separated explicitly.** It is both the personal-asset index of "**100 per user, globally**" (decided in section 3.2),
->   and it has to be presented on a platform that filters by execution scope. Before the change the latter **silently overrode** the former ⇒ the counter said "97/100 used" while the list showed only 3 cards
->   (**the number and the list contradicted each other**), cards outside the scope were **unreachable**, so the either-or dialog of section 9.7 could **not be triggered by any real user**
->   except from the "All" view = dead code; and the only exit copy read "switch the top-bar scope to view" — which is exactly what guardrail 7 exists for, yet the user was asked to do it by hand.
->   ⇒ Ruling: **complete index, adjustable lens**. The execution scope remains the **default lens** (the platform-wide rule is unchanged, the ratchet is not loosened),
->   but the drawer can widen **its own** reading lens with one click; 🔴 widening only changes "which rows are read" and **never changes the execution scope**
->   (that is the silent switch forbidden by clause 1 of section 9.7), and it must **say explicitly** "the top bar has not changed". Criteria: section 9 GC-9 (default filtering) + 🆕 **GC-9b** (reachability + scope untouched).
-> **② Contention on the single counter is absorbed by the platform, never pushed onto the user, and failures must be compensated.** The quota is a **single** item per user (for the atomicity of "exactly 100";
->   this trade-off stays — a sharded counter would destroy the exact upper bound), so concurrent saves by the same person inevitably collide on it;
->   DynamoDB's `TransactionConflict` is a "retryable" signal, but before the change it was pushed onto the user as a 500 "please retry later"
->   (measured: 3 of 100 attempts). ⇒ The store **backs off with jitter and retries a bounded number of times** (6) internally; when exhausted it throws the typed
->   `CardStoreContended` → **503**; 🔴 `ConditionalCheckFailed` is **never retried** (it is the answer; retrying would drag "full" out into a timeout).
->   At the same time the compensation of section 7.1 is extended from "delete the body only when the quota is full" to **every kind of pointer-write failure** —
->   otherwise every contention leaves behind an orphan body object **that no pointer refers to and that nobody ever finds**. | Status: 🚧 **code and criteria of construction steps 1–7 all landed** (step 7 = the acceptance-segment script is written and registered in the acceptance gate; **none of it deployed yet ⇒ not yet passed**)
-> 🔴🔴 **Revision 1.6 = writing the criteria uncovered and root-fixed two real product gaps** (both of the kind "the contract says it, the code never wired it", and **neither raises an error**):
-> ① **Re-masking was always a no-op ⇒ cards were a back door around data classification.** `maskRows` first computes from "column metadata / SQL" which tables are involved this time,
->   then looks up the classification of those tables; the card path **passed neither** (`columns` had only column names, `sql` and `database` were not given at all) ⇒ the reference table set was empty
->   ⇒ it hit `return passthrough` at the first branch ⇒ **`maskedNow` was always empty, and opening an old card always returned plaintext**.
->   The platform's other three call sites (direct-query results / BI queries / Ask-Your-Data execution) always passed both; only the card path left them out.
->   Root fix = "**the body carries the context needed for re-masking**": `CardBody.database` is added and stays in the region with the body; `sql` is passed per turn;
->   on the write side `database` is **required** (no silent default — that is the breeding ground of a whole class of defects); on the read side the fallback to the default database applies only to old cards saved **before the fix**.
-> ② **Deleting a workspace silently left other people's cards behind.** `bgp-genbi-cards` was not in the resource inventory of workspace deletion at all (not among the 11 kinds).
->   Ruling: **block + list the details**, no cascading delete — a workspace is **shared**, cards are **personal**; cascading would mean that one person deleting a workspace
->   silently destroys the conversations several other people saved. The blocking message must say "must be deleted by the owner", otherwise an administrator thinks the platform is broken (see section 9 GC-15).
->   A fail-open in the same place was fixed along the way: the `.catch(() => [])` of `OWN_LIST_KINDS` made **any read failure of any kind count as 0** ⇒ no block ⇒
->   the workspace was deleted with orphans attached. Now all 12 kinds go through `safeCount` (failure ⇒ `count: null` + masked reason ⇒ **always blocks**).
-> ✅ **Revision 1.5 = the three decisions of 2026-09-12 landed**: ① **the title also stays in the region** (overruling my default of "store the title centrally") · ② 100 = **per user, globally** (as stated) · ③ scheduling order as proposed.
-> Landing points of ①: the central pointer **does not store even `title`** (it has joined the data-value blacklist; writing it is rejected outright); the list title is now read from a lightweight `head.json` in **that card's own region**
->   (one small object per card, written in the same write as the body ⇒ **no index-consistency problem**);
-> 🔴 **a title that cannot be read must degrade, not disappear** — the row is still listed (cardId / region / time / turn count are all central),
->   and the title slot shows a placeholder. Removing unreadable cards from the list = the user thinks the cards are lost, which is far worse than not seeing a title.
-> Revision 1.4: section 5.6 corrected — only **three** error codes are added, the other three **reuse the platform's existing vocabulary** (`code` from the existing union + `detail.reason` as single-author literals); and one Next constraint recorded: the error mapping **cannot** be exported from a route file (routes may only export fixed names); it was extracted into `lib/genbi/cards-http.ts`.
-> Revision 1.3: section 3.3 adds two construction-time rulings (both forced by mutation tests): **the idempotency criterion is prefix matching** (judging "exactly equal" would wipe the turns the user added by continuing) · **cleanup must have an upper bound and fail loudly** (without the bound the failure mode is "the request hangs" rather than an error).
-> Revision 1.2 **two corrections, both things I wrote from memory in revision 1.0 that the real infrastructure falsified**:
-> ① Writing the encryption as "SSE-KMS (that region's dataKey)" was **wrong** — the datalakeBucket uses the bucket default **SSE-S3** (`BucketEncryption.S3_MANAGED`; home `platform-stack.ts:53`, non-home `exec-env/core-stack.ts:64`). The only KMS bucket on the platform is the residency bucket (`residency-stack.ts:74`). Putting cards under a CMK needs **one key per region + grants**, a separate hardening item that is **not done in this work** (see section 12, item ①).
-> ② The lifecycle cannot be covered in one sentence: the **non-home** datalakeBucket is `RETAIN` without autoDeleteObjects (execution-environment discipline), whereas 🔴 **home's is `DESTROY + autoDeleteObjects: true`** (`platform-stack.ts:57`) ⇒ destroying the platform stack deletes the home card bodies with it (see section 12, item ②).
-> Revision 1.1: section 5 tightened from an "interface list" into a **buildable contract** (field-by-field request/response + error-code table + idempotency and concurrency semantics);
-> 🔴 the interaction "open a card from another scope" is **not defined in this document** — it was extracted into the general protocol of the [multi-region interaction design](./multi-region-execution-interaction.md), **revision 2.30, section 9.7 "the page proposes an execution-scope switch" (guardrail 7)**; this work is merely its first consumer (the same family includes opening a run in another region from an alerting / monitoring deep link, shared BI cards, and drilling down from the cross-region overview).
-> ⚠️ When section 9.7 was first drafted it used `residency-blocked` as if it were an existing state, and the `contract-drift` negative list caught it on the spot (that state had already been removed by the residency-gate work) ⇒ changed to point at the registry's single author `unusableReason()`, and "pages may not write their own serviceability check" was written into the contract.
-> Revision 1.0: first version (design pending review)
-> Four-in-one (following the precedent of the [operation guide](./operation-guide.md)): **section 2 summary design · section 3 data model and contract · section 4 interfaces · section 5 prototype · section 6 execution flow · section 7 construction sequence · section 8 headless acceptance criteria**.
-> Planning: tracked as its own work item with a dedicated work package.
-> Related existing modules: **[Ask-Your-Data](./genbi.md)** (the question-answering core) · **[GenBI requirement pipeline](./genbi-requirement-pipeline.md)** ("Raise as request"; this requirement is its **peer**) · **[AgentCore GenBI](./agentcore-genbi.md)** (conversation memory) · **[GenBI asynchronous execution](./genbi-async-execution.md)** (asynchronous tasks) · **[multi-region execution](./multi-region-execution.md)** (execution scope + data residency; the source of this work's hard constraints).
+>
+> Earlier revisions (16) are in the collapsible list below.
+
+<details><summary>Revision history</summary>
+
+- **Assembly layer (`cards-assembly.test.ts`)**: mocks **only true externals** (in-memory DDB / in-memory S3 / registry / model side);
+  **nothing is mocked between** `cards-service` ↔ `cards-store` ↔ `cards-body-store`.
+  The reason for creating it: the 4 self-inflicted defects of that day **all grew on the seams**, while `tsc` was self-consistent, 3000+ `vitest` tests were all green and **60 mutations were all red** —
+- 🔴 **mutation cannot create observational power that the criteria never had**: the mutations hit units that were equally isolated by mocks, so a broken seam stayed all green.
+  Accompanied by the shrink-only ratchet `mock-hygiene-guard` (number of cross-module mock pairs · any directory with cross-module mocks must have an assembly layer) + the corresponding rule of the change-safety protocol.
+- 🔴🔴 **Revision 1.7 = two structural rulings forced by the first run in a real environment** (details were recorded in the planning notes of the time):
+  - **① The card collection has two identities, and they must be separated explicitly.** It is both the personal-asset index of "**100 per user, globally**" (decided in section 3.2),
+    and it has to be presented on a platform that filters by execution scope. Before the change the latter **silently overrode** the former ⇒ the counter said "97/100 used" while the list showed only 3 cards
+    (**the number and the list contradicted each other**), cards outside the scope were **unreachable**, so the either-or dialog of section 9.7 could **not be triggered by any real user**
+    except from the "All" view = dead code; and the only exit copy read "switch the top-bar scope to view" — which is exactly what guardrail 7 exists for, yet the user was asked to do it by hand.
+    ⇒ Ruling: **complete index, adjustable lens**. The execution scope remains the **default lens** (the platform-wide rule is unchanged, the ratchet is not loosened),
+    but the drawer can widen **its own** reading lens with one click; 🔴 widening only changes "which rows are read" and **never changes the execution scope**
+    (that is the silent switch forbidden by clause 1 of section 9.7), and it must **say explicitly** "the top bar has not changed". Criteria: section 9 GC-9 (default filtering) + 🆕 **GC-9b** (reachability + scope untouched).
+  - **② Contention on the single counter is absorbed by the platform, never pushed onto the user, and failures must be compensated.** The quota is a **single** item per user (for the atomicity of "exactly 100";
+    this trade-off stays — a sharded counter would destroy the exact upper bound), so concurrent saves by the same person inevitably collide on it;
+    DynamoDB's `TransactionConflict` is a "retryable" signal, but before the change it was pushed onto the user as a 500 "please retry later"
+    (measured: 3 of 100 attempts). ⇒ The store **backs off with jitter and retries a bounded number of times** (6) internally; when exhausted it throws the typed
+    `CardStoreContended` → **503**; 🔴 `ConditionalCheckFailed` is **never retried** (it is the answer; retrying would drag "full" out into a timeout).
+    At the same time the compensation of section 7.1 is extended from "delete the body only when the quota is full" to **every kind of pointer-write failure** —
+    otherwise every contention leaves behind an orphan body object **that no pointer refers to and that nobody ever finds**. | Status: 🚧 **code and criteria of construction steps 1–7 all landed** (step 7 = the acceptance-segment script is written and registered in the acceptance gate; **none of it
+  deployed yet ⇒ not yet passed**)
+- 🔴🔴 **Revision 1.6 = writing the criteria uncovered and root-fixed two real product gaps** (both of the kind "the contract says it, the code never wired it", and **neither raises an error**):
+  ① **Re-masking was always a no-op ⇒ cards were a back door around data classification.** `maskRows` first computes from "column metadata / SQL" which tables are involved this time,
+    then looks up the classification of those tables; the card path **passed neither** (`columns` had only column names, `sql` and `database` were not given at all) ⇒ the reference table set was empty
+    ⇒ it hit `return passthrough` at the first branch ⇒ **`maskedNow` was always empty, and opening an old card always returned plaintext**.
+    The platform's other three call sites (direct-query results / BI queries / Ask-Your-Data execution) always passed both; only the card path left them out.
+    Root fix = "**the body carries the context needed for re-masking**": `CardBody.database` is added and stays in the region with the body; `sql` is passed per turn;
+    on the write side `database` is **required** (no silent default — that is the breeding ground of a whole class of defects); on the read side the fallback to the default database applies only to old cards saved **before the fix**.
+  ② **Deleting a workspace silently left other people's cards behind.** `bgp-genbi-cards` was not in the resource inventory of workspace deletion at all (not among the 11 kinds).
+    Ruling: **block + list the details**, no cascading delete — a workspace is **shared**, cards are **personal**; cascading would mean that one person deleting a workspace
+    silently destroys the conversations several other people saved. The blocking message must say "must be deleted by the owner", otherwise an administrator thinks the platform is broken (see section 9 GC-15).
+    A fail-open in the same place was fixed along the way: the `.catch(() => [])` of `OWN_LIST_KINDS` made **any read failure of any kind count as 0** ⇒ no block ⇒
+    the workspace was deleted with orphans attached. Now all 12 kinds go through `safeCount` (failure ⇒ `count: null` + masked reason ⇒ **always blocks**).
+- ✅ **Revision 1.5 = the three decisions of 2026-09-12 landed**: ① **the title also stays in the region** (overruling my default of "store the title centrally") · ② 100 = **per user, globally** (as stated) · ③ scheduling order as proposed.
+  Landing points of ①: the central pointer **does not store even `title`** (it has joined the data-value blacklist; writing it is rejected outright); the list title is now read from a lightweight `head.json` in **that card's own region**
+    (one small object per card, written in the same write as the body ⇒ **no index-consistency problem**);
+  🔴 **a title that cannot be read must degrade, not disappear** — the row is still listed (cardId / region / time / turn count are all central),
+    and the title slot shows a placeholder. Removing unreadable cards from the list = the user thinks the cards are lost, which is far worse than not seeing a title.
+- Revision 1.4: section 5.6 corrected — only **three** error codes are added, the other three **reuse the platform's existing vocabulary** (`code` from the existing union + `detail.reason` as single-author literals); and one Next constraint recorded: the error mapping **cannot** be exported from a
+  route file (routes may only export fixed names); it was extracted into `lib/genbi/cards-http.ts`.
+- Revision 1.3: section 3.3 adds two construction-time rulings (both forced by mutation tests): **the idempotency criterion is prefix matching** (judging "exactly equal" would wipe the turns the user added by continuing) · **cleanup must have an upper bound and fail loudly** (without the bound the
+  failure mode is "the request hangs" rather than an error).
+- Revision 1.2 **two corrections, both things I wrote from memory in revision 1.0 that the real infrastructure falsified**:
+  ① Writing the encryption as "SSE-KMS (that region's dataKey)" was **wrong** — the datalakeBucket uses the bucket default **SSE-S3** (`BucketEncryption.S3_MANAGED`; home `platform-stack.ts:53`, non-home `exec-env/core-stack.ts:64`). The only KMS bucket on the platform is the residency bucket
+  (`residency-stack.ts:74`). Putting cards under a CMK needs **one key per region + grants**, a separate hardening item that is **not done in this work** (see section 12, item ①).
+  ② The lifecycle cannot be covered in one sentence: the **non-home** datalakeBucket is `RETAIN` without autoDeleteObjects (execution-environment discipline), whereas 🔴 **home's is `DESTROY + autoDeleteObjects: true`** (`platform-stack.ts:57`) ⇒ destroying the platform stack deletes the home card
+  bodies with it (see section 12, item ②).
+- Revision 1.1: section 5 tightened from an "interface list" into a **buildable contract** (field-by-field request/response + error-code table + idempotency and concurrency semantics);
+  🔴 the interaction "open a card from another scope" is **not defined in this document** — it was extracted into the general protocol of the [multi-region interaction design](./multi-region-execution-interaction.md), **revision 2.30, section 9.7 "the page proposes an execution-scope switch"
+  (guardrail 7)**; this work is merely its first consumer (the same family includes opening a run in another region from an alerting / monitoring deep link, shared BI cards, and drilling down from the cross-region overview).
+  ⚠️ When section 9.7 was first drafted it used `residency-blocked` as if it were an existing state, and the `contract-drift` negative list caught it on the spot (that state had already been removed by the residency-gate work) ⇒ changed to point at the registry's single author `unusableReason()`,
+  and "pages may not write their own serviceability check" was written into the contract.
+- Revision 1.0: first version (design pending review)
+  Four-in-one (following the precedent of the [operation guide](./operation-guide.md)): **section 2 summary design · section 3 data model and contract · section 4 interfaces · section 5 prototype · section 6 execution flow · section 7 construction sequence · section 8 headless acceptance criteria**.
+  Planning: tracked as its own work item with a dedicated work package.
+  Related existing modules: **[Ask-Your-Data](./genbi.md)** (the question-answering core) · **[GenBI requirement pipeline](./genbi-requirement-pipeline.md)** ("Raise as request"; this requirement is its **peer**) · **[AgentCore GenBI](./agentcore-genbi.md)** (conversation memory) · **[GenBI
+  asynchronous execution](./genbi-async-execution.md)** (asynchronous tasks) · **[multi-region execution](./multi-region-execution.md)** (execution scope + data residency; the source of this work's hard constraints).
+
+</details>
 
 ---
 
@@ -188,6 +203,7 @@ The dialog copy flips with the decision: revision 1.0 said "the title will be sa
 ```
 
 **Store everything**: `rows` are not truncated, and `steps` (the reasoning trace) are kept too (the requirement said "all content").
+
 **Anti-abuse caps**: `turns ≤ 200` and `bytes ≤ 20MB`; beyond that, **refuse explicitly and say which limit was exceeded** (no silent truncation — silent truncation equals lying that the save succeeded).
 
 🔴 **Why `database` must be stored in the body (added in revision 1.6; the root fix of a real gap)**: opening a card must re-mask by the **current** data classification,
@@ -239,6 +255,7 @@ idempotency lookup on the GSI → `TransactWriteItems` (Put the pointer + the co
 ### 5.2 `GET /api/genbi/cards?scope=<scopeParam>` — my card list
 
 🔴 Titles are fetched from **their respective regions** (decided in revision 1.5), and **only for the cards that are to be shown in the current scope** — execution-scope filtering naturally reduces cross-region reads to the minimum.
+
 **Unreadable ⇒ `title:null` + `titleUnavailable:true`, and the row is still returned** (never let "cannot read the title" become "the list is empty").
 
 🔴 **Must filter by `?scope=`** (read-route rule, the [multi-region specification](./multi-region-execution-spec.md), section 2.6.3); no `scope` = all scopes.
@@ -257,6 +274,7 @@ idempotency lookup on the GSI → `TransactWriteItems` (Put the pointer + the co
 ### 5.3 `GET /api/genbi/cards/[cardId]` — fetch the body (open)
 
 Response = the full `body.json` of section 4.2 + `{ "resnapshotted": false }`.
+
 🔴 Two post-processing steps, both mandatory: ① `userSub` mismatch ⇒ **404**; ② after retrieval, **re-mask by the current data classification**, taking the **stricter** of stored and current,
 and include `maskedNow: ["col"]` in the response so the page can explain "this column is now hidden by classification".
 
@@ -272,6 +290,7 @@ and include `maskedNow: ["col"]` in the response so the page can explain "this c
                              "region": "us-east-1", "rehydratedTurns": 4 } }
 ```
 Server side = `replaceConversation(conversationId, turns)` (**overwriting, idempotent**, section 3.3).
+
 🔴 **This route does not change the execution scope** — switching region is done by the page itself after obtaining the user's consent under the protocol of the multi-region interaction design, **section 9.7**;
 the server only answers "which target this card belongs to". When the user chooses "View read-only" this route **is not called at all** (section 9.7, clause 6: declining the switch has zero side effects).
 
@@ -419,7 +438,9 @@ Failure at ② ⇒ the card disappears from the list and leaves a "Cleanup incom
 
 **Progress (2026-09-13)**: steps 1–6 code all landed · step 7 **script written (921 lines, 43 assertions) and registered as a segment of the full multi-region acceptance run**;
 **3054 unit tests all green**, `tsc` 0, `contract-drift` 62/62, two mutation batches **7/7 all red** each.
+
 🔴 **But it has not entered a real environment even once ⇒ by the rule "registering is not passing", this work is not yet closed**; the only blocker = the temporary test account's credentials expired (the profile needs to be refreshed).
+
 ⚠️ Correcting one outdated conclusion of my own: **this acceptance segment does not need a core-only execution environment** (that was a carrier requirement of the data-quality acceptance items) —
 the carriers it needs are "two targets + a second user + a stale descriptor", **all of which it can create itself**, independent of VPC slots.
 
@@ -466,8 +487,6 @@ the carriers it needs are "two targets + a second user + a stale descriptor", **
 | ① | Store the title centrally, or also keep it in the region? | ✅ **Decided: also in the region** (my default overruled) | My original default was "store centrally" | Landing: see the revision header and section 4.1a. My worry "region unreachable ⇒ the list is simply empty" is solved by **degrade, do not disappear**: cards are always listed, only the title slot shows a placeholder (pinned by criterion GC-16) |
 | ② | What 100 means | ✅ **Decided: 100 per user, globally** | 100 per user per workspace | Matches my default; implementation = `TransactWriteItems` in the same central table (section 3.2) |
 | ③ | Scheduling order | ✅ **Decided: as proposed** | — | That is, "after the fixture work item and before the next scheduled work package, or in parallel with it" |
-
-
 
 ---
 

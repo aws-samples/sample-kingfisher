@@ -3,24 +3,32 @@
 > Version: v1.5 (2026-10-29 04:0xZ, development-branch copy: **after the customer's production environment was upgraded to `release-2026-10-29` (2.1.2) on 2026-10-29, the transition variable of section 5.1 was found to still be required (the 2026-10-29
 > recurrence: the `cdk bootstrap` line of the buildspec still executes the CDK application); it was added back the same day after the upgrade wiped it, with its value changed to the platform's current default model id (for this customer,
 > `global.moonshotai.kimi-k3`);**
-> **it is only no longer needed from the version that contains the root fix (hotfix `45e322a`, `cdk bootstrap --app ''`)**;
-> the applicable-version line of section 0, section 5.1 and the transition-measure table row were updated accordingly) · v1.4 (2026-10-26, development-branch copy: the "from the next version (candidate-region pre-authorization)" wording in section 0 now means
-> "from `release-2026-10-27`" — once `EXEC_REGION_CANDIDATES=all-enabled` has pre-authorized the candidate regions at install / upgrade time,
-> adding a region inside the candidate set from the web UI no longer needs an operations-side authorization, and the rehearsal record in section 6c is the current behavior;
-> the get-the-code example in section 3 was changed to the new tag;
-> v1.1 on `release-2026-10-13` is unchanged) · v1.3 (2026-10-19 evening, development-branch copy: new section 6c — a complete rehearsal record of the next version's "candidate-region pre-authorization" in the test environment (from web-UI creation to enabling with zero authorization commands;
-> the rehearsal caught and fixed the probe-contract defect described in section 6c);
-> the tag version v1.1 is unchanged) · v1.2 (2026-10-19 afternoon, development-branch copy: the "authorization must be done from the CLI" row in section 0 gained "from the next version, candidate regions can be pre-authorized";
-> v1.1 on tag `release-2026-10-13` is unchanged, and it describes exactly the behavior of the production tag) · v1.1 (2026-10-19;
-> v1.0 was written from the actual end-to-end region addition in Frankfurt (`eu-central-1`) on that day;
-> v1.1 added the handover notes in section 0b, the one-page quick reference in section 1b, the rehearsal switch and verified facts of the appendix script, and the full test-environment rehearsal record in section 6b)
-> Audience: customer administrators (operating the platform web UI) + customer operations staff (running commands on the deployment machine)
-> Applicable version: production **`release-2026-10-29`** (2.1.2, upgraded 2026-10-29; **the transition variable of section 5.1 is still required**, see the 2026-10-29 recurrence described there). Once the version is upgraded, this manual defers to the new
-> version's [deployment guide, section "5. Add an execution region"](deployment.md#5-add-an-execution-region).
-> This manual is the **customer-specific, step-by-step expansion** of the [deployment guide's section "5. Add an execution region"](deployment.md#5-add-an-execution-region); where the two conflict, that section takes precedence.
-> Location: `docs/adding-a-region.md` in the repository (online, or in a local clone).
-> **If you only want to read one page before acting, jump straight to section 1b "One-page quick reference"**; the explanation, expected output and exception handling for each step are in sections 2 to 5.
-> **AI tools or new colleagues taking over: read section 0b first** (system model, the design decision behind each step, how the 2026-10-19 model-guard incident came about, red lines, decision table, six self-check questions), then act.
+>
+> Earlier revisions (7) are in the collapsible list below.
+
+<details><summary>Revision history</summary>
+
+**it is only no longer needed from the version that contains the root fix (hotfix `45e322a`, `cdk bootstrap --app ''`)**;
+  the applicable-version line of section 0, section 5.1 and the transition-measure table row were updated accordingly) · v1.4 (2026-10-26, development-branch copy: the "from the next version (candidate-region pre-authorization)" wording in section 0 now means
+  "from `release-2026-10-27`" — once `EXEC_REGION_CANDIDATES=all-enabled` has pre-authorized the candidate regions at install / upgrade time,
+  adding a region inside the candidate set from the web UI no longer needs an operations-side authorization, and the rehearsal record in section 6c is the current behavior;
+  the get-the-code example in section 3 was changed to the new tag;
+v1.1 on `release-2026-10-13` is unchanged) · v1.3 (2026-10-19 evening, development-branch copy: new section 6c — a complete rehearsal record of the next version's "candidate-region pre-authorization" in the test environment (from web-UI creation to enabling with zero authorization commands;
+  the rehearsal caught and fixed the probe-contract defect described in section 6c);
+  the tag version v1.1 is unchanged) · v1.2 (2026-10-19 afternoon, development-branch copy: the "authorization must be done from the CLI" row in section 0 gained "from the next version, candidate regions can be pre-authorized";
+v1.1 on tag `release-2026-10-13` is unchanged, and it describes exactly the behavior of the production tag) · v1.1 (2026-10-19;
+v1.0 was written from the actual end-to-end region addition in Frankfurt (`eu-central-1`) on that day;
+v1.1 added the handover notes in section 0b, the one-page quick reference in section 1b, the rehearsal switch and verified facts of the appendix script, and the full test-environment rehearsal record in section 6b)
+
+</details>
+
+> - Audience: customer administrators (operating the platform web UI) + customer operations staff (running commands on the deployment machine)
+> - Applicable version: production **`release-2026-10-29`** (2.1.2, upgraded 2026-10-29; **the transition variable of section 5.1 is still required**, see the 2026-10-29 recurrence described there). Once the version is upgraded, this manual defers to the new
+>   version's [deployment guide, section "5. Add an execution region"](deployment.md#5-add-an-execution-region).
+> - This manual is the **customer-specific, step-by-step expansion** of the [deployment guide's section "5. Add an execution region"](deployment.md#5-add-an-execution-region); where the two conflict, that section takes precedence.
+> - Location: `docs/adding-a-region.md` in the repository (online, or in a local clone).
+> - **If you only want to read one page before acting, jump straight to section 1b "One-page quick reference"**; the explanation, expected output and exception handling for each step are in sections 2 to 5.
+> - **AI tools or new colleagues taking over: read section 0b first** (system model, the design decision behind each step, how the 2026-10-19 model-guard incident came about, red lines, decision table, six self-check questions), then act.
 
 ---
 
@@ -578,6 +586,7 @@ case "$CMD" in precheck) precheck;; release) release;; verify) verify;; *) die "
 Order of use: `precheck` → the administrator registers in the web UI and waits for the build to succeed → `release` → `verify` → the administrator presses **Check initialization** → **Enable** in the web UI → revoke permissions.
 
 A few facts about this script (whoever takes over must know them):
+
 - It only chains the manual commands of sections 3.0 / 3.3 / 3.4 together and adds gates; **it does nothing the manual commands cannot do**; when a gate stops it, the manual commands would fail at the same place.
 - The three gates and "the deployment mode must be production" **cannot be bypassed with environment variables**; this is deliberate: in an environment that is not the customer's production tag or not production mode (for example a developer's demo test
   account), it is stopped at the gates — that is the expected behavior, not a broken script; to rehearse in such an environment, use the manual commands of section 3 directly and replace `BGP_DEPLOY_MODE` with that environment's real mode.

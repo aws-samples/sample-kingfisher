@@ -2,13 +2,13 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented** (audit calibration of 2026-08-26: the original header read "in design, no code touched"). Stages 0/1/2 are complete, deployed and verified with zero regressions.
-> **🔴 Major change of direction (2026-07-21)**: starting with this stage, the GenBI engine-unification effort expands from "converging the two GenBI engines" to
-> **unifying the agent framework of the whole platform on Strands Agents**. The requirement from the outset was that the underlying agents be hosted on Strands
-> (Anthropic's Claude SDK was evaluated as the alternative); the Copilot planner has already been validated on `@strands-agents/sdk` v1.10.0.
-> Stage 3 = the first implemented template: **the GenBI container agent moves from a hand-written Converse loop to being hosted by a Strands Agent**.
-> Once it runs end to end, the pattern is rolled out to the netadvisor / paramadvisor containers and to the in-process backend (each as its own red-line stage).
-> Following the design-first, no-code-until-approved discipline: this document was submitted for review and sign-off before any work started.
+> - Status: **✅ implemented** (audit calibration of 2026-08-26: the original header read "in design, no code touched"). Stages 0/1/2 are complete, deployed and verified with zero regressions.
+> - **🔴 Major change of direction (2026-07-21)**: starting with this stage, the GenBI engine-unification effort expands from "converging the two GenBI engines" to
+>   **unifying the agent framework of the whole platform on Strands Agents**. The requirement from the outset was that the underlying agents be hosted on Strands
+>   (Anthropic's Claude SDK was evaluated as the alternative); the Copilot planner has already been validated on `@strands-agents/sdk` v1.10.0.
+> - Stage 3 = the first implemented template: **the GenBI container agent moves from a hand-written Converse loop to being hosted by a Strands Agent**.
+>   Once it runs end to end, the pattern is rolled out to the netadvisor / paramadvisor containers and to the in-process backend (each as its own red-line stage).
+> - Following the design-first, no-code-until-approved discipline: this document was submitted for review and sign-off before any work started.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is the [GenBI engine-unification design](./genbi-engine-unification.md). Kept as a historical implementation record.
 
@@ -55,6 +55,7 @@
 - The core-dist artifact is CJS — `import`ing CJS from ESM is allowed (Node interop direction: ESM→CJS ✓, the reverse ✗). So core-dist does not need to change.
 
 ### 1.4 Structural Differences Between the TS Version and the Container Version (they determine the tool set for the Strands assembly; all with line numbers)
+
 | Dimension | Container agent.js | TS agent.ts | How Strands resolves it |
 |---|---|---|---|
 | retrieval | ❌ none (all tables stuffed into the catalog, `:129`) | ✅ selectRelevantTables (`:129`) | **provided by core**, called before assembly |

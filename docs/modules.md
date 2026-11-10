@@ -1,8 +1,10 @@
 # Kingfisher Module Overview (release-2026-10-13)
 
 > Scope: this document describes, according to the **current code** (tag `release-2026-10-13`, product bytes as of commit `2b181dc`), **what every functional module does today and where it lives**; it does not record design reasoning.
+>
 > Architecture and key flow diagrams: [`docs/architecture.md`](architecture.md); production deployment and known boundaries: the [deployment guide](deployment.md);
 > the design notes of the single-region stage carry a scope header stating that current behavior is defined by this document and the code, while the multi-region, model-configuration, workspace-isolation, operation-guide, session-card and long-running-operation notes are current.
+>
 > Every module follows the same template: **What it does · Pages · API · Core code · AWS dependencies · Key mechanisms · Known boundaries (this release) · Design note**. Paths are relative to the repository root; `src/` means `platform/src/`.
 
 ## 0. Summary table (seven menu groups → modules)
@@ -78,9 +80,9 @@
 - **API**: `datasources` (root · `[id]` · `heartbeat` · `tables` · `schemas` · `s3-external` · `discover` · `test` · `kinesis-streams` · `msk-clusters`) · `s3/buckets` ·
   `network-advisor` (`probe` · `advise` (since the release of 2026-10-27: no result within 45 s ⇒ 202 + polling `GET /api/ai/tasks/[taskId]`) · `apply`).
 - **Core code**: `src/lib/datasource-spi/` (provider registry: `jdbc/` ·
-  - `nosql/dynamodb.ts` ·
-  - `object-store/{s3,athena-external}.ts` ·
-  - `stream/{kinesis,msk}.ts`) · `src/lib/datasource/` (place `ds-place.ts` / `placement.ts`, heartbeat `heartbeat.ts`, `schema-reader.ts`) · `src/lib/aws/datasource-service.ts` (Glue connection / security group / role / network probing) · `src/lib/network-advisor/` (connectivity-diagnosis agent).
+  `nosql/dynamodb.ts` ·
+  `object-store/{s3,athena-external}.ts` ·
+  `stream/{kinesis,msk}.ts`) · `src/lib/datasource/` (place `ds-place.ts` / `placement.ts`, heartbeat `heartbeat.ts`, `schema-reader.ts`) · `src/lib/aws/datasource-service.ts` (Glue connection / security group / role / network probing) · `src/lib/network-advisor/` (connectivity-diagnosis agent).
 - **AWS dependencies**: Glue (Connection · Job) · Secrets Manager · EC2 (security groups / subnets) · RDS (instance discovery) · Kinesis · MSK · Athena.
 - **Key mechanisms**: a data-source row records its place `targetId` and `probeVia`;
   - deleting a data source also removes the Glue connection and the platform-created security group (with retries);
@@ -103,7 +105,7 @@
   - The next release switches to running one discovery job through the data source's own Glue connection to log in to the source database.
 - **Place of S3 external tables** (implemented after this baseline and released on 2026-10-27): the Athena external table created by `POST /api/datasources/[id]/s3-external` lands in the workgroup / Glue catalog of **the region this source lives in**
   (`lib/datasource-spi/object-store/athena-external.ts#ensureExternalTable(spec, place)` requires a place; the executor resolves it from the region stamp on the row through `resolveAthenaPlace`;
-  - previously every table landed in the home-region catalog, and the platform TaskRole's `bgp_s3_ext` Glue permission was likewise authorized for the home region only — both now follow the execution-region axis);
+  previously every table landed in the home-region catalog, and the platform TaskRole's `bgp_s3_ext` Glue permission was likewise authorized for the home region only — both now follow the execution-region axis);
   - the response returns `targetId / region`.
 - **Design note**: the [data-source ecosystem design](design/datasource-ecosystem.md) (single-region stage; its §13 is the 2026-10-26 addendum on the S3 external-table place) · multi-region placement: see the [multi-region execution design](design/multi-region-execution.md).
 
@@ -118,11 +120,11 @@
   every exception on "Done" produces an explicit message (released on 2026-10-27, following a user suggestion of 2026-10-15).
 - **API**: `sync` (root · `[id]` · `start` · `stop` · `runs` · `runs/[runId]/logs` · `logs` · `output` · `glue-status` · `start-realtime` · `realtime-status` · `zeroetl-status` · `recommend-channel` · `type-mapping` · `generate-ddl` · `execute-ddl`).
 - **Core code**: `src/lib/sync/start-run.ts` (the single author of the start path: resolve the place → create / update the job → start → write the run → background polling → OM push) · `glue-script-generator.ts` (PySpark script generation, a pure function;
-  - every region-specific value is injected from the place) · `sync-service.ts` (channel recommendation · type mapping · DDL) · `target-table-guard.ts` / `foreign-guard-adoption.ts` (foreign-table guard and one-time adoption) ·
-    `run-vars.ts` / `run-vars-py.ts` (date variables, TS / Python from one source) · `run-metrics.ts` ·
-  - `schedule-carrier.ts` ·
-  - `src/lib/realtime/dms-service.ts` ·
-  - `zeroetl-service.ts`.
+  every region-specific value is injected from the place) · `sync-service.ts` (channel recommendation · type mapping · DDL) · `target-table-guard.ts` / `foreign-guard-adoption.ts` (foreign-table guard and one-time adoption) ·
+  `run-vars.ts` / `run-vars-py.ts` (date variables, TS / Python from one source) · `run-metrics.ts` ·
+  `schedule-carrier.ts` ·
+  `src/lib/realtime/dms-service.ts` ·
+  `zeroetl-service.ts`.
 - **AWS dependencies**: Glue 5.x (jobs · connections · Data Catalog federated catalog `s3tablescatalog`) · S3 Tables · Redshift Data API · S3 (scripts bucket) · DMS · CloudWatch Logs · OpenMetadata.
 
 ![Data Sync module architecture](diagrams/mr-module-sync.png)
@@ -130,9 +132,9 @@
 *Data Sync module architecture (source `docs/diagrams/src/mr-module-sync.mmd`; re-render with mermaid-cli after changes).*
 
 - **Key mechanisms**: **saving refreshes** the script and the Glue job (no need to run the task once more by hand); a whole-table overwrite of a table **the platform did not create** must be confirmed table by table
-- **Target table bucket must be a route** (lake table-bucket routing, ships with 2.2.0): the bucket entered in the wizard's "S3 Tables Data Lake Configuration → Table Bucket" must already be registered in "Settings → Lake table buckets and routes" and be writable; otherwise the save is rejected with a 400 that names the bucket and the next action. The upgrade script registers the external buckets referenced by existing home-region sync tasks as routes.
   (foreign-table guard; the same rule for Redshift and S3 Tables; tasks that had already succeeded before the upgrade are adopted once); Merge really merges by key (refused when the merge key is missing);
   run records carry `triggeredBy` to distinguish manual runs from backfill, and baselines and SLA exclude backfill on that basis; OM pushes for non-home regions are keyed by a per-region service; S3 Tables identifier sanitizing is aligned with the Glue catalog FQN.
+- **Target table bucket must be a route** (lake table-bucket routing, ships with 2.2.0): the bucket entered in the wizard's "S3 Tables Data Lake Configuration → Table Bucket" must already be registered in "Settings → Lake table buckets and routes" and be writable; otherwise the save is rejected with a 400 that names the bucket and the next action. The upgrade script registers the external buckets referenced by existing home-region sync tasks as routes.
 - **Switching the data source while editing** (released on 2026-10-27; fix for the 2026-10-15 report that a task could not be saved after switching its source): the wizard only accepts the table list of the last selected source
   (request sequence numbers; a stale table list / mapping from an earlier source that arrives later is discarded); after a source switch, selected tables that are not in the new source's table list are removed automatically with a notice,
   and the old source's DDL preview / channel recommendation become void;
@@ -164,8 +166,8 @@
   - `emr/` is the EMR Serverless implementation: application · scripts · network · logs · run records · schedule fan-out) · `src/lib/cookbook/` (script recipes: retrieval · guards · capability vocabulary) · `src/lib/param-advisor/`.
 - **AWS dependencies**: Glue · Redshift Data API · EMR Serverless (shared base `BgpEmrStack` + the per-region `-core` execution role) · S3 · CloudWatch Logs.
 - **Key mechanisms**: run records are written uniformly to `bgp-task-runs` and reused by the monitor page; a scheduled job is published as a workflow on the region's MWAA Serverless (the artifact is generated at publish time, so after changing parameters the job must be republished);
-- **Lake table-bucket routing** (ships with 2.2.0): a job declares under "Advanced Properties → Lake table buckets" which S3 Tables buckets it reads and writes (default: every route of the region); Glue and EMR Serverless each get one Spark catalog per bucket (the alias is the catalog name) plus a default catalog, so scripts address tables as `alias.namespace.table` without a hand-written `--conf`. The route list is read from `GET /api/lake-routes?targetId=` (any signed-in user); the save-time preflight of a custom role probes the declared buckets (s3tables and federated-catalog actions); Glue job definitions are materialised at run / schedule / orchestration time, not on save.
   EMR scripts read `sys.argv` by parameter name (the template was changed accordingly), so adding a parameter no longer raises "unknown parameter".
+- **Lake table-bucket routing** (ships with 2.2.0): a job declares under "Advanced Properties → Lake table buckets" which S3 Tables buckets it reads and writes (default: every route of the region); Glue and EMR Serverless each get one Spark catalog per bucket (the alias is the catalog name) plus a default catalog, so scripts address tables as `alias.namespace.table` without a hand-written `--conf`. The route list is read from `GET /api/lake-routes?targetId=` (any signed-in user); the save-time preflight of a custom role probes the declared buckets (s3tables and federated-catalog actions); Glue job definitions are materialised at run / schedule / orchestration time, not on save.
 - **Design note**: the [offline jobs](design/etl-jobs.md), [job run parameters](design/etl-run-parameters.md), [parameter advisor](design/param-advisor.md) and [engine cookbook](design/engine-cookbook.md) designs (single-region stage).
 
 ### 3.2 ETL Orchestration (workflows)
@@ -175,11 +177,11 @@
 - **Pages**: `/workflow` · `/workflow/[id]`.
 - **API**: `workflow` (root · `[id]` · `publish` · `unpublish` · `trigger` · `run-groups` · `runs/[runId]/status` · `runs/[runId]/nodes` · `nodes/[task]/logs` · `airflow`) · `run-groups` (`[id]` · `cancel` · `retry-failed`).
 - **Core code**: `src/lib/workflow/publish-dag.ts` (publish / unpublish / drift detection) · `dag-generator-v2.ts` ·
-  - `node-registry.ts` ·
-  - `node-exec-py.ts` ·
-  - `runtime-lib.ts` ·
-  - `src/lib/scheduler/serverless/` (`publish.ts` · `workflow-client.ts` · `yaml-generator.ts` · `code-package.ts` · `task-logs.ts`) · `src/lib/scheduler/action-*.ts` (platform-action nodes: command table → dispatcher Lambda → internal endpoint) ·
-    `dependency.ts` (upstream success triggers downstream).
+  `node-registry.ts` ·
+  `node-exec-py.ts` ·
+  `runtime-lib.ts` ·
+  `src/lib/scheduler/serverless/` (`publish.ts` · `workflow-client.ts` · `yaml-generator.ts` · `code-package.ts` · `task-logs.ts`) · `src/lib/scheduler/action-*.ts` (platform-action nodes: command table → dispatcher Lambda → internal endpoint) ·
+  `dependency.ts` (upstream success triggers downstream).
 - **AWS dependencies**: MWAA Serverless (`CreateWorkflow` / `UpdateWorkflow` / `StartWorkflowRun` / `ListWorkflowRuns` / `GetTaskInstance` / `GetLogEvents` …) · S3 (DAG bucket) · Lambda (`infra/lambda/action-dispatcher`) · DynamoDB Streams.
 - **Key mechanisms**: the multiple statements of a SQL node run as **one transaction**; the workflow execution contract is the home region (a workflow bound to a non-home region cannot be backfilled — backfill the individual jobs instead);
   "the region stamp must not lie" — republishing to a different region returns 409.
@@ -229,10 +231,10 @@
 - **API**: `genbi` (`ask` · `tasks/[taskId]` · `history` · `cards` · `cards/[cardId]` (`refresh` · `resume` · `runs` · `schedule`) · `cards/schedules` · `context` · `context/[id]` · `context/seed` · `skills` · `skills/[id]` · `skills/seed`) · `observability/genbi`.
 - **Core code**: `src/lib/genbi/execute.ts` (the single executor function: backend selection → grounding → invocation → masking → chart → history write; shared by the synchronous and asynchronous paths) · `agentcore-client.ts` (`InvokeAgentRuntime`) ·
   `agent.ts` (in-process fallback: Bedrock Converse tool loop) · `context.ts` ·
-  - `memory.ts` ·
-  - `cards-*.ts` ·
-  - `athena.ts` ·
-  - `core/` (the core shared with the AgentCore container; build output `infra/agent/genbi/core-dist/`) · `infra/agent/genbi/` (AgentCore Runtime container, Strands).
+  `memory.ts` ·
+  `cards-*.ts` ·
+  `athena.ts` ·
+  `core/` (the core shared with the AgentCore container; build output `infra/agent/genbi/core-dist/`) · `infra/agent/genbi/` (AgentCore Runtime container, Strands).
 - **AWS dependencies**: Bedrock AgentCore (Runtime · Memory) · Bedrock (models) · Redshift Data API · Athena.
 
 ![Ask-Your-Data (GenBI) module architecture](diagrams/mr-module-genbi.png)
@@ -269,31 +271,30 @@
   SQL lineage and impact analysis · sensitive-data scan (findings can be adopted as classifications) · scheduled governance tasks (quality checks / sensitive scans / catalog sync, really executed per region).
 - **Pages**: `/governance` (several tabs).
 - **API**: `governance` (`catalog` ·
-  - `columns` ·
-  - `sync-redshift-schema` ·
-  - `classification` ·
-  - `access-grants` ·
-  - `quality-rules` ·
-  - `quality-rules/[id]` ·
-  - `quality-run` ·
-  - `quality-results` ·
-  - `quality` ·
-  - `lineage` ·
-  - `lineage/backfill-om` ·
-  - `impact` ·
-  - `sensitive-scan` ·
-  - `sensitive-scan/adopt` ·
-  - `schedules` ·
-  - `schedules/[taskId]` ·
-  - `health`) · `lineage/parse` ·
-  - `metadata-mirror`.
+  `columns` ·
+  `sync-redshift-schema` ·
+  `classification` ·
+  `access-grants` ·
+  `quality-rules` ·
+  `quality-rules/[id]` ·
+  `quality-run` ·
+  `quality-results` ·
+  `quality` ·
+  `lineage` ·
+  `lineage/backfill-om` ·
+  `impact` ·
+  `sensitive-scan` ·
+  `sensitive-scan/adopt` ·
+  `schedules` ·
+  `schedules/[taskId]` ·
+  `health`) · `lineage/parse` ·
+  `metadata-mirror`.
 - **Core code**: `src/lib/governance/` (`classification.ts` · `masking.ts` · `lineage-service.ts` · `sensitive/` · `scoped-fqn.ts`) · `src/lib/quality/` (`service.ts` rule engine: template-generated validation SQL → executed on Redshift → scoring / SLA;
-  - `templates.ts`) · `src/lib/lineage/` (`sql-lineage.ts` · `spark-lineage.ts`) · `src/lib/exec-env/metadata-mirror*.ts` (cross-region read-only mirror) · `src/lib/scheduler/action-schedules.ts` (carrier of the scheduled governance tasks).
+  `templates.ts`) · `src/lib/lineage/` (`sql-lineage.ts` · `spark-lineage.ts`) · `src/lib/exec-env/metadata-mirror*.ts` (cross-region read-only mirror) · `src/lib/scheduler/action-schedules.ts` (carrier of the scheduled governance tasks).
 - **AWS dependencies**: Redshift Data API · Athena / Glue Data Catalog · OpenMetadata · MWAA Serverless (schedules).
 - **Key mechanisms**: catalog sync reconciles against OpenMetadata (the tables fully collected in this round vs. the tables of the same OM service; tables not seen are soft-deleted; nothing is deleted when the collection is incomplete);
   quality / sensitive scans really run **in that region** according to the execution scope; scheduled governance tasks and Ask-Your-Data card refreshes share the same scheduling carrier (a single-node platform-action workflow).
-- **Graphical create table / alter table** (implemented after this baseline and released on 2026-10-27): the catalog tab's "New table" wizard (Redshift: reuses the modeling landing channel, ledger entry `origin: catalog`; S3 Tables: s3tables `CreateTable` from an Iceberg schema)
-  + the row action "Alter table" (Redshift: add column / comment / widen VARCHAR / drop column, where dropping a column requires typing the table name; changes that cannot be performed are refused as a whole with an explanation;
+- **Graphical create table / alter table** (implemented after this baseline and released on 2026-10-27): the catalog tab's "New table" wizard (Redshift: reuses the modeling landing channel, ledger entry `origin: catalog`; S3 Tables: s3tables `CreateTable` from an Iceberg schema) + the row action "Alter table" (Redshift: add column / comment / widen VARCHAR / drop column, where dropping a column requires typing the table name; changes that cannot be performed are refused as a whole with an explanation;
   non-home regions go through the admin executor `alter-model-table`; a table not yet in the ledger is first claimed with its real columns);
   - in a prod environment this becomes a `ddl` approval request.
   - **API**: `governance/tables` (root · `preview` · `columns` · `alter`).
@@ -327,8 +328,7 @@
 
 ### 5.6 Governance Center (OpenMetadata)
 
-- **What it does**: OpenMetadata 1.6.1 is the platform-wide metadata center (one instance, in the home region): 6 kinds of scheduled ingestion (redshift / glue / s3 / s3tables / sources / profiler)
-  + platform event pushes (a sync run registers the source / target entities and column-level lineage) + reconciliation;
+- **What it does**: OpenMetadata 1.6.1 is the platform-wide metadata center (one instance, in the home region): 6 kinds of scheduled ingestion (redshift / glue / s3 / s3tables / sources / profiler) + platform event pushes (a sync run registers the source / target entities and column-level lineage) + reconciliation;
   the page provides the entry point and the SSO redirect.
 - **Pages**: `/openmetadata`. **API**: `openmetadata/url`.
 - **Core code**: `src/lib/openmetadata/` (`om-client.ts` · `om-push.ts` · `om-sync-coords.ts` (single author of the per-region service / FQN) · `om-reconcile.ts` · `om-mirror-push.ts` · `om-glossary.ts`) · `infra/lib/om-{database,search,service,ingestion}-stack.ts`.
@@ -360,8 +360,7 @@
 - **Pages**: `/backfill`. **API**: `backfill` (root · `plan` · `targets` · `[planId]` · `control` · `tick`) · `internal/backfill/tick`.
 - **Core code**: `src/lib/backfill/` (`plan.ts` · `execute.ts` · `pump.ts` the 30 s advancement pump · `sync-task.ts` · `due.ts`). **Design note**: the [backfill center design](design/agent-native-operations-backfill.md) of the agent-native operations set.
 - **Instance observability** (released on 2026-10-27, following a customer report of 2026-10-19): the cells of the progress matrix are clickable ⇒ instance drawer
-  (date / node / execution region / status / attempts / start and end / duration / **rows written and their source** / **verbatim error** / underlying run taskId · runId / Glue job)
-  + "View run log" (the same dialog as the Task Monitor page, `components/monitor/RunLogModal.tsx`) / "Locate in Monitor" (`/monitor?name=&triggeredBy=backfill`; the monitor page's "Trigger" column and filter recognize "Backfill") / "Open task page";
+  (date / node / execution region / status / attempts / start and end / duration / **rows written and their source** / **verbatim error** / underlying run taskId · runId / Glue job) + "View run log" (the same dialog as the Task Monitor page, `components/monitor/RunLogModal.tsx`) / "Locate in Monitor" (`/monitor?name=&triggeredBy=backfill`; the monitor page's "Trigger" column and filter recognize "Backfill") / "Open task page";
   - **succeeded but wrote 0 rows** is marked amber "Succeeded (0 rows)" with candidate causes (no data in the date window / the WHERE clause matched nothing / the incremental watermark has already passed, or the SQL itself selects 0 rows);
   - plan-level "Total rows written (known for k / n successful instances) / succeeded with 0 rows / row count not reported".
   - The single author of the row-count source is `src/lib/backfill/run-facts.ts` (sync task `metrics.rowsWritten` > Redshift statement `metrics.rowsAffected` (`src/lib/redshift/affected-rows.ts`, the sum of Data API `ResultRows`) > null "not reported ≠ 0");
@@ -410,18 +409,18 @@
   per-region credential state, probe canary, jurisdiction confirmation (residency ack), consistency matrix.
 - **Pages**: `/exec-envs`. **API**: `admin/exec-envs` (root GET · `register` POST · `[targetId]` · `build-status` · `preview` · `add-components` · `canary` · `credential-state` · `access` · `acks` · `delete-preview` · `delete-request` …) · `residency/ack` · `exec-targets`.
 - **Core code**: `src/lib/exec-env/` (`registry.ts` the read side of the registry, strongly consistent, never falls back to home ·
-  - `lifecycle.ts` the single author of the state machine ·
-  - `deploy-control.ts` / `deployments.ts` broker calls and build status ·
-  - `probe-runner.ts` / `implemented-components.ts` probing ·
-  - `decommission.ts` / `delete-impact.ts` ·
-  - `target-clients.ts` per-region clients ·
-  - `data-plane-target.ts` the four bindings (region ·
-  - workgroup ·
-  - database ·
-  - credentials) · `privileged-cred.ts` ·
-  - `residency*.ts` ·
-  - `consistency-matrix.ts`) · `infra/lib/exec-env/` (stack group) · `infra/lib/exec-env/deploy-stack.ts` (CodeBuild + broker + source-package asset) · `infra/lambda/exec-env-broker/` ·
-  - `infra/buildspec/exec-env-deploy.yml`.
+  `lifecycle.ts` the single author of the state machine ·
+  `deploy-control.ts` / `deployments.ts` broker calls and build status ·
+  `probe-runner.ts` / `implemented-components.ts` probing ·
+  `decommission.ts` / `delete-impact.ts` ·
+  `target-clients.ts` per-region clients ·
+  `data-plane-target.ts` the four bindings (region ·
+  workgroup ·
+  database ·
+  credentials) · `privileged-cred.ts` ·
+  `residency*.ts` ·
+  `consistency-matrix.ts`) · `infra/lib/exec-env/` (stack group) · `infra/lib/exec-env/deploy-stack.ts` (CodeBuild + broker + source-package asset) · `infra/lambda/exec-env-broker/` ·
+  `infra/buildspec/exec-env-deploy.yml`.
 
 ![Execution environment lifecycle state machine](diagrams/mr-module-exec-env-lifecycle.png)
 

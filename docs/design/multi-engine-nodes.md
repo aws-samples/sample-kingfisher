@@ -2,10 +2,10 @@
 
 > 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For behavior under multi-region operation — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of this module is tracked in the design-document index. Paths mentioned in this document that no longer exist indicate that the idea was not implemented as written here or has since been superseded.
 
-> Revision: 1.0 (Phase A; **✅ implemented and verified in production (Phase A complete)**) (document audit calibration on 2026-08-26: the original status header was out of date — it read "code not yet started, awaiting the go signal") | Created: 2026-07-03 | Maintainer: Architecture
-> Parent roadmap: the 2026-08 roadmap that benchmarks the platform against a leading cloud data-development suite (historical, single-region stage; not part of this repository), section 3, the row for this module (roadmap items B1 / B4)
-> Related reference implementations: `lib/versions/version-service.ts` (table-driven registry) · `lib/network-advisor/prefill-adapters.ts` (factory adapter; `emr` already reserved)
-> Related lessons learned (engineering notes): `taskrole-inline-policy-10kb-limit` · `cdk-cross-stack-export-deadlock` · `full-param-parity-with-managed-consoles` · `network-private-only` · `glue-version-5.1` · `keep-reusable-resources`
+> - Revision: 1.0 (Phase A; **✅ implemented and verified in production (Phase A complete)**) (document audit calibration on 2026-08-26: the original status header was out of date — it read "code not yet started, awaiting the go signal") | Created: 2026-07-03 | Maintainer: Architecture
+> - Parent roadmap: the 2026-08 roadmap that benchmarks the platform against a leading cloud data-development suite (historical, single-region stage; not part of this repository), section 3, the row for this module (roadmap items B1 / B4)
+> - Related reference implementations: `lib/versions/version-service.ts` (table-driven registry) · `lib/network-advisor/prefill-adapters.ts` (factory adapter; `emr` already reserved)
+> - Related lessons learned (engineering notes): `taskrole-inline-policy-10kb-limit` · `cdk-cross-stack-export-deadlock` · `full-param-parity-with-managed-consoles` · `network-private-only` · `glue-version-5.1` · `keep-reusable-resources`
 
 ---
 
@@ -66,6 +66,7 @@ export function prefillFor(kind: ComputeKind, p): Prefill { switch (kind) { ... 
 ## 3. Findings of the current-state survey (hard evidence from four read-only exploration agents, 2026-07-03)
 
 ### 3.1 Zero abstraction in the execution layer; seven hard-coded engine dispatch points (**none of them touched in this phase**)
+
 | # | file:line | Discriminator | Notes |
 |---|---|---|---|
 | 1 | `lib/etl/job-service.ts:350` | `job.type === "glue"` | Main entry point of ETL submit |
@@ -77,6 +78,7 @@ export function prefillFor(kind: ComputeKind, p): Prefill { switch (kind) { ... 
 | 7 | `lib/sync/reconcile.ts:15` | `channel!=="glue"` | Sync reconcile |
 
 ### 3.2 Five method semantics already exist (the source from which the SPI interface is induced)
+
 | Semantics | Glue / Redshift (`job-service.ts`) | Flink (`flink-service.ts`) |
 |---|---|---|
 | submit | `runGlueScriptJob:223` / `runRedshiftSqlJob:282` → `RunResult` | `startFlinkJob:490` |
@@ -84,6 +86,7 @@ export function prefillFor(kind: ComputeKind, p): Prefill { switch (kind) { ... 
 | stop | **Missing on the ETL side** (sync does `BatchStopJobRun` in the route layer) | `pauseFlinkJob:543` |
 | readLogs | Engine branch in the route layer `logs/route.ts` | `readFlinkLogs:700` |
 | reconcile | `reconcileEtlJob:114` (reconcile on read; writes task-runs + etl-jobs) | `reconcileFlinkStatus:651` (writes flink-jobs) |
+
 - Types to replicate: `RunOpts` (`job-service.ts:41`), `RunResult` (`:46`), `createRunRecord` (`:54`), `finishRunRecord` (`:77`).
 - Pattern for landing Glue scripts in S3 (`ensureGlueJob:151-160`): bucket `bgp-glue-scripts-<acct>` (env `GLUE_SCRIPTS_BUCKET`), `PutObjectCommand` with Key=`glue-scripts/etl/<jobId>.py`. EMR follows the same pattern with its own prefix `emr-scripts/<jobId>.py`.
 
@@ -212,6 +215,7 @@ CDK statically creates only 3 things (reusable by every per-job application, in 
 1. **EMR execution role** `bgp-emr-serverless-role` (copied from `flink-stack.ts:34-93`, trusting `emr-serverless.amazonaws.com`; six permission blocks: read on the scripts bucket / read-write on the data-lake bucket / `s3tables:*` limited to `bgp-table-bucket` / `glue:*` + `lakeformation:*` / Logs / `dataKey.grant` / VPC ENI). All through `emrRole.addToPolicy` (a new role; the 10 KB limit does not apply).
 2. **Default security group** `bgp-emr-sg` (following `realtime-stack.ts:53-58`; the egress foundation for private subnets; users can choose other or additional security groups in a job).
 3. Output `EmrRoleArn` (for display only; not exported as a dependency).
+
 > **The application is not created in CDK** — because each job has its own application and they are created and deleted dynamically, static CDK is unsuitable. CDK only prepares the "role + network foundation"; the back end uses them to CreateApplication.
 
 ### 6.3 Platform-side IAM (**a separate ManagedPolicy; addToPolicy forbidden**)
@@ -240,6 +244,7 @@ new iam.ManagedPolicy(this, "EmrServerlessOrchestration", {
 ## 7. Back-end services and specification
 
 ### 7.1 File locations: see section 9.
+
 ### 7.2 Application lifecycle (per job, decision ④)
 - **Create job**: `ensureResource` → `CreateApplication` (name=`bgp-emr-<jobId>`, `networkConfiguration` taken from the job's connection information of section 8, autoStart / autoStop managed), writing back `job.applicationId`. **Tags**: `bgp:jobId`, `bgp:managed=true` (for discovery / audit / orphan prevention).
 - **Run**: `ensureStarted` (STOPPED → StartApplication) → `StartJobRun` (executionRole=`bgp-emr-serverless-role`).

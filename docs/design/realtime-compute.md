@@ -2,14 +2,14 @@
 
 > 📌 **Scope (reconciled on 2026-10-13)**: this document was written in the single-region stage and records the design of that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the behavior of places / execution scope / per-region scheduling under multi-region operation, see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of the module is recorded in the design index. A path mentioned in the text that no longer exists means that the idea was not implemented in that form or has been superseded.
 
-> Revision: 1.0 (design draft) | Date: 2026-06-27 | Status: in implementation
-> Benchmark: the realtime compute feature (Flink SQL / stream processing) of a leading cloud data-development suite. Capability groups **realtime compute with Flink / unified stream and batch** (the second batch of the differentiating-capabilities phase, the second step of the real-time mainline).
-> Master plan: the platform roadmap of 2026-08 (historical, single-region stage); upstream: realtime CDC data integration ([`realtime-cdc.md`](./realtime-cdc.md)).
+> - Revision: 1.0 (design draft) | Date: 2026-06-27 | Status: in implementation
+> - Benchmark: the realtime compute feature (Flink SQL / stream processing) of a leading cloud data-development suite. Capability groups **realtime compute with Flink / unified stream and batch** (the second batch of the differentiating-capabilities phase, the second step of the real-time mainline).
+> - Master plan: the platform roadmap of 2026-08 (historical, single-region stage); upstream: realtime CDC data integration ([`realtime-cdc.md`](./realtime-cdc.md)).
 >
-> 🔴 Red lines: use only `--profile temp-account` (the account is always verified live), no hard-coded secrets / account ids / ARNs (everything derived at runtime +
-> Secrets Manager), every new feature verified for real in a headless browser, no pushing without permission.
-> 💰 **Cost red line: MSAF bills by KPU running time, Kinesis bills by shard. After verification you must follow the checklist in section 10:
-> StopApplication + DeleteApplication + `cdk destroy BgpFlinkStack`, otherwise money keeps burning.**
+> - 🔴 Red lines: use only `--profile temp-account` (the account is always verified live), no hard-coded secrets / account ids / ARNs (everything derived at runtime +
+>   Secrets Manager), every new feature verified for real in a headless browser, no pushing without permission.
+> - 💰 **Cost red line: MSAF bills by KPU running time, Kinesis bills by shard. After verification you must follow the checklist in section 10:
+>   StopApplication + DeleteApplication + `cdk destroy BgpFlinkStack`, otherwise money keeps burning.**
 >
 > 📎 **Companion details**: JAR assembly (the single runner has evolved into several "connector bundles" base / s3t / s3t-kafka plus modular on-demand assembly) is described in
 > [`realtime-compute-connector-runtime-modular.md`](./realtime-compute-connector-runtime-modular.md); the snapshot and state-recovery semantics of start / stop are described in [`realtime-compute-flink-s3tables-412-root-fix.md`](./realtime-compute-flink-s3tables-412-root-fix.md).

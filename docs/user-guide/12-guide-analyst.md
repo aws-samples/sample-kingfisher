@@ -252,11 +252,11 @@ The "Current scope only" switch at the top right is off by default — switching
 1. Click "New analysis" to enter the canvas. At the top: "Back to list" · the "Analysis name" input · "Add visual" · "Save".
 2. Click "Add visual"; the "Add visual" dialog opens: first fill in "Visual name" (e.g. "ROAS by channel"), then choose how to get the data:
 
-| Data method | How | Key points |
-|---|---|---|
-| "Visual builder" | Choose "Warehouse (Redshift)" / "Data lake (Athena)" → "Select a table (no SQL needed)" → drag fields into "X axis / dimension", "Group / color", "Value / measure", "Filters" → choose a chart type → "Preview" | Chart types: bar / line / pie / table / metric card / gauge; stacking, horizontal, sorting and limit can be set |
-| "Free SQL" | Choose the engine → write SQL → "Preview data" → choose "Chart type" (table / bar chart / horizontal bar / line chart / pie chart / metric card) | The SQL must be SELECT / WITH, otherwise the hint "SQL must be a read-only SELECT / WITH query" appears |
-| "Import from reports" | "Select a report" | After import it becomes an independent visual on the canvas (the data configuration is copied and decoupled from the original report) |
+   | Data method | How | Key points |
+   |---|---|---|
+   | "Visual builder" | Choose "Warehouse (Redshift)" / "Data lake (Athena)" → "Select a table (no SQL needed)" → drag fields into "X axis / dimension", "Group / color", "Value / measure", "Filters" → choose a chart type → "Preview" | Chart types: bar / line / pie / table / metric card / gauge; stacking, horizontal, sorting and limit can be set |
+   | "Free SQL" | Choose the engine → write SQL → "Preview data" → choose "Chart type" (table / bar chart / horizontal bar / line chart / pie chart / metric card) | The SQL must be SELECT / WITH, otherwise the hint "SQL must be a read-only SELECT / WITH query" appears |
+   | "Import from reports" | "Select a report" | After import it becomes an independent visual on the canvas (the data configuration is copied and decoupled from the original report) |
 
 3. Click "OK". Each visual on the canvas has "Edit", "Refresh", "Export CSV", "Remove" at its top right.
 4. Fill in "Analysis name" and click "Save". An empty name gives "Please enter an analysis name"; no visuals gives "Please add at least one visual".

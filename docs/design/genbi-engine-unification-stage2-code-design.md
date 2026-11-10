@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented** (audit calibration of 2026-08-26: the original read "in design, no code touched"). Stage 1 is complete and pushed (the 8 core files are in `platform/src/lib/genbi/core/`).
-> The stage 1 review passed, and an i18n empty-translation bug was fixed in passing. This document is for resuming stage 2 after a context compaction.
-> Integration approach decided: **a prebuild script compiles core to CJS + copies it into the Lambda (red team 2's option A; zero CDK change)**.
+> - Status: **✅ implemented** (audit calibration of 2026-08-26: the original read "in design, no code touched"). Stage 1 is complete and pushed (the 8 core files are in `platform/src/lib/genbi/core/`).
+> - The stage 1 review passed, and an i18n empty-translation bug was fixed in passing. This document is for resuming stage 2 after a context compaction.
+> - Integration approach decided: **a prebuild script compiles core to CJS + copies it into the Lambda (red team 2's option A; zero CDK change)**.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is [GenBI engine unification](./genbi-engine-unification.md). Retained as a historical implementation record.
 

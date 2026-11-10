@@ -1,18 +1,23 @@
 # Model Configuration — Interaction Design Chapter: Runtime-Configurable Bedrock Models
 
-> Revision: **1.7** (🆕 2026-10-20, after the probe budget was overrun by Kimi K3's first-token latency (the 10 s budget collided with a 3–39 s first-token delay, so the model could not be switched to in Settings): F8 gains a `Timeout` text (timeout ≠ throttling; prescription "test again shortly / switch to a global. inference profile");
-> a second-probe timeout shows "tool-use probe timed out; test again" instead of "tool-use unavailable";
-> the "Probing" row of the state table: budget per family (Kimi K3 45 s / all others 10 s, both probes in parallel), timeout listed separately as Timeout) · **1.6** (2026-10-14, after construction, section 7 corrected against the code that landed: the two F8 texts and the two family tags follow the implemented wording;
-> the save button is not disabled up front; the server-side step ③′ rejects and the page shows the text;
-> the Ask-Your-Data result card gains a "Model used · backend" row;
-> the unimplemented hover hint on the source tag was removed;
-> the acceptance wording switched to page-driven) · **1.5** (🆕 2026-10-14 multi-vendor: section 7 four-family grouping, two new F8 texts (not enabled for the account / tool use unavailable), reasoning blocks transparent to the user;
-> based on the design document, revision 2.3, section 12) · **1.4** (🔴 2026-08-29 feedback from the convergence verification: the per-region model override key of section 1bis **`ai-model#<region>#global` → `ai-model#<targetId>#global`**, and made explicit that "**the UI copy still says 'this region', while keys and parameters always use `targetId`**;
-> when several targets coexist in one region, the card renders them per target and does not merge them" — rationale in the design document, decision D8 on the dimension) 1.3 (a design-review finding: the "capability-level override" item of the section 6 interaction acceptance is marked [phase 2, not verified in phase 1], symmetric with the design document, section 10;
-> 1.2 a design-review finding: section 1bis transport changed to probe gating + the residency gap accepted in phase 1, not gated off;
-> 1.1 + section 1bis, interaction impact of the model-selection decision) | Date: 2026-08-27 (revision 1.3: 2026-08-28) | Status: ⬜ In design, pending review
-> Positioning: the **authoritative page-interaction landing** of the model-configuration module; follows the platform-wide interaction principles (group A whole-platform / B reasonable / C friendly, the F series / D safe), to the same specification as the interaction chapters of the [multi-region execution](./multi-region-execution-interaction.md) and [project isolation](./project-isolation-interaction.md) modules.
-> 🔴 Red line: pure design; no code is written without an explicit instruction.
+> - Revision: **1.7** (🆕 2026-10-20, after the probe budget was overrun by Kimi K3's first-token latency (the 10 s budget collided with a 3–39 s first-token delay, so the model could not be switched to in Settings): F8 gains a `Timeout` text (timeout ≠ throttling; prescription "test again shortly /
+>   switch to a global. inference profile");
+>   a second-probe timeout shows "tool-use probe timed out; test again" instead of "tool-use unavailable";
+>   the "Probing" row of the state table: budget per family (Kimi K3 45 s / all others 10 s, both probes in parallel), timeout listed separately as Timeout) · **1.6** (2026-10-14, after construction, section 7 corrected against the code that landed: the two F8 texts and the two family tags follow
+>   the implemented wording;
+>   the save button is not disabled up front; the server-side step ③′ rejects and the page shows the text;
+>   the Ask-Your-Data result card gains a "Model used · backend" row;
+>   the unimplemented hover hint on the source tag was removed;
+>   the acceptance wording switched to page-driven) · **1.5** (🆕 2026-10-14 multi-vendor: section 7 four-family grouping, two new F8 texts (not enabled for the account / tool use unavailable), reasoning blocks transparent to the user;
+>   based on the design document, revision 2.3, section 12) · **1.4** (🔴 2026-08-29 feedback from the convergence verification: the per-region model override key of section 1bis **`ai-model#<region>#global` → `ai-model#<targetId>#global`**, and made explicit that "**the UI copy still says 'this
+>   region', while keys and parameters always use `targetId`**;
+>   when several targets coexist in one region, the card renders them per target and does not merge them" — rationale in the design document, decision D8 on the dimension) 1.3 (a design-review finding: the "capability-level override" item of the section 6 interaction acceptance is marked [phase 2,
+>   not verified in phase 1], symmetric with the design document, section 10;
+>   1.2 a design-review finding: section 1bis transport changed to probe gating + the residency gap accepted in phase 1, not gated off;
+>   1.1 + section 1bis, interaction impact of the model-selection decision) | Date: 2026-08-27 (revision 1.3: 2026-08-28) | Status: ⬜ In design, pending review
+> - Positioning: the **authoritative page-interaction landing** of the model-configuration module; follows the platform-wide interaction principles (group A whole-platform / B reasonable / C friendly, the F series / D safe), to the same specification as the interaction chapters of the [multi-region
+>   execution](./multi-region-execution-interaction.md) and [project isolation](./project-isolation-interaction.md) modules.
+> - 🔴 Red line: pure design; no code is written without an explicit instruction.
 
 ---
 

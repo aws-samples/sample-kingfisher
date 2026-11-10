@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
 
-> Status: **landed and passed three-way verification (2026-07-01)**. Account `<account-id>` / test-account profile `temp-account` / us-east-1.
-> Lineage: the **second AI capability** created according to the platform standard [AI capabilities on Amazon Bedrock AgentCore](./agentcore-standard.md) (the first exemplar = the Network Connectivity Advisor). It copies the entire protocol layer and skeleton of the network advisor and writes only the business layer.
-> Product positioning: the AI assistance layer that delivers on the product principle of full parameter parity with managed consoles — the platform exposes the console parameters of Glue / Flink / DMS **in full** (none missing, none hidden), and this advisor **assists with filling them in** on top of that (recommended value + reason + confidence + multi-turn refinement); it does not replace the parameters.
+> - Status: **landed and passed three-way verification (2026-07-01)**. Account `<account-id>` / test-account profile `temp-account` / us-east-1.
+> - Lineage: the **second AI capability** created according to the platform standard [AI capabilities on Amazon Bedrock AgentCore](./agentcore-standard.md) (the first exemplar = the Network Connectivity Advisor). It copies the entire protocol layer and skeleton of the network advisor and writes only the business layer.
+> - Product positioning: the AI assistance layer that delivers on the product principle of full parameter parity with managed consoles — the platform exposes the console parameters of Glue / Flink / DMS **in full** (none missing, none hidden), and this advisor **assists with filling them in** on top of that (recommended value + reason + confidence + multi-turn refinement); it does not replace the parameters.
 
 ## 1. Capability overview
 

@@ -2,10 +2,10 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented (the full-convergence plan is complete)** (audit calibration of 2026-08-26: the original read "pure design"). The decision taken: **the full-convergence plan** (extract `@genbi/core` + delete inprocess + retrieval into the container + unified loop skeleton, converging to one AgentCore shell), with the explicit instruction "**produce the detailed implementation design before any work starts**".
-> This document is the final blueprint submitted for review before work starts: every risk exposed by the three red teams is designed into a mitigation and a verification gate.
-> Rollback anchor: `git tag pre-genbi-core-unification` (pointing at the commit preceding the refactoring; pushed to the remote).
-> Accompanying standing orders: contract-guard must run before and after every change; tag before big changes; verify only through the web pages; the i18n scanner must run before any frontend change; the red line on changing the GenBI runtime image.
+> - Status: **✅ implemented (the full-convergence plan is complete)** (audit calibration of 2026-08-26: the original read "pure design"). The decision taken: **the full-convergence plan** (extract `@genbi/core` + delete inprocess + retrieval into the container + unified loop skeleton, converging to one AgentCore shell), with the explicit instruction "**produce the detailed implementation design before any work starts**".
+> - This document is the final blueprint submitted for review before work starts: every risk exposed by the three red teams is designed into a mitigation and a verification gate.
+> - Rollback anchor: `git tag pre-genbi-core-unification` (pointing at the commit preceding the refactoring; pushed to the remote).
+> - Accompanying standing orders: contract-guard must run before and after every change; tag before big changes; verify only through the web pages; the i18n scanner must run before any frontend change; the red line on changing the GenBI runtime image.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is [GenBI engine unification](./genbi-engine-unification.md). Retained as a historical implementation record.
 
@@ -132,6 +132,7 @@ Carry over all 8 items of section 6 of the architecture document + C-A / C-B / C
 ---
 
 ## 7. Verification matrix (items every stage must pass)
+
 | Stage | contract-guard | Headless, both backends | Unit tests | i18n scan | Image red line | Special gate |
 |---|---|---|---|---|---|---|
 | 0 projectId | ✓ | ✓ (multi-project filter) | — | — | ✓ buildx | multi-project seed verification |

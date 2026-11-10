@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented (stages 1–4 complete); retained as the module index** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "pure design-discussion stage / no direction selected yet, no code touched yet").
-> This document fixes the conclusions of two in-depth architecture surveys plus the implementation facts, for decision-making and for resuming after a context compaction.
+> - Status: **✅ implemented (stages 1–4 complete); retained as the module index** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "pure design-discussion stage / no direction selected yet, no code touched yet").
+> - This document fixes the conclusions of two in-depth architecture surveys plus the implementation facts, for decision-making and for resuming after a context compaction.
 
 ## 0. Origin
 Starting from the question "how do business definitions actually get used", the product owner dug all the way down and found that the platform has **two GenBI engines** (a TypeScript in-process engine + a JavaScript remote image), and asked for a top-level design that **converges them into a single architecture**, eliminating drift of the kind "changing a business definition means changing two places". The product owner stressed that this is a global-grade system: before any code is touched, the design must be thought through fully, be mature, and be approved.
@@ -15,6 +15,7 @@ Starting from the question "how do business definitions actually get used", the 
 - **The current production environment = the agentcore backend** (task definition revision 13, `GENBI_BACKEND=agentcore`, `RUNTIME_ARN` pointing at the Runtime `bgp_genbi_agent-<id>`)
 
 ### Capability comparison (the key inequalities)
+
 | Capability | inprocess | agentcore |
 |---|---|---|
 | Tools | only `run_sql` | 7 MCP tools (sql / introspect / business definitions / skills / websearch — extensible) |
@@ -24,6 +25,7 @@ Starting from the question "how do business definitions actually get used", the 
 | Memory (conversation memory) | ❌ not wired (`memory.ts` exists, but `runInprocess` does not pass it) | ✅ AWS-managed Memory |
 | EMF observability | in-process steps | ✅ CloudWatch EMF |
 | MCP tool management / permissions | hand-written inside the loop | ✅ unified registration on the Gateway + IAM isolation; adding a tool does not change the image |
+
 → **Both copies are incomplete and evolve separately**; any convergence must be the union of their capabilities.
 
 ### Cross-language duplication (TypeScript ↔ JavaScript copied verbatim; found by survey ②)

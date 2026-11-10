@@ -2,14 +2,14 @@
 
 > 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
 
-> Version: revision 1.0 (design draft) | Date: 2026-06-24 | Status: pending review
-> Benchmark: the real-time sync / data integration (whole-database real-time CDC) capability of a leading cloud data-development suite. Capability group: real-time integration — the first step of the real-time mainline.
-> Overall roadmap: the platform roadmap of 2026-08 (historical, single-region stage; archived and not part of this repository).
+> - Version: revision 1.0 (design draft) | Date: 2026-06-24 | Status: pending review
+> - Benchmark: the real-time sync / data integration (whole-database real-time CDC) capability of a leading cloud data-development suite. Capability group: real-time integration — the first step of the real-time mainline.
+> - Overall roadmap: the platform roadmap of 2026-08 (historical, single-region stage; archived and not part of this repository).
 >
-> 🔴 Red lines: use only `--profile temp-account` (the account facts are what the account actually reports), no hard-coded secrets (everything in Secrets Manager),
-> new features verified headless / for real, no push without approval.
-> 💰 **Cost red line: real-time components (Kinesis shards / DMS instances / Flink KPUs) are billed continuously for as long as they run;
-> after verification they must be destroyed according to the checklist in section 9, otherwise they keep burning money.**
+> - 🔴 Red lines: use only `--profile temp-account` (the account facts are what the account actually reports), no hard-coded secrets (everything in Secrets Manager),
+>   new features verified headless / for real, no push without approval.
+> - 💰 **Cost red line: real-time components (Kinesis shards / DMS instances / Flink KPUs) are billed continuously for as long as they run;
+>   after verification they must be destroyed according to the checklist in section 9, otherwise they keep burning money.**
 
 ---
 
@@ -62,8 +62,8 @@ AWS DMS (replication instance + source endpoint + target endpoint + replication 
 > `realtimeConfig.target` written back by `start-realtime` is **always "redshift"** (`start-realtime/route.ts:111`); no Kinesis target branch exists.
 > If real-time lake ingestion is needed, it goes through [real-time compute](./realtime-compute.md) (Flink CDC direct connection) or a Glue detour, not through DMS → Kinesis.
 
-> DMS was chosen over self-hosted Debezium: managed CDC, no cluster operations, the SDK is already a dependency (`@aws-sdk/client-database-migration-service`).
-> Kinesis was chosen over MSK: fully managed and pay-as-you-go, start / stop within seconds, friendly to a temporary account. The SPI abstraction guarantees that a future switch to MSK + EMR is not locked out.
+> - DMS was chosen over self-hosted Debezium: managed CDC, no cluster operations, the SDK is already a dependency (`@aws-sdk/client-database-migration-service`).
+> - Kinesis was chosen over MSK: fully managed and pay-as-you-go, start / stop within seconds, friendly to a temporary account. The SPI abstraction guarantees that a future switch to MSK + EMR is not locked out.
 
 ### 3.2 Two landing paths
 

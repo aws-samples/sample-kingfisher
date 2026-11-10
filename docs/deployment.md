@@ -2,178 +2,178 @@
 
 > Document revision: **v1.33** (2026-11-09: section 7ter step 2 documents the two new upgrade-script steps 2c‴ (auto-registers external buckets referenced by existing home-region sync tasks as routes) and 2f (refreshes the EMR / Flink stacks);
 > new section 7ter.1j, four things to know when upgrading to the version with lake table-bucket routing; section 8 marks the cross-bucket entry as fixed in 2.2.0, the 2.1.2 transition stays) ·
-> **v1.32** (2026-11-03: section 8 adds the production transition for "one batch job reading from and writing to several S3 Tables table buckets"
-> (Job parameters `--conf` registering several catalogs + three-part names; the root fix ships with the lake-bucket-routing work, see [lake-bucket-routing.md](design/lake-bucket-routing.md));
-> the customer has separately received the "Cross-table-bucket read/write handbook (2.1.2)") ·
-> **v1.31** (2026-10-30 00:3xZ: **section 8 — the four data-source deletion / security-group entries changed to "fixed in the next version" + two new production transitions
-> (stream-compute sample data producing few or no aggregation rows, Spark engine "Run" reporting 504 on cold start)**: all six were fixed on the development branch and verified in a test account by page-driven
-> headless-browser acceptance; production `release-2026-10-29` still has them; transition measures as written in that section) ·
-> **v1.30** (2026-10-29 07:4xZ: **hotfix 2.1.2.1 (`release-2026-10-29-b134`) upgrade path rehearsed in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice + the section 8 row
-> on the bootstrap guard recurrence completed)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh`
-> **exited 0** (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, steps 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z, no downtime; IAM gate green),
-> `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
-> ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
-> ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
-> ⇒ approve ⇒ deployment build SUCCEEDED ⇒ "Check initialization" ⇒ active;
-> the test account's home region is in the United States ⇒ the half of the fix where the guard would actually fire can still only be covered by the offline synth gate + a regression after it lands in customer production) ·
-> **v1.29** (2026-10-29 04:0xZ: **record of the customer production upgrade `release-2026-10-13` → `release-2026-10-29` (2.1.2) (one paragraph added to the section 7ter.2 notice) + 🔴 new section 8 entry for the bootstrap guard
-> recurrence + section 7ter.1c row 2 corrected**: control plane 47.5 minutes, exit 0 (step 2c″ OpenMetadata database 8.0.46 → 8.4.11 in 11 minutes / IAM gate green across 18 regions), three agents refreshed,
-> truth check 16 ✅ + 1 not run (password file path);
-> the first "Redeploy" preview of an execution region hit the **bootstrap guard** — the `cdk bootstrap` line of the buildspec carries no `-c` and still executes the CDK app ⇒ a non-US home region hits the "default model geography guard",
-> a recurrence of the 2026-10-19 incident; the statement in section 7ter.1c row 2 that "the new version no longer needs the transition variable" was wrong ⇒ after the transition variable was added back both regions redeployed successfully;
-> the root fix `cdk bootstrap --app ''` is coded as a hotfix and ships with the hotfix tag / the next version) ·
-> **v1.28** (2026-10-29 00:5xZ: **2.1.2 (`release-2026-10-29`) forward upgrade rehearsed once more in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice)**:
-> a production-mode test account rehearsed with `release-2026-10-29` ✅ (2026-10-28 15:34–16:27Z: platform `redeploy-platform.sh` 37 minutes, exit 0, steps 2c′ / 2c″ no-op, no downtime window;
-> agents `--check` said "matches local HEAD, no refresh needed for this version";
-> execution region page "Redeploy" 9 minutes, the preview dialog truthfully said "source has drifted and there is no explicit wave authorization ⇒ administrator approval required";
-> truth check 17 ok / 0 bad;
-> footer / version card / `GET /api/public/version` = `release-2026-10-29` + 2.1.2;
-> 10 continuity checks, 0 failures, 0 recorded — the two scheduled syncs / the orchestration / the job all succeeded at the first tick after the upgrade, the DMS real-time task stayed running across the upgrade,
-> editing and saving existing objects worked, Glue job version / scripts / warehouse counts unchanged);
-> in addition a two-region demo account upgraded to the same tag ran the customer-facing feature walkthrough: 31 segments, 29 green, 2 non-product reds (a template segment blocked by the "only run in seed accounts" guard;
-> a chaining script passed the second region's variable as an empty string ⇒ the fixture CLI endpoint was invalid, the product was not exercised);
-> **all prerequisites for upgrading `customer-prod` are met, waiting for the user to give a time window**;
-> this version is not yet installed in customer production, which is still `release-2026-10-13`) ·
-> **v1.27** (2026-10-28 15:3xZ: **release 2.1.2 (`release-2026-10-29`;**
-> **root fix for the home-region "New data source" request path having no timeout budget)**: section 1 row 0 code retrieval switched to the new tag;
-> new **section 7ter.1h** "three things to know when upgrading to the version with that fix" (data-source creation follows the long-running-operation protocol: 201 within 45 seconds, otherwise 202 + page polling, never 504 / no fork / no duplicate creation;
-> Glue role verification moved out of the request path;
-> network budget for every SDK client;
-> 2.1.1 → 2.1.2 differs in only 15 `platform/` files ⇒ only the platform ECS service rolls, execution regions / database stack / agents zero diff, no downtime window;
-> rollback = check out the 2.1.1 or 2.1.0 tag itself);
-> the section 8 row for that defect changed to "fixed, from `release-2026-10-29`";
-> the full headless acceptance round on the 2.1.2 product bytes stamped fail at 12:39Z ⇒ three-state breakdown: 0 product reds (78/78 segments produced a regular summary, 0 interruptions;
-> three red items were criteria defects (counting only the first page / counting the whole table inside a parallel pool), 28/28 · 5/5 after fixing and rerunning them singly;
-> one was the already registered orphan-security-group boundary + a rerun 43/43;
-> two were caused by an operator deleting a showcase data source's platform security group by mistake at 07:33Z ⇒ the same product bytes rerun in another test account 17/17 · 27/27) ⇒ qualified as pass;
-> the production-mode rehearsal with 2.1.2 is still to run, result written back in the next revision) ·
-> **v1.26** (2026-10-27 09:3xZ: **2.1.1 (`release-2026-10-28`) forward upgrade rehearsed once more in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice)**:
-> platform 38 minutes, exit 0; agents `--check` "no refresh needed for this version"; execution region page "Redeploy" preview 0 changes (that environment had already received the IAM of the 2026-10-27 fix batch;
-> customer production upgrading from `release-2026-10-13` will list `-base` / `-core` / `-redshift` IAM changes); truth check 0 red; footer / version card / version endpoint = tag + 2.1.1;
-> 10 continuity checks, 0 failures, 0 recorded — scheduled sync / orchestration / job all succeeded at the first tick after the upgrade, **the DMS real-time task stayed running across the upgrade** (a real carrier this time),
-> editing and saving existing objects worked, Glue job version / scripts / warehouse counts unchanged) ·
-> **v1.25** (2026-10-27 08:2xZ: **release 2.1.1 (`release-2026-10-28`;**
-> **root fixes for the customer feedback of 2026-10-27 (own table bucket in execution regions / DMS failure not shown in the list) + template-table sample columns + the Redshift table-marker transient error)**:
-> section 1 row 0 code retrieval switched to the new tag;
-> new **section 7ter.1g** "four things to know when upgrading to that version" (execution region page "Redeploy" to pick up the new IAM of the `-core` / `-redshift` stacks;
-> external table bucket registration = visible + writable;
-> the target-table name collision guard rejects saving and the next start of existing colliding tasks;
-> transition for the unmarked empty table;
-> 2.1.0 → 2.1.1 scripts / database stack / agents zero diff ⇒ no downtime window, no agent refresh);
-> section 8 gains two rows (fixed, from `release-2026-10-28`);
-> section 7ter.2 rollback wording unchanged (back to 2.1.0 ⇒ check out `release-2026-10-27` itself);
-> this version is not yet installed in customer production, which is still `release-2026-10-13`) ·
-> **v1.24** (2026-10-26 23:4xZ: **round-trip rehearsal, all three phases green, written back (section 7ter.2 notice)**: upgrade → hotfix rollback → upgrade again, scheduled tasks ran normally throughout;
-> rollback does not require redeploying execution regions;
-> figures in the notice) ·
-> **v1.23** (2026-10-26 13:4xZ: **release `release-2026-10-27` (`VERSION` 2.1.0;**
-> **every fix batch from 2026-10-13 to 2026-10-26 ships with this tag)**: section 1 code retrieval / section 2 / section 7 / section 7ter steps 2 · 4 / the five section titles 7ter.1b–1f / every "development branch …, pending release"
-> in section 8 changed to "from `release-2026-10-27`";
-> section 7ter.1f row 3 corrected the residual "the old tag's script does not touch the database stack" to the rollback fact (the original tag's script does touch the database stack and is refused by RDS; roll back with the hotfix tag);
-> this version is not yet installed in customer production,
-> which is still `release-2026-10-13`,
-> upgrade per section 7ter + the production baseline record) ·
-> **v1.22** (2026-10-26 10:1xZ: **rollback wording rewritten (section 7ter.2)**: rolling back to `release-2026-10-13` must check out the hotfix tag `release-2026-10-13-rollback` (= `release-2026-10-13-b103` + one line `--exclusively`
-> in `redeploy-platform.sh`, product bytes unchanged) — the original tag's script would, in the "WAF / OM service stack" step, also downgrade the OpenMetadata database stack back to MySQL 8.0,
-> be refused by RDS and abort,
-> leaving the platform stack not rolled back;
-> confirmed by a real production-mode rehearsal in a test account on 2026-10-26 (the original script fails / the hotfix rollback succeeds in 17 minutes, IAM gate green, truth check all green, sync / orchestration / job each ran one round successfully on the old version);
-> the notice "rollback has not been rehearsed in a real environment" withdrawn) ·
-> **v1.21** (2026-10-26 03:5xZ, development branch, pending release: new section 7ter.1f "four things to know when upgrading to the version with the OpenMetadata database MySQL 8.0 → 8.4" —
-> `redeploy-platform.sh` gains step 2c″ deploying the database stack; the RDS in-place major version upgrade has one downtime window (test account, Multi-AZ db.t3.small, measured: database stack step 9.5 minutes,
-> OpenMetadata database connection interrupted about 2 minutes, containers not restarted);
-> the master user omadmin logs in as usual under the 8.4 default parameter group `mysql_native_password=ON`;
-> RDS does not support downgrades, rolling back the code does not roll back the database version, restore from the pre-upgrade snapshot when needed (section 7ter.2 item 3 supplemented);
-> eliminates the RDS extended support fee ≈ $292 / month) ·
-> **v1.20** (2026-10-26 01:3xZ, development branch, pending release: new section 7ter.1e — upgrading to the version where the network advisor probes by the place's region **must** also run `redeploy-agents.sh` —
-> the skill Lambda is deployed only by the agent stack; refreshing only the platform leaves the "Analyze network" advice based on the home-region network (two test accounts hit it on 10-25);
-> the fixes of the same batch (field masking by physical column, DMS "Start" accepted immediately, per-node orchestration configuration, S3 object-store sources through the sync wizard) need no customer action;
-> product code see the CHANGELOG `[Unreleased]` section) ·
-> **v1.19** (2026-10-23 05:5xZ, development branch second batch, pending release: section 7ter.1d four things → five things, row 5 = the second batch of 14 operations joining the unified framework
-> (governance "Sync column information" / delete workspace / sync wizard generate DDL · execute table creation / stream job start / stop / delete / orchestration publish · take offline · trigger · delete / S3 external table / metrics and model-metric computation),
-> the dedicated 202 protocols of catalog column sync and workspace deletion retired, enable/disable schedule shares the same guard;
-> section 8 "Connected shown right after creation" row changed to "fixed on the development branch, pending release", the catalog column-sync row notes "replaced by the second batch") ·
-> **v1.18** (2026-10-22 08:3xZ, development branch, pending release: new section 7ter.1c row 5 — when upgrading with `EXEC_REGION_CANDIDATES=all-enabled`, the old script reports
-> "the allow-list covers every candidate probe region…" and exits 1 right before the final IAM simulation gate, although the platform is in fact already upgraded;
-> the script with the fix picks the probe region from the regions the account has not opted in to, does not abort when none can be found, and the gate verdict honestly distinguishes "green / cannot be verified in this account") ·
-> **v1.17** (2026-10-22 03:1xZ, development branch, pending release: the long-running-operation framework — section 7 red lines add "`-c long-ops-sync-wait-ms` is an acceptance knob, do not pass it in production";
-> new section 7ter.1d "four things to know when upgrading to the version that includes it" (new table `bgp-long-ops` created by step 2c′ / the empty `bgp-ai-tasks` shell in pre-release test environments / `AI_*` environment variables removed /
-> operations longer than 45 seconds show "Running in background" and modify / delete on the same object is blocked with 409);
-> the section 8 row on modeling landing 504 changed to "root-fixed on the development branch, still present on the production tag") ·
-> **v1.16** (2026-10-21 09:27Z, development branch, pending release: section 7ter gains step 4 "verify the version" — the login page footer / "Settings → Platform version" / `GET /api/public/version` show the release tag directly
-> (baked in from git facts at image build time); where the production tag does not have this item yet, use the three-carrier method of [AGENTS.md](../AGENTS.md);
-> product code see the CHANGELOG `[Unreleased]` section) ·
-> **v1.15** (2026-10-20 05:2xZ, development branch, pending release: section 7ter step 2 and section 7ter.1 row 8 state that the upgrade script gains step 2c′ deploying the DynamoDB database stack —
-> until then the upgrade path did not deploy the database stack, so tables added by a new version (in this batch `bgp-ai-tasks`) were never created and every endpoint using them returned 500;
-> hit for real when upgrading a test account to the version with AI long calls) ·
-> **v1.14** (2026-10-19 afternoon, development branch candidate pre-authorization wording, pending release: section 2 adds `EXEC_REGION_CANDIDATES` pre-authorizing candidate execution regions ·
-> section 7 steps 1 / 2 / 3 rewritten as "pre-authorized regions need no authorization run" · new section 7ter.1c "four things to know when upgrading to the version with candidate pre-authorization + the CodeBuild guard and advisor-role fixes"
-> (the upgrade wipes the CodeBuild transition variable but the new version no longer needs it;
-> the advisor-role fix requires `redeploy-agents.sh`);
-> product code see the CHANGELOG `[Unreleased]` section) ·
-> v1.13 (2026-10-19, the record of adding the Frankfurt region in customer production written back (same content as manual v1.10 on tag `release-2026-10-13`): section 7 points to the new customer-reality expansion
-> [adding-a-region.md](adding-a-region.md) (customer deployment machine obtaining the code from scratch, the three code gates, the "will change / will not change" list of the authorization step, the operations-side automation script)
-> and pins that the step 2 command must carry `BGP_DEPLOY_MODE=production` / `BEDROCK_MODEL_ID` when needed ·
-> section 8 adds the **non-US home region incident** (creating an execution region from the page is hit by the default-model geography guard; transition = add `BEDROCK_MODEL_ID` to the CodeBuild project, root fix pending);
-> product code unchanged) ·
-> v1.12 (2026-10-16, development branch federated-catalog wording, pending release: section 3 truth check 9 → 10 items (item 10 S3 Tables federated catalog `s3tablescatalog`) ·
-> section 7ter step 2 notes that the upgrade script's step 3c opens the federated catalog in the home region and every execution region ·
-> section 8 adds "an environment that never ran a sync writing S3 Tables ⇒ Lake Query / Ask-Your-Data CATALOG_NOT_FOUND", fixed pending release, with the production transition command) ·
-> v1.11 (2026-10-14, development branch multi-vendor model channel wording, pending release: section 1 rows 1 / 2b / 5 model requirement changed to "any one of the candidate chain suffices"
-> (Claude Opus 4.5 → GLM 5.3 → Kimi K3, pre-flight item 7 makes a real call per candidate) · section 2 ③ candidate-chain algorithm ·
-> new section 7ter.1b "upgrading to the version with the multi-vendor channel: the agent containers changed, **`redeploy-agents.sh` must be run**" ·
-> section 8 adds three entries: GLM 5.3 account-level enablement / Kimi K3 reasoning blocks and token cost / GPT series still gated) ·
-> v1.10 (2026-10-14 02:xxZ, development branch wording: **section 7ter step 2b changed from a manual command block to `scripts/redeploy-agents.sh`** (written, pending one real run in a test account, ships with the next release;
-> the repository at the production tag `release-2026-10-13` has no such script — when upgrading from that tag check out the new tag first, then run it) · section 7ter.2 rollback wording synchronized ·
-> section 8 adds the "agents not refreshed by the upgrade script" row marked "fixed, pending release") ·
-> v1.9 (2026-10-14, corrections after an item-by-item comparison of the document against the scripts: section 0 origin-verification wording ·
-> section 7 button label "Start deployment" · section 7bis retention list adds CMK / namespace·workgroup / DAG bucket / regional audit ·
-> **section 7ter gains step 2b "refresh the three AgentCore images and stacks when the new version changed the agent containers" (redeploy-platform does not do it)** ·
-> section 7ter.1 row 7 Ask-Your-Data recipes ·
-> section 7ter.2 rollback wording adds the agents ·
-> section 8 data-source probe row made precise to "Detect / Browse tables" and the agents row added ·
-> the section 7 reference moved to the development-environment runbook) ·
-> v1.8 (2026-10-13, development branch wording: the five known boundaries in section 8 (saving a sync task with an existing Glue job 502 / Glue version for S3 Tables / data-source probe from the control plane /
-> own table bucket invisible / scheduler page false alarm) marked "fixed (development branch), delivered with the next release;
-> production tag `release-2026-10-13` still has them", plus two new entries ("Connected" right after creation only checks that the Glue connection exists, registered but not fixed /
-> catalog "Sync column information" over 60 seconds reported as "sync failed" by the load balancer, fixed pending release);
-> after a cold-start handover rehearsal added section 7ter.2 rollback · section 4 item 4, the Cognito command for a sole administrator who forgot the password) ·
-> v1.7 (2026-10-13, reconciled line by line with the code of release `release-2026-10-13`: section 1 the real model call happens only when `BEDROCK_MODEL_ID` is **not** given explicitly · factory model written with its full id ·
-> pre-flight probes 3 S3 buckets · section 4 the initial password is also printed to the deployment stdout · section 8 adds five known boundaries;
-> new AI handover entry `AGENTS.md`) ·
-> v1.6 (2026-10-13 early morning, section 8 adds two known boundaries: the customer's own table bucket is not yet visible in the platform (transition = hand-written three-part names in Lake Query) ·
-> a failed data-source probe from the control plane does not affect sync) ·
-> v1.5 (2026-10-12 late night, release `release-2026-10-13` = the data-sync capability completion batch + multi-region placement of the backfill center: section 1 code retrieval switched to the new tag ·
-> section 7ter.1 title pinned to release-2026-10-13 ·
-> section 8 backfill center restriction row changed to "fixed and verified in a real environment") ·
-> v1.4 (2026-10-12, reconciled line by line with the code of release `release-2026-10-12`: section 1 adds code retrieval / tool list / model version / the two ignorable ❌ classes of the pre-flight check / no VPC import ·
-> section 3 changed to running `02-postdeploy-truth.sh` ·
-> new section 7bis retiring an execution region ·
-> section 7ter upgrading ·
-> section 8 adds the data-plane credential default taskrole) ·
-> v1.3 (2026-10-11, section 8 writes back the cross-jurisdiction real-environment verification conclusions ·
-> the three scheduling / landing capabilities delivered ·
-> section 7 adds "Check initialization → Enable") ·
-> v1.2 (2026-10-10, section 8 adds known boundaries: jurisdiction label ·
-> cross-jurisdiction not yet verified in a real environment ·
-> execution regions cannot be trimmed ·
-> the three scheduling / landing capabilities in progress ·
-> phase-two items) ·
-> v1.1 (2026-10-10, section 8 writes back the conclusions of the from-scratch production rehearsal in a second account) ·
-> v1.0 (2026-10-09, first production go-live batch) | Applies to: deploying the Kingfisher multi-region edition into the **customer's own AWS account** as the production environment
-- **One batch job across several S3 Tables table buckets (read from the detail bucket, write to the summary bucket;**
-  - **root fix shipped with lake table-bucket routing and is in 2.2.0 — "Settings → Lake table buckets and routes" registers the buckets, the job declares them under "Advanced Properties → Lake table buckets", the platform registers the Spark catalogs itself with no `--conf`; upgrade notes in section 7ter.1j; production 2.1.2 still uses the transition below)**: 2.1.2 can do this without a code change — in the batch compute job's "Advanced Properties → Job parameters" add one parameter named `--conf`
-    whose value is one group of 5 Iceberg catalog settings per bucket (`spark.sql.catalog.<catalog-name>=org.apache.iceberg.spark.SparkCatalog` ·
-  - `.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog` ·
-  - `.glue.id=<account-id>:s3tablescatalog/<bucket>` ·
-  - `.io-impl=org.apache.iceberg.aws.s3.S3FileIO` ·
-  - `.warehouse=arn:aws:s3tables:<region>:<account-id>:bucket/<bucket>`, several groups joined with ` --conf `), and the script uses three-part names `<catalog-name>.<namespace>.<table>`;
-  - the platform Glue role is already allowed on any table bucket of its own region;
-  - the Athena Query page can query any bucket of the same region with `"s3tablescatalog/<bucket>"."<namespace>"."<table>"` (that page is read-only).
-  - Full steps and screenshots are in the "Cross-table-bucket read/write handbook (2.1.2)" delivered to the customer.
-> Companion document: [operations.md](operations.md) (pre-flight check when switching accounts / workarounds for restricted accounts / post-deploy truth criteria; referenced in several places below).
-> The disposition and acceptance status of every item of the first production go-live batch is tracked in the engineering defect records.
-> 🔴 This document describes the **production** path only. Demonstration / acceptance environments (seed data, demonstration MySQL, 5 test accounts) use `BGP_DEPLOY_MODE=demo` and are out of scope here.
+>
+> Earlier revisions (39) are in the collapsible list below.
+
+<details><summary>Revision history</summary>
+
+- **v1.32** (2026-11-03: section 8 adds the production transition for "one batch job reading from and writing to several S3 Tables table buckets"
+  (Job parameters `--conf` registering several catalogs + three-part names; the root fix ships with the lake-bucket-routing work, see [lake-bucket-routing.md](design/lake-bucket-routing.md));
+  the customer has separately received the "Cross-table-bucket read/write handbook (2.1.2)") ·
+- **v1.31** (2026-10-30 00:3xZ: **section 8 — the four data-source deletion / security-group entries changed to "fixed in the next version" + two new production transitions
+  (stream-compute sample data producing few or no aggregation rows, Spark engine "Run" reporting 504 on cold start)**: all six were fixed on the development branch and verified in a test account by page-driven
+  headless-browser acceptance; production `release-2026-10-29` still has them; transition measures as written in that section) ·
+- **v1.30** (2026-10-29 07:4xZ: **hotfix 2.1.2.1 (`release-2026-10-29-b134`) upgrade path rehearsed in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice + the section 8 row
+  on the bootstrap guard recurrence completed)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh`
+  **exited 0** (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, steps 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z, no downtime; IAM gate green),
+  `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
+  ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
+  ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
+  ⇒ approve ⇒ deployment build SUCCEEDED ⇒ "Check initialization" ⇒ active;
+  the test account's home region is in the United States ⇒ the half of the fix where the guard would actually fire can still only be covered by the offline synth gate + a regression after it lands in customer production) ·
+- **v1.29** (2026-10-29 04:0xZ: **record of the customer production upgrade `release-2026-10-13` → `release-2026-10-29` (2.1.2) (one paragraph added to the section 7ter.2 notice) + 🔴 new section 8 entry for the bootstrap guard
+  recurrence + section 7ter.1c row 2 corrected**: control plane 47.5 minutes, exit 0 (step 2c″ OpenMetadata database 8.0.46 → 8.4.11 in 11 minutes / IAM gate green across 18 regions), three agents refreshed,
+  truth check 16 ✅ + 1 not run (password file path);
+  the first "Redeploy" preview of an execution region hit the **bootstrap guard** — the `cdk bootstrap` line of the buildspec carries no `-c` and still executes the CDK app ⇒ a non-US home region hits the "default model geography guard",
+  a recurrence of the 2026-10-19 incident; the statement in section 7ter.1c row 2 that "the new version no longer needs the transition variable" was wrong ⇒ after the transition variable was added back both regions redeployed successfully;
+  the root fix `cdk bootstrap --app ''` is coded as a hotfix and ships with the hotfix tag / the next version) ·
+- **v1.28** (2026-10-29 00:5xZ: **2.1.2 (`release-2026-10-29`) forward upgrade rehearsed once more in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice)**:
+  a production-mode test account rehearsed with `release-2026-10-29` ✅ (2026-10-28 15:34–16:27Z: platform `redeploy-platform.sh` 37 minutes, exit 0, steps 2c′ / 2c″ no-op, no downtime window;
+  agents `--check` said "matches local HEAD, no refresh needed for this version";
+  execution region page "Redeploy" 9 minutes, the preview dialog truthfully said "source has drifted and there is no explicit wave authorization ⇒ administrator approval required";
+  truth check 17 ok / 0 bad;
+  footer / version card / `GET /api/public/version` = `release-2026-10-29` + 2.1.2;
+  10 continuity checks, 0 failures, 0 recorded — the two scheduled syncs / the orchestration / the job all succeeded at the first tick after the upgrade, the DMS real-time task stayed running across the upgrade,
+  editing and saving existing objects worked, Glue job version / scripts / warehouse counts unchanged);
+  in addition a two-region demo account upgraded to the same tag ran the customer-facing feature walkthrough: 31 segments, 29 green, 2 non-product reds (a template segment blocked by the "only run in seed accounts" guard;
+  a chaining script passed the second region's variable as an empty string ⇒ the fixture CLI endpoint was invalid, the product was not exercised);
+  **all prerequisites for upgrading `customer-prod` are met, waiting for the user to give a time window**;
+  this version is not yet installed in customer production, which is still `release-2026-10-13`) ·
+- **v1.27** (2026-10-28 15:3xZ: **release 2.1.2 (`release-2026-10-29`;**
+  **root fix for the home-region "New data source" request path having no timeout budget)**: section 1 row 0 code retrieval switched to the new tag;
+  new **section 7ter.1h** "three things to know when upgrading to the version with that fix" (data-source creation follows the long-running-operation protocol: 201 within 45 seconds, otherwise 202 + page polling, never 504 / no fork / no duplicate creation;
+  Glue role verification moved out of the request path;
+  network budget for every SDK client;
+  2.1.1 → 2.1.2 differs in only 15 `platform/` files ⇒ only the platform ECS service rolls, execution regions / database stack / agents zero diff, no downtime window;
+  rollback = check out the 2.1.1 or 2.1.0 tag itself);
+  the section 8 row for that defect changed to "fixed, from `release-2026-10-29`";
+  the full headless acceptance round on the 2.1.2 product bytes stamped fail at 12:39Z ⇒ three-state breakdown: 0 product reds (78/78 segments produced a regular summary, 0 interruptions;
+  three red items were criteria defects (counting only the first page / counting the whole table inside a parallel pool), 28/28 · 5/5 after fixing and rerunning them singly;
+  one was the already registered orphan-security-group boundary + a rerun 43/43;
+  two were caused by an operator deleting a showcase data source's platform security group by mistake at 07:33Z ⇒ the same product bytes rerun in another test account 17/17 · 27/27) ⇒ qualified as pass;
+  the production-mode rehearsal with 2.1.2 is still to run, result written back in the next revision) ·
+- **v1.26** (2026-10-27 09:3xZ: **2.1.1 (`release-2026-10-28`) forward upgrade rehearsed once more in a test account in production mode ✅ (one paragraph added to the section 7ter.2 notice)**:
+  platform 38 minutes, exit 0; agents `--check` "no refresh needed for this version"; execution region page "Redeploy" preview 0 changes (that environment had already received the IAM of the 2026-10-27 fix batch;
+  customer production upgrading from `release-2026-10-13` will list `-base` / `-core` / `-redshift` IAM changes); truth check 0 red; footer / version card / version endpoint = tag + 2.1.1;
+  10 continuity checks, 0 failures, 0 recorded — scheduled sync / orchestration / job all succeeded at the first tick after the upgrade, **the DMS real-time task stayed running across the upgrade** (a real carrier this time),
+  editing and saving existing objects worked, Glue job version / scripts / warehouse counts unchanged) ·
+- **v1.25** (2026-10-27 08:2xZ: **release 2.1.1 (`release-2026-10-28`;**
+  **root fixes for the customer feedback of 2026-10-27 (own table bucket in execution regions / DMS failure not shown in the list) + template-table sample columns + the Redshift table-marker transient error)**:
+  section 1 row 0 code retrieval switched to the new tag;
+  new **section 7ter.1g** "four things to know when upgrading to that version" (execution region page "Redeploy" to pick up the new IAM of the `-core` / `-redshift` stacks;
+  external table bucket registration = visible + writable;
+  the target-table name collision guard rejects saving and the next start of existing colliding tasks;
+  transition for the unmarked empty table;
+  2.1.0 → 2.1.1 scripts / database stack / agents zero diff ⇒ no downtime window, no agent refresh);
+  section 8 gains two rows (fixed, from `release-2026-10-28`);
+  section 7ter.2 rollback wording unchanged (back to 2.1.0 ⇒ check out `release-2026-10-27` itself);
+  this version is not yet installed in customer production, which is still `release-2026-10-13`) ·
+- **v1.24** (2026-10-26 23:4xZ: **round-trip rehearsal, all three phases green, written back (section 7ter.2 notice)**: upgrade → hotfix rollback → upgrade again, scheduled tasks ran normally throughout;
+  rollback does not require redeploying execution regions;
+  figures in the notice) ·
+- **v1.23** (2026-10-26 13:4xZ: **release `release-2026-10-27` (`VERSION` 2.1.0;**
+  **every fix batch from 2026-10-13 to 2026-10-26 ships with this tag)**: section 1 code retrieval / section 2 / section 7 / section 7ter steps 2 · 4 / the five section titles 7ter.1b–1f / every "development branch …, pending release"
+  in section 8 changed to "from `release-2026-10-27`";
+  section 7ter.1f row 3 corrected the residual "the old tag's script does not touch the database stack" to the rollback fact (the original tag's script does touch the database stack and is refused by RDS; roll back with the hotfix tag);
+  this version is not yet installed in customer production,
+  which is still `release-2026-10-13`,
+  upgrade per section 7ter + the production baseline record) ·
+- **v1.22** (2026-10-26 10:1xZ: **rollback wording rewritten (section 7ter.2)**: rolling back to `release-2026-10-13` must check out the hotfix tag `release-2026-10-13-rollback` (= `release-2026-10-13-b103` + one line `--exclusively`
+  in `redeploy-platform.sh`, product bytes unchanged) — the original tag's script would, in the "WAF / OM service stack" step, also downgrade the OpenMetadata database stack back to MySQL 8.0,
+  be refused by RDS and abort,
+  leaving the platform stack not rolled back;
+  confirmed by a real production-mode rehearsal in a test account on 2026-10-26 (the original script fails / the hotfix rollback succeeds in 17 minutes, IAM gate green, truth check all green, sync / orchestration / job each ran one round successfully on the old version);
+  the notice "rollback has not been rehearsed in a real environment" withdrawn) ·
+- **v1.21** (2026-10-26 03:5xZ, development branch, pending release: new section 7ter.1f "four things to know when upgrading to the version with the OpenMetadata database MySQL 8.0 → 8.4" —
+  `redeploy-platform.sh` gains step 2c″ deploying the database stack; the RDS in-place major version upgrade has one downtime window (test account, Multi-AZ db.t3.small, measured: database stack step 9.5 minutes,
+  OpenMetadata database connection interrupted about 2 minutes, containers not restarted);
+  the master user omadmin logs in as usual under the 8.4 default parameter group `mysql_native_password=ON`;
+  RDS does not support downgrades, rolling back the code does not roll back the database version, restore from the pre-upgrade snapshot when needed (section 7ter.2 item 3 supplemented);
+  eliminates the RDS extended support fee ≈ $292 / month) ·
+- **v1.20** (2026-10-26 01:3xZ, development branch, pending release: new section 7ter.1e — upgrading to the version where the network advisor probes by the place's region **must** also run `redeploy-agents.sh` —
+  the skill Lambda is deployed only by the agent stack; refreshing only the platform leaves the "Analyze network" advice based on the home-region network (two test accounts hit it on 10-25);
+  the fixes of the same batch (field masking by physical column, DMS "Start" accepted immediately, per-node orchestration configuration, S3 object-store sources through the sync wizard) need no customer action;
+  product code see the CHANGELOG `[Unreleased]` section) ·
+- **v1.19** (2026-10-23 05:5xZ, development branch second batch, pending release: section 7ter.1d four things → five things, row 5 = the second batch of 14 operations joining the unified framework
+  (governance "Sync column information" / delete workspace / sync wizard generate DDL · execute table creation / stream job start / stop / delete / orchestration publish · take offline · trigger · delete / S3 external table / metrics and model-metric computation),
+  the dedicated 202 protocols of catalog column sync and workspace deletion retired, enable/disable schedule shares the same guard;
+  section 8 "Connected shown right after creation" row changed to "fixed on the development branch, pending release", the catalog column-sync row notes "replaced by the second batch") ·
+- **v1.18** (2026-10-22 08:3xZ, development branch, pending release: new section 7ter.1c row 5 — when upgrading with `EXEC_REGION_CANDIDATES=all-enabled`, the old script reports
+  "the allow-list covers every candidate probe region…" and exits 1 right before the final IAM simulation gate, although the platform is in fact already upgraded;
+  the script with the fix picks the probe region from the regions the account has not opted in to, does not abort when none can be found, and the gate verdict honestly distinguishes "green / cannot be verified in this account") ·
+- **v1.17** (2026-10-22 03:1xZ, development branch, pending release: the long-running-operation framework — section 7 red lines add "`-c long-ops-sync-wait-ms` is an acceptance knob, do not pass it in production";
+  new section 7ter.1d "four things to know when upgrading to the version that includes it" (new table `bgp-long-ops` created by step 2c′ / the empty `bgp-ai-tasks` shell in pre-release test environments / `AI_*` environment variables removed /
+  operations longer than 45 seconds show "Running in background" and modify / delete on the same object is blocked with 409);
+  the section 8 row on modeling landing 504 changed to "root-fixed on the development branch, still present on the production tag") ·
+- **v1.16** (2026-10-21 09:27Z, development branch, pending release: section 7ter gains step 4 "verify the version" — the login page footer / "Settings → Platform version" / `GET /api/public/version` show the release tag directly
+  (baked in from git facts at image build time); where the production tag does not have this item yet, use the three-carrier method of [AGENTS.md](../AGENTS.md);
+  product code see the CHANGELOG `[Unreleased]` section) ·
+- **v1.15** (2026-10-20 05:2xZ, development branch, pending release: section 7ter step 2 and section 7ter.1 row 8 state that the upgrade script gains step 2c′ deploying the DynamoDB database stack —
+  until then the upgrade path did not deploy the database stack, so tables added by a new version (in this batch `bgp-ai-tasks`) were never created and every endpoint using them returned 500;
+  hit for real when upgrading a test account to the version with AI long calls) ·
+- **v1.14** (2026-10-19 afternoon, development branch candidate pre-authorization wording, pending release: section 2 adds `EXEC_REGION_CANDIDATES` pre-authorizing candidate execution regions ·
+  section 7 steps 1 / 2 / 3 rewritten as "pre-authorized regions need no authorization run" · new section 7ter.1c "four things to know when upgrading to the version with candidate pre-authorization + the CodeBuild guard and advisor-role fixes"
+  (the upgrade wipes the CodeBuild transition variable but the new version no longer needs it;
+  the advisor-role fix requires `redeploy-agents.sh`);
+  product code see the CHANGELOG `[Unreleased]` section) ·
+- v1.13 (2026-10-19, the record of adding the Frankfurt region in customer production written back (same content as manual v1.10 on tag `release-2026-10-13`): section 7 points to the new customer-reality expansion
+  [adding-a-region.md](adding-a-region.md) (customer deployment machine obtaining the code from scratch, the three code gates, the "will change / will not change" list of the authorization step, the operations-side automation script)
+  and pins that the step 2 command must carry `BGP_DEPLOY_MODE=production` / `BEDROCK_MODEL_ID` when needed ·
+  section 8 adds the **non-US home region incident** (creating an execution region from the page is hit by the default-model geography guard; transition = add `BEDROCK_MODEL_ID` to the CodeBuild project, root fix pending);
+  product code unchanged) ·
+- v1.12 (2026-10-16, development branch federated-catalog wording, pending release: section 3 truth check 9 → 10 items (item 10 S3 Tables federated catalog `s3tablescatalog`) ·
+  section 7ter step 2 notes that the upgrade script's step 3c opens the federated catalog in the home region and every execution region ·
+  section 8 adds "an environment that never ran a sync writing S3 Tables ⇒ Lake Query / Ask-Your-Data CATALOG_NOT_FOUND", fixed pending release, with the production transition command) ·
+- v1.11 (2026-10-14, development branch multi-vendor model channel wording, pending release: section 1 rows 1 / 2b / 5 model requirement changed to "any one of the candidate chain suffices"
+  (Claude Opus 4.5 → GLM 5.3 → Kimi K3, pre-flight item 7 makes a real call per candidate) · section 2 ③ candidate-chain algorithm ·
+  new section 7ter.1b "upgrading to the version with the multi-vendor channel: the agent containers changed, **`redeploy-agents.sh` must be run**" ·
+  section 8 adds three entries: GLM 5.3 account-level enablement / Kimi K3 reasoning blocks and token cost / GPT series still gated) ·
+- v1.10 (2026-10-14 02:xxZ, development branch wording: **section 7ter step 2b changed from a manual command block to `scripts/redeploy-agents.sh`** (written, pending one real run in a test account, ships with the next release;
+  the repository at the production tag `release-2026-10-13` has no such script — when upgrading from that tag check out the new tag first, then run it) · section 7ter.2 rollback wording synchronized ·
+  section 8 adds the "agents not refreshed by the upgrade script" row marked "fixed, pending release") ·
+- v1.9 (2026-10-14, corrections after an item-by-item comparison of the document against the scripts: section 0 origin-verification wording ·
+  section 7 button label "Start deployment" · section 7bis retention list adds CMK / namespace·workgroup / DAG bucket / regional audit ·
+  **section 7ter gains step 2b "refresh the three AgentCore images and stacks when the new version changed the agent containers" (redeploy-platform does not do it)** ·
+  section 7ter.1 row 7 Ask-Your-Data recipes ·
+  section 7ter.2 rollback wording adds the agents ·
+  section 8 data-source probe row made precise to "Detect / Browse tables" and the agents row added ·
+  the section 7 reference moved to the development-environment runbook) ·
+- v1.8 (2026-10-13, development branch wording: the five known boundaries in section 8 (saving a sync task with an existing Glue job 502 / Glue version for S3 Tables / data-source probe from the control plane /
+  own table bucket invisible / scheduler page false alarm) marked "fixed (development branch), delivered with the next release;
+  production tag `release-2026-10-13` still has them", plus two new entries ("Connected" right after creation only checks that the Glue connection exists, registered but not fixed /
+  catalog "Sync column information" over 60 seconds reported as "sync failed" by the load balancer, fixed pending release);
+  after a cold-start handover rehearsal added section 7ter.2 rollback · section 4 item 4, the Cognito command for a sole administrator who forgot the password) ·
+- v1.7 (2026-10-13, reconciled line by line with the code of release `release-2026-10-13`: section 1 the real model call happens only when `BEDROCK_MODEL_ID` is **not** given explicitly · factory model written with its full id ·
+  pre-flight probes 3 S3 buckets · section 4 the initial password is also printed to the deployment stdout · section 8 adds five known boundaries;
+  new AI handover entry `AGENTS.md`) ·
+- v1.6 (2026-10-13 early morning, section 8 adds two known boundaries: the customer's own table bucket is not yet visible in the platform (transition = hand-written three-part names in Lake Query) ·
+  a failed data-source probe from the control plane does not affect sync) ·
+- v1.5 (2026-10-12 late night, release `release-2026-10-13` = the data-sync capability completion batch + multi-region placement of the backfill center: section 1 code retrieval switched to the new tag ·
+  section 7ter.1 title pinned to release-2026-10-13 ·
+  section 8 backfill center restriction row changed to "fixed and verified in a real environment") ·
+- v1.4 (2026-10-12, reconciled line by line with the code of release `release-2026-10-12`: section 1 adds code retrieval / tool list / model version / the two ignorable ❌ classes of the pre-flight check / no VPC import ·
+  section 3 changed to running `02-postdeploy-truth.sh` ·
+  new section 7bis retiring an execution region ·
+  section 7ter upgrading ·
+  section 8 adds the data-plane credential default taskrole) ·
+- v1.3 (2026-10-11, section 8 writes back the cross-jurisdiction real-environment verification conclusions ·
+  the three scheduling / landing capabilities delivered ·
+  section 7 adds "Check initialization → Enable") ·
+- v1.2 (2026-10-10, section 8 adds known boundaries: jurisdiction label ·
+  cross-jurisdiction not yet verified in a real environment ·
+  execution regions cannot be trimmed ·
+  the three scheduling / landing capabilities in progress ·
+  phase-two items) ·
+- v1.1 (2026-10-10, section 8 writes back the conclusions of the from-scratch production rehearsal in a second account) ·
+- v1.0 (2026-10-09, first production go-live batch)
+
+</details>
+
+> Applies to: deploying the Kingfisher multi-region edition into the **customer's own AWS account** as the production environment
+>
+> - Companion document: [operations.md](operations.md) (pre-flight check when switching accounts / workarounds for restricted accounts / post-deploy truth criteria; referenced in several places below).
+>   The disposition and acceptance status of every item of the first production go-live batch is tracked in the engineering defect records.
+> - 🔴 This document describes the **production** path only. Demonstration / acceptance environments (seed data, demonstration MySQL, 5 test accounts) use `BGP_DEPLOY_MODE=demo` and are out of scope here.
 
 ## 0. Deployment topology (align on this first)
 
@@ -231,14 +231,13 @@ BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>
   - `all-enabled` = every region currently enabled in the account;
   - when not given, only the home region is authorized (as before; any later `redeploy-platform.sh` run can add the declaration, `none` revokes it).
   - The cost: in these regions the platform role is allowed to call the data-plane APIs before an execution environment exists there (the application-layer place check still blocks it); name regions deliberately, do not open everything for convenience.
-
 - `BGP_DEPLOY_MODE` **must be given explicitly** (otherwise the script exits 2 immediately). `production` = no seed data, no demonstration MySQL, Cognito gets only the single user `admin`;
   the mode is written to SSM `/bgp/deploy-mode`, and later redeployments are **not allowed** to switch the mode silently.
 - Three things the script does itself that relate to "the customer chooses the home region" (from the first production go-live batch):
   ① when the home region is not us-east-1 it **additionally bootstraps us-east-1** — the WAF rules used by CloudFront can only be created in us-east-1 (an AWS rule), and their ARN is handed to the home region through a CDK cross-region reference;
   ② the CloudFront origin prefix list is looked up by name **at deployment time** from the region's real values (there is no longer a hard-coded region table);
-  - ③ the default model is chosen from the **candidate chain** against the **home-region account's real values** (since the multi-vendor model channel; `candidateModelIds` in `platform/ai-model.json`: Claude Opus 4.5 → GLM 5.3 → Kimi K3):
-    for each candidate, list the region's inference profiles → derive the real base model the profile points to → make real calls in turn with "the region's geographic profile → `global.` → the base id", one each → the first success takes effect (`scripts/resolve-home-model.sh`);
+  ③ the default model is chosen from the **candidate chain** against the **home-region account's real values** (since the multi-vendor model channel; `candidateModelIds` in `platform/ai-model.json`: Claude Opus 4.5 → GLM 5.3 → Kimi K3):
+  for each candidate, list the region's inference profiles → derive the real base model the profile points to → make real calls in turn with "the region's geographic profile → `global.` → the base id", one each → the first success takes effect (`scripts/resolve-home-model.sh`);
   - if nothing in the whole chain works ⇒ the deployment stops and lists, item by item, "candidate → ids tried — Bedrock's message".
   - To pin a model: put `BEDROCK_MODEL_ID=<id>` in front of the command (an explicit value is not validated by a real call; validate it yourself first with `aws bedrock-runtime converse`).
 - The OpenMetadata factory administrator password `admin/admin` is replaced during deployment by the random password in Secrets Manager `bgp/om/admin-password`
@@ -393,6 +392,7 @@ Plus three production-specific checks:
 ## 7. Adding an execution region (after go-live)
 
 Three steps, in this order and no other (development / acceptance environments orchestrate these three steps as one command in the development-environment runbook; that is not a production step):
+
 1. "Execution Environments" page → New execution environment → choose the region (the list comes from the account's real values; regions that already have an execution environment cannot be selected;
    regions where the organization SCP blocks an action required for deployment are **listed but not selectable**, with the blocked action named; regions marked "Organization policy could not be verified" remain selectable — press "Refresh" first to re-check;
    since candidate pre-authorization every region is also labeled "pre-authorized, usable right after the build" or "ops must release it once after the build") → step 2 shows the component set, which is the **complete set, read-only**
@@ -403,10 +403,10 @@ Three steps, in this order and no other (development / acceptance environments o
    - To never have to do this step again: prefix the same command with `EXEC_REGION_CANDIDATES=<region1,region2,…>` to pre-authorize once (section 2);
 3. Back on that execution environment press "Check initialization" (every resource is probed and must be all green; since candidate pre-authorization this also opens the region's S3 Tables federated catalog idempotently) → "Enable" ⇒ status becomes active and the region starts accepting work.
 
-> The step-by-step operating manual expanded along the customer's real situation (customer deployment machine obtaining the code from scratch, the three code gates, the "will change / will not change" list before the step 2 authorization command,
-> verification commands for every step, exception handling, the operations-side automation script `kf-add-region.sh`, the record of adding the Frankfurt region on 2026-10-19): **[adding-a-region.md](adding-a-region.md)**.
-> 🔴 `BGP_DEPLOY_MODE=production` in the step 2 command cannot be omitted (the command shown in the page's "control plane has not enabled this region" notice lacks it; copying it verbatim is refused by the script);
-> when the Anthropic model is not enabled at account level in the customer account, also give `BEDROCK_MODEL_ID=<the same id as at first install>` explicitly.
+> - The step-by-step operating manual expanded along the customer's real situation (customer deployment machine obtaining the code from scratch, the three code gates, the "will change / will not change" list before the step 2 authorization command,
+>   verification commands for every step, exception handling, the operations-side automation script `kf-add-region.sh`, the record of adding the Frankfurt region on 2026-10-19): **[adding-a-region.md](adding-a-region.md)**.
+> - 🔴 `BGP_DEPLOY_MODE=production` in the step 2 command cannot be omitted (the command shown in the page's "control plane has not enabled this region" notice lacks it; copying it verbatim is refused by the script);
+>   when the Anthropic model is not enabled at account level in the customer account, also give `BEDROCK_MODEL_ID=<the same id as at first install>` explicitly.
 
 The execution-region stack group that the build deploys (retained from the earlier English edition):
 
@@ -449,12 +449,13 @@ Two paths; the detail page offers only the one that matches the environment's ac
      the deployment identity must be able to `cloudformation:UpdateStack` that stack and `dynamodb:CreateTable`);
    - from 2.2.0 (lake table-bucket routing) the script has two more steps: **2c‴** registers, as routes, the customer-owned S3 Tables buckets that existing home-region sync tasks already write to but that were never registered (alias derived from the bucket name, tier `other`, writable, note `auto-registered by upgrade`, audit actor `upgrade`; idempotent, a no-op when there is nothing to register; uses only the `aws` CLI),
      and **2f** runs `cdk deploy … --exclusively` for `BgpEmrStack` / `BgpFlinkStack` when they exist, so the home-region EMR / Flink roles may access any table bucket of the region (`bucket/*`). Execution-region Flink roles get the same change only through step 3 (console "Redeploy"); the post-deploy truth check gains an eleventh item (no home-region sync task references an unregistered customer bucket); see section 7ter.1j.
-- 2b. 🔴 **If the new version changed the agent containers** (the version's `CHANGELOG.md` has an "agents / recipes" entry,
-- or `git diff <old-tag> <new-tag> --stat -- infra/agent platform/src/lib/genbi/core platform/src/lib/param-advisor/core platform/src/lib/network-advisor/core platform/src/lib/cookbook` is non-empty):
-  `redeploy-platform.sh` **does not rebuild** the three AgentCore images and does not deploy the three agent stacks,
-- so the agent refresh script must be run separately.
-- It is independent of step 2 and can run before or after it (the Runtime ARNs / Memory ids do not change with the image, so the platform wiring does not need to be touched).
-- Run from the repository root:
+
+   2b. 🔴 **If the new version changed the agent containers** (the version's `CHANGELOG.md` has an "agents / recipes" entry,
+   or `git diff <old-tag> <new-tag> --stat -- infra/agent platform/src/lib/genbi/core platform/src/lib/param-advisor/core platform/src/lib/network-advisor/core platform/src/lib/cookbook` is non-empty):
+   `redeploy-platform.sh` **does not rebuild** the three AgentCore images and does not deploy the three agent stacks,
+   so the agent refresh script must be run separately.
+   It is independent of step 2 and can run before or after it (the Runtime ARNs / Memory ids do not change with the image, so the platform wiring does not need to be touched).
+   Run from the repository root:
 
    ```bash
    ./scripts/redeploy-agents.sh <profile> <home-region> --check   # read-only: the image tag each agent's live Runtime is using vs the local HEAD, and whether the agent sources differ between the two ⇒ whether a refresh is needed
@@ -609,68 +610,68 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 > For a customer production rollback **use the hotfix tag only**;
 > from now on the script of every release tag carries `--exclusively`, so rolling back from a newer version to `release-2026-10-27` or any later tag means simply checking out that tag.
 >
-> **Full round-trip rehearsal (2026-10-26, test account in production mode + one execution region, with sync / orchestration / batch-job fixtures on a `*/20` schedule created on the old version)**:
-> ① upgrade to `release-2026-10-27`: platform 40 minutes (including the `all-enabled` pre-authorization IAM simulation gate), agents 4 minutes (agent sources identical between the two versions, `--check` reported no refresh needed),
-> execution region page "Redeploy" 14 minutes (the preview listed IAM changes only),
-> truth check 14 items all green,
-> page-driven checks 10 items 0 failures (at the first scheduled tick after the upgrade sync / orchestration / job all succeeded, editing and saving existing data sources / sync tasks worked, footer and "Platform version" card == tag,
-> Glue jobs still 5.1, scripts differ by only the one line of the MySQL zero-timestamp fix, warehouse counts unchanged);
-> ② roll back with the hotfix tag: 10.75 minutes, database stack untouched (still UPDATE_COMPLETE / 8.4.11), truth check all green, scheduled tasks kept running normally on the old version for 7 hours (orchestration / job heartbeat 39 rows),
-> checks 10 items 0 failures (the old version's known defect — renaming a data source while editing it returned 500 — appeared as expected and was recorded, not judged red);
-> **the rollback does not require redeploying execution regions** (the execution-region stacks of the two versions differ only in IAM additions of the `-base` stack, which the old control plane uses as before);
-> ③ upgrade again: 34 minutes, checks 10 items 0 failures 1 recorded (DMS fixture), the upgrade fixtures removed cleanly.
+> - **Full round-trip rehearsal (2026-10-26, test account in production mode + one execution region, with sync / orchestration / batch-job fixtures on a `*/20` schedule created on the old version)**:
+>   ① upgrade to `release-2026-10-27`: platform 40 minutes (including the `all-enabled` pre-authorization IAM simulation gate), agents 4 minutes (agent sources identical between the two versions, `--check` reported no refresh needed),
+>   execution region page "Redeploy" 14 minutes (the preview listed IAM changes only),
+>   truth check 14 items all green,
+>   page-driven checks 10 items 0 failures (at the first scheduled tick after the upgrade sync / orchestration / job all succeeded, editing and saving existing data sources / sync tasks worked, footer and "Platform version" card == tag,
+>   Glue jobs still 5.1, scripts differ by only the one line of the MySQL zero-timestamp fix, warehouse counts unchanged);
+>   ② roll back with the hotfix tag: 10.75 minutes, database stack untouched (still UPDATE_COMPLETE / 8.4.11), truth check all green, scheduled tasks kept running normally on the old version for 7 hours (orchestration / job heartbeat 39 rows),
+>   checks 10 items 0 failures (the old version's known defect — renaming a data source while editing it returned 500 — appeared as expected and was recorded, not judged red);
+>   **the rollback does not require redeploying execution regions** (the execution-region stacks of the two versions differ only in IAM additions of the `-base` stack, which the old control plane uses as before);
+>   ③ upgrade again: 34 minutes, checks 10 items 0 failures 1 recorded (DMS fixture), the upgrade fixtures removed cleanly.
 >
-> **2.1.1 rehearsal (2026-10-27, same test account in production mode, from the 2.1.0 product bytes up to `release-2026-10-28`;**
-> **fixtures = two `*/20` scheduled syncs + orchestration + batch job + one DMS real-time task (the source database had binlog on this time, the task was really running))**: platform `redeploy-platform.sh` 38 minutes, exit 0 (2c′ / 2c″ no-op, **no downtime window**;
-> the IAM simulation gate recorded "cannot be verified in this account" for the regions the temporary account's SCP blocks, per the all-enabled gate fix), agents `--check` concluded "matches local HEAD, no refresh needed for this version",
-> execution region page "Redeploy" 8 minutes (preview 7 stacks 0 changes, because that environment had already installed branch bytes containing the 2026-10-27 fix batch;
-> **customer production upgrading from `release-2026-10-13` will list IAM changes of the three stacks `-base` / `-core` / `-redshift`**), truth check 0 red, footer / "Platform version" card / `GET /api/public/version` all = `release-2026-10-28` + 2.1.1;
-> page-driven continuity checks **10 items 0 failures 0 recorded**: at the first scheduled tick after the upgrade both syncs / the orchestration / the job all succeeded, **the DMS task list still "running" and running on the DMS side (uninterrupted across the platform ECS roll)**,
-> editing and saving existing data sources / sync tasks worked, Glue job version and scripts differ by only the two permitted lines, the warehouse overwrite-table count unchanged, the heartbeat table kept growing.
+> - **2.1.1 rehearsal (2026-10-27, same test account in production mode, from the 2.1.0 product bytes up to `release-2026-10-28`;**
+>   **fixtures = two `*/20` scheduled syncs + orchestration + batch job + one DMS real-time task (the source database had binlog on this time, the task was really running))**: platform `redeploy-platform.sh` 38 minutes, exit 0 (2c′ / 2c″ no-op, **no downtime window**;
+>   the IAM simulation gate recorded "cannot be verified in this account" for the regions the temporary account's SCP blocks, per the all-enabled gate fix), agents `--check` concluded "matches local HEAD, no refresh needed for this version",
+>   execution region page "Redeploy" 8 minutes (preview 7 stacks 0 changes, because that environment had already installed branch bytes containing the 2026-10-27 fix batch;
+>   **customer production upgrading from `release-2026-10-13` will list IAM changes of the three stacks `-base` / `-core` / `-redshift`**), truth check 0 red, footer / "Platform version" card / `GET /api/public/version` all = `release-2026-10-28` + 2.1.1;
+>   page-driven continuity checks **10 items 0 failures 0 recorded**: at the first scheduled tick after the upgrade both syncs / the orchestration / the job all succeeded, **the DMS task list still "running" and running on the DMS side (uninterrupted across the platform ECS roll)**,
+>   editing and saving existing data sources / sync tasks worked, Glue job version and scripts differ by only the two permitted lines, the warehouse overwrite-table count unchanged, the heartbeat table kept growing.
 >
-> **2.1.2 rehearsal (2026-10-28 15:34–16:27Z, same test account in production mode, from an unreleased build of the 2.1.2 product bytes (footer `<product commit> · unreleased`, VERSION 2.1.1) up to tag `release-2026-10-29`;**
-> **fixtures = two `*/20` scheduled syncs + orchestration + batch job + one DMS real-time task running)**: platform `redeploy-platform.sh` 37 minutes, exit 0 (`EXEC_REGION_CANDIDATES=all-enabled`;
-> 2c′ / 2c″ no-op, **no downtime window**), agents `--check` concluded "matches local HEAD, no refresh needed for this version", execution region page "Redeploy" 9 minutes
-> (the preview dialog truthfully said "source has drifted and there is no explicit wave authorization ⇒ administrator approval required"; after approval the build succeeded;
-> **customer production upgrading from `release-2026-10-13` will still list IAM changes of the three stacks `-base` / `-core` / `-redshift`**), truth check 17 ok / 0 bad, footer / "Platform version" card / `GET /api/public/version` all = `release-2026-10-29` + 2.1.2;
-> page-driven continuity checks **10 items 0 failures 0 recorded**: at the first scheduled tick after the upgrade both syncs / the orchestration / the job all succeeded, the DMS task list still "running" and running on the DMS side,
-> editing and saving existing data sources / sync tasks worked, Glue job version and scripts differ by only the two permitted lines, the warehouse overwrite-table count unchanged, the heartbeat table kept growing.
-> The three mechanisms of the customer production upgrade `release-2026-10-13` → `release-2026-10-29` (database stack 8.0 → 8.4 / new table `bgp-long-ops` / agent refresh / execution-region IAM) were each exercised once
-> in the three production-mode rehearsals: the round trip of 10-26 (→ 2.1.0), 10-27 (→ 2.1.1) and this one (→ 2.1.2).
-> **Customer production record (2026-10-29, home region ap-southeast-1, three execution regions, `release-2026-10-13` → `release-2026-10-29`)**: control plane `redeploy-platform.sh` **47.5 minutes, exit 0** (02:00:53–02:49:08Z;
-> `EXEC_REGION_CANDIDATES=all-enabled` ⇒ 18 enabled regions authorized;
-> 2c′ new table `bgp-long-ops`;
-> 2c″ OpenMetadata database 8.0.46 → 8.4.11 in **11 minutes**, database connection interrupted about 2 minutes;
-> the platform ECS roll did not interrupt the pages;
-> IAM gate 18 regions × 136 rows green), agents `--check` three times "refresh needed"
-> ⇒ real refresh **6 minutes**, all ✅; truth check **16 ✅ + item 5 not run** (the script looks for the deployment-time password file by profile, and the deployment machine's password is kept elsewhere; a page login + the footer served as equivalent evidence);
-> footer / version endpoint = `release-2026-10-29` + 2.1.2;
-> **the first "Redeploy" preview of an execution region failed in the `cdk bootstrap` step = the bootstrap guard recurrence** (section 8; after the upgrade wiped the transition variable of the 2026-10-19 incident,
-> the buildspec's bootstrap line still executed the CDK app ⇒ the guard's message); after adding the variable back (value changed to the platform's current default model id) Frankfurt succeeded in **5 minutes**
-> (the preview listed 4 in-place IAM modifications in `-base` / `-core` / `-redshift` + "source has drifted, approval required" ⇒ approved) and US East in **6 minutes** (same three stacks; residency-api and three other stacks unchanged);
-> after "Check initialization" all three regions active;
-> no scheduled task fired during the upgrade (the customer's cron schedules all run on Mondays).
-> Two non-product reds: the first run of the upgrade script stopped at `git fetch --tags` (the deployment clone's stale local tag refused to be overwritten by the moved tag of the same name on origin ⇒ the script's fetch gained `--force`; zero writes by the customer);
-> the `aws: [ERROR] … ChangeSetNotFound` log line after the preview gate cleans up its change set is a harmless confirmation read.
+> - **2.1.2 rehearsal (2026-10-28 15:34–16:27Z, same test account in production mode, from an unreleased build of the 2.1.2 product bytes (footer `<product commit> · unreleased`, VERSION 2.1.1) up to tag `release-2026-10-29`;**
+>   **fixtures = two `*/20` scheduled syncs + orchestration + batch job + one DMS real-time task running)**: platform `redeploy-platform.sh` 37 minutes, exit 0 (`EXEC_REGION_CANDIDATES=all-enabled`;
+>   2c′ / 2c″ no-op, **no downtime window**), agents `--check` concluded "matches local HEAD, no refresh needed for this version", execution region page "Redeploy" 9 minutes
+>   (the preview dialog truthfully said "source has drifted and there is no explicit wave authorization ⇒ administrator approval required"; after approval the build succeeded;
+>   **customer production upgrading from `release-2026-10-13` will still list IAM changes of the three stacks `-base` / `-core` / `-redshift`**), truth check 17 ok / 0 bad, footer / "Platform version" card / `GET /api/public/version` all = `release-2026-10-29` + 2.1.2;
+>   page-driven continuity checks **10 items 0 failures 0 recorded**: at the first scheduled tick after the upgrade both syncs / the orchestration / the job all succeeded, the DMS task list still "running" and running on the DMS side,
+>   editing and saving existing data sources / sync tasks worked, Glue job version and scripts differ by only the two permitted lines, the warehouse overwrite-table count unchanged, the heartbeat table kept growing.
+>   The three mechanisms of the customer production upgrade `release-2026-10-13` → `release-2026-10-29` (database stack 8.0 → 8.4 / new table `bgp-long-ops` / agent refresh / execution-region IAM) were each exercised once
+>   in the three production-mode rehearsals: the round trip of 10-26 (→ 2.1.0), 10-27 (→ 2.1.1) and this one (→ 2.1.2).
+> - **Customer production record (2026-10-29, home region ap-southeast-1, three execution regions, `release-2026-10-13` → `release-2026-10-29`)**: control plane `redeploy-platform.sh` **47.5 minutes, exit 0** (02:00:53–02:49:08Z;
+>   `EXEC_REGION_CANDIDATES=all-enabled` ⇒ 18 enabled regions authorized;
+>   2c′ new table `bgp-long-ops`;
+>   2c″ OpenMetadata database 8.0.46 → 8.4.11 in **11 minutes**, database connection interrupted about 2 minutes;
+>   the platform ECS roll did not interrupt the pages;
+>   IAM gate 18 regions × 136 rows green), agents `--check` three times "refresh needed"
+>   ⇒ real refresh **6 minutes**, all ✅; truth check **16 ✅ + item 5 not run** (the script looks for the deployment-time password file by profile, and the deployment machine's password is kept elsewhere; a page login + the footer served as equivalent evidence);
+>   footer / version endpoint = `release-2026-10-29` + 2.1.2;
+>   **the first "Redeploy" preview of an execution region failed in the `cdk bootstrap` step = the bootstrap guard recurrence** (section 8; after the upgrade wiped the transition variable of the 2026-10-19 incident,
+>   the buildspec's bootstrap line still executed the CDK app ⇒ the guard's message); after adding the variable back (value changed to the platform's current default model id) Frankfurt succeeded in **5 minutes**
+>   (the preview listed 4 in-place IAM modifications in `-base` / `-core` / `-redshift` + "source has drifted, approval required" ⇒ approved) and US East in **6 minutes** (same three stacks; residency-api and three other stacks unchanged);
+>   after "Check initialization" all three regions active;
+>   no scheduled task fired during the upgrade (the customer's cron schedules all run on Mondays).
+>   Two non-product reds: the first run of the upgrade script stopped at `git fetch --tags` (the deployment clone's stale local tag refused to be overwritten by the moved tag of the same name on origin ⇒ the script's fetch gained `--force`; zero writes by the customer);
+>   the `aws: [ERROR] … ChangeSetNotFound` log line after the preview gate cleans up its change set is a harmless confirmation read.
 >
-> **Hotfix 2.1.2.1 upgrade rehearsal (2026-10-29 06:55–07:42Z,**
-> **test account in production mode + one `eu-sim` execution region,**
-> **from 2.1.2 up to the hotfix tag)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh` **exited 0**
-> (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z,
-> no downtime;
-> IAM gate green), `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
-> ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
-> ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
-> ⇒ approve
-> ⇒ deployment build SUCCEEDED
-> ⇒ "Check initialization"
-> ⇒ active;
-> the test account's home region is in the United States ⇒ the half where the guard would fire can still only be covered by the offline synth gate + a regression after it lands in customer production.
-> Customer production will take the same path (once the user gives a window, the operations-side upgrade script with `release-2026-10-29-b134`, about 25 minutes); after landing, delete the CodeBuild transition variable + "Redeploy" any one execution region as a regression.
+> - **Hotfix 2.1.2.1 upgrade rehearsal (2026-10-29 06:55–07:42Z,**
+>   **test account in production mode + one `eu-sim` execution region,**
+>   **from 2.1.2 up to the hotfix tag)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh` **exited 0**
+>   (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z,
+>   no downtime;
+>   IAM gate green), `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
+>   ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
+>   ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
+>   ⇒ approve
+>   ⇒ deployment build SUCCEEDED
+>   ⇒ "Check initialization"
+>   ⇒ active;
+>   the test account's home region is in the United States ⇒ the half where the guard would fire can still only be covered by the offline synth gate + a regression after it lands in customer production.
+>   Customer production will take the same path (once the user gives a window, the operations-side upgrade script with `release-2026-10-29-b134`, about 25 minutes); after landing, delete the CodeBuild transition variable + "Redeploy" any one execution region as a regression.
 
 1. **Control plane**: on the deployment machine `git fetch --tags && git checkout <the rollback-capable tag of the old version>` (returning to `release-2026-10-13` ⇒ `release-2026-10-13-rollback`;
-   - returning to `release-2026-10-27` or later ⇒ that tag itself), `npm ci` in each of the two directories, then `BGP_DEPLOY_MODE=production ./scripts/redeploy-platform.sh <profile> <home-region>`
-     (when the Anthropic model is not usable in the customer account, give `BEDROCK_MODEL_ID` explicitly here too, the same id as at upgrade time).
+   returning to `release-2026-10-27` or later ⇒ that tag itself), `npm ci` in each of the two directories, then `BGP_DEPLOY_MODE=production ./scripts/redeploy-platform.sh <profile> <home-region>`
+   (when the Anthropic model is not usable in the customer account, give `BEDROCK_MODEL_ID` explicitly here too, the same id as at upgrade time).
    - The script reads the wiring parameters back from the live environment (OpenMetadata address, agent Runtimes and so on) and assembles the complete deployment parameters, so the wiring is not lost;
    - images are rebuilt by CDK from the old source (an existing image is reused when the content is identical).
    - When agent-related sources differ between the two versions (`release-2026-10-12` ↔ `release-2026-10-13` do: the Ask-Your-Data recipes), the rollback must also refresh the agent images and stacks:
@@ -716,10 +717,10 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
   when the home region is not in the United States, the CodeBuild of an execution region created from the page fails the moment `cdk bootstrap` loads the CDK app, and not a single stack is built.**
   The log line reads: "default model us.anthropic.claude-opus-4-5-20251101-v1:0 is a 'us.' geographic inference profile and cannot be invoked from home region ap-southeast-1".
 - **Bootstrap guard recurrence (hit for real after customer production was upgraded to 2.1.2 on 2026-10-29;**
-  - **a recurrence of the 2026-10-19 incident;**
-  - **present in `release-2026-10-27` through `release-2026-10-29`;**
-  - **coded as a hotfix on 2026-10-29, ships with the hotfix tag `release-2026-10-29-b134` / the next version): when the home region is not in the United States, the CodeBuild of "Execution Environments → Redeploy / New" on the page fails at its very first command `cdk bootstrap`;
-    the page shows "preview ended but no impact verdict could be obtained (buildPhase=FAILED) — cannot confirm what this run would change, aborted", and the log line is identical to the 2026-10-19 incident.**
+  **a recurrence of the 2026-10-19 incident;**
+  **present in `release-2026-10-27` through `release-2026-10-29`;**
+  **coded as a hotfix on 2026-10-29, ships with the hotfix tag `release-2026-10-29-b134` / the next version): when the home region is not in the United States, the CodeBuild of "Execution Environments → Redeploy / New" on the page fails at its very first command `cdk bootstrap`;
+  the page shows "preview ended but no impact verdict could be obtained (buildPhase=FAILED) — cannot confirm what this run would change, aborted", and the log line is identical to the 2026-10-19 incident.**
   - Root cause: that `cdk bootstrap` line carries no `-c exec-env-target`, the CDK CLI still executes the CDK app and takes the control-plane branch, so the 2026-10-19 fix (calling the guard only on the control-plane branch) has no effect on it.
   - **Transition (to be done after every control-plane deployment / upgrade until the version with the root fix is installed)**: add the environment variable `BEDROCK_MODEL_ID` = the platform container's current default model id to the CodeBuild project `bgp-exec-env-deploy`
     (a `global.` prefix passes the guard; read the current state and write the whole block back, do not retype `EXEC_ENV_SOURCE_REF` by hand):
@@ -740,17 +741,17 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
     An authorization redeploy within the same version does not wipe it; **upgrading to a new version does wipe it**, and the next version must include the root fix (guard runs only on the control-plane path).
   - Handling after a failure: detail page "Recover (record failure and unlock)" → add the variable → "Redeploy".
   - **The hotfix upgrade path was rehearsed in a test account ✅ (2026-10-29 06:55–07:42Z,**
-    - **test account in production mode + one `eu-sim` execution region)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh` **exited 0**
-      (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z,
-    - no downtime;
-    - IAM gate green), `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
-    - ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
-    - ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
-    - ⇒ approve
-    - ⇒ deployment build SUCCEEDED
-    - ⇒ "Check initialization"
-    - ⇒ active;
-    - the test account's home region is in the United States ⇒ the half where the guard would fire can still only be covered by the offline synth gate + a regression after it lands in customer production.
+    **test account in production mode + one `eu-sim` execution region)**: from `release-2026-10-29` check out `release-2026-10-29-b134` + `npm ci` in both directories + `EXEC_REGION_CANDIDATES=all-enabled BGP_DEPLOY_MODE=production redeploy-platform.sh` **exited 0**
+    (step 2b ExecEnvDeploy stack source package refreshed at 06:56Z, 2c / 2c′ / 2c″ all no-op, platform stack rolled 06:59–07:02Z,
+    no downtime;
+    IAM gate green), `GET /api/public/version` = `release-2026-10-29-b134` / the hotfix product commit / 2.1.2, the CodeBuild project `bgp-exec-env-deploy` carried only the variable `EXEC_ENV_SOURCE_REF` (**no** `BEDROCK_MODEL_ID`)
+    ⇒ the page "Redeploy" preview got through bootstrap (build log `npx cdk bootstrap --app '' … ⇒ Environment … bootstrapped (no changes)`)
+    ⇒ dialog "7 stacks, 0 changes in total; source has drifted and there is no explicit wave authorization ⇒ approval required" (the preview build exits 1 by design = the approval checkpoint of the preview gate)
+    ⇒ approve
+    ⇒ deployment build SUCCEEDED
+    ⇒ "Check initialization"
+    ⇒ active;
+    the test account's home region is in the United States ⇒ the half where the guard would fire can still only be covered by the offline synth gate + a regression after it lands in customer production.
 - **Jurisdiction label** (the "jurisdiction" field of the "New execution environment" wizard, default `home`): filled in **by hand** by the administrator; the platform **does not derive it from the region**, it **cannot be changed** after registration, and no legal judgment is made.
   When the execution region is not in the same jurisdiction as the home region it must be changed to a value other than `home` (for example `eu-sim`); the wizard shows a hint at the input field but does not block.
   A non-`home` execution environment has four extra things: a disclaimer to accept before deployment (retained) · residency-api must be installed (the region's regional audit table / regional result table / residency bucket) ·
@@ -852,6 +853,16 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 - **Spark engine job "Run" on a cold EMR application (all versions; fixed in the next version — fixed on the development branch, verified in a test account by page-driven acceptance)**: while the EMR application cold-starts, the page may report 504 / "service response error" after 60 seconds,
   although the run has in fact been submitted and will succeed — after the error, check "Run history" first for a new run and **do not press again** (a second press is a second run).
   From the next version the submission segment goes through the long-running-operation framework: beyond 45 seconds it moves to the background automatically and polls, and pressing "Run" / editing / deleting during submission returns 409 "in progress".
+- **One batch job across several S3 Tables table buckets (read from the detail bucket, write to the summary bucket;**
+  **root fix shipped with lake table-bucket routing and is in 2.2.0 — "Settings → Lake table buckets and routes" registers the buckets, the job declares them under "Advanced Properties → Lake table buckets", the platform registers the Spark catalogs itself with no `--conf`; upgrade notes in section 7ter.1j; production 2.1.2 still uses the transition below)**: 2.1.2 can do this without a code change — in the batch compute job's "Advanced Properties → Job parameters" add one parameter named `--conf`
+  whose value is one group of 5 Iceberg catalog settings per bucket (`spark.sql.catalog.<catalog-name>=org.apache.iceberg.spark.SparkCatalog` ·
+  `.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog` ·
+  `.glue.id=<account-id>:s3tablescatalog/<bucket>` ·
+  `.io-impl=org.apache.iceberg.aws.s3.S3FileIO` ·
+  `.warehouse=arn:aws:s3tables:<region>:<account-id>:bucket/<bucket>`, several groups joined with ` --conf `), and the script uses three-part names `<catalog-name>.<namespace>.<table>`;
+  - the platform Glue role is already allowed on any table bucket of its own region;
+  - the Athena Query page can query any bucket of the same region with `"s3tablescatalog/<bucket>"."<namespace>"."<table>"` (that page is read-only).
+  - Full steps and screenshots are in the "Cross-table-bucket read/write handbook (2.1.2)" delivered to the customer.
 - Deferred items (least-privilege narrowing, secret rotation, OpenSearch sizing and snapshots, alerting and so on) are recorded as deferred in the engineering defect records.
 
 ## Appendix A. Configuration reference

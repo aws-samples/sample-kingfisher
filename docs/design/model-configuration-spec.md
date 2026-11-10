@@ -1,58 +1,85 @@
 # Model Configuration — Technical Specification (SPEC): Runtime-Configurable Bedrock Models
 
-> Revision: **2.5** (🆕 2026-10-21, the long-running-operation framework: the implementation of the "hybrid response" row of section 3.3a **moved into `lib/long-ops/`** (the `lib/ai/long-call*.ts` files of the 2026-10-20 hybrid-response fix were merged into the unified long-running-operation framework;
-> endpoint `GET /api/long-ops/[taskId]`, with `/api/ai/tasks/[taskId]` kept as an alias for one release;
-> table `bgp-ai-tasks` → `bgp-long-ops`;
-> environment variables `AI_SYNC_WAIT_MS` / `AI_ASYNC*` → `LONG_OPS_*`;
-> asynchronous failures restore the original status code through `errorStatus`);
-> from this revision on, this document keeps only the `_meta` echo contract; the hybrid-response contract is governed by [the long-running-operations design](./long-running-operations.md), section 2, and [the multi-region execution specification](./multi-region-execution-spec.md), section 3.18) · **revision 2.4** (🆕 2026-10-20 05:1xZ, **the asynchronous landing of synchronous routes** (the hybrid-response fix): section 3.3a gains a "hybrid response" row — the five synchronous routes ②③④⑤⑥ plus `etl-jobs/generate` / `engines/generate`, seven model-calling POST routes in total, uniformly become "wait in-process for `AI_SYNC_WAIT_MS` (45 s); if still not terminal
-> ⇒ 202 `{taskId,status:"running",async:true}`"; the terminal state is echoed through the top-level `_meta` of `GET /api/ai/tasks/[taskId]` (the model + the correlationId of the submitting POST); the third persisted schema = the `model` attribute of the `bgp-ai-tasks` row;
-> the synchronous 200 shape for results that arrive within 45 s is unchanged byte for byte.
-> Basis: in a test account under Kimi K3, a Copilot question took 60.2 s, the network advisor 60.8 s, and batch code generation hit the CloudFront 60-second wall with a 504 while the page parsed the HTML as JSON) · **revision 2.3** (🆕 2026-10-20, the probe budget (the probe-timeout fix): section 2 `ProbeError` gains `Timeout` and `ProbeResult` gains `toolUseError` / `elapsedMs`;
-> in section 3.2 the tiny invoke and the tool-use second probe run **in parallel**, timeout = the vendor profile's `probeTimeoutMs` (Kimi K3 45 s / all others 10 s;
-> `probeTimeoutMsFor` is the single accessor), and a timeout is listed separately as Timeout, not classified as Throttle;
-> in section 3.3, PUT step ④ first accepts a probe-cache entry from the last 10 minutes that passed in the same region with complete tool-use evidence (`freshProbeFromCache`) and no longer probes a second time.
-> Basis: real measurements in a test account — 8 Kimi probe samples took 3.0–39.4 s, and 5 of them timed out under the 10 s budget) · **revision 2.2** (2026-10-14, after the first page-driven acceptance run: 🆕 section 7.2b retries a transient stream error once (`lib/ai/core/transient.ts`, design decision D17);
-> section 7.8 adds the change points) · **revision 2.1** (2026-10-14, section 7 corrected after construction against the **code as landed**: 7.1 the family regular expression gains `(?![0-9])` plus `FAMILIES / familySummaries`;
-> 7.2 the real signatures of the shaping functions (`shapeInferenceConfig / shapeConverseInput` return `{ config|input, stripped, boosted }`, the learning table hangs on globalThis), `InvokeOutcome.shaped`, the planner maxTokens factor;
-> 7.3 the probe request goes through shaping;
-> 7.5 ordering and `families[]`;
-> 7.6 `CAP_AFTER` / `AGENT_SOURCE_PATHS`;
-> 7.7 the candidate chain derived from ground truth / failures leave a trace / last resort;
-> 7.8 the change points as actually made;
-> real-environment conclusions to be back-filled by the first page-driven acceptance run) · **revision 2.0** (🆕 2026-10-14, the multi-vendor model channel: new section 7 — vendor-profile types / `shapeConverseRequest` / changes to the probe and PUT flows / four families in the catalog / shared core in the containers / deployment-time candidate chain / list of change points;
-> basis: the design, revision 2.3, section 12) · **revision 1.7** (🔴 2026-09-10, the **purpose of `_meta.backend` in section 3.3a is narrowed**: decided on that day that "all natural-language queries go through the same AgentCore"
-> ⇒ the normal value is always `agentcore`, and the value of the field becomes **exposing an AgentCore failure fallback** (the value is `inprocess` when the call fell back to the in-process engine; the answers of the two paths look identical, so without the echo nobody would know a downgrade happened)) revision 1.6 (🆕 2026-09-10, section 3.3a gains the optional field **`_meta.backend`** (the execution backend actually used for this query, `agentcore`|`inprocess`) — since the multi-region work of 2026-09-10, "in which region the question is asked" decides the backend (AgentCore is installed only in the home region), and the two backends differ in capability while their **answers look the same**
-> ⇒ without the echo one can only guess;
-> optional field, the shapes of the other 8 routes are unaffected) revision 1.5 (🔴 2026-09-09, **parameter renamed `scope` → `settingScope`**: `?scope=` had already been defined by [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.34, section 2.6, as the platform-wide single meaning of the **execution scope**, while an earlier platform-wide feature plan intended to write the per-region model override as `model-config?scope=<targetId>#global` ⇒ **a scheduled collision**.
-> Ruling: the model-setting scope parameter is renamed; receiving the old name `scope` ⇒ **400 `ScopeParamRenamed`**, **no compatibility alias**;
-> the only callers are `components/settings/AiModelCard.tsx:268` plus three unit tests) revision 1.4 (🔴 2026-09-05, 🆕 **section 6.5 landing corrections**: back-fed from the implementation record of construction stream C — `_meta` landing points / ★ error-body shape / `BGP_NONPROD_TARGET` / source of `releaseId` / the three codegen routes / containers throw when both sources are missing / non-admins read-only / ★ GPT rejection-reason order / shared pieces / new dependencies / deployment order) revision 1.3 (🔴 2026-09-05, **the implementation addendum, section 6, rewritten**: rewritten with the GPT branch as the reference implementation, the landing points of the five modes [literal type for `probeOk` / last-good + `runtime-stale` / audit and configuration in the same TransactWrite / `version` optimistic lock / AgentCore receipt validation] + three pitfalls avoided [keys and caches shaped by `targetId` / the second parameter of `resolveModelIdRuntime` really wired / `isModelIdFormatValid` keeps a region hook] + scope of this wave = all of the first construction phase + the code side of the second construction phase;
-> production topology corrected = single account × multiple regions) revision 1.2 (implementation-level technical design: finalized table / interface schemas / pseudo-code for the key mechanisms / list of change points / acceptance) | Date: 2026-08-28 (revision 1.1: 2026-08-29) | Status: ⬜ in design, pending review
-> Basis: [the design](./model-configuration.md), **revision 2.3** (decisions / surfaces changed / risks) + [the interaction design](./model-configuration-interaction.md), **revision 1.7** (interaction). **This document only elaborates the technical "how"; decisions and the "why" are in the design.**
-> 🔴 Red line: this is a pure design document (with pseudo-code); **no implementation code is written and nothing is deployed without explicit confirmation**. The pseudo-code is **illustrative**, not directly compilable.
-> 🎯 **Revision 1.1 changes (convergence review of 2026-08-29: three independent reviews agreed that this module was the only one with "zero handling",**
-> **so four blocking points are now added)**: ① **the `modelId` echo contract of section 3.3a** (previously a "circular gap": the acceptance criteria named it the only reliable state source and forbade CloudTrail, yet the specification never required any endpoint to add that field) — defines the response-body metadata block `_meta:{modelId,modelSource,correlationId}` + **landing points = 8 routes (6 synchronous routes echo it directly + 2 asynchronous routes return only a taskId) + 2 persisted schemas + retrieval/memory, which have no endpoint, covered by `_meta.invocations[]`** (precise wording in section 3.3a) + the **actually used** modelId uniformly supplied by `invokeWithFallback`;
-> ② **the landing point of `gptTransportReady()`** (`sk="ai-model#__transport"` + the new endpoint `PUT /transport` + **400 `TransportNotVerified` when the probe has not passed**) and removal of the contradiction with the P0-5 hard gate that "reads no flag";
-> ③ **the fault-injection mechanism** (🔴 **corrected in this summary on 2026-08-29**: the original wording "`FAULT_SETTINGS_TABLE` + build-time exclusion + status in health" — **all three points had already been rejected by the body of section 3.4a**, but the summary block was not synchronized ⇒ building from the summary would produce a mechanism incompatible with the multi-region execution specification and point at an endpoint that does not exist.
-> **Ruling**: throttling faults use **`FAULT_THROTTLE_MODEL`**;
-> DynamoDB faults **add no new seam** and instead give `bgp-settings` a **`SETTINGS_TABLE` environment variable** (following the repository's existing `COPILOT_TURNS_TABLE` precedent) that is pointed at a broken table in non-production deployments;
-> mechanism = **runtime environment gate + effective only on non-production targets** (word for word the same as the multi-region execution specification, section 8ter.2; **not build-time exclusion** — otherwise acceptance would not run the release image);
-> the enablement status is shown in **`GET /api/system/wiring`** (**`/api/system/health` does not exist**)), replacing "temporarily pointing at a wrong table name", a way of creating faults that the multi-region execution specification, section 8ter.2, judged a red-line violation;
-> ④ **the probe rate limit fixed at 6 per minute per administrator** + the landing point of the counter (the original literal "N/min" could not be executed headlessly).
-> 🎯 **Revision 1.1 second convergence (full-module verification of 2026-08-29; everything fixed here was "introduced or missed by the previous round of corrections itself")**: ⑤ 🔴 **the dimension of the model key and of the resolver functions back-fed from `region` to `targetId`** — the multi-region execution specification had long defined `ai-model#<targetId>#global` in sections 1.3a-S2 and 6, while the four documents of this module and the platform feature plan **never synchronized 10 key names and 8 signatures**;
-> implementing by region = two accounts in the same region share one model (Bedrock enablement is account × region) + when the per-target activation phase of the multi-region work arrives it turns into a key migration (violating the zero-migration decision D2).
-> Reasoning and ruling in **design decision D8, "dimension ruling"**;
-> ⑥ **the rate-limit sk of section 1 corrected** to `ratelimit#probe#<adminSub>#m#<bucket>` (the original invented a `<yyyy-MM-ddTHH:mm>` string, exactly the "needless fork of the in-house format" that section 3.4a judges and rejects; sections 1 and 3.4a contradicted each other);
-> ⑦ **self-correction of the landing-point count in section 3.3a** (the previous "10 routes + 2 task-item schemas" conflicted with its own enumeration ①–⑩; the truth = **8 routes + 2 persisted schemas + ⑨⑩ without endpoint via `_meta.invocations[]`**);
-> ⑧ **three stale mechanisms removed from the summary block of section 0** (`FAULT_SETTINGS_TABLE` / build-time exclusion / `/api/system/health` had all been rejected by section 3.4a; the summary block was not synchronized ⇒ building from the summary would produce a mechanism incompatible with the multi-region execution specification).
-> 🎯 **Revision 1.0 changes (2026-08-28, specification-level deep review by two tracks — A, code-fact verification, and B, constructability — confirmed by grep)**: the skeleton and decision chain of revision 0.1 are correct, but "writing directly from the pseudo-code of section 3.1 would produce a hot path that crashes", so **5 P0 items that must be completed before construction starts** + P1/P2 items are added:
-> **P0-1** try/catch + stale fallback on the resolver hot path, an independent short TTL for readVersion (no longer one table read per call);
-> **P0-2** the store/version-layer contract finalized (ownership of the `ai-model#` prefix / cold-table defaults / write-then-bump order);
-> **P0-3** the new shared `invokeWithFallback` (throttle back-off + downgrade to the previous layer's model; the only home of the P0-4 cold cliff);
-> **P0-4** the landing point of the per-model probe cache (`ai-model#probe#<id>`); `/catalog` only reads the cache and never probes all models;
-> **P0-5** the phase-one server-side hard gate that forbids storing GPT as the global default.
-> Naming corrections: `BgpDatabaseStack` → **`DatabaseStack`** (the class name does not exist);
-> the `bgp-budgets` optimistic-lock convention lives in `FinOpsStack`.
+> - Revision: **2.5** (🆕 2026-10-21, the long-running-operation framework: the implementation of the "hybrid response" row of section 3.3a **moved into `lib/long-ops/`** (the `lib/ai/long-call*.ts` files of the 2026-10-20 hybrid-response fix were merged into the unified long-running-operation
+>   framework;
+>   endpoint `GET /api/long-ops/[taskId]`, with `/api/ai/tasks/[taskId]` kept as an alias for one release;
+>   table `bgp-ai-tasks` → `bgp-long-ops`;
+>   environment variables `AI_SYNC_WAIT_MS` / `AI_ASYNC*` → `LONG_OPS_*`;
+>   asynchronous failures restore the original status code through `errorStatus`);
+>   from this revision on, this document keeps only the `_meta` echo contract; the hybrid-response contract is governed by [the long-running-operations design](./long-running-operations.md), section 2, and [the multi-region execution specification](./multi-region-execution-spec.md), section 3.18) ·
+>   **revision 2.4** (🆕 2026-10-20 05:1xZ, **the asynchronous landing of synchronous routes** (the hybrid-response fix): section 3.3a gains a "hybrid response" row — the five synchronous routes ②③④⑤⑥ plus `etl-jobs/generate` / `engines/generate`, seven model-calling POST routes in total, uniformly
+>   become "wait in-process for `AI_SYNC_WAIT_MS` (45 s); if still not terminal
+>   ⇒ 202 `{taskId,status:"running",async:true}`"; the terminal state is echoed through the top-level `_meta` of `GET /api/ai/tasks/[taskId]` (the model + the correlationId of the submitting POST); the third persisted schema = the `model` attribute of the `bgp-ai-tasks` row;
+>   the synchronous 200 shape for results that arrive within 45 s is unchanged byte for byte.
+>   Basis: in a test account under Kimi K3, a Copilot question took 60.2 s, the network advisor 60.8 s, and batch code generation hit the CloudFront 60-second wall with a 504 while the page parsed the HTML as JSON) · **revision 2.3** (🆕 2026-10-20, the probe budget (the probe-timeout fix): section 2
+>   `ProbeError` gains `Timeout` and `ProbeResult` gains `toolUseError` / `elapsedMs`;
+>   in section 3.2 the tiny invoke and the tool-use second probe run **in parallel**, timeout = the vendor profile's `probeTimeoutMs` (Kimi K3 45 s / all others 10 s;
+>   `probeTimeoutMsFor` is the single accessor), and a timeout is listed separately as Timeout, not classified as Throttle;
+>   in section 3.3, PUT step ④ first accepts a probe-cache entry from the last 10 minutes that passed in the same region with complete tool-use evidence (`freshProbeFromCache`) and no longer probes a second time.
+>   Basis: real measurements in a test account — 8 Kimi probe samples took 3.0–39.4 s, and 5 of them timed out under the 10 s budget) · **revision 2.2** (2026-10-14, after the first page-driven acceptance run: 🆕 section 7.2b retries a transient stream error once (`lib/ai/core/transient.ts`, design
+>   decision D17);
+>   section 7.8 adds the change points) · **revision 2.1** (2026-10-14, section 7 corrected after construction against the **code as landed**: 7.1 the family regular expression gains `(?![0-9])` plus `FAMILIES / familySummaries`;
+>   7.2 the real signatures of the shaping functions (`shapeInferenceConfig / shapeConverseInput` return `{ config|input, stripped, boosted }`, the learning table hangs on globalThis), `InvokeOutcome.shaped`, the planner maxTokens factor;
+>   7.3 the probe request goes through shaping;
+>   7.5 ordering and `families[]`;
+>   7.6 `CAP_AFTER` / `AGENT_SOURCE_PATHS`;
+>   7.7 the candidate chain derived from ground truth / failures leave a trace / last resort;
+>   7.8 the change points as actually made;
+>   real-environment conclusions to be back-filled by the first page-driven acceptance run) · **revision 2.0** (🆕 2026-10-14, the multi-vendor model channel: new section 7 — vendor-profile types / `shapeConverseRequest` / changes to the probe and PUT flows / four families in the catalog / shared core
+>   in the containers / deployment-time candidate chain / list of change points;
+>   basis: the design, revision 2.3, section 12) · **revision 1.7** (🔴 2026-09-10, the **purpose of `_meta.backend` in section 3.3a is narrowed**: decided on that day that "all natural-language queries go through the same AgentCore"
+>   ⇒ the normal value is always `agentcore`, and the value of the field becomes **exposing an AgentCore failure fallback** (the value is `inprocess` when the call fell back to the in-process engine; the answers of the two paths look identical, so without the echo nobody would know a downgrade
+>   happened)) revision 1.6 (🆕 2026-09-10, section 3.3a gains the optional field **`_meta.backend`** (the execution backend actually used for this query, `agentcore`|`inprocess`) — since the multi-region work of 2026-09-10, "in which region the question is asked" decides the backend (AgentCore is
+>   installed only in the home region), and the two backends differ in capability while their **answers look the same**
+>   ⇒ without the echo one can only guess;
+>   optional field, the shapes of the other 8 routes are unaffected) revision 1.5 (🔴 2026-09-09, **parameter renamed `scope` → `settingScope`**: `?scope=` had already been defined by [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.34, section 2.6, as the
+>   platform-wide single meaning of the **execution scope**, while an earlier platform-wide feature plan intended to write the per-region model override as `model-config?scope=<targetId>#global` ⇒ **a scheduled collision**.
+>   Ruling: the model-setting scope parameter is renamed; receiving the old name `scope` ⇒ **400 `ScopeParamRenamed`**, **no compatibility alias**;
+>   the only callers are `components/settings/AiModelCard.tsx:268` plus three unit tests) revision 1.4 (🔴 2026-09-05, 🆕 **section 6.5 landing corrections**: back-fed from the implementation record of construction stream C — `_meta` landing points / ★ error-body shape / `BGP_NONPROD_TARGET` / source
+>   of `releaseId` / the three codegen routes / containers throw when both sources are missing / non-admins read-only / ★ GPT rejection-reason order / shared pieces / new dependencies / deployment order) revision 1.3 (🔴 2026-09-05, **the implementation addendum, section 6, rewritten**: rewritten with
+>   the GPT branch as the reference implementation, the landing points of the five modes [literal type for `probeOk` / last-good + `runtime-stale` / audit and configuration in the same TransactWrite / `version` optimistic lock / AgentCore receipt validation] + three pitfalls avoided [keys and caches
+>   shaped by `targetId` / the second parameter of `resolveModelIdRuntime` really wired / `isModelIdFormatValid` keeps a region hook] + scope of this wave = all of the first construction phase + the code side of the second construction phase;
+>   production topology corrected = single account × multiple regions) revision 1.2 (implementation-level technical design: finalized table / interface schemas / pseudo-code for the key mechanisms / list of change points / acceptance) | Date: 2026-08-28 (revision 1.1: 2026-08-29) | Status: ⬜ in
+>   design, pending review
+>
+> - Basis: [the design](./model-configuration.md), **revision 2.3** (decisions / surfaces changed / risks) + [the interaction design](./model-configuration-interaction.md), **revision 1.7** (interaction). **This document only elaborates the technical "how"; decisions and the "why" are in the design.**
+>
+> Earlier revisions (11) are in the collapsible list below.
+
+<details><summary>Revision history</summary>
+
+- 🔴 Red line: this is a pure design document (with pseudo-code); **no implementation code is written and nothing is deployed without explicit confirmation**. The pseudo-code is **illustrative**, not directly compilable.
+- 🎯 **Revision 1.1 changes (convergence review of 2026-08-29: three independent reviews agreed that this module was the only one with "zero handling",**
+  **so four blocking points are now added)**: ① **the `modelId` echo contract of section 3.3a** (previously a "circular gap": the acceptance criteria named it the only reliable state source and forbade CloudTrail, yet the specification never required any endpoint to add that field) — defines the
+  response-body metadata block `_meta:{modelId,modelSource,correlationId}` + **landing points = 8 routes (6 synchronous routes echo it directly + 2 asynchronous routes return only a taskId) + 2 persisted schemas + retrieval/memory, which have no endpoint, covered by `_meta.invocations[]`** (precise
+  wording in section 3.3a) + the **actually used** modelId uniformly supplied by `invokeWithFallback`;
+  ② **the landing point of `gptTransportReady()`** (`sk="ai-model#__transport"` + the new endpoint `PUT /transport` + **400 `TransportNotVerified` when the probe has not passed**) and removal of the contradiction with the P0-5 hard gate that "reads no flag";
+  ③ **the fault-injection mechanism** (🔴 **corrected in this summary on 2026-08-29**: the original wording "`FAULT_SETTINGS_TABLE` + build-time exclusion + status in health" — **all three points had already been rejected by the body of section 3.4a**, but the summary block was not synchronized ⇒
+  building from the summary would produce a mechanism incompatible with the multi-region execution specification and point at an endpoint that does not exist.
+  **Ruling**: throttling faults use **`FAULT_THROTTLE_MODEL`**;
+  DynamoDB faults **add no new seam** and instead give `bgp-settings` a **`SETTINGS_TABLE` environment variable** (following the repository's existing `COPILOT_TURNS_TABLE` precedent) that is pointed at a broken table in non-production deployments;
+  mechanism = **runtime environment gate + effective only on non-production targets** (word for word the same as the multi-region execution specification, section 8ter.2; **not build-time exclusion** — otherwise acceptance would not run the release image);
+  the enablement status is shown in **`GET /api/system/wiring`** (**`/api/system/health` does not exist**)), replacing "temporarily pointing at a wrong table name", a way of creating faults that the multi-region execution specification, section 8ter.2, judged a red-line violation;
+  ④ **the probe rate limit fixed at 6 per minute per administrator** + the landing point of the counter (the original literal "N/min" could not be executed headlessly).
+- 🎯 **Revision 1.1 second convergence (full-module verification of 2026-08-29; everything fixed here was "introduced or missed by the previous round of corrections itself")**: ⑤ 🔴 **the dimension of the model key and of the resolver functions back-fed from `region` to `targetId`** — the
+  multi-region execution specification had long defined `ai-model#<targetId>#global` in sections 1.3a-S2 and 6, while the four documents of this module and the platform feature plan **never synchronized 10 key names and 8 signatures**;
+  implementing by region = two accounts in the same region share one model (Bedrock enablement is account × region) + when the per-target activation phase of the multi-region work arrives it turns into a key migration (violating the zero-migration decision D2).
+- Reasoning and ruling in **design decision D8, "dimension ruling"**;
+- ⑥ **the rate-limit sk of section 1 corrected** to `ratelimit#probe#<adminSub>#m#<bucket>` (the original invented a `<yyyy-MM-ddTHH:mm>` string, exactly the "needless fork of the in-house format" that section 3.4a judges and rejects; sections 1 and 3.4a contradicted each other);
+  ⑦ **self-correction of the landing-point count in section 3.3a** (the previous "10 routes + 2 task-item schemas" conflicted with its own enumeration ①–⑩; the truth = **8 routes + 2 persisted schemas + ⑨⑩ without endpoint via `_meta.invocations[]`**);
+  ⑧ **three stale mechanisms removed from the summary block of section 0** (`FAULT_SETTINGS_TABLE` / build-time exclusion / `/api/system/health` had all been rejected by section 3.4a; the summary block was not synchronized ⇒ building from the summary would produce a mechanism incompatible with the
+  multi-region execution specification).
+- 🎯 **Revision 1.0 changes (2026-08-28, specification-level deep review by two tracks — A, code-fact verification, and B, constructability — confirmed by grep)**: the skeleton and decision chain of revision 0.1 are correct, but "writing directly from the pseudo-code of section 3.1 would produce a
+  hot path that crashes", so **5 P0 items that must be completed before construction starts** + P1/P2 items are added:
+- **P0-1** try/catch + stale fallback on the resolver hot path, an independent short TTL for readVersion (no longer one table read per call);
+- **P0-2** the store/version-layer contract finalized (ownership of the `ai-model#` prefix / cold-table defaults / write-then-bump order);
+- **P0-3** the new shared `invokeWithFallback` (throttle back-off + downgrade to the previous layer's model; the only home of the P0-4 cold cliff);
+- **P0-4** the landing point of the per-model probe cache (`ai-model#probe#<id>`); `/catalog` only reads the cache and never probes all models;
+- **P0-5** the phase-one server-side hard gate that forbids storing GPT as the global default.
+- Naming corrections: `BgpDatabaseStack` → **`DatabaseStack`** (the class name does not exist);
+  the `bgp-budgets` optimistic-lock convention lives in `FinOpsStack`.
+
+</details>
 
 ---
 
@@ -131,15 +158,18 @@ interface ProbeResult { ok:boolean; error?:ProbeError; errorDetail?:string;
   and the acceptance criteria' "may temporarily be set to true when testing branch A" **contradicted** this hard gate's "400 **unconditionally** by family, reading no flag" (implemented per the specification, the flag would have no effect).
   **Ruling**: it lands in **`bgp-settings` under `sk="ai-model#__transport"`** (item `{gptReady:boolean, branch:"A"|"B"|null, decidedAt, decidedBy}`, default `gptReady=false`), and `gptTransportReady()` reads it (**sharing the 5 s short TTL with `readVersionCached`**, no extra table read);
   🔴 **only a platform admin sets it explicitly through `PUT /api/admin/model-config/transport` after the decision-D9 probe has passed** (endpoint in section 2) — **not an environment variable, not a CDK context** (changing an env requires a redeploy = violates the "effective from the page" intent).
-> 🔴 **Three reinforcements in revision 1.1 (real defects pointed out by the convergence verification)**:
-> ① **Phasing**: the gate's **code / endpoint / DynamoDB item and the negative test of the gate must ship in the same phase**. The original arrangement (the gate in the first construction phase, the negative test in the second) = **shipping an unverified self-service release switch in phase one**. **Ruling: in the first construction phase `gptTransportReady()` always returns `false`** (hard-coded, does not read DynamoDB); **the endpoint + the DynamoDB item + the negative test enter the second construction phase together**.
-> ② **Failure direction fail-closed**: **any exception in `gptTransportReady()` ⇒ return `false`** (never adopt section 3.1's "never throw + fall back to lastGood" — that would make the GPT hard gate **fail-open**, exactly the historical lesson of this project's "16 fail-open ternaries").
-> ③ **Cache and invalidation**: use an **independent** `_transportCache{val,at}` (TTL = `VER_TTL_MS` 5 s), **and `PUT /transport` must also call `bumpVersion()`** (otherwise a reader hung off `__version` would **never refresh** = bug).
-> ④ **Strength of the gate's evidence**: the `probe` item has a **24-hour expiry** semantics ⇒ the transport item must store `{probeModelId, probedAt}` and is **considered invalid after 24 h** (the model may be revoked / the SCP may change);
-> and a PUT of `openai.*` **requires `toolUseOk===true` from that probe** (not just `ok`).
-> ⚠️ **Honest boundary**: a single tiny probe is weaker than the "4 tool loops each verified headlessly" required by the design, section 9.3, P0-3 ⇒ the **formal adoption** of branch A still depends on the 4-loop acceptance of the second construction phase; setting the transport flag is only **a switch**, not **evidence**.
-> ⑤ ⚠️ **Risk record**: `auth/identity.ts:40-49` gives everyone `isPlatformAdmin:true` **when Cognito is not configured**
-> ⇒ in a demo or misconfigured deployment anyone could flip the gate — one more reason for the always-false of the first construction phase → **mandatory `probeModel`**, failure ⇒ 400 with the reason → `store.put` (conditional write `version=:expectVersion`, conflict ⇒ 409) → `bumpVersion()` → `recordAudit(req,"model-config.update",{resourceType:"model-config",resourceId:scope,detail:{old,new}})`.
+> - 🔴 **Three reinforcements in revision 1.1 (real defects pointed out by the convergence verification)**:
+> - ① **Phasing**: the gate's **code / endpoint / DynamoDB item and the negative test of the gate must ship in the same phase**. The original arrangement (the gate in the first construction phase, the negative test in the second) = **shipping an unverified self-service release switch in phase
+>   one**. **Ruling: in the first construction phase `gptTransportReady()` always returns `false`** (hard-coded, does not read DynamoDB); **the endpoint + the DynamoDB item + the negative test enter the second construction phase together**.
+>   ② **Failure direction fail-closed**: **any exception in `gptTransportReady()` ⇒ return `false`** (never adopt section 3.1's "never throw + fall back to lastGood" — that would make the GPT hard gate **fail-open**, exactly the historical lesson of this project's "16 fail-open ternaries").
+>   ③ **Cache and invalidation**: use an **independent** `_transportCache{val,at}` (TTL = `VER_TTL_MS` 5 s), **and `PUT /transport` must also call `bumpVersion()`** (otherwise a reader hung off `__version` would **never refresh** = bug).
+>   ④ **Strength of the gate's evidence**: the `probe` item has a **24-hour expiry** semantics ⇒ the transport item must store `{probeModelId, probedAt}` and is **considered invalid after 24 h** (the model may be revoked / the SCP may change);
+>   and a PUT of `openai.*` **requires `toolUseOk===true` from that probe** (not just `ok`).
+> - ⚠️ **Honest boundary**: a single tiny probe is weaker than the "4 tool loops each verified headlessly" required by the design, section 9.3, P0-3 ⇒ the **formal adoption** of branch A still depends on the 4-loop acceptance of the second construction phase; setting the transport flag is only **a
+>   switch**, not **evidence**.
+> - ⑤ ⚠️ **Risk record**: `auth/identity.ts:40-49` gives everyone `isPlatformAdmin:true` **when Cognito is not configured**
+>   ⇒ in a demo or misconfigured deployment anyone could flip the gate — one more reason for the always-false of the first construction phase → **mandatory `probeModel`**, failure ⇒ 400 with the reason → `store.put` (conditional write `version=:expectVersion`, conflict ⇒ 409) → `bumpVersion()` →
+>   `recordAudit(req,"model-config.update",{resourceType:"model-config",resourceId:scope,detail:{old,new}})`.
 - 🔴 **`modelId` uses the short id** (catalog and PUT agree; `ListInferenceProfiles` returns both the id and the ARN, always take the short id; the regular expression rejecting ARNs is intentional, P1-3).
 - 🔴 **Audit strength (P2-3)**: in phase one `recordAudit` reuses the existing `bgp-audit` (best effort, plain Put, **without the deny-modify/delete tamper protection of the multi-region execution specification, section 3.3**) — consistent with the whole platform, acceptable; if "changing the global model" must be tamper-proof, that is a separate to-do (joining the unified egress / high-risk audit list of the multi-region execution specification, section 3.3).
 
@@ -180,6 +210,7 @@ async function resolveModelIdRuntime(capability?:Capability, targetId?:string): 
   }
 }
 ```
+
 ### 3.1a `resolveWithProvenance` (P1-1: the "resolve + report the hit layer" primitive shared by three callers)
 
 ```
@@ -246,6 +277,7 @@ await invokeWithFallback("genbi", targetId, (mid)=>new ConverseCommand({modelId:
 **Problem**: of the 9 consumption points **only flink** returns `model:` in its response (`ai-sql/route.ts:23`); the other 8 have neither the field nor a modelId log; and the method given by the design, section 10, is CloudTrail — which is exactly what section 7 of the acceptance criteria forbids because of **delivery lag** ⇒ acceptance has no reliable, immediate state source.
 
 **Ruling (contract)**:
+
 | Item | Final |
 |---|---|
 | **Carrier** | A uniform metadata block in the **response body**, **`_meta: { modelId, modelSource, correlationId }`** (`modelSource` ∈ `runtime\|env\|ssot`). 🔴 **Implementation fixed**: extend `apiOk(data, status?, meta?)` — following the **compatible-signature precedent** of `api-response.ts:33 apiError` (206 routes use `apiOk`; **existing calls must not break**); `_actions` is already an underscore-metadata precedent (`requirements/[id]/generate:36`), and `_meta` has zero hits across the repository, no conflict. 🔴 **The real reason not to use response headers (revision 1.1 correction)**: this repository has **no streaming responses** (`ConverseStreamCommand`/`text/event-stream`/`ReadableStream` have **zero hits** in `platform/src`), so the original "streaming headers already sent" was **factually wrong**; the real reason = **long tasks go asynchronous + polling** (to get around CloudFront's 60 s), and headers cannot carry the terminal state |
@@ -378,13 +410,13 @@ async function invokeWithFallback(capability, region, buildOrRun, kind: "command
 
 > The complete positive/negative matrix, headless-script design, contracts, hard evidence and rollback acceptance are kept in the module's acceptance record (an engineering record, not part of the public repository). Acceptance scripts stay on the developer machine and are never committed.
 
-
 ---
 
 ## 6. 🆕 Revision 1.3 — rewrite-and-landing addendum (2026-09-05; rewritten with the GPT branch as the **reference implementation**, not copied; scheduled as a work package of the multi-region execution program, roadmap items ② / ④)
 
-> 🔴 Relation to sections 1–5: sections 1–5 are the contract; this section only adds "how to land it" and "the scope of this wave". On conflict, the **corrections** in this section prevail (every correction keeps its retraction wording on the same line).
-> 🔴 **Production-form correction (decided on 2026-09-05, verbatim: "a real production environment has exactly one account with several regions; a multi-account situation never occurs")**: in the multi-region-dimension decision, the reason "same region, different accounts" **becomes secondary**; keys and caches are still shaped by `targetId`, and the load-bearing reasons become ① the platform identity is uniformly `targetId` ② two blue/green targets in the same region each keep their own setting ③ zero table migration.
+> - 🔴 Relation to sections 1–5: sections 1–5 are the contract; this section only adds "how to land it" and "the scope of this wave". On conflict, the **corrections** in this section prevail (every correction keeps its retraction wording on the same line).
+> - 🔴 **Production-form correction (decided on 2026-09-05, verbatim: "a real production environment has exactly one account with several regions; a multi-account situation never occurs")**: in the multi-region-dimension decision, the reason "same region, different accounts" **becomes secondary**;
+>   keys and caches are still shaped by `targetId`, and the load-bearing reasons become ① the platform identity is uniformly `targetId` ② two blue/green targets in the same region each keep their own setting ③ zero table migration.
 
 ### 6.1 Five patterns → our locations (what is worth taking from the reference implementation, rewritten to our contract)
 
@@ -509,8 +541,7 @@ export function describeModelError(e: unknown): { name: string; message: string;
 ```
 
 - Locations: `infra/agent/genbi/agent.js` and `infra/agent/_runtime/agent-runner.js` (+ the distributed copies under `netadvisor` / `paramadvisor/_runtime/`): `const mkAgent = () => new Agent({ …, messages: [...messages] })`;
-  - `for (attempt = 0; ; attempt++) { try { result = await mkAgent().invoke(…); break } catch (e) { const d = describeModelError(e); console.error(…); if (d.transient && attempt < TRANSIENT_MAX_RETRIES) { steps.push({ tool: "model", phase: "retry", … }); await sleep(transientBackoffMs(attempt));
-  - continue } return <existing fallback> } }`.
+  - `for (attempt = 0; ; attempt++) { try { result = await mkAgent().invoke(…); break } catch (e) { const d = describeModelError(e); console.error(…); if (d.transient && attempt < TRANSIENT_MAX_RETRIES) { steps.push({ tool: "model", phase: "retry", … }); await sleep(transientBackoffMs(attempt)); continue } return <existing fallback> } }`.
 - Unchanged: the platform-side `invokeConverse` does not add this (non-streaming Converse has never shown this class of error; if it ever needs it, it imports this one list only); the "learn a field + same-layer retry" of the request-shaping decision and this section are two different things (the former is the ValidationException wording, the latter stream / throttle / 5xx) and neither contains the other.
 - Artifacts: `tsconfig.ai-core.json` includes the three files; `core-prebuild.sh ai` produces `core-dist/ai/transient.{js,d.ts}` in the three containers.
 

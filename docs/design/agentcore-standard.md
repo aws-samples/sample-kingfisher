@@ -1,11 +1,13 @@
 # Platform standard — AI capabilities on Amazon Bedrock AgentCore (an independent Gateway + Runtime + Memory per capability)
 
-> 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
-> ⚠️ **Implementation differences**: `infra/lambda/netadvisor-skills` does not exist; the network advisor runtime lives in `infra/agent/netadvisor/`, and the three AgentCore agent directories are `infra/agent/{genbi,netadvisor,paramadvisor}`.
+> - 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path
+>   mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
+> - ⚠️ **Implementation differences**: `infra/lambda/netadvisor-skills` does not exist; the network advisor runtime lives in `infra/agent/netadvisor/`, and the three AgentCore agent directories are `infra/agent/{genbi,netadvisor,paramadvisor}`.
 
-> Status: **standard established (2026-07-01)**. Account `<account-id>` / test-account profile `temp-account` / us-east-1.
-> Positioning: this document is a **platform-level standard (the baseline to copy from)**, not the implementation document of any single capability. It abstracts the approach that GenBI (the AgentCore GenBI module, [design](./agentcore-genbi.md)) has already verified LIVE in this account into a fixed paradigm, contracts, naming, deployment orchestration and reuse checklist that "any AI capability going onto AgentCore follows".
-> Lineage: **GenBI (the AgentCore GenBI module) = the pioneer implementation** (it ran first, but was not abstracted into a reusable standard at the time); **the Network Connectivity Advisor (this round) = the first implementation built to this standard**; every subsequent AI capability (such as the downstream "parameter-assistance agent") is created as a new set in the same way.
+> - Status: **standard established (2026-07-01)**. Account `<account-id>` / test-account profile `temp-account` / us-east-1.
+> - Positioning: this document is a **platform-level standard (the baseline to copy from)**, not the implementation document of any single capability. It abstracts the approach that GenBI (the AgentCore GenBI module, [design](./agentcore-genbi.md)) has already verified LIVE in this account into a fixed paradigm, contracts, naming, deployment orchestration and reuse checklist that "any AI capability going onto AgentCore follows".
+> - Lineage: **GenBI (the AgentCore GenBI module) = the pioneer implementation** (it ran first, but was not abstracted into a reusable standard at the time); **the Network Connectivity Advisor (this round) = the first implementation built to this standard**; every subsequent AI capability (such as the downstream "parameter-assistance agent") is created as a new set in the same way.
 
 ## 0. One-sentence conclusion
 
@@ -83,10 +85,10 @@
 3. **Pass 2 (`-c <cap>-runtime=1 -c <cap>-agent-tag=<sha>`)**: create the Runtime (referencing the image) + output the RuntimeArn. Source: `deploy-all.sh:60-62`; gate `agentcore-stack.ts:197-217`.
 4. **The platform deployment injects the flags**: `-c <cap>-backend=agentcore -c <cap>-runtime-arn=<arn> -c <cap>-memory-backend=agentcore -c <cap>-memory-id=<id>`; a bare platform deployment (without this set of flags) still falls back to in-process (development profile / one-step rollback). Source: `deploy-all.sh:68-73`.
 
-> **🔴 buildx attestation pitfall (must observe)**: `docker buildx --push` produces an **OCI image index** by default (with an `unknown/unknown` attestation sub-manifest); when the AgentCore Runtime pulls by tag it may resolve to the index and **fail to create**.
-> **`--provenance=false --sbom=false` is mandatory** to obtain a single-platform arm64 image manifest.
-> The host is usually x86_64; use the `multiarch` buildx builder (QEMU-emulated arm64).
-> Details in the engineering notes of the GenBI AgentCore deployment (comment at `deploy-all.sh:53-56`).
+> - **🔴 buildx attestation pitfall (must observe)**: `docker buildx --push` produces an **OCI image index** by default (with an `unknown/unknown` attestation sub-manifest); when the AgentCore Runtime pulls by tag it may resolve to the index and **fail to create**.
+> - **`--provenance=false --sbom=false` is mandatory** to obtain a single-platform arm64 image manifest.
+>   The host is usually x86_64; use the `multiarch` buildx builder (QEMU-emulated arm64).
+>   Details in the engineering notes of the GenBI AgentCore deployment (comment at `deploy-all.sh:53-56`).
 
 **Chaining points (CfnOutput)**: pass 1 → image → pass 2 → platform are chained through stack outputs: `GenbiEcrRepoUri` (`:251`), `GenbiMemoryId` (`:248`), `GenbiRuntimeArn` (`:216`), `GenbiGatewayUrl` (`:252`). A new capability exports `<Cap>EcrRepoUri` and so on in the same way.
 

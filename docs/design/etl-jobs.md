@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: implemented and **verified online** (v1.3.0). The engines reuse the existing **Glue (PySpark script jobs) / Redshift (SQL jobs)**; scheduling goes through **MWAA**.
-> Complements the "ETL Orchestration (visual DAG)" module: this module is aimed at developers who **write code** and author their own scripts.
+> - Status: implemented and **verified online** (v1.3.0). The engines reuse the existing **Glue (PySpark script jobs) / Redshift (SQL jobs)**; scheduling goes through **MWAA**.
+> - Complements the "ETL Orchestration (visual DAG)" module: this module is aimed at developers who **write code** and author their own scripts.
 
 ## 1. Feature Overview
 Lets developers build ETL jobs by "writing scripts" (the same way they used to write Glue/Redshift scripts directly):

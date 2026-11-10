@@ -46,15 +46,15 @@ On a demo installation where the administrator has run the showcase-object scrip
 - **Choose the project and environment**: pick your project in the top-bar "Workspace" selector; leave "Environment" at dev.
 - **The 7 source tables** (demo database `gamedata`; replace with your own in production):
 
-| Table | Content | Columns used in this scenario |
-|---|---|---|
-| `ad_channels` | Channels (Google Ads / Meta Ads / TikTok Ads / AppLovin / Unity Ads / Organic) | `channel_id` `channel_name` `channel_type` |
-| `ad_campaigns` | Campaigns | Not used directly in this scenario; synced along with the rest |
-| `ad_events` | Impression / click events (about 2 million rows) | `channel_id` `event_time` `cost_usd` |
-| `players` | Players (with attributed channel) | `player_id` `install_time` `source_channel_id` `is_paying` |
-| `game_sessions` | Game sessions | Synced along with the rest |
-| `payments` | Payments | `player_id` `pay_time` `amount_usd` |
-| `player_events` | Player behaviour events (the largest fact table, millions of rows, generated randomly per player) | Synced along with the rest |
+  | Table | Content | Columns used in this scenario |
+  |---|---|---|
+  | `ad_channels` | Channels (Google Ads / Meta Ads / TikTok Ads / AppLovin / Unity Ads / Organic) | `channel_id` `channel_name` `channel_type` |
+  | `ad_campaigns` | Campaigns | Not used directly in this scenario; synced along with the rest |
+  | `ad_events` | Impression / click events (about 2 million rows) | `channel_id` `event_time` `cost_usd` |
+  | `players` | Players (with attributed channel) | `player_id` `install_time` `source_channel_id` `is_paying` |
+  | `game_sessions` | Game sessions | Synced along with the rest |
+  | `payments` | Payments | `player_id` `pay_time` `amount_usd` |
+  | `player_events` | Player behaviour events (the largest fact table, millions of rows, generated randomly per player) | Synced along with the rest |
 
 - **Dates in the demo data**: events are concentrated in the two weeks starting 2026-06-15. The manual runs below use `2026-06-20` as the "Business date", and the backfill range `2026-06-16 ~ 2026-06-22`. In production, substitute your own data dates.
 - **Network**: when the source database is inside a VPC, the administrator must already have allowed the subnet / security group of that region's Glue connection to reach the source database port; the demo database is created by the platform together with everything else, so nothing to do there.
@@ -188,9 +188,9 @@ Page: "Data Development → Athena Query" (page title "Athena Query (S3 Tables /
 3. Click the table name `players`; the editor is filled with `SELECT * FROM "s3tablescatalog/<table-bucket>"."gamedata"."players" LIMIT 100`. Click "Execute".
 4. Change the SQL to a count and execute again:
 
-```sql
-SELECT COUNT(*) AS n FROM "s3tablescatalog/<table-bucket>"."gamedata"."players"
-```
+   ```sql
+   SELECT COUNT(*) AS n FROM "s3tablescatalog/<table-bucket>"."gamedata"."players"
+   ```
 
 What you should see: above the result "Scanned … / Duration … / 1 rows returned", with `n` around 70–100 thousand (the data generator adds a random amount).
 
@@ -301,34 +301,34 @@ The report builder reads the warehouse fastest, so create a second, Redshift SQL
 1. "Batch Compute" → "New": Job name `channel_roi_daily_dws`, type "Redshift SQL Job" → "Create".
 2. Replace the whole script with:
 
-```sql
-BEGIN;
-CREATE TABLE IF NOT EXISTS gamedata.dws_channel_roi_daily (
-  dt DATE, channel_id INT, channel_name VARCHAR(40), channel_type VARCHAR(20),
-  cost_usd DECIMAL(14,2), installs BIGINT, payers BIGINT, revenue_usd DECIMAL(14,2),
-  cpi_usd DECIMAL(14,4), roas DECIMAL(14,4)
-);
-DELETE FROM gamedata.dws_channel_roi_daily WHERE dt = '${ds}';
-INSERT INTO gamedata.dws_channel_roi_daily
-WITH cost AS (
-  SELECT channel_id, SUM(cost_usd) AS cost_usd
-  FROM gamedata.ad_events WHERE event_time::date = '${ds}' GROUP BY channel_id),
-inst AS (
-  SELECT source_channel_id AS channel_id, COUNT(*) AS installs, SUM(is_paying) AS payers
-  FROM gamedata.players WHERE install_time::date = '${ds}' GROUP BY source_channel_id),
-rev AS (
-  SELECT pl.source_channel_id AS channel_id, SUM(pay.amount_usd) AS revenue_usd
-  FROM gamedata.payments pay JOIN gamedata.players pl ON pl.player_id = pay.player_id
-  WHERE pay.pay_time::date = '${ds}' GROUP BY pl.source_channel_id)
-SELECT '${ds}'::date, ch.channel_id, ch.channel_name, ch.channel_type,
-       COALESCE(c.cost_usd, 0), COALESCE(i.installs, 0), COALESCE(i.payers, 0), COALESCE(r.revenue_usd, 0),
-       ROUND(c.cost_usd / NULLIF(i.installs, 0), 4), ROUND(r.revenue_usd / NULLIF(c.cost_usd, 0), 4)
-FROM gamedata.ad_channels ch
-LEFT JOIN cost c ON c.channel_id = ch.channel_id
-LEFT JOIN inst i ON i.channel_id = ch.channel_id
-LEFT JOIN rev  r ON r.channel_id = ch.channel_id;
-COMMIT;
-```
+   ```sql
+   BEGIN;
+   CREATE TABLE IF NOT EXISTS gamedata.dws_channel_roi_daily (
+     dt DATE, channel_id INT, channel_name VARCHAR(40), channel_type VARCHAR(20),
+     cost_usd DECIMAL(14,2), installs BIGINT, payers BIGINT, revenue_usd DECIMAL(14,2),
+     cpi_usd DECIMAL(14,4), roas DECIMAL(14,4)
+   );
+   DELETE FROM gamedata.dws_channel_roi_daily WHERE dt = '${ds}';
+   INSERT INTO gamedata.dws_channel_roi_daily
+   WITH cost AS (
+     SELECT channel_id, SUM(cost_usd) AS cost_usd
+     FROM gamedata.ad_events WHERE event_time::date = '${ds}' GROUP BY channel_id),
+   inst AS (
+     SELECT source_channel_id AS channel_id, COUNT(*) AS installs, SUM(is_paying) AS payers
+     FROM gamedata.players WHERE install_time::date = '${ds}' GROUP BY source_channel_id),
+   rev AS (
+     SELECT pl.source_channel_id AS channel_id, SUM(pay.amount_usd) AS revenue_usd
+     FROM gamedata.payments pay JOIN gamedata.players pl ON pl.player_id = pay.player_id
+     WHERE pay.pay_time::date = '${ds}' GROUP BY pl.source_channel_id)
+   SELECT '${ds}'::date, ch.channel_id, ch.channel_name, ch.channel_type,
+          COALESCE(c.cost_usd, 0), COALESCE(i.installs, 0), COALESCE(i.payers, 0), COALESCE(r.revenue_usd, 0),
+          ROUND(c.cost_usd / NULLIF(i.installs, 0), 4), ROUND(r.revenue_usd / NULLIF(c.cost_usd, 0), 4)
+   FROM gamedata.ad_channels ch
+   LEFT JOIN cost c ON c.channel_id = ch.channel_id
+   LEFT JOIN inst i ON i.channel_id = ch.channel_id
+   LEFT JOIN rev  r ON r.channel_id = ch.channel_id;
+   COMMIT;
+   ```
 
 3. Confirm "Execution regions (multi-select)" is the same region as before; leave Workgroup / DB empty ("Leave blank to resolve automatically"; the target is decided by that execution environment). Click "Save".
 4. Click "Dry run": the toast "Trial run submitted (EXPLAIN validation, no data written)" appears; "Run History" gains a row with "Trigger" = "Dry run".
@@ -420,16 +420,16 @@ Page: "Smart Analytics → Report Builder" (page title "Analysis").
    - Data source "Free SQL"; engine "Warehouse (Redshift)";
    - SQL:
 
-```sql
-SELECT channel_name,
-       SUM(cost_usd)    AS cost_usd,
-       SUM(revenue_usd) AS revenue_usd,
-       ROUND(SUM(revenue_usd) / NULLIF(SUM(cost_usd), 0), 4) AS roas
-FROM gamedata.dws_channel_roi_daily
-WHERE dt BETWEEN '2026-06-16' AND '2026-06-22'
-GROUP BY channel_name
-ORDER BY roas DESC
-```
+     ```sql
+     SELECT channel_name,
+            SUM(cost_usd)    AS cost_usd,
+            SUM(revenue_usd) AS revenue_usd,
+            ROUND(SUM(revenue_usd) / NULLIF(SUM(cost_usd), 0), 4) AS roas
+     FROM gamedata.dws_channel_roi_daily
+     WHERE dt BETWEEN '2026-06-16' AND '2026-06-22'
+     GROUP BY channel_name
+     ORDER BY roas DESC
+     ```
 
    - Click "Preview data" and see 6 rows; "Chart type" "Bar chart"; click "OK".
 3. The chart appears on the canvas; click "Save" and the toast "Saved" appears. Back in the "Analyses" list you can see it, with "Visual" = 1 and your region in the "Regions involved" column.

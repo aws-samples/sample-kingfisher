@@ -331,24 +331,31 @@ Check each item:
 ## 12. Common problems
 
 **Clicking "Evaluate now" says "Evaluated: no new alerts", but there clearly is a failure.**
+
 Cause: the rule is not "Enable"d, "Silence" is on, the scope type does not include that run's type, or the run happened before the rule was created (failure conditions only look at runs completed after the rule was created). Next step: check the switches and scope; run the task once more and evaluate again.
 
 **The alert event status is "Delivery failed".**
+
 Cause: the webhook URL is unreachable, the DingTalk signature is wrong, or the SES sender is not verified. Next step: expand the event and read that channel's verbatim failure; reproduce with "Send test" under "Notification Channels" and fix the configuration.
 
 **"AI Diagnosis" keeps spinning.**
+
 Cause: a deep DevOps Agent investigation can take up to 3 minutes; after 5 minutes the page says "Diagnosis timed out; check the diagnosis records later". Next step: reopen the dialog later; a failed diagnosis shows "Diagnosis failed" or the verbatim error.
 
 **A task in the baseline table shows "Cold start".**
+
 Cause: fewer than 7 samples. Next step: run it a few more times (backfill runs do not count), then "Re-learn baselines".
 
 **The Ops Dashboard is all green in one region's view, but Alert Events has red.**
+
 Cause: both the dashboard and alerts are filtered by execution scope, and you may be looking at different regions. Next step: check the top-bar "Execution scope"; the "Execution environment" column of "Alert Events" tells you which region it is.
 
 **The Incident Knowledge Base is empty.**
+
 Cause: no diagnosis has finished yet; or the region in the current execution scope has had no incidents. Next step: run "AI Diagnosis" on a failed run and wait for it to finish; switch to "All regions" and look again; click "Refresh" to catch up.
 
 **I cannot see my run in the monitor list.**
+
 Cause: three filters — the top-bar "Workspace" and "Execution scope", and the in-page "status / type / region / trigger mode / date" filters. Next step: switch to "All regions" and click "Reset". See the [FAQ](32-faq.md).
 
 ---

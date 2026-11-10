@@ -127,11 +127,11 @@ Tab "Dimensional modeling".
 3. Choose "SCD1 (overwrite)" for "SCD Type", "Business key" `channel_id`.
 4. "Column definitions": one row exists by default; fill in three columns as in the table below (choose the type from the drop-down; VARCHAR needs a length; check PK for primary key, check NULL for nullable):
 
-| Column name | Type | Length | PK | Comment |
-|---|---|---|---|---|
-| `channel_id` | INTEGER | — | checked | Channel ID |
-| `channel_name` | VARCHAR | 128 | unchecked | Channel name |
-| `channel_type` | VARCHAR | 32 | unchecked | Channel type; values see code table channel_type |
+   | Column name | Type | Length | PK | Comment |
+   |---|---|---|---|---|
+   | `channel_id` | INTEGER | — | checked | Channel ID |
+   | `channel_name` | VARCHAR | 128 | unchecked | Channel name |
+   | `channel_type` | VARCHAR | 32 | unchecked | Channel type; values see code table channel_type |
 
 5. Click "Save". The table gains a row: Logical name · Type "Dimension table" · Ownership (DWD + Channel Performance) · Physical table `dwd.dim_channel` · Columns 3 · Applied (observed per region) "Local: ⚠ Not landed".
 6. Click "DDL" in the row to see the read-only preview "DDL Preview — Channel dimension": `CREATE SCHEMA IF NOT EXISTS dwd;` plus `CREATE TABLE IF NOT EXISTS dwd.dim_channel (...)` plus column comments.

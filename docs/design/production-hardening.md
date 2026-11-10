@@ -1,15 +1,20 @@
 # Production Hardening — Top-Level and Detailed Design
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written in the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place, execution scope, per-region scheduling and the like — is described in the [multi-region execution specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index; a path mentioned below that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: the `platform/e2e` Playwright suite, `infra/lib/backup-stack.ts`, `infra/lib/alerting-stack.ts` and `DR-RUNBOOK.md` planned in this document were not implemented as described: alerting is implemented at the application layer by the [intelligent operations and alerting design](./intelligent-ops-alerting.md) (`platform/src/lib/alerting/`), the headless acceptance suite is kept outside the repository (not checked in), the rules for retaining / snapshotting data resources are in the [deployment guide](../deployment.md), section 7bis, and the current production-hardening rules are in the [deployment guide](../deployment.md), sections 6 and 8.
-> The phrases "deploy only with `--profile temp-account`" and "`.session-state.local.md`" used below are development-period conventions of 2026-07: the current rule is any **explicit** `--profile` (see [`AGENTS.md`](../../AGENTS.md), non-negotiable rules), and that state file is not in the repository.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written in the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place,
+>   execution scope, per-region scheduling and the like — is described in the [multi-region execution specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index; a path mentioned below that no
+>   longer exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: the `platform/e2e` Playwright suite, `infra/lib/backup-stack.ts`, `infra/lib/alerting-stack.ts` and `DR-RUNBOOK.md` planned in this document were not implemented as described: alerting is implemented at the application layer by the [intelligent operations and
+>   alerting design](./intelligent-ops-alerting.md) (`platform/src/lib/alerting/`), the headless acceptance suite is kept outside the repository (not checked in), the rules for retaining / snapshotting data resources are in the [deployment guide](../deployment.md), section 7bis, and the current
+>   production-hardening rules are in the [deployment guide](../deployment.md), sections 6 and 8.
+> - The phrases "deploy only with `--profile temp-account`" and "`.session-state.local.md`" used below are development-period conventions of 2026-07: the current rule is any **explicit** `--profile` (see [`AGENTS.md`](../../AGENTS.md), non-negotiable rules), and that state file is not in the
+>   repository.
 
-> Revision: 1.0 (design draft) | Date: 2026-06-23 | Status: pending review
-> Benchmark: the production form of a leading cloud data-development suite (HA/DR, defense in depth, intelligent operations, observability)
-> Target milestone: **release 2.0.0** ("from an advanced demo to a platform that can carry production")
+> - Revision: 1.0 (design draft) | Date: 2026-06-23 | Status: pending review
+> - Benchmark: the production form of a leading cloud data-development suite (HA/DR, defense in depth, intelligent operations, observability)
+> - Target milestone: **release 2.0.0** ("from an advanced demo to a platform that can carry production")
 >
-> 🔴 This document follows the project red lines: ① deploy only with `--profile temp-account`; ② no hard-coded secrets or account values of any kind (everything goes through Secrets Manager / IAM roles); ③ every new capability must be verified by headless Playwright; ④ never push without permission.
-> This document contains no real account ids / ARNs / URLs; placeholders are used; the real values are in `.session-state.local.md`.
+> - 🔴 This document follows the project red lines: ① deploy only with `--profile temp-account`; ② no hard-coded secrets or account values of any kind (everything goes through Secrets Manager / IAM roles); ③ every new capability must be verified by headless Playwright; ④ never push without permission.
+> - This document contains no real account ids / ARNs / URLs; placeholders are used; the real values are in `.session-state.local.md`.
 
 ---
 

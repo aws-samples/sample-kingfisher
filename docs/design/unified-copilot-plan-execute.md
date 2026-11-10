@@ -1,16 +1,19 @@
 # Unified Copilot — Plan-Execute-Confirm engine design
 
-> 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
-> ⚠️ **Implementation differences**: the AgentCore flavor of the Copilot described in this document (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform process (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`); the Plan Center's "create only, never execute" guardrail is documented in the [endpoint inventory](./unified-copilot-endpoint-inventory.md).
+> - 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path
+>   mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
+> - ⚠️ **Implementation differences**: the AgentCore flavor of the Copilot described in this document (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform process
+>   (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`); the Plan Center's "create only, never execute" guardrail is documented in the [endpoint inventory](./unified-copilot-endpoint-inventory.md).
 
-> Status: **✅ implemented (the planner uses the official Strands SDK)** (design finalized on 2026-07-18 with three decisions) (documentation audit calibration of 2026-08-26: the original status header was outdated; it read "no product code written yet").
-> Positioning: on top of the existing Copilot skeleton (the read-only tools, the draft-creation tools, the three gates and the multi-turn memory of the [Copilot design](./unified-copilot.md)), add a layer of
-> agentic orchestration: **"a one-sentence request → automatic discovery of the current state → an execution plan table → step-by-step human confirmation"**.
-> Target scenario: the user only says "compute the advertising ROI for me"; the Copilot investigates on its own (where the data is / whether a ready-made metric exists /
-> whether the source data has been synchronized), reasons out an execution path, and produces an **execution plan table** for the user to confirm.
-> Lineage: follows the global-grade design discipline (plan first, abstract highly), the global self-install architecture
-> (single self-contained directory, zero hard-coding), the [AgentCore platform standard](./agentcore-standard.md), and the three-gate safety contract of the [Copilot design](./unified-copilot.md).
-> Prerequisite already in place: multi-turn conversation (the `bgp-copilot-turns` table + the agent's high-fidelity history, already committed).
+> - Status: **✅ implemented (the planner uses the official Strands SDK)** (design finalized on 2026-07-18 with three decisions) (documentation audit calibration of 2026-08-26: the original status header was outdated; it read "no product code written yet").
+> - Positioning: on top of the existing Copilot skeleton (the read-only tools, the draft-creation tools, the three gates and the multi-turn memory of the [Copilot design](./unified-copilot.md)), add a layer of
+>   agentic orchestration: **"a one-sentence request → automatic discovery of the current state → an execution plan table → step-by-step human confirmation"**.
+> - Target scenario: the user only says "compute the advertising ROI for me"; the Copilot investigates on its own (where the data is / whether a ready-made metric exists /
+>   whether the source data has been synchronized), reasons out an execution path, and produces an **execution plan table** for the user to confirm.
+> - Lineage: follows the global-grade design discipline (plan first, abstract highly), the global self-install architecture
+>   (single self-contained directory, zero hard-coding), the [AgentCore platform standard](./agentcore-standard.md), and the three-gate safety contract of the [Copilot design](./unified-copilot.md).
+> - Prerequisite already in place: multi-turn conversation (the `bgp-copilot-turns` table + the agent's high-fidelity history, already committed).
 >
 > **Three decisions made on 2026-07-18**:
 > 1. **The plan-table UI is needed in both places**: a standalone `/copilot/plans` page (the Plan Center: list + detail + step matrix),
@@ -19,11 +22,11 @@
 >    no longer a hand-written Bedrock Converse loop (sections 3 and 11).
 > 3. **Commit first**: once this design passes review it is committed to the repository first (after a pre-implementation rollback-anchor tag has been created).
 >
-> **Key facts verified (2026-07-18, against authoritative sources)**: Strands has an official **TypeScript SDK** (npm `@strands-agents/sdk`,
-> currently v1.10.0, released on 2026-07-17; repository `strands-agents/harness-sdk` with 6.6k stars and actively maintained, Apache-2.0, Node ≥ 20,
-> **first-class support for Amazon Bedrock**, depending on `@aws-sdk/client-bedrock-runtime`).
-> → Significance: the planner can be written with Strands **directly inside the Next.js / TS process**, in the same language and with the same Bedrock client as the existing `agent.ts`,
-> **with no Python container and no cross-language RPC**. "Adopting Strands in this phase" is therefore **low-risk and deliverable**, not a gamble.
+> - **Key facts verified (2026-07-18, against authoritative sources)**: Strands has an official **TypeScript SDK** (npm `@strands-agents/sdk`,
+>   currently v1.10.0, released on 2026-07-17; repository `strands-agents/harness-sdk` with 6.6k stars and actively maintained, Apache-2.0, Node ≥ 20,
+>   **first-class support for Amazon Bedrock**, depending on `@aws-sdk/client-bedrock-runtime`).
+>   → Significance: the planner can be written with Strands **directly inside the Next.js / TS process**, in the same language and with the same Bedrock client as the existing `agent.ts`,
+>   **with no Python container and no cross-language RPC**. "Adopting Strands in this phase" is therefore **low-risk and deliverable**, not a gamble.
 
 ---
 
@@ -123,10 +126,10 @@ Reasons (consistent with the long-term planning of the global-grade design disci
   **tool definitions (Zod schemas) + the system prompt + the structured output**, dropping the hand-written loop / wall-clock / wrap-up fallback boilerplate that `agent.ts` carries today.
 - **Capability-surface safety unchanged**: Strands can only call **the tools we register with it**; registering no execution tool → gate 1 holds inside the framework (section 2).
 
-> **Relationship to the existing `agent.ts`**: `agent.ts` (hand-written Converse) serves the **general Q&A Copilot** (the first Copilot phase, read-only question answering) and
-> **stays untouched**. The new `planner.ts` (Strands) is the **dedicated planning brain**, used only on the "produce an execution plan" path (`/api/copilot/plan`).
-> The two share the same tool semantics and the same `COPILOT` configuration, but are physically separate with different responsibilities. Whether to migrate the general Q&A to Strands as well is evaluated separately
-> once Strands has proven stable on the planning path (out of scope for this phase, to avoid changing too much at once).
+> - **Relationship to the existing `agent.ts`**: `agent.ts` (hand-written Converse) serves the **general Q&A Copilot** (the first Copilot phase, read-only question answering) and
+>   **stays untouched**. The new `planner.ts` (Strands) is the **dedicated planning brain**, used only on the "produce an execution plan" path (`/api/copilot/plan`).
+> - The two share the same tool semantics and the same `COPILOT` configuration, but are physically separate with different responsibilities. Whether to migrate the general Q&A to Strands as well is evaluated separately
+>   once Strands has proven stable on the planning path (out of scope for this phase, to avoid changing too much at once).
 
 > **AgentCore deployment form**: following the [AgentCore platform standard](./agentcore-standard.md), the planner first runs **inprocess** in this phase (Strands TS
 > inside the platform process, zero new stacks, reusing the existing Bedrock IAM). Should a standalone Runtime be needed later, Strands officially supports deployment to Bedrock
@@ -225,6 +228,7 @@ CopilotStepRow {
 ```
 
 ### 5.4 Summary of the generalization points (backfill → Copilot)
+
 | Backfill (hard-wired date × node) | Copilot (heterogeneous steps) |
 |---|---|
 | Mechanical expansion by expandDates × analyzeDag | The agent produces `StepSpec[]` directly (the expander degenerates to "persist the plan array") |
@@ -260,6 +264,7 @@ registerStepHandler(emrHandler)
 ```
 
 ### 6.1 Step type → real API mapping (all verified to exist)
+
 | stepType | Create draft (L1) | Execute (L3, interface reserved) | Status query (reconcile) |
 |---|---|---|---|
 | sync-glue | `POST /api/sync` (channel=glue) | `POST /api/sync/[id]/start` | `GET /api/sync/[id]/glue-status` |
@@ -315,9 +320,9 @@ landed at the state-machine layer. After resolveBlocked unlocks a step, it lands
 | **Stage C** | Executor skeleton (StepHandler registry + tick/reconcile, reusing the backfill core) | — | 🔧 **code written; `autoExecute` defaults to false; the engine does not claim** |
 | **Delegated-execution phase** | L3 step-by-step delegated execution: turn on autoExecute; the engine executes after confirm-step | L3 | 🔒 **enabled only with written approval** |
 
-> **The value of Stage C**: the executor, as a **pluggable module**, gets its interfaces and skeleton written first (sharing the core with backfill), but `autoExecute`
-> defaults to false → the engine exists but executes no step. When L3 is approved in the future, only the flag needs flipping + the `execute()` of each handler needs implementing,
-> **with no architectural refactoring**. This is "plan ahead, think long-term" made concrete: today's L2 and tomorrow's L3 are two configuration states of the same code.
+> - **The value of Stage C**: the executor, as a **pluggable module**, gets its interfaces and skeleton written first (sharing the core with backfill), but `autoExecute`
+>   defaults to false → the engine exists but executes no step. When L3 is approved in the future, only the flag needs flipping + the `execute()` of each handler needs implementing,
+>   **with no architectural refactoring**. This is "plan ahead, think long-term" made concrete: today's L2 and tomorrow's L3 are two configuration states of the same code.
 
 ---
 

@@ -2,10 +2,10 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.0 (draft) | Created: 2026-07-04 | Capability groups: intelligent baseline / SLA / data-interruption detection + ops dashboard / unified alerting center
-> Dependent blueprint: [production hardening design](./production-hardening.md), work stream WS6 (alerting center + ops dashboard, already detailed there)
-> Reuse: run ledger `bgp-task-runs` · hand-drawn SVG charts `components/dashboard/charts.tsx` · AI diagnosis ([fault diagnosis design](./devops-agent-diagnostics.md)) · MWAA scheduling
-> **This document is the authoritative design for intelligent operations and alerting; read it before starting work. On completion, write the results back to section 3 of the capability roadmap of 2026-08 (a historical document that is not part of this repository).**
+> - Revision: 1.0 (draft) | Created: 2026-07-04 | Capability groups: intelligent baseline / SLA / data-interruption detection + ops dashboard / unified alerting center
+> - Dependent blueprint: [production hardening design](./production-hardening.md), work stream WS6 (alerting center + ops dashboard, already detailed there)
+> - Reuse: run ledger `bgp-task-runs` · hand-drawn SVG charts `components/dashboard/charts.tsx` · AI diagnosis ([fault diagnosis design](./devops-agent-diagnostics.md)) · MWAA scheduling
+> - **This document is the authoritative design for intelligent operations and alerting; read it before starting work. On completion, write the results back to section 3 of the capability roadmap of 2026-08 (a historical document that is not part of this repository).**
 
 ---
 
@@ -255,6 +255,7 @@ All Chinese strings in new pages / components are wrapped in `t("...")`; run `no
 6. `/ops` dashboard: the six cards — task state / trend / top slow / Gantt / on-time rate / recent alerts — render, auto refresh works, dark projection looks right.
 7. i18n: in English mode the whole page has 0 residual Chinese (business data excepted); Chinese regression.
 8. DingTalk / WeCom (if a real webhook is available) receive one message over the real chain (optional).
+
 > Scheduled / periodic items "run twice then stop"; evaluations triggered by tests leave nothing standing, so no cleanup is needed.
 
 ---

@@ -2,9 +2,11 @@
 
 > 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place, execution scope, per-region scheduling and the like — is described in the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the module index; a path mentioned in this document that no longer exists means that idea was not implemented as described or has since been superseded.
 
-> Revision: 1.0 **✅ Completed (the EMR / Flink catalog JARs have been unified on 0.1.8)** (documentation audit calibration of 2026-08-26: the original status header was out of date; it originally read "design · pending decision") | Date: 2026-07-27 | Trigger: the requirement that "the Glue / Flink / EMR Serverless compute engines must all work end to end" — the real run of the connector modularization covered only Flink; the real-run status of S3 Tables from Glue / EMR was unknown.
-> Relationship: independent of the connector-runtime modularization (the connector-runtime module of Stream Compute) and of MSK source support (part of the data-source ecosystem). Dedicated to establishing that all three engines really read and write the same S3 Tables table bucket, and to eliminating catalog JAR version drift.
-> 🔴 **Design only; nothing moves until the decision is made; real runs follow the real-time red line (stop / delete after verification to cap cost).**
+> - Revision: 1.0 **✅ Completed (the EMR / Flink catalog JARs have been unified on 0.1.8)** (documentation audit calibration of 2026-08-26: the original status header was out of date; it originally read "design · pending decision") | Date: 2026-07-27 | Trigger: the requirement that "the Glue /
+>   Flink / EMR Serverless compute engines must all work end to end" — the real run of the connector modularization covered only Flink; the real-run status of S3 Tables from Glue / EMR was unknown.
+> - Relationship: independent of the connector-runtime modularization (the connector-runtime module of Stream Compute) and of MSK source support (part of the data-source ecosystem). Dedicated to establishing that all three engines really read and write the same S3 Tables table bucket, and to
+>   eliminating catalog JAR version drift.
+> - 🔴 **Design only; nothing moves until the decision is made; real runs follow the real-time red line (stop / delete after verification to cap cost).**
 
 ---
 

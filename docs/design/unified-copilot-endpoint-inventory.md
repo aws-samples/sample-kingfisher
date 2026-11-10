@@ -1,11 +1,14 @@
 # Appendix — platform-wide API endpoint classification (basis for the Copilot permission boundary)
 
-> 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
-> ⚠️ **Implementation differences**: the AgentCore edition of the Copilot described in the [design document](./unified-copilot.md) (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform process (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`), and the "create only, never execute" guardrails of the Plan Center are documented in this endpoint inventory.
+> - 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is tracked in the module index of the engineering documentation; a path
+>   mentioned below that no longer exists means that the idea was not implemented as written here or has since been superseded.
+> - ⚠️ **Implementation differences**: the AgentCore edition of the Copilot described in the [design document](./unified-copilot.md) (`infra/agent/copilot`, `infra/lib/copilot-agentcore-stack.ts`, `infra/lambda/copilot-skills`) was never implemented; the current Copilot runs inside the platform
+>   process (`platform/src/lib/copilot/`, API `platform/src/app/api/copilot/`), and the "create only, never execute" guardrails of the Plan Center are documented in this endpoint inventory.
 
-> Source: exhaustive verification by a code-survey agent (2026-07-15) scanning `platform/src/app/api/**/route.ts`.
-> Purpose: the authoritative basis for the "may create / must not execute" allow- and deny-lists of the [unified platform Copilot](./unified-copilot.md).
-> Classification anchors: **the audit-action suffix** (`.create` permitted / `.run·.start·...` blocked) + **a path deny-list** (covering the execution endpoints that have no audit record).
+> - Source: exhaustive verification by a code-survey agent (2026-07-15) scanning `platform/src/app/api/**/route.ts`.
+> - Purpose: the authoritative basis for the "may create / must not execute" allow- and deny-lists of the [unified platform Copilot](./unified-copilot.md).
+> - Classification anchors: **the audit-action suffix** (`.create` permitted / `.run·.start·...` blocked) + **a path deny-list** (covering the execution endpoints that have no audit record).
 
 ## Unified authentication / audit infrastructure
 

@@ -1,26 +1,34 @@
 # Model Configuration — Runtime-configurable Bedrock models (replacing install-time hard-coding)
 
-> Revision: **2.3** (🆕 2026-10-20, probe-budget correction: the D5 probe budget follows the vendor profile (Kimi K3 45 s / all others 10 s) + the tiny probe and the tool-use probe run in parallel + a timeout is classified separately as Timeout (no longer folded into Throttle) + saving accepts a probe that passed in the same region within the last 10 minutes and does not probe a second time;
-> based on real measurements of Kimi probes in a temporary test account, 8 samples of 3.0–39.4 s; see [the specification](./model-configuration-spec.md) (revision 2.5), section 3.2, and [the interaction design](./model-configuration-interaction.md) (revision 1.7), item F8) · **2.2** (2026-10-14, after the first real-environment run of the page-driven acceptance segment: 🆕 **D17 transient stream errors are retried once and must leave a log line** — under Kimi K3, the sixth model call of a GenBI container run intermittently (1 in 3) received "Stream ended without completing a message", and the container's catch block used to swallow the error silently;
-> single author `lib/ai/core/transient.ts`, compiled into the three containers) · **2.1** (2026-10-14, after construction: the status in section 12 changed to "code landed; awaiting **page-driven** real-environment acceptance";
-> D12 adds the Strands planner factor and the real function names;
-> D14 adds base-model derivation from real values / failure traces / fallback;
-> 🆕 D16 the GenBI answer card shows the model and backend used for this answer;
-> section 12.4 marked "landed; the actual change list is in the specification, section 7.8") · **2.0** (🆕 2026-10-14 **multi-vendor model channel: GLM 5 / Kimi K3**, decided the same day: "everything through Bedrock, everything through the same model channel";
-> new section 12: real-environment survey (real `converse` calls in a temporary test account) + decisions D3′ / D10–D15 + change scope + risks + construction phases 5 and 6) · **1.6** (🔴 2026-09-09 the scope parameter of model-config renamed `scope` → `settingScope`; rationale in [the specification](./model-configuration-spec.md) (revision 1.5) and in [the multi-region specification](./multi-region-execution-spec.md) (revision 3.34), section 2.6.0) 1.5 (🔴 2026-08-29 **external-audit remediation**: two audit items — the probe key gains the target dimension; the sequence becomes a pure pointer;
-> details in [the multi-region design](./multi-region-execution-design.md), section 20.8) 1.4 (🔴 2026-08-29 **convergence-review back-fill**: ① **D8 dimension settled** — the model key and the second parameter of `resolveModelIdRuntime` unified from `region` to **`targetId`** (long since settled in the multi-region specification, sections 1.3a-S2 and 6, but the four documents of this module plus the feature map — **10 key names + 8 signatures — had never been back-filled**);
-> three hard reasons: Bedrock model enablement is **account × region** scoped (a region key would cross accounts and pick up a model that is not enabled = risk P0-2), the platform identity is already unified on `targetId` (keeping a region key = a second identity), and two blue/green targets in the same region each need their own configuration;
-> ⚠️ if implemented by region, activating the multi-region per-target phase would mean a **key migration** of `bgp-settings`, which conflicts with the zero-migration promise of D2 ⇒ **the table shape is fixed on targetId from phase 1**;
-> ② **`gpt-oss-*` "pending" status removed** — the phase-1 hard gate judges by family, and the `openai.` prefix cannot be saved anyway, so leaving it "pending" was a false openness;
-> whether to include it is decided together with the transport gate of construction phase 2) 1.3 (review item: D2 adds the factory-default clarification — construction phase 1 does not change the SSOT [still opus-4-6, keeping zero migration]; opus-4-8-global is the recommended global default that an administrator sets after deployment once a probe passes, which removes the apparent mismatch between D2 zero migration and the D3/D9 default.
-> 1.2 review refinement of the D9 Mantle wording [OPENAI_PATH_MODEL_PREFIXES is a sub-path selector; gpt-oss also goes through Mantle; the load-bearing conclusion that Claude does not use it is unchanged] + paths gain the platform/ prefix;
-> the closing sentence of D8 "section 3 sk supported in phase 1" corrected to phase 2, construction phase 3;
-> section 10 adds the acceptance item for quota back-off and degradation (risk P0-4).
-> 1.1: review: D9 probe gate + per-capability overrides deferred to phase 2 (construction phase 4) + per-region key unified as #<region>#global + the AI-path gap accepted;
-> 1.0 two-family selection, see D3/D4) | Date: 2026-08-26 (revision 1.2: 2026-08-28) | Status: ⬜ in design, not started
-> Requirement origin: raised on 2026-08-26: "the underlying model must be selectable, only models on Bedrock are supported, and the scope is every place a model is used. Today it is hard-coded in the installation code, which is not acceptable."
-> Upstream roadmap: the platform roadmap of 2026-08 (historical), which placed this work in the platformization track (priority 2) and reserved this module.
-> 🔴 Red line: this document is pure design; no code is written without an explicit instruction.
+> - Revision: **2.3** (🆕 2026-10-20, probe-budget correction: the D5 probe budget follows the vendor profile (Kimi K3 45 s / all others 10 s) + the tiny probe and the tool-use probe run in parallel + a timeout is classified separately as Timeout (no longer folded into Throttle) + saving accepts a
+>   probe that passed in the same region within the last 10 minutes and does not probe a second time;
+>   based on real measurements of Kimi probes in a temporary test account, 8 samples of 3.0–39.4 s; see [the specification](./model-configuration-spec.md) (revision 2.5), section 3.2, and [the interaction design](./model-configuration-interaction.md) (revision 1.7), item F8) · **2.2** (2026-10-14,
+>   after the first real-environment run of the page-driven acceptance segment: 🆕 **D17 transient stream errors are retried once and must leave a log line** — under Kimi K3, the sixth model call of a GenBI container run intermittently (1 in 3) received "Stream ended without completing a message",
+>   and the container's catch block used to swallow the error silently;
+>   single author `lib/ai/core/transient.ts`, compiled into the three containers) · **2.1** (2026-10-14, after construction: the status in section 12 changed to "code landed; awaiting **page-driven** real-environment acceptance";
+>   D12 adds the Strands planner factor and the real function names;
+>   D14 adds base-model derivation from real values / failure traces / fallback;
+>   🆕 D16 the GenBI answer card shows the model and backend used for this answer;
+>   section 12.4 marked "landed; the actual change list is in the specification, section 7.8") · **2.0** (🆕 2026-10-14 **multi-vendor model channel: GLM 5 / Kimi K3**, decided the same day: "everything through Bedrock, everything through the same model channel";
+>   new section 12: real-environment survey (real `converse` calls in a temporary test account) + decisions D3′ / D10–D15 + change scope + risks + construction phases 5 and 6) · **1.6** (🔴 2026-09-09 the scope parameter of model-config renamed `scope` → `settingScope`; rationale in [the
+>   specification](./model-configuration-spec.md) (revision 1.5) and in [the multi-region specification](./multi-region-execution-spec.md) (revision 3.34), section 2.6.0) 1.5 (🔴 2026-08-29 **external-audit remediation**: two audit items — the probe key gains the target dimension; the sequence
+>   becomes a pure pointer;
+>   details in [the multi-region design](./multi-region-execution-design.md), section 20.8) 1.4 (🔴 2026-08-29 **convergence-review back-fill**: ① **D8 dimension settled** — the model key and the second parameter of `resolveModelIdRuntime` unified from `region` to **`targetId`** (long since settled
+>   in the multi-region specification, sections 1.3a-S2 and 6, but the four documents of this module plus the feature map — **10 key names + 8 signatures — had never been back-filled**);
+>   three hard reasons: Bedrock model enablement is **account × region** scoped (a region key would cross accounts and pick up a model that is not enabled = risk P0-2), the platform identity is already unified on `targetId` (keeping a region key = a second identity), and two blue/green targets in
+>   the same region each need their own configuration;
+>   ⚠️ if implemented by region, activating the multi-region per-target phase would mean a **key migration** of `bgp-settings`, which conflicts with the zero-migration promise of D2 ⇒ **the table shape is fixed on targetId from phase 1**;
+>   ② **`gpt-oss-*` "pending" status removed** — the phase-1 hard gate judges by family, and the `openai.` prefix cannot be saved anyway, so leaving it "pending" was a false openness;
+>   whether to include it is decided together with the transport gate of construction phase 2) 1.3 (review item: D2 adds the factory-default clarification — construction phase 1 does not change the SSOT [still opus-4-6, keeping zero migration]; opus-4-8-global is the recommended global default that
+>   an administrator sets after deployment once a probe passes, which removes the apparent mismatch between D2 zero migration and the D3/D9 default.
+>   1.2 review refinement of the D9 Mantle wording [OPENAI_PATH_MODEL_PREFIXES is a sub-path selector; gpt-oss also goes through Mantle; the load-bearing conclusion that Claude does not use it is unchanged] + paths gain the platform/ prefix;
+>   the closing sentence of D8 "section 3 sk supported in phase 1" corrected to phase 2, construction phase 3;
+>   section 10 adds the acceptance item for quota back-off and degradation (risk P0-4).
+>   1.1: review: D9 probe gate + per-capability overrides deferred to phase 2 (construction phase 4) + per-region key unified as #<region>#global + the AI-path gap accepted;
+>   1.0 two-family selection, see D3/D4) | Date: 2026-08-26 (revision 1.2: 2026-08-28) | Status: ⬜ in design, not started
+> - Requirement origin: raised on 2026-08-26: "the underlying model must be selectable, only models on Bedrock are supported, and the scope is every place a model is used. Today it is hard-coded in the installation code, which is not acceptable."
+> - Upstream roadmap: the platform roadmap of 2026-08 (historical), which placed this work in the platformization track (priority 2) and reserved this module.
+> - 🔴 Red line: this document is pure design; no code is written without an explicit instruction.
 
 ---
 
@@ -177,13 +185,14 @@ Leave the **other fields** of the `GENBI` / `COPILOT` / `NET_ADVISOR` objects un
 | Candidate | Verdict |
 |---|---|
 | **Pass modelId through the request payload** (selected) | When the platform invokes a Runtime (`genbi/agentcore-client.ts` etc.) it includes `modelId` in the payload (taken from `resolveModelIdRuntime`); the container's `agent.js` reads `payload.modelId \|\| env.BEDROCK_MODEL_ID \|\| fallback`. ✅ Takes effect immediately, no deployment; the container change is one line; env remains the fallback |
+| UpdateAgentRuntime to change env | ❌ Minute-level propagation; requires the platform to hold the UpdateAgentRuntime permission (privilege expansion); availability jitter while the Runtime rolls |
 
 > ⚠️ **Two fact checks from the review (must be aligned before implementation)**:
+>
 > 1. **The copilot container is not in this repository** — `infra/agent/` contains only the four entries `genbi/netadvisor/paramadvisor/_runtime`, **no copilot directory, and infra/lib has no copilot stack**;
-> `COPILOT_RUNTIME_ARN` points to an externally deployed Runtime.
-> So among the "4 AgentCore client call sites", the **container-side pass-through for the copilot client cannot be implemented in this repository** — copilot's model configuration can rely only on the group-A in-process path (planner / agent are already covered in group A); AgentCore pass-through is a no-op for copilot, which must be stated clearly as not an omission.
+>    `COPILOT_RUNTIME_ARN` points to an externally deployed Runtime.
+>    So among the "4 AgentCore client call sites", the **container-side pass-through for the copilot client cannot be implemented in this repository** — copilot's model configuration can rely only on the group-A in-process path (planner / agent are already covered in group A); AgentCore pass-through is a no-op for copilot, which must be stated clearly as not an omission.
 > 2. **The shared runner is the prebuild distribution source**: `_runtime/agent-runner.js` is the source, and the copies inside the netadvisor / paramadvisor directories are **replicas** — making "payload.modelId wins" requires **changing the shared source + redistributing** (core-prebuild); changing only the replicas would create a new round of drift (the 4 drifted fallback literals already known from section 1.1 are precisely the historical product of this mechanism).
-| UpdateAgentRuntime to change env | ❌ Minute-level propagation; requires the platform to hold the UpdateAgentRuntime permission (privilege expansion); availability jitter while the Runtime rolls |
 
 - Fix the drift of the 4 container fallback literals from section 1.1 (sonnet-4-5, proven to have drifted from the SSOT opus-4-6): **lock them to "read the SSOT value injected at build time" (automatic)**, not the weak option of "someone remembers to keep them in sync with the SSOT" — eliminating the manual synchronization burden (finalized in the second review). Low weight (it only matters for local bare runs with env missing; production is injected by CDK), but directionally it should be automated.
 
@@ -193,22 +202,26 @@ Leave the **other fields** of the `GENBI` / `COPILOT` / `NET_ADVISOR` objects un
 - It was stated explicitly that querying executes in a single region and each region uses its own model — at that point GenBI's modelId resolution reads the configuration by "**the target execution target**" (details in [the multi-region design](./multi-region-execution-design.md), querying section).
 - The per-target override key = `ai-model#<targetId>#global` (all capabilities of that target share one model), surfaced on the execution-environment detail page as the "AI model for this region" card (see [the multi-region interaction design](./multi-region-execution-interaction.md); **the sk of section 3 is activated in phase 2, construction phase 3 — the table structure is ready from phase 1, zero migration**; the earlier "supported in phase 1" conflicted with section 3 / the first line of D8 / the phase-2 classification of construction phase 3 and was corrected in review).
 
-> 🔴 **Dimension settled: the key and the second parameter of the resolution function always use `targetId`, not `region` (back-filled 2026-08-29 from the convergence review)**.
-> The multi-region documents had already fixed this key as **`ai-model#<targetId>#global`** in **the specification, sections 1.3a-S2 and 6 (change comparison), and the design, section 10 line 511 and section 15 line 678**, but the four documents of this module plus the feature map — **10 key names + 8 function signatures in total — had never been back-filled** and still said `<region>`.
-> **Why it must be target and not region (three reasons, all hard facts, not preferences)**: ① **Bedrock model enablement (Marketplace subscription / model access) is "account × region" scoped**, while `targetId` carries `accountId` + `region` ⇒ two targets in **the same region but different accounts** may well have different models enabled, and a region key would **cross accounts** and pick up a model that is not enabled (exactly risk P0-2 "switch to the wrong model and everything is down");
-> ② the whole platform's identity is already unified on `targetId` (multi-region design, section 20.1-1); keeping an extra region-keyed entry = **a second identity**, the very disease the multi-region work introduced targetId to eliminate;
-> ③ when **blue/green or primary/standby targets coexist in the same region**, a staged model switch must be configurable per target, which a region key cannot do.
-> ⚠️ **If implemented as `<region>`, activating the multi-region per-target phase would be a key migration of `bgp-settings`** — in direct conflict with this module's "zero table migration" promise (D2); therefore **the table shape must be fixed on targetId from phase 1** (the key value is not written in phase 1, but the shape is fixed).
+> - 🔴 **Dimension settled: the key and the second parameter of the resolution function always use `targetId`, not `region` (back-filled 2026-08-29 from the convergence review)**.
+> - The multi-region documents had already fixed this key as **`ai-model#<targetId>#global`** in **the specification, sections 1.3a-S2 and 6 (change comparison), and the design, section 10 line 511 and section 15 line 678**, but the four documents of this module plus the feature map — **10 key
+>   names + 8 function signatures in total — had never been back-filled** and still said `<region>`.
+> - **Why it must be target and not region (three reasons, all hard facts, not preferences)**: ① **Bedrock model enablement (Marketplace subscription / model access) is "account × region" scoped**, while `targetId` carries `accountId` + `region` ⇒ two targets in **the same region but different
+>   accounts** may well have different models enabled, and a region key would **cross accounts** and pick up a model that is not enabled (exactly risk P0-2 "switch to the wrong model and everything is down");
+>   ② the whole platform's identity is already unified on `targetId` (multi-region design, section 20.1-1); keeping an extra region-keyed entry = **a second identity**, the very disease the multi-region work introduced targetId to eliminate;
+>   ③ when **blue/green or primary/standby targets coexist in the same region**, a staged model switch must be configurable per target, which a region key cannot do.
+> - ⚠️ **If implemented as `<region>`, activating the multi-region per-target phase would be a key migration of `bgp-settings`** — in direct conflict with this module's "zero table migration" promise (D2); therefore **the table shape must be fixed on targetId from phase 1** (the key value is not
+>   written in phase 1, but the shape is fixed).
 
 ### D9. Call transport = probe-gated (Converse-only or dual transport); phase 1 uses `global.*` profiles, phase 2 region-pins (decided 2026-08-28)
 
-> 🔴 **Correction from review (2026-08-28, confirmed by grep)**: the first draft's "both families use the same OpenAI-compatible endpoint client" **does not hold and is withdrawn**.
-> Evidence: ① all 9 current consumption points (section 1.2) **use the Bedrock Converse API + the Claude tool-use loop** (`genbi/agent.ts:170` `stopReason!=="tool_use"`, `:180` `"toolUse" in blk`, `:210` `toolResult`);
-> ② Bedrock's OpenAI-compatible endpoint is implemented by the Strands Mantle adapter (`platform/node_modules/@strands-agents/sdk/dist/src/models/openai/mantle.js:23` `OPENAI_PATH_MODEL_PREFIXES=['openai.gpt-5.']`, :52) — ⚠️ review refinement: that constant is the **sub-path selector** between `/openai/v1` and `/v1` (`openai.gpt-5.*` takes the former; `openai.gpt-oss-*` also goes through Mantle and takes the latter),
-> **not "routes only gpt-5"**;
-> the load-bearing conclusion is unchanged = **Mantle as a whole is an endpoint dedicated to OpenAI-family models (baseURL `bedrock-mantle…`, the OpenAI SDK, token-generator), and Claude cannot use that endpoint** (Claude uses Converse / BedrockModel);
-> ③ the two packages `openai` / `@aws/bedrock-token-generator` **are currently not installed** (absent from both `platform/node_modules` and `platform/package.json`).
-> Hence "one client for both families" is wrong: Claude can only use Converse, and if GPT is to use the OpenAI-compatible endpoint, that is **another transport**.
+> - 🔴 **Correction from review (2026-08-28, confirmed by grep)**: the first draft's "both families use the same OpenAI-compatible endpoint client" **does not hold and is withdrawn**.
+> - Evidence: ① all 9 current consumption points (section 1.2) **use the Bedrock Converse API + the Claude tool-use loop** (`genbi/agent.ts:170` `stopReason!=="tool_use"`, `:180` `"toolUse" in blk`, `:210` `toolResult`);
+>   ② Bedrock's OpenAI-compatible endpoint is implemented by the Strands Mantle adapter (`platform/node_modules/@strands-agents/sdk/dist/src/models/openai/mantle.js:23` `OPENAI_PATH_MODEL_PREFIXES=['openai.gpt-5.']`, :52) — ⚠️ review refinement: that constant is the **sub-path selector** between
+>   `/openai/v1` and `/v1` (`openai.gpt-5.*` takes the former; `openai.gpt-oss-*` also goes through Mantle and takes the latter),
+>   **not "routes only gpt-5"**;
+>   the load-bearing conclusion is unchanged = **Mantle as a whole is an endpoint dedicated to OpenAI-family models (baseURL `bedrock-mantle…`, the OpenAI SDK, token-generator), and Claude cannot use that endpoint** (Claude uses Converse / BedrockModel);
+>   ③ the two packages `openai` / `@aws/bedrock-token-generator` **are currently not installed** (absent from both `platform/node_modules` and `platform/package.json`).
+> - Hence "one client for both families" is wrong: Claude can only use Converse, and if GPT is to use the OpenAI-compatible endpoint, that is **another transport**.
 
 - **Decision = probe first, then choose one of two (the implementation is not locked before the probe)**:
   - The key unknown = **whether GPT-5.6 supports tool-use under the Bedrock Converse API** (querying / copilot / planner among the 9 points rely on the tool loop). This probe can only be settled by **a real invoke in the platform account**, and **cannot be done now** (the one-off read-only permission in the developer account has been used up and will not be touched again).
@@ -360,12 +373,14 @@ Leave the **other fields** of the `GENBI` / `COPILOT` / `NET_ADVISOR` objects un
 
 ## 11. Construction phases
 
-> ✅ Decided (2026-08-26): **phase 1 = construction phases 1 + 2**.
-> 🔴 **The sole authority for the implementation order = [the multi-region design](./multi-region-execution-design.md), section 17** (corrected in revision 1.4: the original text said "the three-module order (model configuration → project isolation → multi-region execution), with the cross matrix in section 15 of the multi-region design as authority" — **the old module-granularity order has been superseded by the batch-granularity settled order**, and that cell of section 15 was itself the same stale text and has been changed to point at section 17).
-> 🔴 **The sequence is in the multi-region design, section 17, and is not restated here** (revision 1.5: restating is a source of drift; section 17 explicitly includes construction phases 1, 2 and 3 of this module).
-> **This module's position in it: it is still the first functional module to be touched**, but **it comes after the standalone IDOR security fix for the production environment and after the shared-foundation batch** — the security fix has no prerequisite and the highest priority;
-> the shared-foundation batch first aligns the `bgp-task-runs` write points / naming SSOT / ledgers and other shared foundations in one go, so that the modules after this one are not repeatedly overturned.
-> 🔴 **Revision of 2026-08-28 (decided; overrides the 08-26 "per-capability overrides in phase 1" above)**: **per-capability overrides are demoted to phase 2 (construction phase 4)**; in phase 1 all 9 capabilities uniformly use the global default (see D3); hence phase 1 (construction phases 1 + 2) **does not include** the per-capability override UI.
+> - ✅ Decided (2026-08-26): **phase 1 = construction phases 1 + 2**.
+> - 🔴 **The sole authority for the implementation order = [the multi-region design](./multi-region-execution-design.md), section 17** (corrected in revision 1.4: the original text said "the three-module order (model configuration → project isolation → multi-region execution), with the cross matrix
+>   in section 15 of the multi-region design as authority" — **the old module-granularity order has been superseded by the batch-granularity settled order**, and that cell of section 15 was itself the same stale text and has been changed to point at section 17).
+> - 🔴 **The sequence is in the multi-region design, section 17, and is not restated here** (revision 1.5: restating is a source of drift; section 17 explicitly includes construction phases 1, 2 and 3 of this module).
+> - **This module's position in it: it is still the first functional module to be touched**, but **it comes after the standalone IDOR security fix for the production environment and after the shared-foundation batch** — the security fix has no prerequisite and the highest priority;
+>   the shared-foundation batch first aligns the `bgp-task-runs` write points / naming SSOT / ledgers and other shared foundations in one go, so that the modules after this one are not repeatedly overturned.
+> - 🔴 **Revision of 2026-08-28 (decided; overrides the 08-26 "per-capability overrides in phase 1" above)**: **per-capability overrides are demoted to phase 2 (construction phase 4)**; in phase 1 all 9 capabilities uniformly use the global default (see D3); hence phase 1 (construction phases 1 + 2)
+>   **does not include** the per-capability override UI.
 
 - **Construction phase 1 (core)**: bgp-settings table + resolveModelIdRuntime + global default + /settings card + probe + rework of the 9 group-A points.
 - **Construction phase 2**: AgentCore payload pass-through + container fallback drift fix + **D9 probe gate settling the GPT transport branch** (probe supported = branch A, no extra work; not supported = branch B dual transport, separate PR).
@@ -499,7 +514,6 @@ Background: in the customer production account (`customer-prod`, Singapore) the 
 - real environment = a temporary test account (pre-deployed at the development HEAD; this wave's code was raised with `redeploy-agents.sh` (the agent redeploy script, needed because the platform redeploy script does not refresh the agents) + `redeploy-platform.sh`), real Kimi K3 model + GLM 5 stand-in;
 - real verification of GLM 5.3 itself is attached to construction phase 6.
 - **Conclusion pending back-fill from the page-driven segment (2026-10-14).**
-- ****
 
 ### 12.7 Phases
 

@@ -8,7 +8,9 @@
 | What you will have afterwards | You know which pages to visit every day / every week, which buttons to click and what every option means; you know which rejections the platform makes on purpose and what to do next |
 
 > This guide is organized by "what this role does in a day / a week". Each section gives: which page to go to · key buttons · key points · related scenarios.
+>
 > If you want a complete end-to-end walk-through first, go straight to [Scenario 1: MySQL detail data to a channel daily report](20-scenario-detail-to-daily-report.md).
+>
 > The ❓ "How to use this page" in the top-right corner of every page is always the most authoritative one-line description of that page; the button names in this guide match it word for word.
 
 ## 0. A day and a week

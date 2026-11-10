@@ -2,9 +2,10 @@
 
 > 📌 **Scope note (reconciled on 2026-10-13)**: this document was written during the single-region stage and records the design as it stood then (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place, execution scope, per-region scheduling and the like — is described in the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the module index; a path mentioned in this document that no longer exists means that idea was not implemented as described or has since been superseded.
 
-> Revision: 1.0 (design · pending decision) | Date: 2026-07-27 | Trigger: while adding the MSK source it became clear that the "fat JAR" model cannot carry 50+ sources worldwide; the requirement was to think the **final form** through, eliminate the multiple mechanisms, map out the blast radius clearly, and write the document before writing any code.
-> Relationship: this is the **foundation** on which MSK source support (the MSK phase of the data-source ecosystem work) stands. MSK should not be crammed into "adding a source"; it should land on top of this foundation and return to genuinely "adding one line".
-> 🔴 **Design only; code moves only after the decision. What moves is the start path of every Flink job (the core chain), so it must be a strangler-pattern rollout with zero regression.**
+> - Revision: 1.0 (design · pending decision) | Date: 2026-07-27 | Trigger: while adding the MSK source it became clear that the "fat JAR" model cannot carry 50+ sources worldwide; the requirement was to think the **final form** through, eliminate the multiple mechanisms, map out the blast radius
+>   clearly, and write the document before writing any code.
+> - Relationship: this is the **foundation** on which MSK source support (the MSK phase of the data-source ecosystem work) stands. MSK should not be crammed into "adding a source"; it should land on top of this foundation and return to genuinely "adding one line".
+> - 🔴 **Design only; code moves only after the decision. What moves is the start path of every Flink job (the core chain), so it must be a strangler-pattern rollout with zero regression.**
 
 ---
 

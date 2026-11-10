@@ -1,7 +1,7 @@
 # Operation Guide (summary design · prototype · execution flow · headless acceptance criteria, in one document)
 
-> Revision: **1.0** (2026-09-06; the direction given, verbatim: "you need to add an operation guide to the web pages, otherwise hardly anyone will know how to use the system as it stands") | delivered as a single construction batch | covered by a dedicated headless-browser acceptance segment
-> Basis: the platform-wide interaction constitution (the [multi-region interaction design](./multi-region-execution-interaction.md), section 0) · the reach surface listed in the feature map (section 0) · the existing `FeatureGuide` (feature-description card) on each page stays untouched; this module is the **global layer** on top of it.
+> - Revision: **1.0** (2026-09-06; the direction given, verbatim: "you need to add an operation guide to the web pages, otherwise hardly anyone will know how to use the system as it stands") | delivered as a single construction batch | covered by a dedicated headless-browser acceptance segment
+> - Basis: the platform-wide interaction constitution (the [multi-region interaction design](./multi-region-execution-interaction.md), section 0) · the reach surface listed in the feature map (section 0) · the existing `FeatureGuide` (feature-description card) on each page stays untouched; this module is the **global layer** on top of it.
 
 ## 1. Summary design
 

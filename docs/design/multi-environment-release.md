@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.6.0 | Date: 2026-06-14 | Status: implemented and verified online
-> Addresses the engineering item of the gap-analysis re-check (group B): "no **dev/staging/prod multi-environment and release process (CI/CD)**". This module reuses the version snapshots of [versioning and rollback](./versioning-rollback.md) (as release artifacts) and the approval flow of [multi-tenancy RBAC](./multitenancy-rbac.md) (`type:"deploy"`).
+> - Revision: 1.6.0 | Date: 2026-06-14 | Status: implemented and verified online
+>   Addresses the engineering item of the gap-analysis re-check (group B): "no **dev/staging/prod multi-environment and release process (CI/CD)**". This module reuses the version snapshots of [versioning and rollback](./versioning-rollback.md) (as release artifacts) and the approval flow of [multi-tenancy RBAC](./multitenancy-rbac.md) (`type:"deploy"`).
 
 ---
 

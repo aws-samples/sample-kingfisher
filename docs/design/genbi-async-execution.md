@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.0 **✅ implemented and deployed (GENBI_ASYNC end to end)** (audit calibration of 2026-08-26: the original status header was outdated; it read "design draft, awaiting the go-ahead to start") | Created: 2026-07-06 | Maintainer: architecture
-> Related: [AgentCore GenBI](./agentcore-genbi.md), the [AgentCore platform standard](./agentcore-standard.md), and the deployed AgentCore GenBI runtime
-> **This file is design only and contains no implementation. Whether to start was to be decided when instructed.**
+> - Revision: 1.0 **✅ implemented and deployed (GENBI_ASYNC end to end)** (audit calibration of 2026-08-26: the original status header was outdated; it read "design draft, awaiting the go-ahead to start") | Created: 2026-07-06 | Maintainer: architecture
+> - Related: [AgentCore GenBI](./agentcore-genbi.md), the [AgentCore platform standard](./agentcore-standard.md), and the deployed AgentCore GenBI runtime
+> - **This file is design only and contains no implementation. Whether to start was to be decided when instructed.**
 
 ---
 
@@ -21,6 +21,7 @@ escaping the CloudFront 60-second origin timeout wall once and for all; **the be
 When a user submits a complex question on `/genbi`, the front end reports `JSON.parse: unexpected character at line 1 column 1`.
 
 ### 1.2 Root-cause chain (evidence layer by layer)
+
 | Layer | Fact | Evidence |
 |---|---|---|
 | Front end | `const data = await res.json()`; when the response is not JSON it throws a JSON.parse error (caught and shown as turn.error) | `app/genbi/page.tsx:225` |
@@ -92,6 +93,7 @@ Single process, no worker, and `InvokeAgentRuntime` is a blocking call of 60 s+.
 
 ### Recommended landing order
 **Phase one = B1 (in-app detached + timeout backstop)**: smallest change, fits the status quo, loop verifiable headlessly, revertible.
+
 **If load testing shows an unacceptable detached-task loss rate → phase two upgrades to B3** (runtime submission-style); the task-table contract stays unchanged and only the executor location changes.
 > This way the task table / front end / API contract is designed once and the executor location can evolve smoothly — **a stable top-level design with a replaceable bottom layer**.
 
@@ -116,6 +118,7 @@ attributes:
 - **`result` stores the whole `GenBiResult`**: once the front end has it, the rendering path is **exactly the same** as today (reusing `TurnResult`).
 
 ### 5.2 API contract (purely additive; the old endpoint is kept)
+
 | Endpoint | Behavior |
 |---|---|
 | `POST /api/genbi/ask` | **Remains**; the feature flag `GENBI_ASYNC` decides: off = the existing synchronous behavior (zero regression); on = create a task and return `{ taskId, status:"pending" }` (202) |

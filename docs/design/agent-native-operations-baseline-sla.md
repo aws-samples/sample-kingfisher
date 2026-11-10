@@ -1,11 +1,15 @@
 # Part B — Intelligent baseline learning + SLA critical-path prediction (early warning before the breach)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the `/backfill` page plus `platform/src/lib/backfill/`.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior —
+>   place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned
+>   in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: `infra/agent/devopsdiag` was not implemented; the operations diagnosis agent runs inside the platform process at `platform/src/lib/diagnostics/devops-agent.ts` (API `platform/src/app/api/diagnostics/`). The Backfill Center (Part C) was implemented as the
+>   `/backfill` page plus `platform/src/lib/backfill/`.
 
-> Revision: 1.0 **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was out of date) | Created: 2026-07-12 | Priority: P1 | Capability group: intelligent baselines / SLA / stall prediction (phase two)
-> Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: `bgp-task-runs` (learning data source) · `bgp-workflows.dagDefinition` (topology) · the [alerting module](./intelligent-ops-alerting.md)'s channel dispatch (push) · MWAA (learner DAG + cron expected period) · `charts.tsx` (dashboard cards)
-> **Purely additive `lib/baseline/` + independent API + independent tables + independent events. Does not change the alerting module's rule engine (only imports its channel dispatch functions).**
+> - Revision: 1.0 **✅ implemented** (documentation audit calibration of 2026-08-26: the original status header was out of date) | Created: 2026-07-12 | Priority: P1 | Capability group: intelligent baselines / SLA / stall prediction (phase two)
+> - Upstream master design: [agent-native operations](./agent-native-operations.md) | Reuse: `bgp-task-runs` (learning data source) · `bgp-workflows.dagDefinition` (topology) · the [alerting module](./intelligent-ops-alerting.md)'s channel dispatch (push) · MWAA (learner DAG + cron expected period)
+>   · `charts.tsx` (dashboard cards)
+> - **Purely additive `lib/baseline/` + independent API + independent tables + independent events. Does not change the alerting module's rule engine (only imports its channel dispatch functions).**
 
 ---
 
@@ -63,7 +67,7 @@ This design delivers:
 | Table | PK / SK | Purpose | Notes |
 |---|---|---|---|
 | `bgp-baselines` | `pk="baseline#<projectId>"` / `taskId` | The baseline snapshot learned per task | Upserted periodically by the learner; includes the algorithm version |
-| `bgp-slas` | `pk="sla#<projectId>"` / `slaId` (ULID) | SLA definition + the most recent prediction state | `version` optimistic lock; `targetType: relative|absolute` |
+| `bgp-slas` | `pk="sla#<projectId>"` / `slaId` (ULID) | SLA definition + the most recent prediction state | `version` optimistic lock; `targetType: relative\|absolute` |
 
 **Baseline row (`bgp-baselines`)**:
 ```

@@ -236,10 +236,10 @@ job.commit()
 
 - To get the "alias → bucket" mapping inside the script, read the reserved parameter `bgp_lake_catalogs` injected by the platform (its value looks like `s3tablescatalog=<platform-table-bucket>,detail=<detail-bucket>,agg=<aggregate-bucket>`):
 
-```python
-args = getResolvedOptions(sys.argv, ["JOB_NAME", "bgp_lake_catalogs"])
-catalogs = dict(kv.split("=", 1) for kv in args["bgp_lake_catalogs"].split(","))
-```
+  ```python
+  args = getResolvedOptions(sys.argv, ["JOB_NAME", "bgp_lake_catalogs"])
+  catalogs = dict(kv.split("=", 1) for kv in args["bgp_lake_catalogs"].split(","))
+  ```
 
 - EMR Serverless jobs (type "EMR Serverless (PySpark, standalone engine)") have the same "Lake table buckets" block and use the same three-part names; the route map is read from `spark.conf.get("spark.bgp.lakeCatalogs")`.
 - `s3tablescatalog.<namespace>.<table>` in existing scripts keeps working; it is the implicit route of the platform table bucket.
@@ -430,15 +430,15 @@ aws s3tables delete-table-bucket --region $REGION --table-bucket-arn arn:aws:s3t
 2. The script is exactly the same as in section 5 of this document: tables always as three-part names, and the catalog names are the `detail` / `agg` you define yourself in the next step.
 3. Expand "Advanced Properties" → "Job parameters (custom --key parameters …)" → "Add parameter": parameter name `--conf`, value = 5 properties per bucket, joined into one line with ` --conf ` between the items, without a leading `--conf`:
 
-```text
-spark.sql.catalog.<catalog-name>=org.apache.iceberg.spark.SparkCatalog
-spark.sql.catalog.<catalog-name>.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
-spark.sql.catalog.<catalog-name>.glue.id=<account>:s3tablescatalog/<table-bucket>
-spark.sql.catalog.<catalog-name>.io-impl=org.apache.iceberg.aws.s3.S3FileIO
-spark.sql.catalog.<catalog-name>.warehouse=arn:aws:s3tables:<region>:<account>:bucket/<table-bucket>
-```
+   ```text
+   spark.sql.catalog.<catalog-name>=org.apache.iceberg.spark.SparkCatalog
+   spark.sql.catalog.<catalog-name>.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
+   spark.sql.catalog.<catalog-name>.glue.id=<account>:s3tablescatalog/<table-bucket>
+   spark.sql.catalog.<catalog-name>.io-impl=org.apache.iceberg.aws.s3.S3FileIO
+   spark.sql.catalog.<catalog-name>.warehouse=arn:aws:s3tables:<region>:<account>:bucket/<table-bucket>
+   ```
 
-Two buckets make 10 entries (one group for `detail`, one for `agg`); a third bucket simply adds another group.
+   Two buckets make 10 entries (one group for `detail`, one for `agg`); a third bucket simply adds another group.
 
 4. Keep Glue version 5.1 (the minimum for writing S3 Tables).
 5. Leave "Execution Role ARN" empty: the 2.1.x platform Glue role is already allowed on any table bucket of the region; a custom role in that field has no effect in 2.1.x.

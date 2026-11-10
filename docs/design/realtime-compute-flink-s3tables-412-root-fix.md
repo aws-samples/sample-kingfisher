@@ -5,6 +5,7 @@
 > ## 🆕 Section 13 — SQL splitting robustness (2026-07-26): hardening splitStatements rather than switching to the Calcite parser
 >
 > **Background**: after the trailing-orphan-`)` incident, "switch the runner to the official Flink / Calcite parser for multi-statement splitting" was evaluated as a root fix.
+>
 > **Conclusion: not feasible; keep the hand-written splitStatements and harden it.** Basis (verified in the real environment, not by reasoning):
 > - Flink 1.20's `flink-table-planner-loader` **does not expose `org.apache.calcite.*` to the user JAR** — Calcite is
 >   encapsulated in the internal nested JAR `flink-table-planner.jar` plus a separate class loader (the top level only has `org/apache/flink/table`).
@@ -13,10 +14,10 @@
 > - Flink's user layer exposes only `TableEnvironment.executeSql(a single String)` + `createStatementSet()`; **it provides no multi-statement splitting API**.
 >   Multi-statement splitting must be done at the application layer → the hand-written `splitStatements` is an architectural decision, not laziness.
 >
-> **Hardening** (both runners in step): `splitStatements` completes the SQL-standard escape lexing — `''` inside a single-quoted string and ``` `` ``` inside a backquoted identifier
-> do not terminate the literal (otherwise `'it''s; x'` would be mis-split at the semicolon inside the string). A standalone Java lexing verification in the real environment passed 7/7 (escaped quote + semicolon inside the string,
-> a comment containing a semicolon, a semicolon inside backquotes, consecutive escapes, a block comment containing a semicolon, and so on).
-> **The root cure remains on the input side**: normalizeFlinkSql + the guard dialect rules (section 12) guarantee that the SQL entering the runner is already normalized; splitStatements only needs to handle clean input correctly.
+> - **Hardening** (both runners in step): `splitStatements` completes the SQL-standard escape lexing — `''` inside a single-quoted string and ``` `` ``` inside a backquoted identifier
+>   do not terminate the literal (otherwise `'it''s; x'` would be mis-split at the semicolon inside the string). A standalone Java lexing verification in the real environment passed 7/7 (escaped quote + semicolon inside the string,
+>   a comment containing a semicolon, a semicolon inside backquotes, consecutive escapes, a block comment containing a semicolon, and so on).
+> - **The root cure remains on the input side**: normalizeFlinkSql + the guard dialect rules (section 12) guarantee that the SQL entering the runner is already normalized; splitStatements only needs to handle clean input correctly.
 >
 > **Same-source normalization on the save path**: PUT / POST run `guardCode("flink", normalizeFlinkSql(sql))` before persisting, so DynamoDB / page / MSAF are consistent in all three places,
 > and the editor no longer accumulates dirty formatting.
@@ -44,8 +45,10 @@
 > - **Dual read in the runner** (`assembleSql` in both JARs): collect `sql` / `sql.N` from every `bgp*` group and reassemble them losslessly in order.
 > - **Eliminate the silent swallow**: a failed `UpdateApplication` is no longer `catch{}`-ed; the SQL currently stored in MSAF is read back (reassembled across shard groups) and compared with the target; on mismatch, `throw` and abort the start — never run old SQL and produce silently wrong results.
 >
-> **Quality gate**: tsc 0 errors; **all 33 flink-service unit tests green** (new: normalization idempotence / literals untouched, every shard value ≤ 2048, lossless encode ↔ restore round trip, 200 KB unlimited roll-over, multi-byte UTF-8 boundaries); `javap` confirms that both runner JARs contain `assembleSql`.
-> **Position-expiry hardening (section 9) done in the same pass**: the `failure-advisor` regex gains the MySQL server-side variants (`replication from ... position > file size`, `Could not find first log file name`); unit tests fully cover the original text from the real environment plus the variants.
+> - **Quality gate**: tsc 0 errors; **all 33 flink-service unit tests green** (new: normalization idempotence / literals untouched, every shard value ≤ 2048, lossless encode ↔ restore round trip, 200 KB unlimited roll-over, multi-byte UTF-8 boundaries); `javap` confirms that both runner JARs
+>   contain `assembleSql`.
+> - **Position-expiry hardening (section 9) done in the same pass**: the `failure-advisor` regex gains the MySQL server-side variants (`replication from ... position > file size`, `Could not find first log file name`); unit tests fully cover the original text from the real environment plus the
+>   variants.
 >
 > **Rollback anchor**: a `git tag` on the pre-change commit. **Not committed.**
 >
@@ -65,18 +68,20 @@
 > | Flink restore log | None | **`Restoring job from Savepoint 11`** |
 >
 > **Live** (task definition revision 2 → 5, **not committed**, rollback anchor = a `git tag` on the pre-change commit):
-> L1: CDK adds the 4 snapshot permissions (reusing the existing PolicyStatement to stay clear of the TaskRole 10 KB limit; the `pauseFlinkJob` graceful stop is fixed from the same source);
-> L2: `SnapshotProbe` with four states + probe failures leave a trace + `FlinkDecisionRequired`;
-> infrastructure: `seed_*.py` sets `binlog retention hours=72` (the RDS default is **None**);
-> new `failure-advisor.ts` (a failure-pattern table, data-driven); `api-response.ts` gains `DECISION_REQUIRED` + `detail`;
-> front end: 409 → a `Modal.confirm` decision dialog; the dialect library's 412 rule **now has the correct root-cause description** and is synced to the GenBI remote Runtime.
+> - L1: CDK adds the 4 snapshot permissions (reusing the existing PolicyStatement to stay clear of the TaskRole 10 KB limit; the `pauseFlinkJob` graceful stop is fixed from the same source);
+> - L2: `SnapshotProbe` with four states + probe failures leave a trace + `FlinkDecisionRequired`;
+> - infrastructure: `seed_*.py` sets `binlog retention hours=72` (the RDS default is **None**);
+> - new `failure-advisor.ts` (a failure-pattern table, data-driven); `api-response.ts` gains `DECISION_REQUIRED` + `detail`;
+> - front end: 409 → a `Modal.confirm` decision dialog; the dialect library's 412 rule **now has the correct root-cause description** and is synced to the GenBI remote Runtime.
 >
-> **Quality gate**: tsc 0 / **all 538 unit tests green (48 files)** / next build passes / contract-guard baseline snapshot (29 pages + 7 contracts all green).
-> **⚠️ Not finished**: contract-guard `verify` not run; the V1 / V6 headless assertions are not fully green (V1 once failed spuriously because of a script bug, since fixed; V6 could not detect anything because the section 9 pre-check never took effect).
+> - **Quality gate**: tsc 0 / **all 538 unit tests green (48 files)** / next build passes / contract-guard baseline snapshot (29 pages + 7 contracts all green).
+> - **⚠️ Not finished**: contract-guard `verify` not run; the V1 / V6 headless assertions are not fully green (V1 once failed spuriously because of a script bug, since fixed; V6 could not detect anything because the section 9 pre-check never took effect).
 >
-> **🔴 Section 9 — remaining independent problem (unsolved; a separate task is recommended)**: CDC binlog position expiry causes a crash loop.
-> **The "pre-check before start" route has been proven impassable by measurement** — the platform has no reliable way to tell "whether the position inside the snapshot is still readable" (all three criteria were refuted: ① snapshot age < retention window → wrong, a snapshot only 2.5 h old was already unrecoverable; ② compare against the oldest binlog time on the source → wrong, `SHOW BINLOG EVENTS` **does not return a Timestamp field**; ③ parameter binding `IN ?` → wrong, MySQL accepts only literals in that position).
-> **Recommendation: switch to "recognize after the first crash"**: `failure-advisor` can already identify `CDC_BINLOG_POSITION_EXPIRED` precisely from real stack traces (7 unit tests verified against the original text from the real environment); wire the diagnosis + user confirmation into the error area of the detail page, with zero guessing.
+> - **🔴 Section 9 — remaining independent problem (unsolved; a separate task is recommended)**: CDC binlog position expiry causes a crash loop.
+> - **The "pre-check before start" route has been proven impassable by measurement** — the platform has no reliable way to tell "whether the position inside the snapshot is still readable" (all three criteria were refuted: ① snapshot age < retention window → wrong, a snapshot only 2.5 h old was
+>   already unrecoverable; ② compare against the oldest binlog time on the source → wrong, `SHOW BINLOG EVENTS` **does not return a Timestamp field**; ③ parameter binding `IN ?` → wrong, MySQL accepts only literals in that position).
+> - **Recommendation: switch to "recognize after the first crash"**: `failure-advisor` can already identify `CDC_BINLOG_POSITION_EXPIRED` precisely from real stack traces (7 unit tests verified against the original text from the real environment); wire the diagnosis + user confirmation into the
+>   error area of the detail page, with zero guessing.
 >
 > **🔴 Red line (made explicit on 2026-07-25)**: **major decisions must be confirmed by the user personally; the platform may at most advise, and the action must be performed by the user.** No automatic downgrade to a cold start / automatic restart / automatic configuration change — discarding progress recomputes history and may write duplicates; that is a business decision.
 >
@@ -84,8 +89,8 @@
 >
 > Revision: 1.0 (root-cause relocation revision) | Status: design decided and implemented
 >
-> 🟢 Requirement: a Flink real-time job restarts briefly after starting; a **root fix** is required — global users must not be the ones to hit the error.
-> 🟢 Instruction (2026-07-25): this is a **global-grade application**; it needs top-level design, a high level of abstraction, objectivity, no impact on other features / interfaces, and no new bugs created while fixing.
+> - 🟢 Requirement: a Flink real-time job restarts briefly after starting; a **root fix** is required — global users must not be the ones to hit the error.
+> - 🟢 Instruction (2026-07-25): this is a **global-grade application**; it needs top-level design, a high level of abstraction, objectivity, no impact on other features / interfaces, and no new bugs created while fixing.
 >
 > 🔴 Red lines observed: ① AWS is used only through the explicit `--profile` of the temporary test account (`temp-account-1`); ② **nothing is installed or built on the local machine**; ③ feature acceptance **recognizes only headless-browser page results** (CLI / CloudTrail serve only to take ground truth for troubleshooting, not as acceptance evidence); ④ design first; code moves only after the decision; ⑤ `git tag` + contract-guard snapshot before touching the core chain; ⑥ no pushing without approval; ⑦ stop the job after verification to cap cost.
 >

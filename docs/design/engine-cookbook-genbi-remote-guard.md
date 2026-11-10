@@ -1,11 +1,14 @@
 # Engine Cookbook — Adding the Cookbook Dialect Guard to the GenBI AgentCore Remote Runtime Container (Top-Level and Detailed Design)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: `platform/src/app/api/cookbook` and `platform/src/components/cookbook` were not implemented as described here; the recipe guard and the capability vocabulary live in `platform/src/lib/cookbook/`, and the recipe texts ship with the Ask-Your-Data agent image under `infra/agent/genbi/core-dist/cookbook/`.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer
+>   exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: `platform/src/app/api/cookbook` and `platform/src/components/cookbook` were not implemented as described here; the recipe guard and the capability vocabulary live in `platform/src/lib/cookbook/`, and the recipe texts ship with the Ask-Your-Data agent image
+>   under `infra/agent/genbi/core-dist/cookbook/`.
 
-> Status: **✅ implemented (decision 3 — extracting the pure core — was adopted)** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design, pending approval"). Follows the engineering disciplines `design-first-no-code-until-approved` + `global-grade-design-discipline` (global grade: a thorough top-level design + a complete detailed design) + 🔴 `genbi-runtime-image-change-redline` (the hard red line on changing the GenBI remote image).
-> Prerequisites completed: phase 1 foundation / phase 2 recipes / phase 3 batch ETL integration / phase 4 realtime Flink integration / the two Athena dialect sub-steps of phase 5 / **phase 5a: in-process GenBI wired to the guard** (`lib/genbi/agent.ts:189`).
-> This design is based on first-hand code verification on 2026-07-24 (a deep exploration of the cookbook dependency chain + the container's SQL generation / execution points + the core-dist mechanism), not on memory.
+> - Status: **✅ implemented (decision 3 — extracting the pure core — was adopted)** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design, pending approval"). Follows the engineering disciplines `design-first-no-code-until-approved` + `global-grade-design-discipline` (global grade: a thorough top-level design + a complete detailed design) + 🔴 `genbi-runtime-image-change-redline` (the hard red line on changing the GenBI remote image).
+> - Prerequisites completed: phase 1 foundation / phase 2 recipes / phase 3 batch ETL integration / phase 4 realtime Flink integration / the two Athena dialect sub-steps of phase 5 / **phase 5a: in-process GenBI wired to the guard** (`lib/genbi/agent.ts:189`).
+> - This design is based on first-hand code verification on 2026-07-24 (a deep exploration of the cookbook dependency chain + the container's SQL generation / execution points + the core-dist mechanism), not on memory.
 
 ---
 
@@ -29,6 +32,7 @@
 ## 1. Survey of the current state (first-hand verification, file:line)
 
 ### 1.1 Guard status of the two backends
+
 | Backend | SQL generation point | Guard status | Execution point |
 |---|---|---|---|
 | inprocess | `agent.ts:184` the model calls the `run_sql` tool, `tu.input.sql` | ✅ `agent.ts:189` `cookbookGuard(engine, rawSql).code` | `agent.ts:193` runSelect / runSelectAthena |
@@ -53,6 +57,7 @@
 ### Decision 1: how the cookbook gets into the container — a new standalone `cookbook-core` compilation unit (not merged into genbi/core)
 
 **Option comparison**:
+
 | Option | Approach | Trade-off |
 |---|---|---|
 | **A (recommended): a standalone cookbook-core compilation unit** | New `tsconfig.cookbook-core.json` (rootDir=`src/lib/cookbook`, includes only the pure guard subset) + a `[cookbook]` registration line in core-prebuild; the output is copied into `agent/genbi/core-dist` | Matches the positioning "the cookbook is platform-level shared, not GenBI-private"; fits the core-prebuild paradigm "adding a capability = adding one line"; Copilot / other containers can later reuse the same cookbook-dist |

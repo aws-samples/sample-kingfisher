@@ -1,9 +1,9 @@
 # Lake Table-Bucket Routing · Decoupling Execution Environments from a Single Table Bucket
 
-> Revision **1.2-en** (2026-11-09). Status: **authoritative; Phase 1 implemented and verified by headless page-driven acceptance on a two-region test account**. This English document supersedes the earlier Chinese draft of this design. Where the two differ, this document wins.
-> Decisions D1–D13 in §13 were signed off on 2026-11-03 and are binding. §15 records where the Phase 1 implementation deviates from §6 and why; where §15 and §6 differ, the implementation (§15) is the fact.
-> Revision history: 1.2-en (2026-11-09) — the two read-only endpoints (route list, bucket candidates) moved out of the `/api/admin` prefix so that any signed-in user can read them (§6.10.1, §6.10.5, §15 item 14); Phase 1 acceptance recorded in §15 item 15.
-> 1.1-en (2026-11-06) — Phase 1 implemented; §13 decisions recorded as binding; §15 implementation notes 1–13. 1.0-en (2026-11-03) — initial authoritative design, four static diagrams, decisions proposed.
+> - Revision **1.2-en** (2026-11-09). Status: **authoritative; Phase 1 implemented and verified by headless page-driven acceptance on a two-region test account**. This English document supersedes the earlier Chinese draft of this design. Where the two differ, this document wins.
+>   Decisions D1–D13 in §13 were signed off on 2026-11-03 and are binding. §15 records where the Phase 1 implementation deviates from §6 and why; where §15 and §6 differ, the implementation (§15) is the fact.
+> - Revision history: 1.2-en (2026-11-09) — the two read-only endpoints (route list, bucket candidates) moved out of the `/api/admin` prefix so that any signed-in user can read them (§6.10.1, §6.10.5, §15 item 14); Phase 1 acceptance recorded in §15 item 15.
+>   1.1-en (2026-11-06) — Phase 1 implemented; §13 decisions recorded as binding; §15 implementation notes 1–13. 1.0-en (2026-11-03) — initial authoritative design, four static diagrams, decisions proposed.
 >
 > Vocabulary follows the multi-region execution design ([`multi-region-execution-design.md`](./multi-region-execution-design.md) §0–§3): an **execution target** (`targetId`, home is `tgt_home`) is one region's data plane; a **place** is the explicit target a request runs against; a **scope** is the page-level "all regions / one region" view filter. The execution role binding design ([`execution-role-binding.md`](./execution-role-binding.md)) supplies the per-job execution role and the save-time IAM preflight that this design extends.
 

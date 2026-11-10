@@ -2,11 +2,11 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the behavior under the multi-region deployment — place (target), execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of the module is recorded in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 0.2 (**✅ Implemented · in canary rollout (the default engine is still `legacy`; Strangler-style canary)**) (documentation audit calibration of 2026-08-26: the previous status header was outdated — it still read "design draft / code not started") | Created: 2026-08-02 · Updated: 2026-08-02 | Owner: architecture
-> Parent roadmap: the platform roadmap of 2026-08 (historical, archived) — its rich-node item in section 1 and its entry for this module in section 3 (annotated "add `generateAirflowDagV2`, freeze the old generator pending deletion, run as a separate project")
-> Predecessor: part A — batch multi-engine compute on EMR, completed 2026-07-03 — see [Multi-Engine Nodes](./multi-engine-nodes.md)
-> Related disciplines: the change-safety discipline (the blast radius was surveyed before the change, see section 7) · the contract-guard regression check (the `lineage_column` anchor must not regress)
-> Related facts: every statement about the current state in this design comes from a full-repository evidence sweep on 2026-08-02, marked 🔵 hard evidence from code `file:line` / ⚪ official mechanism / 🟢 to be verified by a real deployment
+> - Revision: 0.2 (**✅ Implemented · in canary rollout (the default engine is still `legacy`; Strangler-style canary)**) (documentation audit calibration of 2026-08-26: the previous status header was outdated — it still read "design draft / code not started") | Created: 2026-08-02 · Updated: 2026-08-02 | Owner: architecture
+> - Parent roadmap: the platform roadmap of 2026-08 (historical, archived) — its rich-node item in section 1 and its entry for this module in section 3 (annotated "add `generateAirflowDagV2`, freeze the old generator pending deletion, run as a separate project")
+> - Predecessor: part A — batch multi-engine compute on EMR, completed 2026-07-03 — see [Multi-Engine Nodes](./multi-engine-nodes.md)
+> - Related disciplines: the change-safety discipline (the blast radius was surveyed before the change, see section 7) · the contract-guard regression check (the `lineage_column` anchor must not regress)
+> - Related facts: every statement about the current state in this design comes from a full-repository evidence sweep on 2026-08-02, marked 🔵 hard evidence from code `file:line` / ⚪ official mechanism / 🟢 to be verified by a real deployment
 
 ---
 
@@ -15,6 +15,7 @@
 **Goal**: extend the node types of visual workflow orchestration from the 3 types `sync/sql/python` to cover the mainstream node capabilities of a leading cloud data-development suite, **giving priority to reusing the native capabilities of Amazon MWAA (Airflow 2.10.3; see [supported versions](../supported-versions.md)) rather than building our own scheduling semantics**.
 
 **Directions decided on 2026-08-02**:
+
 | # | Decision point | Decision |
 |---|---|---|
 | ① | DAG code generation architecture | **Fixed runtime library + lightweight configuration injection** (no more string-concatenating Python business logic) |
@@ -61,6 +62,7 @@
 > **Design implication**: if the fixed runtime library is abstracted well, it can become the **shared execution layer** for all 4 entry points (section 2 discusses the boundary trade-off).
 
 ### 1.4 Full-lifecycle consumers (new nodes must not break them)
+
 | Stage | Current contract | 🔵 Evidence |
 |---|---|---|
 | Publish | fire-and-forget polling, 18×10 s, waits for the DAG to load and then unpauses (works around the CloudFront 60 s timeout) | `publish/route.ts:56-75` |
@@ -76,6 +78,7 @@
 ## 2. Core Architecture: Fixed Runtime Library + Lightweight Configuration Injection
 
 ### 2.1 Why (compared with string concatenation)
+
 | Dimension | String-concatenated Python (current) | Fixed runtime library + configuration injection (this design) |
 |---|---|---|
 | Injection risk | High (SQL/script concatenated into code; escaping relies on `.replace`) | **None** (business data is passed as JSON parameters and never enters the code text) |
@@ -181,12 +184,14 @@ type WorkflowNode =
 
 ### 5.4 The `exec` root-fix approach (native security capability of the new engine only)
 - **Platform-wide execution-surface scan (2026-08-02; evidence hygiene: a grep over all static source code)**:
+
   | Execution surface | Platform-wide hits | Conclusion |
   |---|---|---|
   | Python `exec(` | 🔵 **exactly 1 place** `workflow/dag-generator.ts:169` | the very place to be root-fixed |
   | `eval(` / `new Function` / `Function()` | 🔵 zero | none |
   | Node `child_process`/`execSync`/`spawn` | 🔵 zero | none |
   | The other 3 DAG generators (etl/emr/spark-lineage) | 🔵 zero exec | etl only splices SQL; emr submits to the isolated EmrServerless runtime; neither execs user scripts on the worker |
+
   > **Verdict**: the platform-wide RCE surface converges to exactly 1 place; **the root fix does not need to spread, and there is no "plug one hole, open another"**.
 - **Root fix (the python node executor `_exec_python_safe` in the new engine's runtime library, section 12)**:
   - By default **forbid dangerous built-ins / modules** (`__import__`/`eval`/`exec`/`open`/`os`/`sys`/`subprocess`/`socket`), exposing only an allow-list of safe built-ins + the platform-injected data-manipulation API;
@@ -230,6 +235,7 @@ type WorkflowNode =
   - The publish route chooses which generator to call according to the flag.
 
 ### 8.2 Five-step migration path (each step reversible)
+
 | Step | Action | Rollback |
 |---|---|---|
 | **① Freeze** | Freeze the old `generateAirflowDag` (including its bare exec, section 5.3); take a `contract-guard snapshot` + a headless-browser baseline of workflow publish/run = the characterization golden master | — |
@@ -335,6 +341,7 @@ def _on_success(**kwargs): ...     # 同上
 - **Persistence dirty-check fix**: the edge projection in `normalizeDag` is widened from `{s,t}` to `{s,t,b:x.data?.branch}` (otherwise changing a branch affiliation does not trigger "unsaved" — prevention of a real bug found during evidence gathering). This is a **mandatory change point** within the A2 blast radius and has been registered.
 
 ### 11.2 Node-by-node table
+
 | Node | data schema | Airflow translation (in the runtime library) | Dependency / edge handling |
 |---|---|---|---|
 | **empty** | `{label?}` | `EmptyOperator(task_id)` | regular edges |
@@ -440,6 +447,7 @@ export const NODE_REGISTRY: Record<WorkflowNodeType, NodeTypeDef> = { ... };
 > **Only one kind of identifier should exist on the runtime side = the legal task_id. Before the spec reaches the runtime, every "internal node reference" has already been normalized on the TS side (by the single sanitization authority `sanitize()`). The concept of a "raw nodeId" no longer appears on the runtime side, so it cannot be used wrongly.**
 
 **The complete set of fields that must be normalized** (full sweep of 2026-08-05, to prevent another miss):
+
 | Field | Location | Handling |
 |---|---|---|
 | `edge.source` / `edge.target` | spec.edges | → sanitize |

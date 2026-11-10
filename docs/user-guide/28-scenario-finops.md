@@ -227,24 +227,31 @@ In the "Execution Environments" details, "1. Stop accepting work (drain)" → "2
 ## 11. FAQ
 
 **"Cost overview" keeps showing "No cost data yet".**
+
 Cause: nothing collected yet; or the account enabled Cost Explorer less than 24 hours ago; or the current project lacks editor permission to click "Collect now". Next step: click "Collect now" and read the verbatim hint; wait for CE data; switch to an account with permission.
 
 **"Month to date" is much lower than the AWS bill.**
+
 Cause: a single-region view includes only that region; "No region (global services)" is not counted in the region cards; billing is T+1. Next step: switch to "All regions", add the global-services card, then compare with CE's "Month to date".
 
 **Redshift queries do not appear in "Task costs".**
+
 Cause: run-level attribution covers only Glue and EMR Serverless; warehouse active time is in "Unallocated". Next step: look in Cost Explorer with SERVICE = Amazon Redshift; reduce dashboard / GenBI / governance sync frequency.
 
 **The budget row keeps saying "Not evaluated".**
+
 Cause: budget evaluation runs only with "Cost anomalies → Detect & notify". Next step: click it once; check whether "Alert Events" has an event starting with "[FinOps]".
 
 **"Detect & notify" reports 0 anomalies, but spend clearly went up.**
+
 Cause: fewer than 7 samples, or the increase is in the billing layer while the corresponding service baseline is rising too, or backfill runs are excluded. Next step: run for a few more days, then detect again; locate it manually with "Cost overview → 14-day trend" and the "Task costs" ranking.
 
 **"Advice" says the DMS instance is idle, but I cannot find a button to delete the instance in the platform.**
+
 Cause: the platform only stops tasks and does not delete instances. Next step: once you are sure the region has no real-time sync task that needs to run, delete the replication instance in the AWS console; the next "Start" of a real-time task lazily creates it again.
 
 **Creating a budget reports no permission.**
+
 Cause: writing budgets needs the project owner. Next step: ask the project owner to create it, or request the role under "Workspace".
 
 ---

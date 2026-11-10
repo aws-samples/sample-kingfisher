@@ -1,7 +1,8 @@
 # Design documents (docs/design)
 
-> This page is navigation only: one line per module saying what it is, what state it is in and which document to read. The implementation is defined by the code; what every module does today is in [`docs/modules.md`](../modules.md); the index written for AI tools is [`AGENTS.md`](../../AGENTS.md) at the repository root.
-> Status legend: ✅ implemented and in use in the multi-region version · ✅🕰 implemented in the single-region stage, design document not updated since (multi-region behaviour is defined by the multi-region execution design and the code) · 🆕 design written, implementation planned.
+> - This page is navigation only: one line per module saying what it is, what state it is in and which document to read. The implementation is defined by the code; what every module does today is in [`docs/modules.md`](../modules.md); the index written for AI tools is [`AGENTS.md`](../../AGENTS.md)
+>   at the repository root.
+> - Status legend: ✅ implemented and in use in the multi-region version · ✅🕰 implemented in the single-region stage, design document not updated since (multi-region behaviour is defined by the multi-region execution design and the code) · 🆕 design written, implementation planned.
 >
 > In the engineering repository every module lives in a numbered directory with one or more design documents; in this repository each document is published as one file named by topic, and the Chinese originals are translated in full. Acceptance criteria, work-package lists, roadmaps, research notes and review records are engineering-process documents and are not published here.
 

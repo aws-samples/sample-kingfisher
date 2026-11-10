@@ -8,6 +8,7 @@
 | What you get | You can obtain a token and call any endpoint; you understand the uniform success / error envelope; you know the endpoints behind every page, which context they need (target · scope · project · environment) and when they are refused |
 
 > Every platform capability is on the pages; the API is the same set of HTTP routes the pages use, there is no separate "public API". This chapter registers them so that automation and troubleshooting are easier.
+>
 > The API shape is that of 2.2.0; paths marked "Retired" still respond (410) but no longer provide the capability.
 
 ## 1. How to call
@@ -67,13 +68,13 @@ Notes:
 - **Platform admin group `bgp-admin`**: `/api/admin/**` requires this group at the gateway layer, and non-admins always get 403 (the gateway returns the same text as for analyst accounts: "Analyst accounts may only use GenBI and submit requests"); each admin route checks again internally. GET is no exception: reads such as `/api/admin/lake-routes` and `/api/admin/lake-buckets/candidates` also return 403 to non-admin scripts.
 - **Accounts that belong only to `bgp-analyst` (operations analyst)**: the gateway lets through only the routes below; every other `/api/*` returns 403 "Analyst accounts may only use GenBI and submit requests":
 
-| Prefix | Methods | Purpose |
-|---|---|---|
-| `/api/genbi/**` | GET · POST | GenBI: ask / history / cards |
-| `/api/redshift/connections` | GET | The workgroup selector on the GenBI page |
-| `/api/redshift/databases` | GET | The database selector on the GenBI page |
-| `/api/requirements/**` | GET · POST | Submit requests / my requests |
-| `/api/projects` | GET | The project switcher (read-only) |
+  | Prefix | Methods | Purpose |
+  |---|---|---|
+  | `/api/genbi/**` | GET · POST | GenBI: ask / history / cards |
+  | `/api/redshift/connections` | GET | The workgroup selector on the GenBI page |
+  | `/api/redshift/databases` | GET | The database selector on the GenBI page |
+  | `/api/requirements/**` | GET · POST | Submit requests / my requests |
+  | `/api/projects` | GET | The project switcher (read-only) |
 
 - **Project roles** (owner ⊇ editor ⊇ viewer): most business endpoints check the minimum role against the "current project" or "the project the resource belongs to"; not a member ⇒ 403 "No access to this workspace", role too low ⇒ 403 "Insufficient permission: a higher project role is required".
 - **Project config admin** = a platform admin, or a `bgp-manager` who is the owner of this project: renaming / deleting the project, adding / removing members and approval decisions use this level.
@@ -117,32 +118,34 @@ Requests that wait for an external system to reach a final state (modeling landi
 1. The server first waits in-process for up to 45 seconds; if the result arrives, it is returned synchronously as is (status code and envelope are byte-for-byte the same as without the background hand-off).
 2. If not ⇒ it returns **202**, and `data` in the envelope carries the protocol marker:
 
-```json
-{ "success": true, "data": { "taskId": "01J…", "kind": "modeling-land", "label": "落地码表",
-  "status": "running", "async": true, "protocol": "long-op/1" } }
-```
+   ```json
+   { "success": true, "data": { "taskId": "01J…", "kind": "modeling-land", "label": "落地码表",
+     "status": "running", "async": true, "protocol": "long-op/1" } }
+   ```
 
 3. Poll `GET /api/long-ops/{taskId}` with the same request headers about every 2 seconds (only the creator can read it; anyone else gets 403):
 
-```json
-{ "success": true, "data": { "taskId": "01J…", "kind": "modeling-land", "label": "落地码表",
-  "status": "succeeded", "result": { … }, "resultStatus": 200, "elapsedMs": 61234 } }
-```
+   ```json
+   { "success": true, "data": { "taskId": "01J…", "kind": "modeling-land", "label": "落地码表",
+     "status": "succeeded", "result": { … }, "resultStatus": 200, "elapsedMs": 61234 } }
+   ```
 
 - `status` is one of `running` / `succeeded` / `failed` / `timeout`. On `succeeded`, `result` is the `data` of the synchronous response; on `failed`, `error` is the message text and `errorStatus` / `errorBody` are the status code and envelope the synchronous branch would have returned, so they can be restored byte for byte; `timeout` means it exceeded 5 minutes and was terminated automatically (message "The operation exceeded 5 minutes and was terminated automatically; narrow the scope and retry").
 - The pages already do this in the interception layer: when you see "Running in background: <label> (n s elapsed)" in the bottom-right corner, polling is in progress; scripts must implement it themselves.
 - `GET /api/ai/tasks/{taskId}` is the legacy path alias of the same endpoint (see §4). The GenBI 202 (`{ "taskId", "status": "pending" }`, without `protocol`) is a separate mechanism; poll `GET /api/genbi/tasks/{taskId}`.
 - **Object lease**: while a long-running operation is in progress, a second long-running operation on the same object, or its edit / delete endpoints, always return 409:
 
-```json
-{ "success": false, "error": { "code": "LONG_OP_IN_PROGRESS",
-  "message": "「落地码表」正在进行中(已 37 秒),请等它结束后再操作" } }
-```
+  ```json
+  { "success": false, "error": { "code": "LONG_OP_IN_PROGRESS",
+    "message": "「落地码表」正在进行中(已 37 秒),请等它结束后再操作" } }
+  ```
 
 ### 1.8 Response envelope and common error codes
 
 Success: `{ "success": true, "data": <result> }`; a few LLM endpoints add a `_meta` (the model id actually used, its source, correlationId).
+
 Failure: `{ "success": false, "error": { "message": "<human-readable>", "code": "<machine code, optional>", "correlationId": "<optional>", "detail": { … optional } } }`.
+
 A few older endpoints return the flat `{ "error": "<text>" }` (noted in the tables); scripts that read the error text must handle both shapes.
 
 | Status | `error.code` | Meaning and your next step |

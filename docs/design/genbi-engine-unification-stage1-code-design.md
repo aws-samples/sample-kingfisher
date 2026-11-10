@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> **✅ Stage 1 is complete and pushed (the 8 core files are in place).** Authorization to "start" was given; scope = stage 1. This document is the last design confirmation before code is written (file / function / interface level).
-> Stage 1 iron rules: **pure TypeScript, no image touched, no production agentcore touched, zero contract change**. inprocess remains the safety net.
-> Rollback anchors: `pre-genbi-core-unification` (the commit preceding the refactoring) + `pre-genbi-stage1`, added before this stage.
+> - **✅ Stage 1 is complete and pushed (the 8 core files are in place).** Authorization to "start" was given; scope = stage 1. This document is the last design confirmation before code is written (file / function / interface level).
+> - Stage 1 iron rules: **pure TypeScript, no image touched, no production agentcore touched, zero contract change**. inprocess remains the safety net.
+> - Rollback anchors: `pre-genbi-core-unification` (the commit preceding the refactoring) + `pre-genbi-stage1`, added before this stage.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is [GenBI engine unification](./genbi-engine-unification.md). Retained as a historical implementation record.
 
@@ -85,6 +85,7 @@ export interface ModelClient {
 - **Old-path re-exports are kept**: `genbi/sql-guard.ts` / `prompt.ts` / `chart.ts` and the others become `export * from "./core/xxx"`, so that every existing import site (`agent.ts` / `execute.ts` / ...) **needs no change at all**, shrinking the regression surface to a minimum.
 
 ## 5. Stage 1 verification matrix
+
 | Verification | Command / method | Pass criterion |
 |---|---|---|
 | Unit tests | `cd platform && npm test` | all green (including the new core tests + the original sql-guard / context-injection tests) |

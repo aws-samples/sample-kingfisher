@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written in the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. Multi-region behavior — place, execution scope, per-region scheduling and the like — is described in the [multi-region execution specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index; a path mentioned below that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented · deployed LIVE** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design pending confirmation, 2026-06-15"). Account `<account-id>` / profile `temp-account` / us-east-1.
-> Goal: re-platform the existing GenBI (NL→SQL done in-process in the Next.js API by calling Bedrock Converse) onto **AWS Bedrock AgentCore**: the agent logic is deployed to the **AgentCore Runtime**, and the skills (querying Redshift / Athena / schema) are exposed as **MCP tools** through the **AgentCore Gateway**.
+> - Status: **✅ implemented · deployed LIVE** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "design pending confirmation, 2026-06-15"). Account `<account-id>` / profile `temp-account` / us-east-1.
+> - Goal: re-platform the existing GenBI (NL→SQL done in-process in the Next.js API by calling Bedrock Converse) onto **AWS Bedrock AgentCore**: the agent logic is deployed to the **AgentCore Runtime**, and the skills (querying Redshift / Athena / schema) are exposed as **MCP tools** through the **AgentCore Gateway**.
 
 ## 0. One-sentence conclusion
 Keep the frontend and the request/response contract of `/api/genbi/ask` unchanged; move the "NL→SQL reasoning loop" into the AgentCore Runtime (a containerized agent) and the skills such as "execute SQL / inspect schema" into the AgentCore Gateway (MCP tools implemented as Lambda); the platform side remains responsible for authentication, workspace isolation, governance masking, injection of published tables, chart suggestion and history. A feature flag `GENBI_BACKEND=agentcore|inprocess` provides a one-step rollback.
@@ -56,6 +56,7 @@ Browser ──HTTPS──► CloudFront ──► ECS (Next.js)
 ```
 
 ## 5. Division of component responsibilities
+
 | Concern | Where it lives | Rationale |
 |---|---|---|
 | NL→SQL reasoning loop, table selection, prompts | **Runtime agent** | AgentCore hosts the reasoning and isolates sessions; reuses the existing TypeScript logic |
@@ -87,6 +88,7 @@ Browser ──HTTPS──► CloudFront ──► ECS (Next.js)
 - ★ **b. CDK CfnResource escape hatch**: create `BgpAgentCoreStack` using the raw CloudFormation resources `AWS::BedrockAgentCore::Gateway / GatewayTarget / Runtime / RuntimeEndpoint`; the skill Lambdas, IAM roles and ECR use ordinary CDK constructs. No CDK upgrade needed (the currently supported CDK version is listed in [supported versions](../supported-versions.md)).
 - a. Upgrade aws-cdk-lib to a 2026 release containing the `aws-bedrockagentcore` L1: ripples through 11 stacks, high risk.
 - c. Out-of-band scripts (boto3 / CLI `create-gateway/create-gateway-target/create-agent-runtime`) checked into the repository under `scripts/` (like the Cognito bootstrap): avoids the CDK risk but is not pure IaC.
+
 > During implementation, verify b first (synth and deploy a minimal Gateway); if the CloudFormation resource types are unstable in this account, fall back to c.
 
 ### D4 Authentication
@@ -101,12 +103,14 @@ Browser ──HTTPS──► CloudFront ──► ECS (Next.js)
 - Reuse the platform's existing Docker + ECR flow; add an ECR repository `bgp-genbi-agent`, build and push with `docker buildx --platform linux/arm64`; `create_agent_runtime` references the image.
 
 ## 8. Gateway skills (MCP tools) inventory
+
 | Tool name | Input | Behavior | Reuses existing |
 |---|---|---|---|
 | `run_redshift_sql` | `{sql}` | Read-only guard (`sanitizeSelect`) → execute via the Redshift Data API → {columns, rows, rowCount} | `lib/genbi/redshift.ts` + `sql-guard.ts` |
 | `run_athena_sql` | `{sql}` | Read-only guard → execute on Athena → {columns, rows} | `lib/genbi/athena.ts` + `lib/athena/*` |
 | `introspect_redshift_schema` | `{}` | pg_tables/information_schema → table / column catalog | `lib/genbi/schema.ts` |
 | `introspect_s3tables_schema` | `{}` | Athena information_schema → tables / columns of the namespace | `lib/genbi/athena.ts` |
+
 - All **read-only**; run_* still goes through `sanitizeSelect` (a single SELECT/WITH statement + forbidden write keywords + a hard row cap). The Lambda uses the admin Redshift SecretArn (same as the platform).
 
 ## 9. Migration and rollback

@@ -2,11 +2,11 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ executed and implemented** (audit calibration of 2026-08-26: the original header read "execution-path design, no code touched"). All three prerequisite gates passed (G-Strands / G-V3 / G-V1).
-> This document is the **step-by-step construction plan** for step 3 of stage 3 (Strands in the container + import core + retrieval moved into the container).
-> 🔴 This is a red-line image (the GenBI runtime image change red line): it changes the remote image under `infra/agent/genbi/*`,
-> deploys with two buildx passes using `--provenance=false --sbom=false`, verifies zero regressions over several rounds, and does not affect netadvisor / paramadvisor.
-> Rollback anchors: the checkpoint tag taken after the gates and before the red line, plus the production image tag of stage 0.
+> - Status: **✅ executed and implemented** (audit calibration of 2026-08-26: the original header read "execution-path design, no code touched"). All three prerequisite gates passed (G-Strands / G-V3 / G-V1).
+> - This document is the **step-by-step construction plan** for step 3 of stage 3 (Strands in the container + import core + retrieval moved into the container).
+> - 🔴 This is a red-line image (the GenBI runtime image change red line): it changes the remote image under `infra/agent/genbi/*`,
+>   deploys with two buildx passes using `--provenance=false --sbom=false`, verifies zero regressions over several rounds, and does not affect netadvisor / paramadvisor.
+> - Rollback anchors: the checkpoint tag taken after the gates and before the red line, plus the production image tag of stage 0.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is the [GenBI engine-unification design](./genbi-engine-unification.md). Kept as a historical implementation record.
 
@@ -17,6 +17,7 @@
 4. **Failure means rollback**: if any step fails verification, revert to the tag; never deploy with a known defect. The in-process backend is the production safety net (touched only in stage 4).
 
 ## 1. agent.js Behaviors That Must Be Preserved (the easiest to lose when moving to Strands; checked one by one)
+
 | # | Behavior | Current location | How the Strands version preserves it |
 |---|---|---|---|
 | B1 | **Multi-turn conversation**: history(-6) as a prefix of alternating user/assistant messages | agent.js:164-169 | The Strands Agent supports injecting message history; or use conversationManager |
@@ -49,6 +50,7 @@
 3. **🟡 Strands prints `🔧 Tool #N` progress to stdout by default**: pass `printer: false` to the constructor to turn it off (agent.d.ts printer?:boolean). Keeps the container logs clean.
 
 ### Exact Implementation of Behaviors B1–B12 (finalized after the deep review)
+
 | # | Behavior | Exact implementation |
 |---|---|---|
 | B1 | Multi-turn history(-6) | `new Agent({messages})` with alternating user/assistant |
@@ -91,6 +93,7 @@
 - `COPY *.mjs` (or keep .js with type:module). CMD unchanged.
 
 ## 3. Local Verification Matrix (must be all green before pushing to ECR)
+
 | Check | Method | Pass criterion |
 |---|---|---|
 | V-build | buildx ARM64 --load | The image builds successfully; core-dist is inside the image |

@@ -1,15 +1,18 @@
 # Strands Platform Unification · Top-Level Design of the Platform-Level Agent Framework Layer (`@platform/agent-kit`)
 
-> 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
-> ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
-> the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` + `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
-> `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
+> - 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place,
+>   execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is tracked in the design index. A path mentioned in this document that no longer
+>   exists means that the idea was not implemented as described here or has since been superseded.
+> - ⚠️ **Implementation differences**: the `@platform/agent-kit` package was not implemented under that name;
+>   the agent code is currently distributed as follows: Ask-Your-Data (GenBI) in `platform/src/lib/genbi/` + `infra/agent/genbi/`, the parameter advisor in `platform/src/lib/param-advisor/` + `infra/agent/paramadvisor/`, the network advisor in `platform/src/lib/network-advisor/` +
+>   `infra/agent/netadvisor/`, and Copilot in `platform/src/lib/copilot/` (including `plan/strands-tools.ts`);
+>   `infra/agent/copilot` and `infra/lib/copilot-*` do not exist.
 
-> Status: **✅ implemented (the runtime piece of the framework layer, F0→F3, is live)** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "pure design, no code touched"). Follows the engineering discipline `design-first-no-code-until-approved`.
-> Origin: it was pointed out that the "A / B / C / D — replicate the GenBI template three times" path of the original top-level design ([strands-platform-unification.md](./strands-platform-unification.md)) would produce 4 near-identical, separately maintained code bases —
-> **the same disease as "the model ID scattered across 9 places, a wrong assumption copied 9 times"** (duplicated effort is the opposite of a global-grade architecture).
-> Decision: **route ② — first extract a platform-level agent framework layer, and make each capability a consumer of it**; the first step is to deliver this top-level design (documentation only).
-> Evidence baseline: three file:line-level surveys (the 3 container agent.js files / the 3 CDK stacks / Copilot's special characteristics), see the appendix at the end.
+> - Status: **✅ implemented (the runtime piece of the framework layer, F0→F3, is live)** (documentation audit calibration of 2026-08-26: the original status header was outdated — it read "pure design, no code touched"). Follows the engineering discipline `design-first-no-code-until-approved`.
+> - Origin: it was pointed out that the "A / B / C / D — replicate the GenBI template three times" path of the original top-level design ([strands-platform-unification.md](./strands-platform-unification.md)) would produce 4 near-identical, separately maintained code bases —
+>   **the same disease as "the model ID scattered across 9 places, a wrong assumption copied 9 times"** (duplicated effort is the opposite of a global-grade architecture).
+> - Decision: **route ② — first extract a platform-level agent framework layer, and make each capability a consumer of it**; the first step is to deliver this top-level design (documentation only).
+> - Evidence baseline: three file:line-level surveys (the 3 container agent.js files / the 3 CDK stacks / Copilot's special characteristics), see the appendix at the end.
 
 ---
 

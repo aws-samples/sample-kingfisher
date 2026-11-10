@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For the multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current status of each module is summarized in the [modules overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.10.0 | Date: 2026-10-24 | Status: implemented and verified in a live environment (**revision 1.10.0, fix of 2026-10-24: result columns are matched to classifications through their physical columns — aliased columns and expression columns are no longer missed by masking**; the code landed on 2026-10-24 and was merged into the main development line after page-level re-verification)
-> Addresses the gap-analysis item "Data classification / masking / access requests" under the "re-check / first-priority track · governance depth" heading. The third item of the first-priority track (the first two were run parameterization in revision 1.7.0 and SQL lineage + impact analysis in revision 1.8.0).
+> - Revision: 1.10.0 | Date: 2026-10-24 | Status: implemented and verified in a live environment (**revision 1.10.0, fix of 2026-10-24: result columns are matched to classifications through their physical columns — aliased columns and expression columns are no longer missed by masking**; the code landed on 2026-10-24 and was merged into the main development line after page-level re-verification)
+> - Addresses the gap-analysis item "Data classification / masking / access requests" under the "re-check / first-priority track · governance depth" heading. The third item of the first-priority track (the first two were run parameterization in revision 1.7.0 and SQL lineage + impact analysis in revision 1.8.0).
 
 ---
 
@@ -56,10 +56,11 @@ Why DynamoDB rather than OM tags: masking needs a **low-latency, platform-manage
 - Both call `resolveIdentity(req)` (the front-end global fetch interceptor already carries the ID token); no identity → treated as not granted (the safer side).
 
 > ~~Limitation: masking matches by **column name / the column's table**;
-> a column renamed by `SELECT col AS alias` or a pure expression column (`CONCAT(...)`) cannot be related to a classification and may escape masking (recorded as a limitation).
-> ~~ **Lifted in revision 1.10.0 (fix of 2026-10-24)**: every result column is first parsed by `parseSelectOutputs` of the SQL lineage parser (`lib/lineage/sql-lineage.ts`) into "which physical columns it references" (AS / bare alias / expression / aggregate / `::cast` / case-when / extract; aliases inside CTEs and subqueries are expanded level by level; literals / keywords / type names / function names do not count), and `maskRows` takes the strongest strategy for any hit on **the result column name ∪ the physical columns** (an expression that touches a sensitive column is masked too — better strict than leaky);
+> a column renamed by `SELECT col AS alias` or a pure expression column (`CONCAT(...)`) cannot be related to a classification and may escape masking (recorded as a limitation).~~
+> **Lifted in revision 1.10.0 (fix of 2026-10-24)**: every result column is first parsed by `parseSelectOutputs` of the SQL lineage parser (`lib/lineage/sql-lineage.ts`) into "which physical columns it references" (AS / bare alias / expression / aggregate / `::cast` / case-when / extract; aliases inside CTEs and subqueries are expanded level by level; literals / keywords / type names / function names do not count), and `maskRows` takes the strongest strategy for any hit on **the result column name ∪ the physical columns** (an expression that touches a sensitive column is masked too — better strict than leaky);
 > when nothing can be parsed (`SELECT *`, a non-select statement) only the result column name itself remains = the original rule, never looser;
 > `maskedColumns` still reports result column names.
+>
 > Why the fix was mandatory: the Ask-Your-Data model almost always writes Chinese aliases (`country AS <alias>`, where the alias is the Chinese word for "region"); the page-driven headless-browser acceptance of the GenBI chain of 2026-10-24, using SQL really returned by the model, confirmed "the classification sits on country, the result column is called by its Chinese alias ⇒ always plaintext".
 
 ## 4. Access requests (reusing the approval flow)

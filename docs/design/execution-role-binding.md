@@ -1,13 +1,15 @@
 # Execution Role Binding · User-selectable Job Execution Roles (requirements + design)
 
-> Revision **1.2** (2026-11-03).
-> Status: ✅ **fixed and verified** (two product commits on 2026-11-03;
-> all six gates green: tsc · vitest 5,761 tests · naming-parity · synth gate (including the new check 9.4d) · redline scan · IAM call manifest 142 entries;
-> the new page-driven acceptance segment for execution-role binding passed **7/7** in a two-region demo test account in observe data-plane credential mode, and the contract-guard baseline taken before the change re-verified with 0 FAIL (28 pages / 7 contracts;
-> the 6 WARNs are all body-length data drift on Home · Audit Log · FinOps · Task Monitor · Ops Dashboard · Settings, not contract regressions), see section 8).
-> Revision 1.1: code written, awaiting verification.
-> Decided on 2026-11-03: this is a **basic capability**; it must be fixed at the root and built to the highest global standard (same batch: [chaining sync tasks and batch jobs into one DAG published completely to Airflow Serverless](./workflow-job-node.md)).
-> Origin: a customer production environment (release 2.1.2) moved the dependency libraries of a Batch Compute job to **its own S3 bucket** and wanted to bind the job to **an IAM role it had created itself**; the page would not accept the binding. After the job fell back to the platform role, Glue was denied with 403 while downloading `--extra-py-files` at launch (`LAUNCH ERROR … Error downloading from S3 … Forbidden`). Decided on 2026-11-03: **parity with AWS — every job can specify its own role; the roles the platform generates by default remain usable; the dropdown can be refreshed within the page; customers must be allowed to switch to their own buckets, so binding self-created roles must be allowed. Fix it at the root, keep it friendly, keep it compatible.**
+> - Revision **1.2** (2026-11-03).
+> - Status: ✅ **fixed and verified** (two product commits on 2026-11-03;
+>   all six gates green: tsc · vitest 5,761 tests · naming-parity · synth gate (including the new check 9.4d) · redline scan · IAM call manifest 142 entries;
+>   the new page-driven acceptance segment for execution-role binding passed **7/7** in a two-region demo test account in observe data-plane credential mode, and the contract-guard baseline taken before the change re-verified with 0 FAIL (28 pages / 7 contracts;
+>   the 6 WARNs are all body-length data drift on Home · Audit Log · FinOps · Task Monitor · Ops Dashboard · Settings, not contract regressions), see section 8).
+> - Revision 1.1: code written, awaiting verification.
+> - Decided on 2026-11-03: this is a **basic capability**; it must be fixed at the root and built to the highest global standard (same batch: [chaining sync tasks and batch jobs into one DAG published completely to Airflow Serverless](./workflow-job-node.md)).
+> - Origin: a customer production environment (release 2.1.2) moved the dependency libraries of a Batch Compute job to **its own S3 bucket** and wanted to bind the job to **an IAM role it had created itself**; the page would not accept the binding. After the job fell back to the platform role, Glue
+>   was denied with 403 while downloading `--extra-py-files` at launch (`LAUNCH ERROR … Error downloading from S3 … Forbidden`). Decided on 2026-11-03: **parity with AWS — every job can specify its own role; the roles the platform generates by default remain usable; the dropdown can be refreshed
+>   within the page; customers must be allowed to switch to their own buckets, so binding self-created roles must be allowed. Fix it at the root, keep it friendly, keep it compatible.**
 
 ## 1. Current state and root cause (🔵 code facts; the production tag `release-2026-10-29` and the development trunk are the same here)
 
@@ -47,6 +49,7 @@ GetRole / SimulatePrincipalPolicy   role/*
 - The IAM call manifest registers 6 entries (ListRoles / GetRole / SimulatePrincipalPolicy / PassRole × 3 services); the simulation gate measures the TaskRole against the manifest for real.
 
 ### 3.2 Platform-side single author `platform/src/lib/execution-role/`
+
 | File | Responsibility |
 |---|---|
 | `types.ts` | `ExecRoleEngine = "glue" \| "emr" \| "flink"` (closed list); `SERVICE_PRINCIPAL_BY_ENGINE`; candidate / preflight types |
@@ -62,12 +65,14 @@ GetRole / SimulatePrincipalPolicy   role/*
 - The three-state semantics are unchanged; `unverifiable` still does not block but is echoed back.
 
 ### 3.4 Endpoints
+
 | Route | Description |
 |---|---|
 | `GET /api/exec-roles/candidates?engine=&targetId=` | Sign-in required; engine not in the closed list / missing targetId ⇒ 400 (the place is explicit; the home region is never assumed); returns `{ groups: { platform[], advisor[], custom[] }, servicePrincipal, fetchedAt }` |
 | `POST /api/exec-roles/preflight` | body `{ engine, targetId, roleArn, extraS3Uris?, scriptCode? }` ⇒ `PreflightResult`; used by the page's "Check permissions" button; the save path measures again on the server by itself (it does not trust the client) |
 
 ### 3.5 Wiring (four entry points + two save points)
+
 | Where | Change |
 |---|---|
 | `lib/etl/job-service.ts#ensureGlueJob` | Takes the role through `resolveExecutionRoleArn`; for a custom role, `preflightExecutionRole` (extra = the two glueConfig fields + the script scan) ⇒ gaps ⇒ throws `ExecRolePreflightError` (the route maps it to 400) |
@@ -118,10 +123,10 @@ On the test-instrument side, incidentally: `app/api/flink/__tests__/delete-orpha
 ## 8. Verification record (revision 1.2, 2026-11-03, two-region demo test account in observe data-plane credential mode, final product bytes)
 - Deployed twice: during the first image build, `page.tsx` was edited on the same tree (the build output may have picked up uncommitted changes) ⇒ rolled once more after the tree was clean; `GET /api/public/version` productCommit = the final product commit, all 17 post-deploy truth-check items ✅. Lesson: **do not edit a tree while redeploy is running on it**.
 - New page-driven acceptance segment (a local headless script, not committed; registered in the acceptance-gate suite list with a segment budget of 2700 s) **7/7**: item 1 self-created role bound → "Run now" succeeded in 55 s, [cross-check] the Glue job's Role == that ARN ·
-  - item 2 the customer's production path (dependency library pointing at a self-created bucket, role without permission ⇒ save PUT 400, the page text contains `s3:GetObject` and the bucket name; the "Check permissions" gaps list that object verbatim ⇒ the CLI grants GetObject + ListBucket ⇒ "Refresh" ⇒ "Check permissions" ok ⇒ save 200 ⇒ run succeeded, the dependency really downloaded from the customer bucket) · item 3 a role created in IAM
-  - ⇒ one in-page "Refresh" and it appears in the "Your own roles" group, own-role count +1, the page was not reloaded · item 4 an existing Showcase job saved without changing the field
-  - ⇒ 200 and `executionRoleArn` empty both before and after, the dropdown shows "Platform default role · bgp-glue-role" · item 5 a new job from the us-west-2 view has the platform default entry = `BgpExecEnv-tgt-usw2-a-glue-role`, the candidates request's place = tgt_usw2_a · item 6 (dependency upload per region) a us-west-2 job uploads a dependency
-  - ⇒ the filled-in bucket = that region's scripts bucket, key `glue-deps/<jobId>/<file>`, the response's uploaded contains only tgt_usw2_a, the home-region bucket has nothing · teardown: both jobs / both roles / the dependency bucket / the scripts-bucket objects deleted clean, Showcase untouched.
+  item 2 the customer's production path (dependency library pointing at a self-created bucket, role without permission ⇒ save PUT 400, the page text contains `s3:GetObject` and the bucket name; the "Check permissions" gaps list that object verbatim ⇒ the CLI grants GetObject + ListBucket ⇒ "Refresh" ⇒ "Check permissions" ok ⇒ save 200 ⇒ run succeeded, the dependency really downloaded from the customer bucket) · item 3 a role created in IAM
+  ⇒ one in-page "Refresh" and it appears in the "Your own roles" group, own-role count +1, the page was not reloaded · item 4 an existing Showcase job saved without changing the field
+  ⇒ 200 and `executionRoleArn` empty both before and after, the dropdown shows "Platform default role · bgp-glue-role" · item 5 a new job from the us-west-2 view has the platform default entry = `BgpExecEnv-tgt-usw2-a-glue-role`, the candidates request's place = tgt_usw2_a · item 6 (dependency upload per region) a us-west-2 job uploads a dependency
+  ⇒ the filled-in bucket = that region's scripts bucket, key `glue-deps/<jobId>/<file>`, the response's uploaded contains only tgt_usw2_a, the home-region bucket has nothing · teardown: both jobs / both roles / the dependency bucket / the scripts-bucket objects deleted clean, Showcase untouched.
 - Contract guard (baseline of 28 pages / 7 contracts taken before the change) re-verified: 0 FAIL (28 pages / 7 contracts; the 6 WARNs are all body-length data drift on Home · Audit Log · FinOps · Task Monitor · Ops Dashboard · Settings, not contract regressions).
 - The reds of the first two runs were all on the instrument side: ① `aws glue get-job --name` (should be `--job-name`) ② with a search term typed, the antd 6 Select dropdown's inner_text starts with an extra a11y block that prints the current item's `title` (= the role ARN); the ARN contains the role name ⇒ "the role name appears before the group title" always holds ⇒ the group-substring check was a false red; changed to take the nearest preceding `.ant-select-item-group` in DOM order ③ a save 400 goes through `Modal.error`, whose mask blocks "Check permissions" ⇒ the check reads the full page text first and then closes the dialog.
   - A read-only review by a subagent hardened four more items (a failed refresh is an Alert, not a toast / register the fixture before creating it / the GET of item 4 must not be an empty assertion / local temporary files are cleaned up), re-verified on the fourth run.

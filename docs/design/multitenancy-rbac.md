@@ -2,8 +2,8 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Revision: 1.4.1 | Date: 2026-06-14 | Status: implemented (revision 1.4.1 correction: strict membership; the implicit editor role on the Default Workspace was removed)
-> Addresses the first priority-0 finding of the gap-analysis re-check (group B): "`userId` is still hard-coded to `default-user`; there are no projects/workspaces, no resource-level or row/column-level RBAC, and no permission request and approval flow".
+> - Revision: 1.4.1 | Date: 2026-06-14 | Status: implemented (revision 1.4.1 correction: strict membership; the implicit editor role on the Default Workspace was removed)
+> - Addresses the first priority-0 finding of the gap-analysis re-check (group B): "`userId` is still hard-coded to `default-user`; there are no projects/workspaces, no resource-level or row/column-level RBAC, and no permission request and approval flow".
 
 ---
 

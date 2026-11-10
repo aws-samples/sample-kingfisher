@@ -2,9 +2,9 @@
 
 > 📌 **Scope note (reconciled 2026-10-13)**: this document was written during the single-region stage and records the design as it stood at that time (including the audit-calibration annotations of 2026-08); **the current implementation is defined by the code**. For multi-region behavior — place, execution scope, per-region scheduling and so on — see the multi-region execution [specification](./multi-region-execution-spec.md) and [design](./multi-region-execution-design.md); the current state of each module is described in the [module overview](../modules.md). A path mentioned in this document that no longer exists means that the idea was not implemented as described here or has since been superseded.
 
-> Status: **✅ implemented** (audit calibration of 2026-08-26: the original header read "in design, no code touched"). Stages 0–3 are all achieved and verified online (duplicate sources ① and ② eliminated, hosted on Strands,
-> prompt / catalog / retrieval all unified in core, both backends return the identical result of 898 persons). This document is the decision design for the last step of the first construction phase.
-> Following the design-first, no-code-until-approved discipline: action is taken only after the decision between a and b.
+> - Status: **✅ implemented** (audit calibration of 2026-08-26: the original header read "in design, no code touched"). Stages 0–3 are all achieved and verified online (duplicate sources ① and ② eliminated, hosted on Strands,
+>   prompt / catalog / retrieval all unified in core, both backends return the identical result of 898 persons). This document is the decision design for the last step of the first construction phase.
+> - Following the design-first, no-code-until-approved discipline: action is taken only after the decision between a and b.
 
 > ⚠️ (documentation audit of 2026-08-26) This implementation plan has been fully implemented; the code is authoritative. The overall design is the [GenBI engine-unification design](./genbi-engine-unification.md). Kept as a historical implementation record.
 

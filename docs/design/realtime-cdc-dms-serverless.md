@@ -45,6 +45,7 @@
 ## 3. Architecture design
 
 ### 3.1 Core concept mapping (instance mode → Serverless)
+
 | Old (instance mode) | New (Serverless) |
 |---|---|
 | ReplicationInstance (always-on, created by CDK) | **None** (no instance) |
@@ -99,12 +100,14 @@ realtimeConfig.replicationConfigArn?: string;
 ### 5.2 Kept / added
 - **Kept**: ReplicationSubnetGroup (private subnets), the DMS SG, `bgp-dms-kinesis-role` (Serverless still needs a SecretsManagerAccessRole / ServiceAccessRole for the Redshift target).
 - **Added VPC endpoints (the key of this rework; required for Serverless to reach private dependencies)**:
+
   | Endpoint | Type | Purpose |
   |---|---|---|
   | `com.amazonaws.us-east-1.s3` | **Gateway** | S3 staging for the DMS → Redshift transfer / S3 target |
   | `com.amazonaws.us-east-1.secretsmanager` | Interface | Read the source / target secrets |
   | `com.amazonaws.us-east-1.redshift-data` or redshift | Interface | Target Redshift |
   | (optional) `kinesis-streams` | Interface | If an S3 / Kinesis target is built |
+
   - Interface endpoints go in the private subnets + the SG allows 443; the Gateway endpoint is attached to the private route tables.
   - **Reusability**: these endpoints also benefit other components (Glue COPY, Secrets reads); consider moving them to the VpcStack as always-on (not gated) so that other functions are not affected after a destroy. **Review decision point A**.
 - **SLR**: `00-prereqs.sh` adds idempotent creation of the service-linked role for `dms.amazonaws.com`.
