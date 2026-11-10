@@ -19,6 +19,7 @@ import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
 // 数据湖表桶路由:作业的数据湖表桶声明(形状 / 按绑定区校验 / 错误整形)唯一作者
 import { checkLakeDeclarationForTargets, lakeRouteErrorResponse, normalizeLakeDeclaration, resolveJobLakeRoutes, userGlueConfEntries, type LakeDeclaration } from "@/lib/lake/job-declaration";
 import { s3UrisFromGlueConfig } from "@/lib/execution-role/s3-uris";
+import { glueVersionForNewRecord } from "@/lib/sync/glue-version";
 import { ulid } from "ulid";
 
 const USER_ID = "default-user";
@@ -88,6 +89,13 @@ export async function POST(req: NextRequest) {
   //   不过 ⇒ 400 带 code,不落库;手写目录被平台接管 ⇒ 响应 `_meta.notices`。预检按声明解析出的路由逐桶量 s3tables。
   let lakeNotices: string[] = [];
   if (body.type === "glue") {
+    // 新建 Glue 作业落库就带版本(客户端没给 = 新缺省;给了就校验),不再留「没存版本」的行 —— 那样的行打开时按存量口径回写 5.1,
+    //   与表单常量 6.0 不一致(2026-11-03 客户手册截图)。单一作者 lib/sync/glue-version.ts。
+    try {
+      body.glueConfig = { ...(body.glueConfig || {}), glueVersion: glueVersionForNewRecord(body.glueConfig?.glueVersion) };
+    } catch (e) {
+      return apiError((e as Error)?.message ?? String(e), 400, { code: "VALIDATION_FAILED" });
+    }
     let decl: LakeDeclaration;
     try {
       decl = normalizeLakeDeclaration(body.glueConfig);

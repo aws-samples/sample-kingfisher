@@ -1,6 +1,7 @@
 "use client";
 
 import { targetOfStamp } from "@/lib/exec-env/target-id";
+import { fetchScoped, workflowTargetsOf } from "@/components/dag-editor/scoped-candidates";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { Button, Space, message, Dropdown, Spin, Tabs, Card, Tag, Badge, Table, Tooltip, Modal, Select, Input, Popconfirm } from "antd";
 import { SaveOutlined, PlusOutlined, ArrowLeftOutlined, PlayCircleOutlined, CloudUploadOutlined, DashboardOutlined, LinkOutlined, FileTextOutlined, ApartmentOutlined, HistoryOutlined, FieldTimeOutlined } from "@ant-design/icons";
@@ -75,6 +76,8 @@ export default function WorkflowEditorPage() {
   const [reloadKey, setReloadKey] = useState(0);
   // SCH-03: options (other workflows + sync tasks) for the downstream-dependency selector.
   const [depOptions, setDepOptions] = useState<{ label: string; value: string }[]>([]);
+  // 下游依赖候选读取失败的原话(红字说明;不静默回空列表)
+  const [depOptionsError, setDepOptionsError] = useState<string | null>(null);
   const [savingDeps, setSavingDeps] = useState(false);
   // PLT-02: per-action loading so save/publish/trigger can't be double-submitted.
   const [actionLoading, setActionLoading] = useState<{ save?: boolean; publish?: boolean; trigger?: boolean }>({});
@@ -234,24 +237,32 @@ export default function WorkflowEditorPage() {
   }, [id, reloadKey]);
 
   // SCH-03: load selectable downstream targets (other workflows + sync tasks).
+  //   候选按**这条工作流的执行区**取(`?scope=<落点>`,与节点面板 / 发布期落点判定同一口径;单一作者 scoped-candidates.ts):
+  //   两条读接口只认 URL ?scope=,原来裸 fetch 不带它 = 「全部」视角 ⇒ 列出所有区的候选(2026-11-03 勘查)。读失败红字说明,不静默回空。
+  const depTargetsKey = workflow ? workflowTargetsOf(workflow as { targets?: unknown; targetId?: unknown }, targetOfStamp).join(",") : "";
   useEffect(() => {
+    if (!depTargetsKey) return;
+    const targets = depTargetsKey.split(",");
+    let cancelled = false;
     (async () => {
       try {
-        const [wfRes, syncRes] = await Promise.all([
-          fetch("/api/workflow").then((r) => r.json()),
-          fetch("/api/sync").then((r) => r.json()),
+        const [wfs, syncs] = await Promise.all([
+          fetchScoped("/api/workflow", targets, (w) => String(w.workflowId)),
+          fetchScoped("/api/sync", targets, (s) => String(s.taskId)),
         ]);
-        const wfs = (Array.isArray(wfRes) ? wfRes : wfRes.data || []).filter((w: any) => w.workflowId !== id);
-        const syncs = (syncRes.data || syncRes || []) as any[];
+        if (cancelled) return;
         setDepOptions([
-          ...wfs.map((w: any) => ({ label: t("工作流: {name}", { name: w.name || w.workflowId }), value: w.workflowId })),
+          ...wfs.filter((w: any) => w.workflowId !== id).map((w: any) => ({ label: t("工作流: {name}", { name: w.name || w.workflowId }), value: w.workflowId })),
           ...syncs.map((s: any) => ({ label: t("同步: {name}", { name: s.name || s.taskId }), value: s.taskId })),
         ]);
-      } catch {
-        /* options optional */
+        setDepOptionsError(null);
+      } catch (e) {
+        if (!cancelled) { setDepOptions([]); setDepOptionsError(String((e as Error)?.message || e)); }
       }
     })();
-  }, [id]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, depTargetsKey]);
 
   // 周期调度设置:后端/DAG 生成器一直支持 cronExpression(发布时写进 Airflow schedule_interval),
   // 但页面此前没有设置入口(只能手动调 API)——这里补齐:填 cron → 应用(落库+重新发布 DAG 生效)。
@@ -434,11 +445,8 @@ export default function WorkflowEditorPage() {
   };
 
   // 这个工作流的执行区(行上的章 `targets[]`;无章的存量工作流 = 主控区,与 openAirflowConsole 同口径)。
-  //   节点面板按它过滤候选同步任务 / 离线作业(?scope=),与发布期落点一致性判定同一口径。权威判定在服务端(job-node-spec.ts)。
-  const wfTargets: string[] =
-    Array.isArray(workflow?.targets) && workflow.targets.length
-      ? workflow.targets.map((x: unknown) => String(x))
-      : [targetOfStamp((workflow as { targetId?: unknown } | null)?.targetId)];
+  //   节点面板与下游依赖下拉都按它过滤候选(?scope=),与发布期落点一致性判定同一口径。权威判定在服务端(job-node-spec.ts)。
+  const wfTargets: string[] = workflowTargetsOf(workflow as { targets?: unknown; targetId?: unknown } | null, targetOfStamp);
 
   if (loading) return <Spin size="large" style={{ display: "block", margin: "100px auto" }} />;
 
@@ -521,7 +529,9 @@ export default function WorkflowEditorPage() {
             onChange={saveTriggers}
             options={depOptions}
             optionFilterProp="label"
+            data-testid="wf-dep-select"
           />
+          {depOptionsError && <span data-testid="wf-dep-error" style={{ color: "#cf1322", fontSize: 12 }}>{t("候选读取失败:{msg}", { msg: depOptionsError })}</span>}
         </Space>
       </Card>
 

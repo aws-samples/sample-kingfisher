@@ -1,6 +1,7 @@
 # Workflow Job Node · Batch Job Nodes in the Orchestration DAG (requirements + design)
 
-> - Revision **1.0** (2026-11-03). Status: 🆕 design written, code pending (ships with the 2.2.0 release).
+> - Revision **1.1** (2026-11-10): R8 ② the "Downstream dependencies" selector takes its candidates by the workflow's place; R8 ④ the sync node passes the business date (`--ds`) to the sync Glue run, runtime library 12 → 13. Status: ✅ implemented and verified (ships with the 2.2.0 release).
+> - Revision **1.0** (2026-11-03). Status: design written, code pending.
 > - Decided on 2026-11-03: "Allow data sync tasks and batch development jobs to be chained into one DAG workflow and **published completely into Airflow Serverless**. This is a **basic capability; it must be fixed at the root, and to the highest global standard**."
 > - Origin (the second question raised the same day): a Data Sync task's dependencies can only be other sync tasks; Batch Compute jobs cannot enter orchestration — to chain "sync → batch job → SQL" today, the only way is to paste the job's code once more into an inline SQL / Python node, losing the engine configuration, the execution role, the dependency libraries and the run history.
 
@@ -49,6 +50,7 @@ In one sentence: **today "sync → SQL / Python" can be chained; "sync → batch
 - `NODE_EXEC_PY` gains `_exec_job(env, node, ds)`: `spec = node["data"]["jobSpec"]` → `_acquire_run_lock(spec, token)` (busy ⇒ wait 45 minutes / skip) → run by `spec["engine"]` → `_record(spec, run_id, status, extra={ "triggeredBy": "workflow", "workflowId", "workflowRunId", "nodeId", "duration" })` → release;
   - exceptions close the books and re-throw, following the existing `run_node` convention.
 - `_exec_sync` in the same change: at the end of the run, write the sync task's own run row (`taskType: sync`, `triggeredBy: workflow`, back-link fields as above); everything else untouched (whether the business date can be passed to the sync script still has to be checked against `SYNC_RUN_VARS_PY`; not promised in this change).
+  - **Done on 2026-11-10**: the sync script has parsed `--ds` (`SYNC_RUN_DATE_ARG`) since 2026-10, so `_exec_sync(..., ds)` now passes `Arguments={"--ds": ds}` when a date is present and records `runDate` on the run row; the classic operator passes `{{ ds }}`, the serverless runtime passes the context `ds`; `RUNTIME_LIB_VERSION` 12 → 13.
 
 ### 3.4 Wiring the two carriers
 - classic `runtime-lib.ts#_make_operator`: `job` ⇒ `PythonOperator(_exec_job, op_kwargs={env, node, ds: "{{ ds }}"})`; `RUNTIME_LIB_VERSION = 11`.

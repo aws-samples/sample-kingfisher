@@ -170,7 +170,7 @@ def _put_workflow_name(env, item):
     return item
 
 
-def _sync_node_record(env, task, task_id, status, started, job_name, glue_run_id, node_id, workflow_run_id, scheduler, error=None):
+def _sync_node_record(env, task, task_id, status, started, job_name, glue_run_id, node_id, workflow_run_id, scheduler, error=None, ds=None):
     # (57 DESIGN R8):工作流里的同步节点把这次运行写进**同步任务自己的**运行历史
     #   (taskType=sync · triggeredBy=workflow · 回链 workflowId / workflowRunId / nodeId),与离线作业节点同一套「双写回链」。
     # 🔴 同步任务自己的定时调度载体(carrier-ledger:ledger_task_id == task_id)已由 __start / __finish 记在它名下 ⇒ 不再多写一行。
@@ -199,13 +199,15 @@ def _sync_node_record(env, task, task_id, status, started, job_name, glue_run_id
         "workflowRunId": wf_run,
         "nodeId": str(node_id or ""),
     }
+    if ds:
+        item["runDate"] = str(ds)   # 与离线作业节点同一列(运行历史「业务日期」)
     _put_workflow_name(env, item)
     if error:
         item["error"] = str(error)[:500]
     env["ddb"].Table("bgp-task-runs").put_item(Item=item)
 
 
-def _exec_sync(env, task_id, node_id=None, workflow_run_id=None, scheduler=None, **kwargs):
+def _exec_sync(env, task_id, node_id=None, workflow_run_id=None, scheduler=None, ds=None, **kwargs):
     task = env["ddb"].Table("bgp-sync-tasks").get_item(
         Key={"userId": "default-user", "taskId": task_id}).get("Item")
     if not task:
@@ -214,7 +216,13 @@ def _exec_sync(env, task_id, node_id=None, workflow_run_id=None, scheduler=None,
     if not job_name:
         raise Exception("Sync task %s has no Glue job. Run it from the platform first." % task_id)
     started = time.time()
-    run = env["glue"].start_job_run(JobName=job_name)
+    # 业务日期:工作流给了逻辑日期(经典 Airflow ds / serverless ctx)就按同步任务自己的参数名传给这次 Glue 运行
+    #   (与手动运行 / 补数同一个参数 "--ds";单一作者 lib/sync/run-vars.ts SYNC_RUN_DATE_ARG,判据逐字比对);
+    #   没给就不传 ⇒ 同步脚本按任务的业务时区取「今天」,与改动前逐字相同。
+    start_kw = {"JobName": job_name}
+    if ds:
+        start_kw["Arguments"] = {"--ds": str(ds)}
+    run = env["glue"].start_job_run(**start_kw)
     run_id = run["JobRunId"]
     print("Started Glue job %s, run %s" % (job_name, run_id))
     while True:
@@ -225,11 +233,11 @@ def _exec_sync(env, task_id, node_id=None, workflow_run_id=None, scheduler=None,
     if st != "SUCCEEDED":
         err = "Glue job %s run %s ended with %s" % (job_name, run_id, st)
         try:
-            _sync_node_record(env, task, task_id, "failed", started, job_name, run_id, node_id, workflow_run_id, scheduler, error=err)
+            _sync_node_record(env, task, task_id, "failed", started, job_name, run_id, node_id, workflow_run_id, scheduler, error=err, ds=ds)
         except Exception as le:
             print("WARNING: failed to record sync node failure in ledger: %s" % le)
         raise Exception(err)
-    _sync_node_record(env, task, task_id, "succeeded", started, job_name, run_id, node_id, workflow_run_id, scheduler)
+    _sync_node_record(env, task, task_id, "succeeded", started, job_name, run_id, node_id, workflow_run_id, scheduler, ds=ds)
     print("Glue job %s completed: %s" % (job_name, st))
 
 

@@ -7,6 +7,7 @@ import type { Node } from "reactflow";
 import { useT } from "@/lib/i18n/useT";
 import { JOB_NODE_KINDS, type JobNodeRef } from "@/types/workflow";
 import { jobEngineLabel } from "./JobNode";
+import { fetchScoped } from "./scoped-candidates";
 
 interface Props {
   node: Node | null;
@@ -28,23 +29,6 @@ export interface NodeCandidates {
 }
 
 const EMPTY_CANDIDATES: NodeCandidates = { syncTasks: [], etlJobs: [], emrJobs: [], error: null, loaded: false };
-
-/**
- * 按工作流的执行区取候选:每个区各取一次 `?scope=<tid>`,工作流绑多个区时只留**每个区都绑了**的
- * (发布期判定是「绑定含工作流的每个落点」,面板只列发得出去的)。
- */
-async function fetchScoped(base: string, targets: string[], idOf: (x: any) => string): Promise<any[]> {
-  const lists = await Promise.all(
-    targets.map(async (tid) => {
-      const res = await fetch(`${base}?scope=${encodeURIComponent(tid)}`);
-      const d = await res.json().catch(() => null);
-      if (!res.ok || d?.success === false) throw new Error(d?.error?.message || `HTTP ${res.status}`);
-      return (Array.isArray(d) ? d : d?.data || []) as any[];
-    })
-  );
-  const [first, ...rest] = lists;
-  return (first || []).filter((x) => rest.every((l) => l.some((y) => idOf(y) === idOf(x))));
-}
 
 export default function NodeConfigPanel({ node, wfTargets, onClose, onChange, onDelete }: Props) {
   const t = useT();

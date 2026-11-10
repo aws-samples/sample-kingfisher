@@ -31,6 +31,7 @@ import { buildDagSpec } from "@/lib/workflow/dag-generator-v2";
 import { withJobSpecs } from "@/lib/workflow/job-node-spec";
 import { serverlessJobSpecFor } from "@/lib/etl/job-spec";
 import { glueJobNameFor } from "@/lib/etl/glue-job-name";
+import { SYNC_RUN_DATE_ARG } from "@/lib/sync/run-vars";
 import type { Workflow } from "@/types/workflow";
 
 const USW2 = "tgt_usw2_a";
@@ -172,7 +173,7 @@ try:
     if fn == "_exec_job":
         out["result"] = rt._exec_job(env, S.get("node"), ds=S.get("ds"), workflow_run_id=S.get("workflowRunId"), scheduler=S.get("scheduler"))
     elif fn == "_exec_sync":
-        out["result"] = rt._exec_sync(env, S["taskId"], node_id=S.get("nodeId"), workflow_run_id=S.get("workflowRunId"), scheduler=S.get("scheduler"))
+            out["result"] = rt._exec_sync(env, S["taskId"], node_id=S.get("nodeId"), workflow_run_id=S.get("workflowRunId"), scheduler=S.get("scheduler"), ds=S.get("ds"))
     elif fn == "_node_run_id":
         out["result"] = rt._node_run_id(S.get("workflowRunId"), S.get("nodeId"), S.get("targetId"))
 except Exception as e:
@@ -391,6 +392,27 @@ describe("⑤ 同步节点写同步任务自己的运行行", () => {
     const carrier = runShared({ fn: "_exec_sync", env: { ...ENV, ledger_task_id: TASK.taskId, ledger_task_type: "sync", writes_workflow_row: false }, taskId: TASK.taskId, nodeId: "sync-1", getItems: { "bgp-sync-tasks": TASK } });
     expect(carrier.ok, carrier.error).toBe(true);
     expect(runRow(carrier)).toBeUndefined();
+  });
+  // 2026-11-10:同步节点把工作流的业务日期传给同步 Glue 运行,与离线作业节点 / 手动运行 / 补数同一个参数名。
+  it("同步节点业务日期:给了 ds ⇒ start_job_run 带 Arguments[--ds](参数名与 lib/sync/run-vars SYNC_RUN_DATE_ARG 逐字同)且运行行带 runDate;没给 ds ⇒ 不传 Arguments(脚本按任务时区取今天,与改动前逐字同)", () => {
+    expect(SYNC_RUN_DATE_ARG).toBe("--ds");
+    expect(NODE_EXEC_PY, "Python 字面量与 TS 单一作者逐字比对(Python 源里禁模板插值,所以靠判据钉)").toContain('start_kw["Arguments"] = {"--ds": str(ds)}');
+    const withDs = runShared({ fn: "_exec_sync", env: ENV, taskId: TASK.taskId, nodeId: "sync-1", workflowRunId: "ex_abc#" + USW2, getItems: { "bgp-sync-tasks": TASK }, ds: "2026-10-11" });
+    expect(withDs.ok, withDs.error).toBe(true);
+    const start = withDs.calls.find((c) => c.api === "glue.start_job_run")!;
+    expect(start.JobName).toBe("bgp-sync-orders");
+    expect(start.Arguments).toEqual({ [SYNC_RUN_DATE_ARG]: "2026-10-11" });
+    expect(runRow(withDs)!.runDate).toBe("2026-10-11");
+    const noDs = runShared({ fn: "_exec_sync", env: ENV, taskId: TASK.taskId, nodeId: "sync-1", workflowRunId: "ex_abc#" + USW2, getItems: { "bgp-sync-tasks": TASK } });
+    expect(noDs.ok, noDs.error).toBe(true);
+    const start2 = noDs.calls.find((c) => c.api === "glue.start_job_run")!;
+    expect(start2).not.toHaveProperty("Arguments");
+    expect(runRow(noDs)).not.toHaveProperty("runDate");
+  });
+  it("同步节点业务日期:两载体的同步分支都把 ds 传进 _exec_sync(经典 operator 的 ds 来自 Airflow 上下文;serverless 来自 run_node 的 ds)", () => {
+    expect(RUNTIME_LIB_SOURCE).toMatch(/def _sync\(_env=env, _task_id=data\.get\("syncTaskId", ""\), _node_id=node\.get\("id", task_id\), ds=None, \*\*kw\):/);
+    expect(RUNTIME_LIB_SOURCE).toContain('return _exec_sync(_env, _task_id, node_id=_node_id, workflow_run_id=rid, scheduler="mwaa", ds=ds)');
+    expect(BGP_RUNTIME_PY).toContain('_exec_sync(e, data.get("syncTaskId", ""), node_id=node.get("id"), workflow_run_id=e.get("ledger_run_id"), ds=ds)');
   });
 });
 

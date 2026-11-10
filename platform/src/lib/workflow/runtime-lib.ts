@@ -54,7 +54,8 @@ import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 // v11 → **v12**(2026-11-04):作业族共享块 `JOB_EXEC_PY` 的台账写法改为「开跑 `_record_start` 落 running 行 → 结束 `_record` 用 update 收口」
 //   (在途运行对删作业可见;作业行回写一律 attribute_exists(jobId) 条件写,不造幽灵行;软限 timeout-pending 带后端句柄)。
 //   🔴 已发布的工作流 / 单作业 DAG 仍 import 旧版本号的库 ⇒ 要重新发布才拿到新执行体(升级须知)。
-export const RUNTIME_LIB_VERSION = 12;
+// v12 → **v13**(2026-11-10):同步节点把工作流的业务日期(ds)传给同步 Glue 运行(--ds)并记进运行行 runDate;已发布 DAG 要重发才生效。
+export const RUNTIME_LIB_VERSION = 13;
 export const RUNTIME_LIB_MODULE = `bgp_workflow_runtime_v${RUNTIME_LIB_VERSION}`;
 export const RUNTIME_LIB_FILENAME = `${RUNTIME_LIB_MODULE}.py`;
 
@@ -149,10 +150,11 @@ def _make_operator(env, node, tasks_meta):
     if ntype == "sync":
         # 同步节点带节点 id 与工作流 run id(经典 run_id + "#" + target,与 _update_run_record 的台账键同口径)
         #   ⇒ 执行器把这次运行写进同步任务自己的运行历史并回链;scheduler=mwaa 如实记载体。
-        def _sync(_env=env, _task_id=data.get("syncTaskId", ""), _node_id=node.get("id", task_id), **kw):
+        #   业务日期取 Airflow 的 ds,与离线作业节点同一口径(同步脚本按 --ds 解析日期变量;没有就按任务时区取今天)。
+        def _sync(_env=env, _task_id=data.get("syncTaskId", ""), _node_id=node.get("id", task_id), ds=None, **kw):
             dr = kw.get("dag_run")
             rid = (str(dr.run_id) + "#" + _env["target_id"]) if dr is not None else None
-            return _exec_sync(_env, _task_id, node_id=_node_id, workflow_run_id=rid, scheduler="mwaa")
+            return _exec_sync(_env, _task_id, node_id=_node_id, workflow_run_id=rid, scheduler="mwaa", ds=ds)
         return PythonOperator(task_id=task_id, python_callable=_sync)
     if ntype == "job":
         # 离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析);业务日期取 Airflow 的 ds;

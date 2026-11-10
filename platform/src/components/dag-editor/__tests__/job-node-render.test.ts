@@ -88,11 +88,23 @@ describe("③ 接线(源码字面)", () => {
     const page = strip(read("app/workflow/[id]/page.tsx"));
     expect(page).toMatch(/<DagEditor nodes=\{nodes\} edges=\{edges\} wfTargets=\{wfTargets\}/);
   });
-  it("面板三条候选读取都带 scope=(执行范围读取守卫认它),且只用三条已有读接口", () => {
+  it("面板三条候选读取都带 scope=(执行范围读取守卫认它),且只用三条已有读接口;按落点取候选的 fetch 只有单一作者 scoped-candidates.ts", () => {
+    const author = strip(read("components/dag-editor/scoped-candidates.ts"));
+    expect(author).toMatch(/fetch\(`\$\{base\}\?scope=\$\{encodeURIComponent\(tid\)\}`\)/);
     const panel = strip(read("components/dag-editor/NodeConfigPanel.tsx"));
-    expect(panel).toMatch(/fetch\(`\$\{base\}\?scope=\$\{encodeURIComponent\(tid\)\}`\)/);
+    expect(panel).toContain('import { fetchScoped } from "./scoped-candidates"');
+    expect(panel, "面板里不许再有第二份 fetchScoped 实现").not.toMatch(/async function fetchScoped/);
     for (const api of ['"/api/sync"', '"/api/etl-jobs"', '"/api/engines/emr-serverless"']) expect(panel).toContain(`fetchScoped(${api}, targets,`);
     expect(panel, "不许再裸 fetch(\"/api/sync\")").not.toMatch(/fetch\("\/api\/sync"\)/);
+  });
+  it("2026-11-10:工作流页「下游依赖」下拉的两条候选读取也按工作流落点走 fetchScoped(原裸 fetch 无 ?scope= = 全部视角,列出所有区的候选);读失败红字原话", () => {
+    const page = strip(read("app/workflow/[id]/page.tsx"));
+    expect(page).toContain('import { fetchScoped, workflowTargetsOf } from "@/components/dag-editor/scoped-candidates"');
+    expect(page).toContain('fetchScoped("/api/workflow", targets,');
+    expect(page).toContain('fetchScoped("/api/sync", targets,');
+    expect(page, "不许再裸 fetch(\"/api/sync\") / fetch(\"/api/workflow\")").not.toMatch(/fetch\("\/api\/(sync|workflow)"\)/);
+    expect(page).toMatch(/data-testid="wf-dep-error"/);
+    expect(page, "工作流落点的取法只有一个作者").toContain("const wfTargets: string[] = workflowTargetsOf(");
   });
   it("④ jobRef ⇄ 标量编解码闭合", () => {
     expect(encodeJobRef({ kind: "etl", jobId: "a" })).toBe("etl:a");

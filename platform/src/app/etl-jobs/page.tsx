@@ -659,7 +659,7 @@ export default function EtlJobsPage() {
                               options={GLUE_WORKER_TYPES} />
                             <InputNumber size="small" min={2} max={GLUE_MAX_WORKERS} value={glueCfg.numberOfWorkers} onChange={(v) => setGlueCfg({ ...glueCfg, numberOfWorkers: v })} addonBefore="Workers" style={{ width: 140 }} />
                             <Select size="small" value={glueCfg.glueVersion || GLUE_VERSION_DEFAULT} style={{ width: 250 }} onChange={(v) => setGlueCfg({ ...glueCfg, glueVersion: v })}
-                              options={GLUE_VERSIONS.map((x) => ({ label: glueVersionLabel(x), value: x }))} />
+                              data-testid="etl-glue-version" options={GLUE_VERSIONS.map((x) => ({ label: glueVersionLabel(x), value: x }))} />
                             <InputNumber size="small" min={5} max={2880} value={glueCfg.timeoutMinutes ?? 60} onChange={(v) => setGlueCfg({ ...glueCfg, timeoutMinutes: v })} addonBefore={t("超时(分)")} style={{ width: 150 }} />
                             {/* Glue 连接(可选):引用平台已建 Glue Connection 的数据源。访问 VPC 内私有源(如 RDS)才需要;
                                 纯 S3/S3Tables 作业留空。VPC/子网/SG 是连接的属性(在数据源层配),此处只选引用哪个连接。 */}
@@ -895,7 +895,9 @@ export default function EtlJobsPage() {
                   key: "runs", label: t("运行历史 ({count})", { count: runs.length }), children: (
                     <>
                       <Button size="small" icon={<ReloadOutlined />} onClick={() => sel && fetchRuns(sel.jobId)} style={{ marginBottom: 8 }}>{t("刷新")}</Button>
-                      <Table size="small" rowKey="runId" dataSource={runs} pagination={{ pageSize: 10 }}
+                      {/* 固定列合计约 1220px:视口 1600 以下不再把自适应的「开始 / 错误」两列挤成 0 宽(时间戳一字一行竖排、错误列消失),
+                          而是横向滚动(2026-11-03 客户 1600 宽截图);「开始」给定宽,剩余宽度全归「错误」列。 */}
+                      <Table size="small" rowKey="runId" dataSource={runs} pagination={{ pageSize: 10 }} scroll={{ x: 1400 }} data-testid="etl-run-history-table"
                         columns={[
                           { title: t("状态"), dataIndex: "status", width: 90, render: (v: string) => <Tag color={STATUS_COLOR[v] || "default"}>{v}</Tag> },
                           // 🔴 **这一列是"多区域一起执行"唯一的可见证据**:扇出后同一次点击产生 N 条 run,
@@ -922,7 +924,7 @@ export default function EtlJobsPage() {
                           // 工作流触发的行 ⇒ 「由工作流「X」触发」可点回那次工作流运行(唯一作者 RunTriggerCell)
                           { title: t("触发"), dataIndex: "triggeredBy", width: 200, render: (_v: string, r: any) => <RunTriggerCell run={r} /> },
                           { title: t("业务日期"), dataIndex: "runDate", width: 110, render: (v: string) => v || "-" },
-                          { title: t("开始"), dataIndex: "startedAt", render: (v: string) => v?.slice(0, 19).replace("T", " ") },
+                          { title: t("开始"), dataIndex: "startedAt", width: 160, render: (v: string) => v?.slice(0, 19).replace("T", " ") },
                           { title: t("耗时"), dataIndex: "duration", width: 70, render: (v: number) => (v ? `${v}s` : "-") },
                           { title: t("错误"), dataIndex: "error", ellipsis: true, render: (v: string) => v ? <Text type="danger" style={{ fontSize: 12 }}>{v}</Text> : "-" },
                           { title: t("操作"), key: "act", width: 230, render: (_: any, r: any) => (

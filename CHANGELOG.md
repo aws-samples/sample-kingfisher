@@ -13,6 +13,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Added
 
+- Sync nodes inside a workflow pass the workflow's business date to the sync Glue run (`--ds`, the same parameter used by "Run with a business date" and by backfill) and record `runDate` on the sync task's own run row; both carriers pass it through and `RUNTIME_LIB_VERSION` moves from 12 to 13. Workflows published before the upgrade must be republished once to pick up the new carrier; until then their sync nodes keep running with the task's current date, as before.
 - Release cut with GitHub Release: `scripts/cut-release.sh <version> --yes --github-release` packages the tag and creates the Release (body = the CHANGELOG section, assets = archive + SHA-256); it refuses to start without an authenticated `gh` or with an empty `[Unreleased]` section.
 - Release packaging: `scripts/package-release.sh <tag>` builds a deterministic customer delivery archive from a git tag without tests or developer tooling, with a SHA-256 file and a `BUILD-INFO.json` that keeps the release tag visible in deployments made from the archive.
 - Per-job execution role selection: offline Spark, EMR Serverless, sync, and Flink jobs can run under any IAM role the engine service may assume, as in the AWS console.
@@ -20,7 +21,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - Saving a job now preflights the chosen role: trust policy, existence, and permissions on everything the job references. Gaps are listed with action, resource, and reason.
 - Dependency libraries of multi-region jobs are uploaded once per bound region and submitted from that region's bucket.
 - System Settings shows platform-created data-source network objects (security groups, Glue connections) with ownership and in-use status, and a background cleanup card.
-- Design specification for an offline job node in workflow orchestration, so sync tasks and offline jobs can form one DAG published to the serverless scheduler (implementation planned).
+- Batch job node in workflow orchestration: a `job` node references a batch job (Glue / Redshift / EMR Serverless) of the same project bound to the workflow's place, so sync tasks and batch jobs form one DAG published completely to the serverless scheduler; runs are recorded on both sides with back-links, publishing fails closed when a referenced job is bound elsewhere, backfill supports job nodes, and a referenced job cannot be deleted (`409 JOB_IN_USE`). Design: `docs/design/workflow-job-node.md`.
 - Lake table-bucket routing, phase 1: "Settings → Lake table buckets and routes" registers customer-owned S3 Tables buckets as routes (alias, tier, namespace ownership, writable). No new table; the external-bucket registry rows are reused.
 - Batch Glue and EMR Serverless jobs declare the table buckets they read and write (default: every route of the region); the platform registers one Spark catalog per bucket plus a default catalog, so scripts address tables as `alias.namespace.table` without hand-written `--conf`.
 - Sync tasks must target a writable route; a save with an unregistered bucket is rejected with the bucket name and the next action.
@@ -32,6 +33,8 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Changed
 
+- The "Downstream dependencies" selector on the workflow page lists only the sync tasks and workflows bound to the workflow's execution regions. Before, the request carried no `?scope=`, which means "all regions", so objects of every region were offered. The node panel and this selector share one author (`components/dag-editor/scoped-candidates.ts`), and a failed read shows the error text instead of an empty list.
+- The run-history table of Batch Compute scrolls horizontally (`scroll.x` 1400) and the "Started" column has a fixed width, so at a 1600 px viewport the "Started" and "Error" columns are no longer squeezed to zero width.
 - Home-region EMR / Flink roles and execution-region Flink roles may access any S3 Tables bucket of their region (`bucket/*`) instead of the platform bucket only; every execution region must be redeployed from the console once to pick up the Flink role change.
 - The engine baseline of the role preflight no longer demands write access to the platform data-lake bucket (the TempDir probe targets the scripts bucket), and advisor-generated Glue roles no longer carry that blanket write grant.
 - Product source no longer carries internal tracking identifiers (defect, schedule, module, work-package, phase, batch and acceptance ids) in comments, test titles, annotations or operator-facing text.
@@ -46,6 +49,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Fixed
 
+- A newly created Glue job persists its Glue version at creation (default 6.0, the highest supported version; a value outside the supported list is rejected with 400). Reopening the job no longer shows 5.1 and its first run no longer creates the Glue job definition as 5.1. Existing jobs without a stored version keep running as 5.1: an upgrade never changes the Glue version of an existing job.
 - The route list and the bucket-candidate list are served outside the admin prefix (`GET /api/lake-routes`, `GET /api/lake-buckets/candidates`, signed-in user with an explicit place), so developers see the sync wizard's table-bucket dropdown and the job's catalog list instead of an empty list with an analyst-only message; the admin paths remain as read aliases for one release and the gateway rule is unchanged.
 - Deleting an offline job while one of its runs is still in flight is refused with `409 JOB_RUN_IN_PROGRESS` that lists the run ids, so a Glue job definition is no longer removed under a running job and its run record no longer stays "running" forever in the task monitor. The job-row delete is conditional on no live run lock, which also closes the narrow window between the check and the delete; EMR engine jobs apply the same check and refuse while the application still has running jobs.
 - The run poller distinguishes "lock taken over by another run" from "job row gone": when the job row disappears it stops renewing the lock but keeps tracking the run to its real terminal state, and when Glue or EMR report the definition itself gone it closes the run as failed with an explicit message and releases the lock. Job-row status writes are conditional everywhere (TypeScript and the Python scheduler carriers), so a deleted job is never recreated as a ghost row, and running a deleted job returns 409.

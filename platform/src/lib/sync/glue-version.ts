@@ -111,6 +111,16 @@ export function glueVersionOfRecord(stored: unknown): GlueVersion {
   return assertGlueVersion(stored);
 }
 
+/**
+ * **新建**记录(离线 Glue 作业 / 同步任务)落库时写的版本:客户端没给 ⇒ GLUE_VERSION_DEFAULT(新缺省),给了就必须在清单里(否则抛)。
+ * 与 glueVersionOfRecord 的分工:那个读**存量**行(没存 = 它被写下时的缺省 5.1),这个写**新**行 —— 新行必须带版本落库,
+ *   否则建出来的作业在表单里显示 6.0、打开后却回写 5.1(2026-11-03 客户手册截图抓到的「常量与行为不一致」)。
+ */
+export function glueVersionForNewRecord(requested: unknown): GlueVersion {
+  if (requested === undefined || requested === null || requested === "") return GLUE_VERSION_DEFAULT;
+  return assertGlueVersion(requested);
+}
+
 /** Glue 6.0 起底座是 Spark 4(ANSI 缺省开、JDBC 类型映射有变)⇒ 平台生成的同步脚本要带兼容开关。 */
 export function glueVersionNeedsSpark4Compat(v: string): boolean {
   return compareGlueVersions(v, "6.0") >= 0;

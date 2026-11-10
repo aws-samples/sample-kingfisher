@@ -185,8 +185,9 @@ def _run_node_body(e, node, ti, ds=None):
         _exec_sql(e, data.get("sql", "SELECT 1"), node_id=node.get("id"), sqls=data.get("sqls"))
         return "ok"
     if ntype == "sync":
-        # 带节点 id 与这次工作流 run 的台账键 ⇒ 执行器写同步任务自己的运行行并回链
-        _exec_sync(e, data.get("syncTaskId", ""), node_id=node.get("id"), workflow_run_id=e.get("ledger_run_id"))
+        # 带节点 id 与这次工作流 run 的台账键 ⇒ 执行器写同步任务自己的运行行并回链;
+        #   业务日期与离线作业节点同一口径:ctx 里有就传给同步 Glue 运行(--ds),没有则脚本按任务时区取今天。
+        _exec_sync(e, data.get("syncTaskId", ""), node_id=node.get("id"), workflow_run_id=e.get("ledger_run_id"), ds=ds)
         return "ok"
     if ntype == "job":
         # 离线作业节点 ⇒ 共享执行器 _exec_job(spec 在 node.data.jobSpec,发布期解析)。
