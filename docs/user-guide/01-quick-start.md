@@ -24,6 +24,13 @@ Route (suggested timing in parentheses):
 Demo data: the MySQL game user-acquisition database `gamedata`, 7 tables — `players` players · `player_events` player events · `game_sessions` game sessions · `payments` payments · `ad_channels` ad channels · `ad_campaigns` ad campaigns · `ad_events` ad events.
 Each execution region of the demo installation also has a ready-made set of sample objects (name prefix `Showcase-<region-slug>-`, e.g. the `Showcase-<region-slug>-GameData-MySQL` data source and the `Showcase-<region-slug>-GameSync-7tables` sync task); you can open them first to see the finished result, then build your own set following the steps below.
 
+**Preparing the demo data yourself (administrator, demo installs only)**: a demo environment that only ran the install script has neither `gamedata` nor the showcase objects. On the deployment machine:
+
+1. `./scripts/22-seed-game.sh <profile> <home-region>` loads the demo MySQL source database through a Glue job that runs inside the VPC: it **drops and recreates** the 7 `gamedata` tables (about 12 million rows, about 8 minutes) and is safe to re-run.
+2. `./scripts/32-verify-all-regions.sh <profile> <home-region>` runs step 1 automatically when the lake has no `gamedata` yet, then creates the long-lived `Showcase-<region>-*` objects in every enabled execution region and exercises the nine capability classes (about 25 minutes per region).
+
+Both commands are for your own demo environment only; never seed a customer's source database. Parameters, stages and timings: [`docs/deployment.md`, appendix C](../deployment.md#appendix-c-demo-and-acceptance-mode).
+
 ## 1. Preparation
 
 - URL and account: ask the platform admin. A demo installation ships an admin account and a few role test accounts; a production installation has only the admin account, and the admin creates the others under "Users".

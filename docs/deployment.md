@@ -1008,6 +1008,7 @@ Retained from the earlier English edition. Demo mode exists for developer and de
   The imported VPC needs at least two availability zones, each with a private subnet that has NAT egress.
   Import mode is incompatible with execution regions.
 - `scripts/20-seed-data.sh <profile> <home-region>` reseeds the demonstration dataset.
+- `scripts/22-seed-game.sh <profile> <home-region>` loads the game user-acquisition database `gamedata` used by the user guide (7 tables, about 12 million rows) into the demo MySQL source through a Glue job inside the VPC; it drops and recreates those 7 tables on every run and is idempotent.
 - `scripts/32-verify-all-regions.sh <profile> <home-region>` runs the nine capability classes in every active execution region and leaves long-lived showcase objects behind.
 - `scripts/35-rebuild-account.sh <profile> <home-region> <second-region>` chains pre-flight, install, truth check, seeding, a UI-driven region build and the headless acceptance suite.
 
