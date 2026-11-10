@@ -205,7 +205,7 @@ Key points:
 - **The customer chooses the home region** and it never changes afterwards; it must offer Bedrock (the factory default is Claude Opus 4.5; the deployment script walks a candidate chain with real calls and picks the first available model, or you specify `BEDROCK_MODEL_ID=<id>`; after go-live it can be hot-switched under "System Settings → AI Model"), Redshift Serverless, S3 Tables, AgentCore and MWAA Serverless. Organisation SCPs must not block `us-east-1` (the WAF for CloudFront is created there).
 - 🔴 **Multi-region production cannot "import an existing VPC"**; one region allows exactly one execution environment, and the component set cannot be trimmed.
 - Always pass `--profile` explicitly to AWS; never run `cdk deploy` by hand (the deployment scripts handle wiring, the mode, the IAM simulation gate and the agent images).
-- Upgrading to a new version / rollback / decommissioning an execution region: guide sections 6 / 7 / 8; read the upgrade notes of that version in `CHANGELOG.md`.
+- Upgrading to a new version, rolling back and retiring an execution region: deployment guide [section 7ter "Upgrading"](docs/deployment.md#7ter-upgrading-bringing-a-new-version-live), [section 7ter.2 "Rollback"](docs/deployment.md#7ter2-rollback-returning-to-the-previous-tag) and [section 7bis "Retiring an execution region"](docs/deployment.md#7bis-retiring-an-execution-region-deleting-an-execution-environment); read the upgrade notes of that version in `CHANGELOG.md`.
 
 ---
 
@@ -241,7 +241,7 @@ locales: the language is suggested from the visitor's location and can be switch
 
 | Path | Contents |
 |---|---|
-| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (51 groups / 309 files), business libraries `src/lib/`, components `src/components/`; unit tests with vitest |
+| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (54 groups / 317 files), business libraries `src/lib/`, components `src/components/`; unit tests with vitest |
 | `infra/` | AWS CDK v2 (TypeScript): 23 control-plane stacks `lib/*.ts` (entry `bin/app.ts`) + execution-environment stack group `lib/exec-env/` + execution-environment deployment buildspec + IAM call manifest `iam/` + Lambda (`lambda/`) + three AgentCore agent containers (`agent/`) |
 | `scripts/` | Deployment and operations scripts (`01-preflight-account.sh` pre-flight · `deploy-all.sh` first install · `02-postdeploy-truth.sh` truth check · `redeploy-platform.sh` upgrade / authorise a new region · `redeploy-agents.sh` refresh agents · `cut-release.sh` cut a release) and the offline gates |
 | `flink-sql-runner*/`, `flink-connector-modules/` | Managed Flink 1.20 SQL runners (generic / + S3 Tables Iceberg / + Kafka) and connector Maven modules |

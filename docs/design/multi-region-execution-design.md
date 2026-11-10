@@ -629,9 +629,6 @@ The data client (not the AuthProvider interceptor) decides the origin by `execEn
 
 ## 10. Summary of data-model changes
 
-| Table | Change |
-|---|---|
-
 > 🔴 **Revision 3.0: every table renamed to the target model (resolves an external-review finding; the implementation-level final form is in [the specification](./multi-region-execution-spec.md), sections 1.1 / 1.2 / 1.3 / 1.3a)**
 
 | Table | Change |

@@ -24,8 +24,8 @@ v1.1 added the handover notes in section 0b, the one-page quick reference in sec
 
 > - Audience: customer administrators (operating the platform web UI) + customer operations staff (running commands on the deployment machine)
 > - Applicable version: production **`release-2026-10-29`** (2.1.2, upgraded 2026-10-29; **the transition variable of section 5.1 is still required**, see the 2026-10-29 recurrence described there). Once the version is upgraded, this manual defers to the new
->   version's [deployment guide, section "5. Add an execution region"](deployment.md#5-add-an-execution-region).
-> - This manual is the **customer-specific, step-by-step expansion** of the [deployment guide's section "5. Add an execution region"](deployment.md#5-add-an-execution-region); where the two conflict, that section takes precedence.
+>   version's [deployment guide, section 7 "Adding an execution region"](deployment.md#7-adding-an-execution-region-after-go-live).
+> - This manual is the **customer-specific, step-by-step expansion** of the [deployment guide's section 7 "Adding an execution region"](deployment.md#7-adding-an-execution-region-after-go-live); where the two conflict, that section takes precedence.
 > - Location: `docs/adding-a-region.md` in the repository (online, or in a local clone).
 > - **If you only want to read one page before acting, jump straight to section 1b "One-page quick reference"**; the explanation, expected output and exception handling for each step are in sections 2 to 5.
 > - **AI tools or new colleagues taking over: read section 0b first** (system model, the design decision behind each step, how the 2026-10-19 model-guard incident came about, red lines, decision table, six self-check questions), then act.
@@ -213,7 +213,7 @@ PRODUCT_SHA=2b181dcefa52a9653f9d9c38d99d023e9fcc5ffa
 ```
 
 🔴 From now on, **never** run `git pull` / `git fetch` / `git checkout <anything else>` or modify any file in this directory. Its only purpose is authorization and verification. To upgrade the version, follow the upgrade procedure instead ([deployment guide,
-section "6. Upgrade"](deployment.md#6-upgrade)).
+section 7ter "Upgrading"](deployment.md#7ter-upgrading-bringing-a-new-version-live)).
 
 ### 2.3 Install dependencies
 
@@ -386,7 +386,7 @@ Revoke the administrator permissions temporarily attached to the operations cred
 | The region list printed by step 1b of the step-3 script does not contain the new region | The region's status in the registry is abnormal (for example deleted); go back to the web UI and look at that environment's status; do not continue |
 | CloudFormation rolls back in step 3 | The platform automatically returns to the previous task definition and the service is not interrupted; look at the FAILED rows in the `BgpPlatformStack` events for the cause, fix, and rerun |
 | **Check initialization** in step 5 has red items | Open the red item to see the reason. "Control plane has not enabled region" = step 3 was not completed or the page was not refreshed; "descriptor is missing resources.*" is usually a derived symptom — confirm the authorization first, then re-check; for other red items contact us |
-| You want to abandon this region | No stack was created at all: **Discard this environment** on the detail page (only changes the registry and frees the quota for that region). Stacks were created: follow the decommission procedure ([deployment guide, section "8. Decommission a region"](deployment.md#8-decommission-a-region): stop accepting work → impact preview → type the region name to confirm → approval → destroy); data buckets / table bucket / final snapshot / CMK are retained and keep billing |
+| You want to abandon this region | No stack was created at all: **Discard this environment** on the detail page (only changes the registry and frees the quota for that region). Stacks were created: follow the decommission procedure ([deployment guide, section "8. Decommission a region"](deployment.md#7bis-retiring-an-execution-region-deleting-an-execution-environment): stop accepting work → impact preview → type the region name to confirm → approval → destroy); data buckets / table bucket / final snapshot / CMK are retained and keep billing |
 
 ---
 

@@ -195,7 +195,7 @@ Key points:
 
 The same "NL→SQL" can run either **inside the Next.js process** or in an **AgentCore Runtime (container)**; the choice is made by an environment variable and can be rolled back with one switch:
 
-| | `inprocess` backend | `agentcore` backend (production) |
+| Aspect | `inprocess` backend | `agentcore` backend (production) |
 |---|---|---|
 | Where it runs | Inside the Next.js ECS process | AgentCore Runtime (ARM64 container) |
 | Entry point | `lib/genbi/agent.ts` `runGenBiAgent()` | `lib/genbi/agentcore-client.ts` `invokeGenBiAgent()` → Runtime `agent.js` |

@@ -24,12 +24,13 @@ Keep file paths, commands and identifiers exactly as written here. Answer the hu
 | Review the security model | `docs/security.md` |
 | Check a runtime, engine or driver version | `docs/supported-versions.md` |
 | Estimate monthly cost | `docs/cost-model.md` |
-| Read the multi-region contract, design, interaction and acceptance criteria | `docs/design/50-multi-region-execution/` |
-| Read other design contracts | `docs/design/<module>/DESIGN.md` |
+| Read the multi-region overview, contract, design and interaction | [`docs/design/multi-region-execution.md`](docs/design/multi-region-execution.md), [`multi-region-execution-spec.md`](docs/design/multi-region-execution-spec.md), [`multi-region-execution-design.md`](docs/design/multi-region-execution-design.md), [`multi-region-execution-interaction.md`](docs/design/multi-region-execution-interaction.md) |
+| Read other design documents (one Markdown file per topic, flat directory) | [`docs/design/README.md`](docs/design/README.md) (index with status) |
+| Learn to use the platform page by page, from first login to proficiency | [`docs/user-guide/README.md`](docs/user-guide/README.md) |
 | Find a figure or its source | `docs/diagrams/`, `docs/diagrams/src/` |
 | See what changed between versions | `CHANGELOG.md` |
 
-Precedence when documents disagree: code (`platform/src`, `infra`, `scripts`) first, then `docs/deployment.md`, then `docs/design/50-multi-region-execution/SPEC.md` and `DESIGN.md`, then other documents.
+Precedence when documents disagree: code (`platform/src`, `infra`, `scripts`) first, then `docs/deployment.md`, then `docs/design/multi-region-execution-spec.md` and `docs/design/multi-region-execution-design.md`, then other documents.
 
 ## 3. Non-negotiable rules
 
