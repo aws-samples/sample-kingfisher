@@ -42,10 +42,24 @@ function headingSlug(text: string): string {
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .trim()
     .toLowerCase();
-  return Array.from(plain)
-    .filter((ch) => /[\p{L}\p{N}\p{M} _-]/u.test(ch))
-    .join("")
-    .replace(/ /g, "-");
+  return Array.from(plain).filter(keptInAnchor).join("").replace(/ /g, "-");
+}
+
+/** Characters GitHub keeps in an anchor: ASCII letters and digits, space, hyphen, underscore, and letters of the scripts this repository writes in
+ *  (Latin-1 / Latin Extended, Greek, Cyrillic, Hiragana / Katakana, CJK ideographs, Hangul). Spelled out as code-point ranges because the
+ *  platform compiles with `target: es5`, which rejects the `u` regex flag that `\p{L}` would need. */
+function keptInAnchor(ch: string): boolean {
+  if (/[A-Za-z0-9 _-]/.test(ch)) return true;
+  const c = ch.codePointAt(0) ?? 0;
+  return (
+    (c >= 0x00c0 && c <= 0x024f && c !== 0x00d7 && c !== 0x00f7) ||
+    (c >= 0x0370 && c <= 0x052f) ||
+    (c >= 0x3040 && c <= 0x30ff) ||
+    (c >= 0x3400 && c <= 0x4dbf) ||
+    (c >= 0x4e00 && c <= 0x9fff) ||
+    (c >= 0xac00 && c <= 0xd7af) ||
+    (c >= 0xf900 && c <= 0xfaff)
+  );
 }
 
 /** Every anchor a Markdown file exposes on GitHub: heading slugs (with -1, -2 suffixes for repeats) plus explicit id/name attributes. */
