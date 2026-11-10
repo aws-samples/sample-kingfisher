@@ -78,7 +78,8 @@ CI (`.github/workflows/ci.yml`) re-runs the scan, the tests, the build and the C
 - `main` is the trunk. Work on short-lived `feat/<topic>` or `fix/<topic>` branches and open a pull request against `main`.
 - Commit messages follow Conventional Commits in English: `feat(scope): summary`, `fix(scope): summary`,
   `docs(scope): summary`, `chore(scope): summary`. The first line must stand on its own.
-- A commit changes either product code or documentation, not both.
+- A commit changes either product code or documentation, not both. Files that the code gates read travel with the code (the IAM call manifest, ratchet ledgers, fixtures, `.env.example`);
+  prose documentation, `CHANGELOG.md` and `docs/supported-versions.md` follow in a `docs(scope)` commit of the same pull request, so the pull request as a whole leaves code and documentation consistent.
 - Releases follow Semantic Versioning and are tagged `vX.Y.Z`. The tag, the `VERSION` file and the CHANGELOG heading must agree.
 - `scripts/cut-release.sh <version>` performs the cut: it bumps `VERSION`, closes the `[Unreleased]` section of `CHANGELOG.md`,
   creates the `release/X.Y.Z` branch and the annotated tag, and pushes them. Without `--yes` it only prints the plan.

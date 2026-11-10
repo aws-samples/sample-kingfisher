@@ -152,7 +152,8 @@ Each recipe lists the places that must change together. Missing one of them prod
 
 - `main` is the trunk. All work lands on `main` through pull requests from short-lived feature branches.
 - Commit messages follow Conventional Commits in English: `feat(scope): summary`, `fix(scope): summary`, `docs(scope): summary`, `chore(scope): summary`. The first line must stand on its own.
-- A commit changes either product code or documentation, not both.
+- A commit changes either product code or documentation, not both. Files that the code gates read travel with the code (the IAM call manifest, ratchet ledgers, fixtures, `.env.example`);
+  prose documentation, `CHANGELOG.md` and `docs/supported-versions.md` follow in a `docs(scope)` commit of the same pull request, so the pull request as a whole leaves code and documentation consistent.
 - Releases are tagged `vX.Y.Z` following Semantic Versioning. The tag, the `VERSION` file and the CHANGELOG heading must agree.
 - `scripts/cut-release.sh <version>` performs the release cut: it bumps `VERSION`, closes the `[Unreleased]` section of `CHANGELOG.md`, creates the release branch and the annotated tag, and pushes them. Without `--yes` it only prints the plan.
 - `scripts/cut-release.sh <version> --yes --github-release` additionally publishes the GitHub Release for the new tag:
