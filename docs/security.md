@@ -234,6 +234,7 @@ The environment variable `BGP_DATAPLANE_CREDS` selects how data-plane clients ob
 - `npm audit --omit=dev --audit-level=high` runs in continuous integration for `platform/` and `infra/`; a high or critical advisory in a production dependency fails the job.
 - Every container image, including the three AI agent images, is built from a committed lockfile with development and optional dependencies omitted.
 - All containers run as a non-root user.
+- GitHub Dependabot alerts on the public repository are triaged under §6.4. A vulnerable transitive package that is reachable only through development tooling is still pinned to a fixed release (for example `minimatch` under the lint parser); a copy bundled inside an upstream package that has no fixed release yet (for example `minimatch` inside `aws-cdk-lib`, used only at synthesis time on patterns written by the deployer) is recorded as accepted and re-checked on every upstream upgrade.
 
 ### 6.2 Static analysis configuration
 
@@ -273,6 +274,13 @@ Every finding from a scanner, an audit, or a report is classified into exactly o
 - Tests mock only true external systems (AWS SDK clients, OpenMetadata, models), never sibling modules, so wiring defects surface.
 - Deleting an object removes everything it created (connections, jobs, scripts, security groups) or reports the failure honestly.
 - Features are accepted only by driving the real UI in a headless browser against a deployed test account.
+
+### 6.6 Code scanning
+
+- The public repository runs GitHub CodeQL (default setup: JavaScript/TypeScript, Python, and GitHub Actions; `default` query suite) on every push to `main` and on a weekly schedule, alongside Dependabot.
+- Every alert is classified under §6.4 before the next push to `main`. Fixes are equivalent rewrites with regression tests that pin the previous behaviour on legal input and a time bound on hostile input; a fix is verified with the CodeQL CLI and the same query suite before it is pushed.
+- Rules the scanner flags on user-controlled text are treated as real defects even without a known exploit: regular expressions that can backtrack polynomially, substring checks used as URL or policy decisions, hand-written escaping of user text into generated code, weak randomness in identifiers, and exception objects returned in HTTP responses.
+- Accepted by design: the Athena query console passes the user's SQL to `StartQueryExecution`. That is the feature; it is guarded by the read-only sanitizer (single statement, `SELECT` / `WITH` only, write keywords rejected, row cap), the mandatory execution place, the per-region Athena workgroup, and the data-plane role. The alert is dismissed with this reason and re-evaluated whenever the guard changes.
 
 ## 7. Reporting a vulnerability
 

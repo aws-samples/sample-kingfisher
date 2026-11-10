@@ -76,6 +76,13 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 - Scanner configurations (`.bandit`, `.gitleaks.toml`, `.semgrepignore`) are committed with a written reason for every exclusion.
 - The Cognito bootstrap function accepts only HTTPS callback URLs and no longer silences callback failures.
 - Flink runner and connector-module JARs are built against Flink 1.20.4 (GHSA-2f54-v4hm-fx73, remote code execution in Flink SQL code generation). The planner itself is a `provided` dependency supplied by the Managed Service for Apache Flink `FLINK-1_20` runtime, whose patch level is maintained by AWS; the Flink artifacts bundled into the JARs move to the same patch level and the repository's dependency alert is cleared.
+- Regular expressions applied to user-controlled text (Glue `--conf` values, source column types, sync filter templates, role-name hints, and SQL comments in the read-only query guard and the lineage parser) were rewritten as linear scans or unambiguous character classes, removing polynomial backtracking; SQL comment stripping now has a single implementation shared by the query guard and the lineage parser.
+- The scheduler role health probe parses the IAM trust policy and compares the service principal exactly instead of searching the document text; RDS endpoint detection matches the domain suffix instead of a substring.
+- Correlation ids fall back to `crypto.getRandomValues` instead of `Math.random` when `randomUUID` is unavailable.
+- Workflow DAG generation emits user SQL and Python snippets as JSON-encoded Python string literals, so backslashes and quotes can no longer corrupt or escape the generated file; the CloudWatch log-group probe resource replaces every wildcard, not only the first.
+- AI agent containers return only the error message on failure and log the exception object inside the container; the Cognito bootstrap function no longer echoes the CloudFormation response reason into its logs.
+- The `minimatch` package in the platform development toolchain is pinned to 11.0.1 or later (GHSA-g3hv-75wg-m249); the copy bundled inside `aws-cdk-lib` is tracked until upstream ships a fixed release.
+- GitHub CodeQL code scanning and Dependabot alerts are triaged under the policy in `docs/security.md` §6.6.
 
 ## [2.1.2] - 2026-10-29
 
