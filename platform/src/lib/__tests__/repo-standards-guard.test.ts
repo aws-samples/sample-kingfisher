@@ -2,7 +2,8 @@
 //   1. Documentation is English: tracked Markdown prose contains no CJK characters. Fenced code blocks are
 //      excerpts of real source (whose comments and string literals are Chinese by convention, see README
 //      "Languages") and are shown verbatim, so they are excluded; inline code spans in prose are still checked.
-//   2. Every relative link in tracked Markdown resolves to a tracked path.
+//   2. Every relative link in tracked Markdown resolves to a tracked path, and a `#fragment` on a link to a
+//      Markdown file resolves to a heading (GitHub slug) or an explicit HTML id in that file.
 //   3. Figures are PNG or WebP only; every figure is referenced from a tracked text file;
 //      every Mermaid source has a rendered PNG; docs/diagrams/README.md lists every figure in that folder.
 import { describe, it, expect } from "vitest";
@@ -30,6 +31,37 @@ function prose(markdown: string): string {
 /** Markdown with fenced code blocks removed: verbatim source excerpts may carry Chinese comments and literals. */
 function withoutFencedCode(markdown: string): string {
   return markdown.replace(/```[\s\S]*?```/g, "");
+}
+
+/** GitHub's heading-to-anchor rule: strip inline markup, lower-case, drop punctuation, spaces to hyphens, number repeats. */
+function headingSlug(text: string): string {
+  const plain = text
+    .replace(/<[^>]+>/g, "")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\*\*|\*|__|~~/g, "")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .trim()
+    .toLowerCase();
+  return Array.from(plain)
+    .filter((ch) => /[\p{L}\p{N}\p{M} _-]/u.test(ch))
+    .join("")
+    .replace(/ /g, "-");
+}
+
+/** Every anchor a Markdown file exposes on GitHub: heading slugs (with -1, -2 suffixes for repeats) plus explicit id/name attributes. */
+function anchorsOf(markdown: string): Set<string> {
+  const anchors = new Set<string>();
+  for (const m of markdown.matchAll(/(?:id|name)="([^"]+)"/g)) anchors.add(m[1]);
+  const seen = new Map<string, number>();
+  for (const line of markdown.replace(/```[\s\S]*?```/g, "").split("\n")) {
+    const h = /^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
+    if (!h) continue;
+    const slug = headingSlug(h[1]);
+    const n = seen.get(slug) ?? 0;
+    seen.set(slug, n + 1);
+    anchors.add(n === 0 ? slug : `${slug}-${n}`);
+  }
+  return anchors;
 }
 
 function trackedPathExists(p: string): boolean {
@@ -60,6 +92,36 @@ describe("repository standards", () => {
       }
     }
     expect(dead).toEqual([]);
+  });
+
+  it("every #fragment on a link to a tracked Markdown file names a heading or an explicit id in that file", () => {
+    const anchorCache = new Map<string, Set<string>>();
+    const dangling: string[] = [];
+    for (const f of MARKDOWN) {
+      const text = prose(read(f));
+      for (const m of text.matchAll(LINK)) {
+        const href = m[1] ?? "";
+        if (!href.includes("#") || /^(https?:|mailto:)/.test(href)) continue;
+        const [rawPath, fragment] = href.split("#", 2);
+        if (!fragment) continue;
+        const target = rawPath ? path.posix.normalize(path.posix.join(path.posix.dirname(f), rawPath)) : f;
+        if (!target.endsWith(".md") || !TRACKED_SET.has(target)) continue;
+        let anchors = anchorCache.get(target);
+        if (!anchors) {
+          anchors = anchorsOf(read(target));
+          anchorCache.set(target, anchors);
+        }
+        const wanted = decodeURIComponent(fragment);
+        if (!anchors.has(wanted) && !anchors.has(wanted.toLowerCase())) dangling.push(`${f} -> ${href}`);
+      }
+    }
+    expect(dangling).toEqual([]);
+  });
+
+  it("headingSlug follows GitHub's anchor rule", () => {
+    expect(headingSlug("7ter. Upgrading (bringing a new version live)")).toBe("7ter-upgrading-bringing-a-new-version-live");
+    expect(headingSlug("7bis. Retiring an execution region (deleting an execution environment)")).toBe("7bis-retiring-an-execution-region-deleting-an-execution-environment");
+    expect(headingSlug("`scripts/foo.sh` — **bold** and [link](x.md)")).toBe("scriptsfoosh--bold-and-link");
   });
 
   it("figures are PNG or WebP only", () => {
