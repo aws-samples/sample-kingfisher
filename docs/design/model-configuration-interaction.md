@@ -66,7 +66,7 @@ Decided on 2026-08-28; the following **overrides the related details further dow
 
 **Why medium tier rather than light**: switching the global default = changing **all 9 capabilities** (GenBI / Copilot / codegen / modeling advisor, and so on) in one stroke, effective for **all tenants**. Per the principles' ruling D, "affects the whole scope" calls for at least the medium tier; because it is reversible (deleting the setting falls back) it does not reach the heavy "type the name" tier.
 
-```
+```text
 ┌─ Change global default model ─────────────────────────────────────────┐
 │ Effective now: anthropic.claude-opus-4-6 (source: runtime config)     │
 │ Change to:     [anthropic.claude-sonnet-5      ▼] 🟢 available        │
@@ -104,7 +104,7 @@ Decided on 2026-08-28; the following **overrides the related details further dow
 
 **Requirement**: the 9 capability keys are jargon to users and need visualization: each item shows the **current value + a badge (🔵 inherits global / 🟡 overridden)** + an F4 tooltip explaining what the capability is. Overriding a single capability = light tier (small impact, reversible).
 
-```
+```text
 ┌─ Per-capability overrides (default: inherit global: opus-4-6) ──────┐
 │ Capability           Current model          Status                  │
 │ Ask-Your-Data (i)    opus-4-6               🔵 inherited            │
@@ -125,7 +125,7 @@ Decided on 2026-08-28; the following **overrides the related details further dow
 - The AI model card **permanently shows the live probe state of the current model**; when the currently effective model is detected to fail its probe, a **conspicuous red alert banner** appears at the top of the card: "⚠ The current model X is no longer available; all AI features of the platform may be failing. [Restore factory default now] [Choose another model]".
 - "Restore factory default" = delete all runtime overrides and fall back to env / SSOT (last item of the acceptance list in the design document, section 10). **This operation recovers from a broken state and does not require a passing probe** (otherwise the button would be dead in the broken state = deadlock); it does need one light confirmation against accidental clicks.
 
-```
+```text
 ╔═ ⚠ AI model problem ════════════════════════════════════════════════╗
 ║ Current model anthropic.claude-xxx failed its probe: model retired  ║
 ║ All AI features of the platform may be unavailable.                 ║

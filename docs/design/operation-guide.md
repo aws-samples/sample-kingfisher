@@ -12,7 +12,7 @@
 
 ## 2. Prototype (text wireframe)
 
-```
+```text
 Top bar, right side: [❓ User guide] [Copilot] [Language] [Theme] [Avatar]
                                    │
    ┌──── Drawer 560px ─────────────────────────────────────────────────────────┐

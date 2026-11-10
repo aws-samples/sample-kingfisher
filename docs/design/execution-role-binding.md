@@ -39,7 +39,7 @@ In one sentence: **the UI claimed a capability that had no carrier** (the engine
 ## 3. Design
 
 ### 3.1 IAM (`infra/lib/platform-stack.ts`, new ManagedPolicy `ExecutionRoleBinding` attached to the TaskRole)
-```
+```text
 PassRole   role/*   Condition StringEquals iam:PassedToService ∈ { glue.amazonaws.com, emr-serverless.amazonaws.com, kinesisanalytics.amazonaws.com }
 ListRoles  *
 GetRole / SimulatePrincipalPolicy   role/*

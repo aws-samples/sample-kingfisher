@@ -91,7 +91,7 @@ Members use the **Cognito `Username`** (e.g. `admin`) as the sk, consistent with
 
 A generic approval entity `bgp-approvals`; v1.4.0 fully implements the **`membership` type** (request to join a project / elevate a role):
 
-```
+```text
 Requester (editor/viewer) ── POST /api/approvals {projectId, type:"membership", payload:{role}} ──► pending
 Project owner ── GET /api/approvals?projectId= to see pending items ──► POST /api/approvals/[id] {decision:"approve"|"reject"}
 approve(membership) ──► writes/updates the member row in bgp-project-members (takes real effect)

@@ -16,7 +16,7 @@ Lets developers build ETL jobs by "writing scripts" (the same way they used to w
 The `/etl-jobs` "Job Development" page: on the left, the job list + New (choose Glue/Redshift, preset script templates); on the right, the Monaco editor + engine configuration (Glue: WorkerType/Workers/connections; Redshift: workgroup/db) + buttons (Save / Run now / Publish to MWAA schedule) + a Run history tab.
 
 ## 3. API
-```
+```text
 GET/POST           /api/etl-jobs                # list / create
 GET/PUT/DELETE     /api/etl-jobs/[id]           # detail / update / delete
 POST               /api/etl-jobs/[id]/run       # run now (glue: create/update job + StartJobRun; redshift: BatchExecuteStatement)

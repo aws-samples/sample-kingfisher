@@ -81,7 +81,7 @@ So that "adding a source / sink = dropping in one connector module JAR + adding 
    - `kinesis`, `kafka`, `msk-iam-auth`, `mysql-cdc`, `jdbc` (including the MySQL driver), `files`, `json`, `avro` …
    - the **`iceberg-s3tables` bundle** (essentially today's s3t package **minus the source connectors** and minus the base; the heaviest, most conflict-prone stack isolated into one module that is built once).
 3. **Connector registry** (a TypeScript data table, data-driven — in the same spirit as the SPI registry of the data-source ecosystem): SQL token → set of required module ids.
-   ```
+   ```text
    'connector'='kinesis'                        → ["kinesis"]
    'connector'='kafka'                          → ["kafka"]  (+ "msk-iam-auth" when the SQL contains AWS_MSK_IAM)
    'connector'='mysql-cdc'                      → ["mysql-cdc"]

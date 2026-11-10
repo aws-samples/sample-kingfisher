@@ -75,7 +75,7 @@
 type MinRole = "viewer" | "editor" | "manager" | "admin";
 type ConflictMode = "rename" | "overwrite" | "cancel";
 type CopyableType = "workflow" | "etl-job" | "sync" | "redshift-task" | "engine-job";
-```
+```text
 
 | Method · path | Request | Response / guard |
 |---|---|---|
@@ -132,7 +132,7 @@ function projectSchema(projectId): string {
 //    (all digits, identical in either case, which happened to bypass exactly this dimension) to the real-environment form.
 // 🔴 The `proj-default` special case: its schema name is fixed as `proj_default` (not `proj_proj_default`), hard-coded in the mapping table (removes the ambiguity of review finding P2-2)
 // safeIdent serves only as a [validator]: the output of projectSchema() is passed through it; the two never act independently
-```
+```text
 
 ### 3.1 `projectFilter` extension (sharedTo + keeping the legacy fallback)
 
@@ -150,7 +150,7 @@ function projectFilter(projectId) {
 //       → [no project filter is added]; only the projectId attribute is added for attribution (adding a filter would miss existing records)
 //   Full list of consumers (confirmed by grep; missing one is an error): incidents/{signature,record}, diagnostics/evidence,
 //   alerting/ops-summary, baseline/workflow-runtime, finops/sweep, copilot/plan/{executor,discovery-tools,step-handlers/spi}, engines/emr/provider
-```
+```text
 
 ### 3.2 The three-state `guardResourceAccess` + `isReadOnlyAction` (P0-6)
 
@@ -180,7 +180,7 @@ function isReadOnly(sql: string): boolean {
 }
 // ⚠️ The adapter [must not] execute the SQL rewritten by sanitizeReadOnly (it injects maxRows, which changes the semantics);
 //    only the verdict bit is taken. assertQuery in section 3.5 uses this adapter.
-```
+```text
 
 ### 3.3 `copyToProject` (generalized promote; P0-7 completion)
 
@@ -210,7 +210,7 @@ async function copyToProject(type, sourceId, toProjectId, {toEnv, conflict, incl
   audit("copy", {from:sourceId, to:draft.id}); return {newId: draft.id, status, unresolvedRefs}
 }
 // datasource is [shared only, never copied] (secretArn / glueConnectionName are not portable)
-```
+```text
 
 ### 3.4 🔴 L3 credential resolution: fail-closed **in three classes** (P0-3; the original two classes would have broken DMS / modeling / L3's own provisioning)
 
@@ -248,7 +248,7 @@ async function resolveCred(targetId, project, purpose) {
   }
 }
 // 🔴 Classification is by [static categorization of the call site] (not by guessing from the SQL at run time); all three classes of calls are audited
-```
+```text
 - 🔴 **Fix the fail-open ternary (count corrected)**: **16 sites** across the repository of `...(SecretArn ? {SecretArn} : {})` — distribution: `redshift/execute:22`, `etl/job-service:351,403`, `backfill/execute:95`, `genbi/schema:33`, `genbi/redshift:51`, `modeling/redshift:40,201`, `quality/service:151`, **`zeroetl-service:240,260,292` (only 3 sites; the earlier draft's "6 sites" was an overestimate)**, `redshift/schemas/route:32`, `sensitive/scan:78`, `realtime/redshift-target:34`, `metrics/service:183`.
 - **Both single-value caches (`admin-secret:13 _arn`, `zeroetl:69 _secretArnCache`) are changed to composite keys**;
   missing zeroetl would let zero-ETL workgroup queries bypass isolation.
@@ -268,7 +268,7 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
   if (/\bUNLOAD\b|\bCREATE\s+EXTERNAL\s+SCHEMA\b|\bdatashare\b/i.test(sql)) DENY
   // cross-project UNLOAD to a bucket other than the project's own is forbidden; enforced in three dimensions, (jurisdiction, project, target)
 }
-```
+```text
 
 ### 3.6 Result retrieval: unified on the queryHandle of the multi-region execution specification, section 3.7 (replacing the original `statementId→projectId` mapping)
 
@@ -290,7 +290,7 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
 // 🔴 Clarification of the acceptance semantics (consistent with the multi-region execution specification, section 3.7): rejection condition = ownerSub does not match [and] the caller is not a member of that projectId
 //   ⇒ members of the same project can fetch each other's results (collaboration inside a project is intentional); the acceptance case "A uses B's statementId → 403"
 //     presupposes that [A and B belong to different projects]; it does not apply within one project (the test case must state this premise)
-```
+```text
 
 ### 3.7 public→proj_ migration (🔴 run once per target)
 
@@ -305,7 +305,7 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
 // 🔴 Idempotent / resumable: the migration tool records {pending|migrated|failed|skipped} progress per table; an interrupted run can re-enter without migrating twice
 // 🔴 Before revoking existing GRANT PUBLIC: use the inspection to list "existing reports / Ask-Your-Data / BI / DataAPI that depend on that grant" → revoke gradually
 //    (SVV_TABLE_INFO / pg_default_acl + a static scan of platform-side configuration that references `public.`)
-```
+```text
 
 ### 3.8 🔴 Physical tables of the global-knowledge class land in `shared` (ruling 2: two dimensions, region × project; P0-4)
 
@@ -323,7 +323,7 @@ const SHARED_SCHEMA = "shared"
 // ⑤ metadata FQNs (section 3.10) point to shared as well; cookbook / codegen reference code tables as shared.<t>
 // 🔴 Semantic boundary (aligned with commitment C2): "a project cannot see another project's tables" holds fully for [business data];
 //    `shared` is [an intentional global read-only knowledge layer] (code tables / conformed dimensions) and contains no project business data
-```
+```text
 
 ### 3.9 Cross-target reclamation on project deletion (jointly with the multi-region execution specification, section 3.12)
 
@@ -342,7 +342,7 @@ async function deleteProject(projectId) {
   await deleteControlPlaneRows(projectId)           // today only this step is done (project-service.ts:162-178)
 }
 // ⚠️ A destructive cross-target operation: approval + re-typing the project name to confirm + back up the data first (leave a way back, as before DROP in section 3.7)
-```
+```text
 
 ### 3.10 Metadata-side FQN convergence (P0-2; prevents masking from silently failing after migration → PII exposed in clear text)
 
@@ -363,7 +363,7 @@ async function deleteProject(projectId) {
 // The migration tool [rewrites in the same batch] `public.` → `proj_<id>.` / `shared.` in existing metadata (classification / lineage / metric fqn / OpenMetadata)
 // 🔴 End-to-end invariant (multi-region execution specification, section 3.10): the schema / target of the four hops scan→findings→classification→masking must agree;
 //    on disagreement, fail closed for sensitivity levels L3 / L4 (masking today fails open: on exception it returns the raw rows)
-```
+```text
 
 ### 3.11 Replacing the `public.` placeholder in cookbook / codegen / templates (P0-8; jointly with the multi-region execution specification, section 3.11)
 

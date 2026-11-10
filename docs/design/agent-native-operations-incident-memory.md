@@ -39,7 +39,7 @@ This design adds two things and thereby forms the moat:
 
 **Entry 1 — enhanced diagnosis report (reuses the fault-diagnosis module's `DiagnosisButton` dialog; a purely additive block)**:
 If the report hits history, an Alert is shown at the top of the report:
-```
+```text
 🔁 Similar incident history: this failure shares its signature with 3 historical incidents (signature: glue::REQUIRES_SINGLE_PART_NAMESPACE).
    Most recently fixed and verified on 2026-07-08 by admin:
    "Register the S3 Tables catalog (spark.sql.catalog.s3tablescatalog=...) and rerun"
@@ -84,7 +84,7 @@ Merged by signature — **one master record per signature + a number of occurren
 | Single occurrence record | `pk="incident#<projectId>"` | `sk="occ#<signature>#<ts-iso>#<ulid>"` | A snapshot of each occurrence: runId / taskId / diagnosis report digest / evidence fingerprint, **TTL 180d** (the master record has no TTL; it is persisted permanently) |
 
 **Key fields of the master record**:
-```
+```text
 projectId, signature, title,
 status: "unresolved" | "resolved-verified" | "silenced",
 occurrenceCount,                 // recurrence count
@@ -102,7 +102,7 @@ createdAt, updatedAt
 ```
 
 **Key fields of a single occurrence record**:
-```
+```text
 projectId, signature, occurredAt,
 taskId, taskName, taskType, runId,
 diagnosisId,                     // link to bgp-diagnostics (the full report lives there; only a digest is stored here)

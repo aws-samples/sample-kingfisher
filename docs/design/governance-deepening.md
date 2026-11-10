@@ -66,7 +66,7 @@ export interface SensitiveDetector {
   suggestedMask: MaskStrategy;
   detect(ctx: DetectorContext): DetectorMatch | null; // 命中返回打分,不命中返回 null
 }
-```
+```text
 
 **Declarative factories** cover most scenarios (column-name hints + value regex); complex logic (Luhn checksum, date parsing) uses a custom `detect`:
 

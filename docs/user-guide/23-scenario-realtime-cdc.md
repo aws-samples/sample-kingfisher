@@ -256,7 +256,7 @@ INSERT INTO s3t.`${S3TABLE_DB}`.`flink_region_agg`
 SELECT window_start, region, SUM(amount) AS total_amount, COUNT(*) AS order_cnt
 FROM TABLE(TUMBLE(TABLE orders_src, DESCRIPTOR(ts), INTERVAL '1' MINUTE))
 GROUP BY window_start, window_end, region;
-```
+```text
 
 Notes:
 

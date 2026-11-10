@@ -52,7 +52,7 @@ do not start a deployment on the strength of last time's experience.
 ```bash
 ./scripts/01-preflight-account.sh <profile> [home-region] [second-region]
 # ❌ hard failure ⇒ non-zero exit (do not start until it is fixed) · ⚠️ soft warning ⇒ you can run, but know the boundary
-```
+```text
 
 🔴 **Why it was consolidated**: the table below used to be just "a string of commands in the runbook", and temporary accounts often last only 3 days ⇒ every few days
 someone had to type it all by hand, **and hands miss things**. On 2026-09-19 the item "`cdk.out` still holds the asset bucket name of the previous account" was missed,
@@ -175,7 +175,7 @@ So when you see that close-out list: **the infrastructure is fine**; only the st
 BGP_DEPLOY_MODE=<same as first install> ./scripts/10-bootstrap-cognito.sh <profile> <region>   # step 11: create groups and users (passwords can be given explicitly with BGP_*_PASSWORD; without a mode it follows production and creates only admin; 🔴 on the release tag then in production the script does not check the deployment mode in SSM, and passing `demo` by mistake creates 4 test accounts in production; since the 2026-10-27 release the script first reads SSM `/bgp/deploy-mode`, refuses with exit 2 when the given value differs, and follows env only when SSM cannot be read)
 ./scripts/20-seed-data.sh        <profile> <region>   # step 12: seed the e-commerce dataset (🔴 demo mode only; production seeds nothing)
 BGP_DEPLOY_MODE=<same as first install> ./scripts/redeploy-platform.sh <profile> <region>   # equivalent of step 13: re-wire + check (no bare cdk deploy); its step 2b also redeploys BgpExecEnvDeployStack (the execution-environment deployer of step 6.5; without it, creating an execution environment fails with Function not found)
-```
+```text
 
 > The **demo / acceptance environment orchestration** — the one-command bring-up after switching accounts, the multi-region end-to-end run, the headless close-out
 > and the shortest path — was moved to the development-environment runbook, which is not published with this repository (these are not production steps).
@@ -210,7 +210,7 @@ the initial password the deployment wrote to disk). When the home region is not 
 Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler  CREATE_FAILED
   AWS::Lambda::Function → "Uploaded file must be a non-empty zip" (400)
 ⇒ BgpPlatformStack ROLLBACK_COMPLETE (step 6)
-```
+```text
 
 Some versions of the CDK CLI package the built-in `S3AutoDelete` handler as a **22-byte empty zip** and upload it to the bootstrap asset bucket;
 and CDK uses the S3Key (content hash) to decide "already exists, do not re-upload" ⇒ **once the bad zip is in the bucket, every retry reuses it = guaranteed recurrence**.
@@ -344,7 +344,7 @@ Set two shell variables once:
 
 ```bash
 P=<profile>; R=<home-region>
-```
+```text
 
 #### A.2.1 Which region is the home region
 
@@ -365,7 +365,7 @@ aws --profile $P --region $R cloudformation list-stacks \
   --query "StackSummaries[?starts_with(StackName,'Bgp')].StackName"
 aws --profile $P --region $R cloudformation describe-stacks --stack-name BgpPlatformStack \
   --query "Stacks[0].Outputs"
-```
+```text
 
 `BgpPlatformStack` outputs include the platform URL; `BgpOmServiceStack` outputs include the OpenMetadata URL; `BgpAuthStack` outputs include the user pool id.
 
@@ -385,7 +385,7 @@ aws --profile $P --region $R ssm get-parameters-by-path --path /bgp/ --recursive
 aws --profile $P --region $R dynamodb scan --table-name bgp-execution-envs \
   --projection-expression "targetId,#r,#s,components" \
   --expression-attribute-names '{"#r":"region","#s":"status"}'
-```
+```text
 
 The home target is `tgt_home`. Status `active` means the region accepts work; `draining`, `decommissioning` and `deleted` are the decommission states.
 
@@ -404,7 +404,7 @@ The meaning of each variable is in [deployment.md](deployment.md), Appendix A.1.
 
 ```bash
 curl -s https://<platform-host>/api/public/version
-```
+```text
 
 The same facts appear in the login page footer and under **Settings → Platform version**.
 For the three agent runtimes, `./scripts/redeploy-agents.sh <profile> <home-region> --check` prints the image tag each runtime is using and whether it differs
@@ -424,7 +424,7 @@ aws --profile $P --region $R codebuild list-builds-for-project --project-name bg
 ```bash
 aws --profile $P --region $R rds describe-db-instances --db-instance-identifier bgp-openmetadata-db \
   --query "DBInstances[0].[EngineVersion,DBInstanceStatus]"
-```
+```bash
 
 #### A.2.9 Residual resources after a decommission
 

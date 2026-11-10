@@ -190,7 +190,7 @@ Page: "Data Development → Athena Query" (page title "Athena Query (S3 Tables /
 
    ```sql
    SELECT COUNT(*) AS n FROM "s3tablescatalog/<table-bucket>"."gamedata"."players"
-   ```
+   ```text
 
 What you should see: above the result "Scanned … / Duration … / 1 rows returned", with `n` around 70–100 thousand (the data generator adds a random amount).
 
@@ -328,7 +328,7 @@ The report builder reads the warehouse fastest, so create a second, Redshift SQL
    LEFT JOIN inst i ON i.channel_id = ch.channel_id
    LEFT JOIN rev  r ON r.channel_id = ch.channel_id;
    COMMIT;
-   ```
+   ```text
 
 3. Confirm "Execution regions (multi-select)" is the same region as before; leave Workgroup / DB empty ("Leave blank to resolve automatically"; the target is decided by that execution environment). Click "Save".
 4. Click "Dry run": the toast "Trial run submitted (EXPLAIN validation, no data written)" appears; "Run History" gains a row with "Trigger" = "Dry run".

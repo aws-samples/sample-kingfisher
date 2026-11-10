@@ -80,7 +80,7 @@ export function guard(engine, code) {
   const rules = SYSTEM_DIALECT_RULES.filter(r => r.engine === engine || !r.engine);
   return runGuardWithRules(rules, engine, code);
 }
-```
+```text
 - **Not a single line of the inprocess `guard.ts` / `@/lib/cookbook` barrel changes** → zero regression for the four outlets.
 - tsconfig.cookbook-core includes only `{core-guard, guard-core, mask, types, seed/**}`, **excluding registry / store** → a clean static graph, zero `@/`, zero DynamoDB.
 

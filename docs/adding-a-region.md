@@ -188,7 +188,7 @@ The customer machine previously had **no** code at all. Choose one of two method
 mkdir -p ~/kingfisher && cd ~/kingfisher
 git clone --branch release-2026-10-27 <repository-url> kf-prod-deploy
 cd kf-prod-deploy
-```
+```text
 
 🔴 Do not add `--depth` (a shallow clone has no history; the third gate needs product commit `2b181dc` for the comparison and would report "unknown revision").
 
@@ -210,7 +210,7 @@ PRODUCT_SHA=2b181dcefa52a9653f9d9c38d99d023e9fcc5ffa
 [ -z "$(git status --porcelain)" ] && echo "Gate 2 passed: working tree clean" || { echo "❌ Gate 2: working tree not clean"; exit 1; }
 [ -z "$(git diff "$PRODUCT_SHA" --stat -- platform infra scripts flink-sql-runner flink-sql-runner-s3t flink-sql-runner-s3t-kafka flink-connector-modules ':!*.md')" ] \
   && echo "Gate 3 passed: product directories match the production bytes" || { echo "❌ Gate 3: product directories differ from production"; exit 1; }
-```
+```text
 
 🔴 From now on, **never** run `git pull` / `git fetch` / `git checkout <anything else>` or modify any file in this directory. Its only purpose is authorization and verification. To upgrade the version, follow the upgrade procedure instead ([deployment guide,
 section 7ter "Upgrading"](deployment.md#7ter-upgrading-bringing-a-new-version-live)).
@@ -236,7 +236,7 @@ Verify the identity (read-only; only check that the last digits of the account i
 
 ```bash
 aws --profile <profile> sts get-caller-identity --query '[Account,Arn]' --output text
-```
+```text
 
 ---
 
@@ -294,7 +294,7 @@ aws --profile <profile> --region <new-region> cloudformation list-stacks \
 aws --profile <profile> --region ap-southeast-1 codebuild batch-get-builds \
   --ids "$(aws --profile <profile> --region ap-southeast-1 codebuild list-builds-for-project --project-name bgp-exec-env-deploy --sort-order DESCENDING --query 'ids[0]' --output text)" \
   --query "builds[0].[buildStatus,currentPhase,startTime,endTime]" --output table
-```
+```text
 
 What to do if the build fails is in section 4.
 
@@ -354,7 +354,7 @@ aws --profile <profile> --region ap-southeast-1 ecs describe-task-definition \
 
 # ③ Post-deploy truth check
 cd ~/kingfisher/kf-prod-deploy && ./scripts/02-postdeploy-truth.sh <profile> ap-southeast-1
-```
+```text
 
 ③ has one known false red on this version: if the account contains historically deleted `Bgp*` stacks, the script reports "stacks not in COMPLETE state … DELETE_COMPLETE"; this one item can be ignored; every other item must be green.
 

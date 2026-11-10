@@ -32,7 +32,7 @@ INSERT OVERWRITE TABLE agg.orders_daily
 SELECT dt, sum(amount) AS total, count(*) AS cnt
 FROM detail.orders_detail
 GROUP BY dt
-```
+```text
 
 Here `agg` and `detail` are different buckets. The customer wants the **schema (namespace) to route to the bucket**. The customer has no mature isolation model and no notion of a "project space"; therefore the execution environment itself must not be hard-bound to one bucket. Their words, paraphrased: *"The platform should let us specify the storage bucket, instead of binding one by default and not letting us change or specify it."*
 
@@ -185,7 +185,7 @@ Job-side declaration fields (closed, validated):
 export interface LakeBucketDeclaration { bucket: string; access: "read" | "write" }
 lakeBuckets?: LakeBucketDeclaration[];   // undefined = all routes of the region
 defaultCatalogAlias?: string;            // must be the alias of a declared (or, if undeclared, any) route
-```
+```typescript
 
 Sync tasks keep `s3Config.tableBucket` (string); the value must be a writable route. Flink jobs gain `lakeRoute?: string` (bucket) in Phase 3.
 
@@ -277,7 +277,7 @@ spark.sql.catalog.<alias>.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
 spark.sql.catalog.<alias>.glue.id=<account>:s3tablescatalog/<bucket>
 spark.sql.catalog.<alias>.io-impl=org.apache.iceberg.aws.s3.S3FileIO
 spark.sql.catalog.<alias>.warehouse=arn:aws:s3tables:<region>:<account>:bucket/<bucket>
-```
+```text
 
 Then, when `defaultCatalogAlias` is set: `spark.sql.defaultCatalog=<alias>`.
 
@@ -410,7 +410,7 @@ All responses use the platform envelope: success `{ "success": true, "data": …
     { "bucket": "demo-agg-bucket", "alias": "agg", "tier": "agg", "writable": true, "platform": false,
       "addedBy": "admin", "addedAt": "2026-11-03T09:01:00Z", "catalogRef": "s3tablescatalog/demo-agg-bucket" }
   ] } }
-```
+```text
 
 #### 6.10.2 `POST /api/admin/lake-routes` — register
 
@@ -435,7 +435,7 @@ Example 409:
 ```json
 { "success": false, "error": { "code": "LAKE_ROUTE_NAMESPACE_CONFLICT", "message": "Namespace dw exists in both demo-detail-bucket (alias detail) and demo-agg-bucket. Declare which route owns dw in namespaces[] and retry.",
   "detail": { "conflicts": [ { "namespace": "dw", "buckets": ["demo-detail-bucket", "demo-agg-bucket"] } ] } } }
-```
+```text
 
 #### 6.10.3 `PATCH /api/admin/lake-routes` — update
 
@@ -700,7 +700,7 @@ spark.sql.catalog.<alias>.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
 spark.sql.catalog.<alias>.glue.id=<account>:s3tablescatalog/<bucket>
 spark.sql.catalog.<alias>.io-impl=org.apache.iceberg.aws.s3.S3FileIO
 spark.sql.catalog.<alias>.warehouse=arn:aws:s3tables:<region>:<account>:bucket/<bucket>
-```
+```text
 
 Optional once per job: `spark.sql.defaultCatalog=<alias>`.
 Reserved job argument: `--bgp_lake_catalogs=s3tablescatalog=<platform-bucket>,detail=<bucket-a>,agg=<bucket-b>`.
@@ -724,7 +724,7 @@ CREATE CATALOG s3t WITH (
   'catalog-impl' = 'software.amazon.s3tables.iceberg.S3TablesCatalog',
   'warehouse' = '${TABLE_BUCKET_ARN}'   -- resolved to the job's lakeRoute, else the platform route
 );
-```
+```text
 
 ### A.4 Reading the route map from a script
 

@@ -88,7 +88,7 @@
 | Rollback | The DAG text changes with every version | The library is fixed, the DAG = a projection of the data, rollback restores data only |
 
 ### 2.2 Layering
-```
+```text
 Generated DAG (one per workflow, minimal):
   from bgp_workflow_runtime import build_dag
   DAG_SPEC = { "dagId": "...", "schedule": "...", "nodes": [ {id,type,data,deps}... ] }
@@ -154,7 +154,7 @@ type WorkflowNode =
   | { type: "foreach"; data: { label?: string; items: string | string[]; ... } }
   | { type: "setvar";  data: { label?: string; vars: Record<string,string> } }
   | { type: "external";data: { label?: string; externalDagId: string; executionDelta?: number } };
-```
+```text
 - **A single registry** (single source of truth): node type → { render component, configuration panel, validation, runtime executor name } driven by one table,
   eliminating the 5 scattered checks of section 1.1. Adding a node = one row in the registry + one executor in the runtime library (following the table-driven paradigm of the part-A engine SPI).
 - Benefit: if an LLM or the front end writes an unknown node type or omits a field → the error is reported at the `tsc` stage, not at run time.
@@ -325,7 +325,7 @@ def build_dag(spec):
     return dag
 def _on_failure(context): ...      # 复刻现有回写 bgp-workflows/bgp-task-runs
 def _on_success(**kwargs): ...     # 同上
-```
+```text
 - **The callback / task-runs write-back contract is replicated verbatim** from the existing dag-generator's `_update_workflow_status`/`_update_run_record` (the monitoring contract of section 1.4 is not broken).
 
 ### 10.3 Library versioning + `.airflowignore` (response to two official constraints that were independently verified)

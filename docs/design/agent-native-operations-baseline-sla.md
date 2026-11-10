@@ -70,7 +70,7 @@ This design delivers:
 | `bgp-slas` | `pk="sla#<projectId>"` / `slaId` (ULID) | SLA definition + the most recent prediction state | `version` optimistic lock; `targetType: relative\|absolute` |
 
 **Baseline row (`bgp-baselines`)**:
-```
+```text
 projectId, taskId, taskType,
 durationSec: { p50, p90, p95, ewma, stdev, samples, windowDays },
 startDelay: { p50Sec, p90Sec },       // queueing delay from the scheduled trigger to the actual start (used for ETA)
@@ -82,7 +82,7 @@ lowConfidence: boolean
 ```
 
 **SLA row (`bgp-slas`)**:
-```
+```text
 slaId, projectId, name, enabled, version,
 target: { taskId|workflowId, scope: "task"|"workflow",
           type: "relative", offsetMinFromTrigger: number

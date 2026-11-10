@@ -39,7 +39,7 @@ The `/genbi` page (chat style, single page):
 
 ## 4. API Design
 
-```
+```http
 POST /api/genbi/ask
   body: { question: string, workgroupName?: string, database?: string }
   resp: { success, data: { answer, sql, columns, rows, rowCount, chart, steps, usage } }
@@ -54,7 +54,7 @@ Both routes are authenticated by the existing Cognito middleware (`/api/*` valid
 
 New DynamoDB table **`bgp-genbi-history`** (`BgpDatabaseStack`):
 
-```
+```text
 PK: userId (String)      # "default-user" in the single-tenant demo
 SK: historyId (String, ULID)   # a ULID makes reading in reverse chronological order easy
 Attributes: question, answer, sql, rowCount, chartType, createdAt

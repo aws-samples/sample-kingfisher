@@ -14,7 +14,7 @@
 - **Verification**: `npm test` (vitest) all green + contract-guard verify with zero FAIL + headless question regression on the inprocess backend.
 
 ## 1. core directory structure (fine-grained entry points, responding to the finding that the container has no tree-shaking)
-```
+```text
 platform/src/lib/genbi/core/
   index.ts            # optional barrel (platform only; the container / Lambda use the sub-entry points in stages 2 / 3)
   types.ts            # engine-agnostic types: SchemaTable / SchemaColumn / CatalogEntry / TableMatch /

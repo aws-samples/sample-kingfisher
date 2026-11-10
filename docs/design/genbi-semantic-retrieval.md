@@ -11,7 +11,7 @@ Previously GenBI put the **entire table catalog** into the prompt and let the mo
 
 ## 2. Design: an explicit two-stage process
 
-```
+```text
 question → [stage 1: semantic table retrieval] → Top-K candidate tables (with descriptions) → [stage 2: grounded SQL generation] → result + matched tables & reasons (explainable)
 ```
 

@@ -47,7 +47,7 @@ By release 1.29.0 the platform already covers about **13 of 23** capability doma
 
 ## 2. Target architecture (after hardening)
 
-```
+```text
                     ┌──────────────────── Access layer ────────────────────┐
    Users ───► CloudFront + AWS WAF ─► (HTTPS) ─► internal ALB (multi-AZ) ─► ECS Fargate (≥2, across AZs, autoscaling)
                     │  Cognito (MFA + OIDC, USER_PASSWORD_AUTH disabled)   │
@@ -290,7 +290,7 @@ Ordered by dependency: **WS0 must come first** (it is the foundation for verifyi
 
 ## 5. CDK stack delta and dependencies
 
-```
+```text
 New:          kms-stack (WS1) · backup-stack (WS3) · waf-stack (WS4) · audit-stack (WS4) · alerting-stack (WS6)
 Modified:     vpc (WS2 NAT) · platform (WS2 scaling / WS4 IAM narrowing / WS4 VPC endpoints) ·
               rds/om-database (WS2 multiAz / WS1 encryption / WS3 backup protection) · redshift (WS1/WS2/WS3) ·
@@ -304,7 +304,7 @@ Dependencies: kms before the data stacks; backup depends on the data stacks bein
 
 ## 6. Implementation order and milestones (proposed)
 
-```
+```text
 Sprint 1   WS0 in full (CI/CD + test foundation + structured logging)                           → makes everything after it regressable
 Sprint 2   WS1 (KMS) + WS2 (HA)                                                                  → encryption and no single points of failure (verify in dev first)
 Sprint 3   WS3 (DR / backups / RETAIN)                                                           → protection against accidental deletion, recoverability

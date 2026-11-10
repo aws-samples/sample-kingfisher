@@ -48,7 +48,7 @@ this guarantees that the real-time mainline can definitely be opened while being
 
 ### 3.1 Technology choice (fully managed / pay-as-you-go / fast start and stop — fits a temporary account + an internal platform)
 
-```
+```text
 MySQL (RDS bgp-source-mysql; binlog enabled? see section 6)
    │  binlog CDC
    ▼
@@ -88,7 +88,7 @@ AWS DMS (replication instance + source endpoint + target endpoint + replication 
 
 ## 4. Data model (reuse `bgp-sync-tasks`, new attributes)
 
-```
+```text
 bgp-sync-tasks (existing table), new / enabled attributes:
   syncMode: "full" | "incremental" | "realtime"   ← realtime added
   channel:  "glue" | "zero-etl" | "dms"            ← dms enabled
@@ -107,7 +107,7 @@ bgp-sync-tasks (existing table), new / enabled attributes:
 
 ## 5. CDK infrastructure (new realtime-stack, gated creation)
 
-```
+```text
 infra/lib/realtime-stack.ts (conditionally instantiated; not created by default, only with -c enable-realtime=1, to control cost):
   - DMS replication instance (dms.t3.micro, the smallest class) + replication subnet group (private subnets)
   - DMS VPC role (dms-vpc-role, account level, idempotent)
@@ -143,7 +143,7 @@ Reason for gating: real-time components are billed continuously; zero cost when 
 
 ## 7. Implementation steps (each step: local verification + deployment + real verification + local commit without push)
 
-```
+```text
 Step 1  RDS binlog prerequisite: check / enable binlog_format=ROW + the retention period; confirm that DMS can read the binlog.
 Step 2  realtime-stack (gated): DMS replication instance + Kinesis + roles / SG. Verify with cdk synth; deploy with -c enable-realtime=1.
 Step 3  Service layer lib/realtime/: dms-service (create / start / stop / query replication tasks, reuse the instance by name) + task model extension.

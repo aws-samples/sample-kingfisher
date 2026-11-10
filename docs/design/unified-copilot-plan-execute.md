@@ -68,7 +68,7 @@ Reconciling the two = **grading the word "execution" by the source of authorizat
 
 ## 2. Architecture overview
 
-```
+```text
 The user's one sentence ("compute the advertising ROI for me")
         │  POST /api/copilot/plan  (with the Bearer identity, reusing the existing authentication)
         ▼
@@ -193,7 +193,7 @@ Backfill's hard-wired "date × node" expansion is generalized into "heterogeneou
 > (same as the wiring silent-degradation fix: adding a table needs zero IAM changes).
 
 ### 5.2 Plan entity (reusing the backfill BackfillPlanRow structure)
-```
+```text
 CopilotPlanRow {
   pk, planId, projectId, createdBy
   prompt: string            // the user's original request ("compute the advertising ROI for me")
@@ -207,7 +207,7 @@ CopilotPlanRow {
 ```
 
 ### 5.3 Step entity (generalizing the backfill BackfillInstanceRow — the core generalization point)
-```
+```text
 CopilotStepRow {
   planId(pk), stepId(sk), seq
   // —— generalization: backfill's date/nodeId/nodeType replaced by a heterogeneous step description ——
@@ -261,7 +261,7 @@ registerStepHandler(syncGlueHandler)   // stepType="sync-glue"
 registerStepHandler(redshiftSqlHandler)
 registerStepHandler(emrHandler)
 ...
-```
+```text
 
 ### 6.1 Step type → real API mapping (all verified to exist)
 
@@ -297,7 +297,7 @@ blocked ──(all upstream succeeded)──> awaiting-confirmation   ← [core 
                                                                                     │(reconcile reads the terminal state / timeout)
                                                                                     ▼
                                                                            succeeded / failed
-```
+```text
 
 **Key gating**: the claim phase of the tick gains one check — **only steps with `status=confirmed` are allowed to go
 `claim→running`**; a step in `awaiting-confirmation` is **not advanced automatically** even when its dependencies are satisfied. This is the iron rule "the AI never executes on its own"

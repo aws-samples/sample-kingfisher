@@ -63,7 +63,7 @@ Real data governance requires OM to collect metadata from **every stage**: sourc
 
 ## 4. Overall Architecture
 
-```
+```text
             Platform operations (create data source / create & run sync / publish workflow)
                        │  event-driven push (OM REST API, idempotent upsert)
                        ▼

@@ -170,7 +170,7 @@ In the left menu "Data Development → Redshift Query", check both regions under
 
 ```sql
 SELECT * FROM public.dim_code_channel_type ORDER BY seq
-```
+```text
 
 Click "Execute". There is one result sheet per region, each with two rows (paid / organic). Then query `SELECT COUNT(*) FROM dwd.dim_channel`; both regions return 0 rows (a dimension table only gets its structure; data is written by jobs).
 

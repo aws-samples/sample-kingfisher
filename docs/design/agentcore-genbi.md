@@ -32,7 +32,7 @@ Keep the frontend and the request/response contract of `/api/genbi/ask` unchange
 
 ## 4. Target architecture
 
-```
+```text
 Browser ──HTTPS──► CloudFront ──► ECS (Next.js)
   /genbi page (unchanged)   │  /api/genbi/ask (thin orchestration; keeps authentication / workspace isolation / masking / published tables / chart suggestion / history)
                             │     │ invoke_agent_runtime(IAM, payload={prompt,engine,db,published,...})

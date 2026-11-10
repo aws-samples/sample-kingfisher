@@ -11,7 +11,7 @@ GenBI (Ask-Your-Data) lets business users obtain analysis results in natural lan
 
 This module upgrades the "one-off question and answer" into a **governable, assignable, deliverable** development pipeline:
 
-```
+```text
 insight (GenBI) → raise as request → manager intake / assignment → development (LLM-assisted implementation + ETL job creation) → review → delivery to production
 ```
 
@@ -40,7 +40,7 @@ Visibility (within a project; the caller must be a member of that project or a p
 
 ## 3. State machine
 
-```
+```text
  draft ──submit──▶ submitted ──assign──▶ assigned ──start──▶ in_development
                       │  ▲                                        │
                   reject │ reopen                          submit_delivery

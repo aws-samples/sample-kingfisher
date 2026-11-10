@@ -50,7 +50,7 @@
 This is the most easily underestimated point of the full-convergence plan and must be nailed down first:
 
 **The agentcore backend is not a monolith; it is distributed**:
-```
+```text
 platform ECS (execute.ts orchestration shell, TS)
     │  InvokeAgentRuntimeCommand
     ▼
@@ -71,7 +71,7 @@ data sources
 
 ## 3. Target architecture (after convergence)
 
-```
+```text
                     ┌────────────────────────────────────┐
                     │   @genbi/core  (TS, single source) │
                     │  ── brain (engine-agnostic) ──     │

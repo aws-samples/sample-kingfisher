@@ -63,7 +63,7 @@ Upgrade the platform from "a pile of tables / metrics without organization" to "
 
 ## 3. Data model (new DynamoDB tables, reusing the hardened option)
 
-```
+```text
 bgp-data-layers          data layers
   pk = "layer" (single logical partition)   sk = layerId (ULID)
   { layerId, code (ODS/DWD/DWS/ADS/custom), name, schema (Redshift schema name), seq (ordering), description }
@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS public."dim_code_order_status" (
 );
 DELETE FROM public."dim_code_order_status";          -- 幂等重灌
 INSERT INTO public."dim_code_order_status" ("value","label","seq") VALUES (...);  -- 枚举值转义
-```
+```text
 
 - Table name / schema go through the `safeIdent` allow-list; enumeration value / label are single-quote escaped (`'' ` escaping, no free-form SQL).
 - The landing result is written back to `landed/landedTable/landedAt`; landing can be repeated (idempotent DELETE+INSERT).
@@ -140,7 +140,7 @@ GET/POST/PUT/DELETE  /api/modeling/codetables[/id]   code tables
 POST   /api/modeling/codetables/[id]/land            land a code table in Redshift (platform administrator)
 
 GET/PUT  /api/modeling/assets?fqn=...      table / metric ownership of layer / domain (PUT: platform administrator)
-```
+```text
 
 Uniformly: `resolveIdentity` → 401; write operations `isPlatformAdmin` → 403; `apiOk/apiError`; writes record `recordAudit`.
 
@@ -168,7 +168,7 @@ M4 API routes lib/modeling → app/api/modeling/* (RBAC + audit).
 M5 Front end app/modeling/page.tsx (tabs) + navigation entry; tsc.
 M6 Deploy PlatformStack; headless browser end-to-end verification (create layer / domain / standard / code table + land code table; 0 console errors / 0 5xx).
 M7 Write back to the roadmap progress table (data modeling, first slice); request approval to commit after the security gate.
-```
+```text
 
 ---
 
@@ -249,7 +249,7 @@ bgp-model-metrics       metric system (atomic / derived)
     lastValue?, lastComputedAt?,
     createdBy?, createdAt, updatedAt
   }
-```
+```text
 > Design trade-off: continues the first slice's "single logical partition + ULID sort key". **The metric system is independent of `bgp-metrics` ([metrics store](./metrics-store.md))**: the metrics store = quick
 > single-value metrics (running, untouched); `bgp-model-metrics` = the governance metric system (atomic → derived). Both computations share the same safe aggregation, but
 > the metadata lives in separate tables and neither pollutes the other.
@@ -302,7 +302,7 @@ write back `applied/appliedTable/appliedAt` → call `setAssetBinding` (attach l
 - Implementation location: `lib/openmetadata/om-glossary.ts` (new), called by the modeling service.
 
 ### 11.7 API (RBAC: read when logged in / write as administrator + audit, following the first-slice pattern)
-```
+```text
 # dimensional modeling
 GET/POST            /api/modeling/dimensions            list / create (administrator)
 PUT/DELETE          /api/modeling/dimensions/[id]       update / delete (administrator)

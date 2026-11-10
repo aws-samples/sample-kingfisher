@@ -182,7 +182,7 @@ Three sub-options; **A1 (recommended)** is chosen:
 
 ## 4. Reuse vs. new build (the nature of the L4 work at a glance)
 
-```
+```text
 ✅ Reused (zero changes / zero duplication):
    agent-runner.js (Strands assembly, 3rd reuse, Q&A-type L-Read)
    mcp.js (shared MCP client)

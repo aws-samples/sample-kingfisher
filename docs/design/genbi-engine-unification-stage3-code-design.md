@@ -14,7 +14,7 @@
 
 ## 0. New Top-Level Architecture (approved 2026-07-21)
 
-```
+```text
 ┌─ @genbi/core  engine-agnostic [pure-logic building blocks] (stays free of framework dependencies) ────┐
 │  systemPrompt / retrieval(selectRelevantTables) / sql-guard /                                         │
 │  catalogText / chart / context-format                                                                 │

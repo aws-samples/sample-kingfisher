@@ -43,7 +43,7 @@ Idempotency: promoting the same `(project, lineageId, toEnv)` again = updating t
 
 Approval decision (`/api/approvals/[id]` approve, project owner only): when `type=="deploy"`, it dispatches to `executePromote(payload)` to actually deploy to prod. `type=="membership"` still writes the member row (multi-tenancy RBAC). The approval list/drawer (`/projects` page) can already display and handle `deploy` requests.
 
-```
+```text
 editor: dev resource ──promote staging──► executed immediately (a copy appears in staging)
 editor: dev resource ──promote prod────► deploy approval (pending)  ──owner approve──► a copy appears in prod
 ```

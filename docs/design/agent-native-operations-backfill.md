@@ -72,7 +72,7 @@ Prototype: antd Table / matrix + hand-drawn status color blocks, consistent with
 | `bgp-backfill-instances` | `pk="<planId>"` / `sk="<date>#<nodeId>"` | One instance per (date, node) | State + runId + dependency-satisfied flag + attempt count, **TTL 90d** |
 
 **Plan row**:
-```
+```text
 planId, projectId, name, createdBy, version,
 target: { id, scope: "task"|"workflow", taskType },
 dateRange: { start, end, granularity: "day"|"hour"|"week" },
@@ -85,7 +85,7 @@ createdAt, updatedAt
 ```
 
 **Instance row**:
-```
+```text
 planId, sk, date, nodeId, nodeName, taskType,
 status: "pending"|"blocked"|"running"|"succeeded"|"failed"|"skipped",
 dependsOn: string[],                  // sk of the predecessor instances within the same plan (dependency chain)

@@ -139,7 +139,7 @@ Pull the whole class of "the request handler **waits synchronously for an extern
 
 ### 1.2 Root-cause abstraction (three layers, only one of which can change)
 
-```
+```text
 Uncontrollable external latency       ×   Hard 60 s wall at the edge                        ×   The request handler waits synchronously
 (warehouse cold start / model inference /   (CloudFront origin readTimeout 60 s ·               (the route awaits the terminal state before answering)
  large tables / OpenMetadata fan-out)        ALB idle 60 s · Node keepAlive 65 s)

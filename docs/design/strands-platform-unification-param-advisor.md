@@ -27,7 +27,7 @@ paramadvisor's `catalog.ts` / `prompt.ts` **already have functions** (not consta
 The container's CATALOG_TEXT / systemPrompt are simply hand-copied outputs of those functions. → **No new logic is built; the container only needs to import the compiled artifacts of these two functions**.
 
 Dependency chain (explored, clean):
-```
+```text
 prompt.ts → catalog.ts(renderCatalogForPrompt) + types.ts(ParamChannel)
 catalog.ts → types.ts(type) + etl/worker-types.ts(zero-import pure constants) + engines/emr/spec.ts(zero-import pure constants)
 ```
@@ -78,7 +78,7 @@ export async function runAdvisorAgent(input, spec) {
   //   spec.captureSuffix       —— 权威结果工具名后缀(param:"recommend_parameters" / net:"analyze_connectivity")
   //   spec.finalize(reasoning, lastX, steps, usage) —— 唯一真差异:组装各自 wire 结构
 }
-```
+```text
 
 - The paramadvisor container `agent.js` → slims down to:
   ```js

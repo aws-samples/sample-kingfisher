@@ -76,7 +76,7 @@ aws s3tables create-table-bucket --region $REGION --name <detail-bucket>
 aws s3tables create-table-bucket --region $REGION --name <aggregate-bucket>
 aws s3tables create-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket> --namespace detail
 aws s3tables create-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<aggregate-bucket> --namespace agg
-```
+```text
 
 - Bucket name rules: 3–63 lowercase letters / digits / hyphens, starting and ending with a letter or digit.
 - Namespace, table and column names **must be all lowercase** (`[a-z0-9_]`), otherwise the federated catalog does not recognize them.
@@ -239,7 +239,7 @@ job.commit()
   ```python
   args = getResolvedOptions(sys.argv, ["JOB_NAME", "bgp_lake_catalogs"])
   catalogs = dict(kv.split("=", 1) for kv in args["bgp_lake_catalogs"].split(","))
-  ```
+  ```text
 
 - EMR Serverless jobs (type "EMR Serverless (PySpark, standalone engine)") have the same "Lake table buckets" block and use the same three-part names; the route map is read from `spark.conf.get("spark.bgp.lakeCatalogs")`.
 - `s3tablescatalog.<namespace>.<table>` in existing scripts keeps working; it is the implicit route of the platform table bucket.
@@ -289,7 +289,7 @@ You can query the detail bucket the same way:
 
 ```sql
 SELECT count(*) FROM "s3tablescatalog/<detail-bucket>"."detail"."orders_detail"
-```
+```text
 
 ![Athena query](../screenshots/athena-run.webp)
 
@@ -411,7 +411,7 @@ aws s3tables delete-namespace --region $REGION --table-bucket-arn arn:aws:s3tabl
 aws s3tables delete-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket> --namespace detail
 aws s3tables delete-table-bucket --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<aggregate-bucket>
 aws s3tables delete-table-bucket --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket>
-```
+```text
 
 ---
 

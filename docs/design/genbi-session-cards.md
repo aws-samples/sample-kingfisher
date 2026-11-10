@@ -124,7 +124,7 @@
 
 🔴 **Ruling: an atomic `TransactWriteItems` write in the same central table.**
 
-```
+```sql
 TransactWriteItems([
   Put   { pk: <userSub>, sk: "card#<cardId>", ... },
   Update{ pk: <userSub>, sk: "quota#", UpdateExpression: "ADD n :one",
@@ -164,7 +164,7 @@ TransactWriteItems([
 
 ### 4.1 Central table `bgp-genbi-cards` (new in the home region; `TABLES.GENBI_CARDS`)
 
-```
+```text
 pk = userSub                 Cognito sub (not the user name — a rename must not lose cards)
 sk = "card#<cardId>"         cardId = ulid()
    | "quota#"                one counter row per user { n }
@@ -200,7 +200,7 @@ The dialog copy flips with the decision: revision 1.0 said "the title will be sa
                            "chart": {}, "steps": [], "usage": {}, "maskedColumns": [],
                            "matchedTables": [], "usedContext": [], "retrievalNote": "…", "_meta": {} },
                "error": null } ] }
-```
+```text
 
 **Store everything**: `rows` are not truncated, and `steps` (the reasoning trace) are kept too (the requirement said "all content").
 
@@ -269,7 +269,7 @@ idempotency lookup on the GSI → `TransactWriteItems` (Put the pointer + the co
     "used": 13, "limit": 100,
     "hiddenByScope": 3,          // 🔴 how many more cards exist outside the current scope (guardrail 1: what is left out must be said; no silent under-listing)
     "titleUnavailableCount": 0 } }  // 🔴 how many titles cannot be read right now (revision 1.5: titles live in their own regions) ⇒ the page says so honestly
-```
+```text
 
 ### 5.3 `GET /api/genbi/cards/[cardId]` — fetch the body (open)
 
@@ -317,7 +317,7 @@ Next App Router routes may only export fixed names; exporting an extra helper is
 
 ### 6.1 The assistant's answer card (peer of "Raise as request"; the `extra` at `page.tsx:70-78`)
 
-```
+```text
 ┌─ 🤖 Assistant ───────────────────────── [💾 Save conversation] [📄 Raise as request]  tokens in 812/out 260 ─┐
 │ Conclusion: 1,204 customers in East China, a 38% share.                                                       │
 │ Matched tables: [public.customers Finalized] semantic retrieval hit                                            │
@@ -327,7 +327,7 @@ Next App Router routes may only export fixed names; exporting an extra helper is
 
 ### 6.2 Top entry + save dialog
 
-```
+```text
 🤖 Ask-Your-Data GenBI                      [🗂 My cards 12/100]  [＋ New chat]
 
 ┌─ Save conversation as card ─────────────────────────────────────────────────┐
@@ -344,7 +344,7 @@ Next App Router routes may only export fixed names; exporting an extra helper is
 
 ### 6.3 The "My cards" drawer (**no new menu leaf**; see section 9, anti-pattern ⑤)
 
-```
+```text
 ┌─ 🗂 My cards   12/100 used   [Current scope: us-east-1 ▾]  ──────────────────────────────────┐
 │ 🔎 [Search titles]                                                        Sort [Latest ▾]     │
 │ ──────────────────────────────────────────────────────────────────────────────────────────── │
@@ -381,7 +381,7 @@ Opening a card that is not in the current view:
 
 ### 7.1 Save (POST)
 
-```
+```text
 Frontend turns[] (the complete GenBiResult held in memory)
   │  ① Validate: turns ≤ 200 and bytes ≤ 20MB; otherwise 400 stating which limit was exceeded
   ├─ ② Resolve the place: targetId ← the target of this conversation (not "the current view" — the view may already have been switched away)
@@ -400,7 +400,7 @@ Frontend turns[] (the complete GenBiResult held in memory)
 
 ### 7.2 Open and continue (GET body + POST resume)
 
-```
+```text
 Click "Open and continue"
   ├─ ① GET /cards/[cardId] → userSub check (not mine ⇒ 404; existence is not leaked)
   ├─ ② cross-jurisdiction ⇒ fetch the body through the residency gate
@@ -413,7 +413,7 @@ Click "Open and continue"
 
 ### 7.3 Delete (two-phase; the quota slot is released **immediately**)
 
-```
+```text
 ① Set the central pointer to state="deleting" + quota.n -= 1 inside the TransactWrite   ← from the user's point of view the slot frees up immediately
 ② Delete the regional S3 body object
 ③ Delete the central pointer

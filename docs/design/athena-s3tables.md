@@ -23,7 +23,7 @@ Evidence (a test account / us-east-1, 2026-06-15):
 
 ## 3. Architecture
 
-```
+```text
 front end: /athena query page ──► /api/athena/* ──► Amazon Athena (workgroup bgp-athena)
    │  left: S3 Tables table tree    StartQueryExecution → poll GetQueryExecution → GetQueryResults
    │  right: SQL editor / results        │ queries use the 3-part name "s3tablescatalog/bgp-table-bucket"."ecommerce"."<table>"

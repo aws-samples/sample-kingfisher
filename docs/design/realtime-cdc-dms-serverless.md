@@ -57,7 +57,7 @@
 | Table mappings TableMappings | Unchanged |
 
 ### 3.2 ReplicationConfig orchestration chain (replacing instance + task)
-```
+```text
 Create sync task (channel=dms) → start (/start-realtime):
   1. ensureSourceEndpoint (MySQL, reused)
   2. ensureTargetEndpoint (Redshift, reused: includes ensureRedshiftDmsUser / Schema / role association)
@@ -87,7 +87,7 @@ dmsServerlessConfig?: {
 };
 // 启动后回写(替代旧 replicationTaskArn)
 realtimeConfig.replicationConfigArn?: string;
-```
+```text
 - DCU value normalization: min ∈ [1, maxAllowed], max ∈ [min, upper limit], max ≥ min. Common range 1..16 (2..32 GB).
 
 ---

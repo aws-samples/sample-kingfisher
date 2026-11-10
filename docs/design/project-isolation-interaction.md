@@ -52,7 +52,7 @@ Configuration management (rename / delete project / add, remove and change membe
 - **The knock-on effect of changing the approval decision-maker**: the approver of membership join requests changes from the owner to "admin / manager-owner" → the visibility of the "Pending my approval" inbox at the top of the projects page follows (a developer-owner no longer sees this project's pending approvals; only admin / manager-owner see them). For the developer-owner this is "one piece missing", which needs a FeatureGuide or a change announcement so nobody asks "where did my approvals go".
 
 **Wireframe (project detail from the developer-owner's perspective, management entries degraded):**
-```
+```text
 ┌─ Workspace: E-commerce Data Team ───────────────────────────────────────────────┐
 │ 💡 You are the owner of this project (development rights). Configuration          │
 │    management (members / rename / delete) requires an administrator or R&D       │
@@ -83,7 +83,7 @@ The pain point that data source sharing solves = **multiple projects referencing
 - It can be selected as the source as usual when creating a sync task (which is the whole value of sharing).
 
 **Wireframe (data source list · shared badge + share-settings drawer):**
-```
+```text
 ┌─ Data Sources ───────────────────────────────────────────────────────────────────────┐
 │ prod-mysql-orders                           mysql  ●healthy  [Share settings][Edit][Del]│
 │ user-profiles 🔗from "User Center Team" (shared)  mysql  ●healthy  [Edit]⊘[Del]⊘ [Test]│
@@ -112,7 +112,7 @@ Copy = read the definition + write the definition (the source is untouched, a re
 The dialog shows "what will happen once copied" in real time (impact preview):
 
 **Wireframe (copy-to-project dialog):**
-```
+```text
 ┌─ Copy "Daily report workflow" to project… ─────────────────────────────────────────┐
 │  Target project:  [E-commerce Analytics ▾]   (dropdown = projects where I am editor+)│
 │                                                                                     │
@@ -180,7 +180,7 @@ The [design document](./project-isolation.md), sections 0.2 / D3, adds guards to
 - 🔴 **Presenting a residency-gate block**: `⊘ This code table is marked "not shareable across jurisdictions" and was not pushed to eu-target` + exit [Change to shareable (requires approval)].
 
 **Wireframe (Modeling › code table landing panel):**
-```
+```text
 ┌─ Code table "Order status dim_code_order_status" · Landing ──────────────────────────┐
 │ Landing location: 🟡 shared schema (global knowledge layer, readable by all projects)  │
 │ Land on which execution targets:  [tgt-use1-home ✓] [tgt-usw2-a ✓] [tgt-euw1 ⊘]      │
@@ -206,7 +206,7 @@ The [design document](./project-isolation.md), sections 0.2 / D3, adds guards to
 - **Audit**: target permission changes go into `bgp-audit` (who opened which target for whom).
 
 **Wireframe (member management · operable targets):**
-```
+```text
 ┌─ Workspace: E-commerce Data Team › Members ──────────────────────────────────────────┐
 │ Member        Role          Operable execution targets                                │
 │ alice         editor        Inherit from project (3) ▾   ← default, zero configuration│
@@ -230,7 +230,7 @@ The [design document](./project-isolation.md), sections 0.2 / D3, adds guards to
 5. **Execution and traces**: executed target by target, the page shows progress per target; `bgp-audit` throughout (`project-purge` events carry the targetId), and deletions on cross-jurisdiction targets **leave separate traces** (provable for compliance).
 
 **Wireframe (delete project · impact preview):**
-```
+```text
 ┌─ Delete workspace "E-commerce Data Team" — Impact preview ───────────────────────────┐
 │ ⚠ This will [PERMANENTLY DELETE] the project data on each execution target below;     │
 │   it cannot be undone:                                                                │
@@ -266,7 +266,7 @@ The [design document](./project-isolation.md), sections 0.2 / D3, adds guards to
 6. **Traces**: `bgp-audit` throughout (`schema-migrate` / `schema-drop` events carry `targetId`), with separate traces for cross-jurisdiction targets.
 
 **Wireframe (migration console · dry-run result):**
-```
+```text
 ┌─ Legacy table migration · Execution target [tgt-usw2-a ▾] ───────────────────────────┐
 │ dry-run finished (2026-08-29 10:12)  47 tables in public                             │
 │                                                                                      │

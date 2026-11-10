@@ -127,7 +127,7 @@ The model ID of every AI capability on the platform has already converged on a *
 
 ### D2. Resolution precedence (backward compatible; does not break existing deployments)
 
-```
+```text
 resolveModelId(ctx?) =
   ① bgp-settings runtime configuration (per-capability override > global default)   ← new; editable on the page
   ② env BEDROCK_MODEL_ID                                                            ← kept (deployment-time override)

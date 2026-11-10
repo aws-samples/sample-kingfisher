@@ -49,7 +49,7 @@
 export type ResourceType = "workflow" | "etl-job" | "sync" | "redshift-task";
 const RESOURCES: Record<ResourceType, ResourceMeta> = { workflow: {...}, ... };
 export function isResourceType(v: unknown): v is ResourceType { return typeof v === "string" && v in RESOURCES; }
-```
+```text
 → **Borrowed**: `Record<EngineType, EngineProvider>` + an `isEngineType` guard + `getProvider(type)`. **Adding an engine = adding one row to the table**.
 
 ### 2.2 Reference two · factory adapter switch (`lib/network-advisor/prefill-adapters.ts:44-56`)
@@ -142,7 +142,7 @@ export interface EngineJob {
   createdBy: string; createdBySub: string; createdAt: string; updatedAt: string;
 }
 export type EngineJobStatus = "draft" | "ready" | "running" | "succeeded" | "failed";
-```
+```text
 
 ### 4.2 The EngineProvider interface (`lib/engines/spi.ts`; semantics derived from section 3.2)
 ```ts
@@ -170,7 +170,7 @@ const PROVIDERS: Record<EngineType, EngineProvider> = { "emr-serverless": emrSer
 export function isEngineType(v: unknown): v is EngineType { return typeof v === "string" && v in PROVIDERS; }
 export function getProvider(type: EngineType): EngineProvider { return PROVIDERS[type]; }
 export function listEngines(): EngineType[] { return Object.keys(PROVIDERS) as EngineType[]; }
-```
+```text
 
 ### 4.4 EMR provider (`lib/engines/emr/**`)
 ```
@@ -181,7 +181,7 @@ lib/engines/emr/
   network.ts       # EmrNetwork type + resolution of subnets / SGs from data sources / advisor prefill
   script.ts        # lands the PySpark script in S3 (following ensureGlueJob; prefix emr-scripts/<jobId>.py)
   run-record.ts    # createRunRecord / finishRunRecord (replicated from job-service.ts:54-94; writes bgp-task-runs)
-```
+```text
 
 ---
 
@@ -235,7 +235,7 @@ new iam.ManagedPolicy(this, "EmrServerlessOrchestration", {
       conditions: { StringEquals: { "iam:PassedToService": "emr-serverless.amazonaws.com" } } }),
   ],
 });
-```
+```text
 - Environment variables (appended at `platform-stack.ts:530-608`; derived from the account to avoid cross-stack dependencies): `EMR_EXECUTION_ROLE_ARN`, `EMR_DEFAULT_SG_ID` (or Describe at run time), `EMR_CODE_BUCKET`, `EMR_OUTPUT_BUCKET`, `EMR_LOG_BUCKET`, `EMR_RELEASE_LABEL`.
 - **Risk**: the first CreateApplication may require the EMR Serverless service-linked role (`AWSServiceRoleForAmazonEMRServerless`) — drawing on the service-linked-role experience recorded in the engineering note `bedrock-marketplace-devops-slr`, if verification reports a missing SLR, add `iam:CreateServiceLinkedRole` (limited to `emr-serverless.amazonaws.com`).
 
@@ -281,7 +281,7 @@ export function toSparkSubmitParameters(s: EmrSpec): string { /* 确定性拼 --
 ## 8. Front end (decision ②: merged into the ETL jobs page as one engine)
 
 ### 8.1 API routes `app/api/engines/[engine]/**` (the execution layer is independent; api/etl-jobs and api/sync are untouched)
-```
+```text
 engines/[engine]/route.ts          GET list (filtered by project + env + engine) / POST create (→ ensureResource creates the application)
 engines/[engine]/[id]/route.ts     GET / PUT / DELETE (→ destroyResource deletes the application)
 engines/[engine]/[id]/run/route.ts POST → getProvider(engine).submit()
@@ -303,7 +303,7 @@ Inside the routes, an `isEngineType(params.engine)` guard → `getProvider` disp
 ## 9. File inventory
 
 **Entirely new (execution layer fully independent):**
-```
+```text
 docs/design/multi-engine-nodes.md
 platform/src/lib/engines/{types,spi,registry}.ts
 platform/src/lib/engines/emr/{provider,application,spec,network,script,run-record}.ts
@@ -312,7 +312,7 @@ platform/src/app/api/engines/[engine]/**
 infra/lib/emr-stack.ts
 ```
 **Existing files touched (incremental; old execution logic unchanged):**
-```
+```text
 platform/src/lib/aws/dynamodb.ts       # add one ENGINE_JOBS row to TABLES
 infra/lib/database-stack.ts            # add one bgp-engine-jobs row to tables[]
 infra/bin/app.ts                       # add the gated EmrStack

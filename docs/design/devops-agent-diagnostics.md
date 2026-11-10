@@ -19,7 +19,7 @@ The platform can already show task failures and logs (revision 1.21.0), but "why
 
 ## 3. Architecture
 
-```
+```text
 failed run (Task Monitor / job run history) ──"AI Diagnosis"──► POST /api/diagnostics (viewer)
         │                                                        │ create a running record (bgp-diagnostics) + background fire-and-forget
         │ front end polls GET /api/diagnostics/[id] every 3 s     ▼

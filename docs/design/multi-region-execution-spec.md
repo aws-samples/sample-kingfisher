@@ -462,7 +462,7 @@ export type TargetScope =
   | { kind: "global" }
   | { kind: "target"; targetId: string }
   | { kind: "compare"; targetIds: string[] };   // 2–4 after deduplication, order kept
-```
+```text
 
 | Form | URL literal | Notes |
 |---|---|---|
@@ -660,7 +660,7 @@ check entry by entry**. Nothing of the "illegal states unrepresentable" rule is 
 
 ### 3.1 Target registry + client factory + splitting runtime-lib across two regions
 
-```
+```text
 // lib/exec-env/registry.ts (new): getTarget(targetId) / requireReadyTarget() / listActiveTargets() / getHomeTarget() / listTargetsByRegion()
 //   only ready=true is accepted; a missing / stale non-home target ⇒ throw (fail-closed, never fall back to home)
 // 🔴🔴 revision 3.4 correction (replaces the former "60s TTL"; a P0 finding of the second external review): **the admission verdict must not be cached, and it must be a strongly consistent read**.
@@ -714,7 +714,7 @@ one partial write, one item broken by a manual edit, would all enter the executi
 
 > 🔴 **Revision 3.22 correction ([the design document](./multi-region-execution-design.md), section 18, decision 6quinquies)**: this section used to be "residency dual-track wrapper + provenance-based track selection" — `residencyGuard` returned `ROUTE_TO_REGION_ONLY` for track 2 and `PASS_REGION_EXECUTE` for track 1, and `classifyTrack` selected the track by authentication method. **The whole passage is withdrawn**: the platform does not select tracks, does not reject, and sets no legal gate. Only two things remain, and both are part of **auditability**: ① if the audit cannot be written, reject (audit integrity, not compliance intervention); ② `requireReadyTarget` never does `?? homeTarget` (the fail-open removed in revision 3.2 still stands — that is admission correctness, unrelated to legal matters). `classifyTrack` is demoted to the audit field `authKind`.
 
-```
+```text
 // lib/exec-env/residency.ts — single author (the remaining criteria / the allow-listed entry points / the dual audit write all live here)
 async function residencyAudit({identity, authKind, targetId, entry, statementId?, sqlText?, triggeredBy?}): Promise<{auditId} | null> {
   const t = requireReadyTarget(targetId)          // the kernel already includes residencyPrerequisite; miss / not-ready / stale all throw (never ?? homeTarget)
@@ -751,7 +751,7 @@ function accessAllows(t, projectId): boolean {               // project allow-li
 
 ### 3.3 Audit wiring (tamper-proofing + covering every egress path + fail-closed-on-audit + residency classification)
 
-```
+```text
 // tamper-proofing: the application role has [PutItem only]; IAM denies Delete / Update; compliance export uses a separate read-only role
 async function auditEgress(rec): Promise<auditId|null> {
   try { const id = uuid(); await auditStore.putImmutable(shardKey(rec), {...rec, id, ts}); return id }
@@ -869,7 +869,7 @@ in direct conflict with the fail-closed rule of sections 1.1 / 2.2. ⇒ The plat
 
 **Decision = express "which region" as OM's service dimension**, collapsing the chain into one:
 
-```
+```text
 per-region Glue / warehouse catalog → (the existing per-region mirror collection) → om-mirror-push → the same OM (per-target service) → the catalog page reads OM only
 ```
 
@@ -908,7 +908,7 @@ target-aware is outside the scope of the direct-query target-awareness work); `/
 
 ### 3.5 Lifecycle (broker + draining + fencing + reconcile)
 
-```
+```text
 // deploy: platform → broker.invoke({targetId, components, operationId})
 //   → broker StartBuild (no override) → self-contained stack group BgpExecEnv-<targetSlug>-*
 // 🔴 revision 3.9 correction: originally written `BgpExecEnv-<targetId>-*` — **targetId contains `_`, while CFN stack names allow only `[a-zA-Z][-a-zA-Z0-9]*`**,
@@ -939,7 +939,7 @@ target-aware is outside the scope of the direct-query target-awareness work); `/
 `writeProbeResult` is today called only by two manual admin routes ⇒ a non-home target **is condemned as stale when nobody clicks probe for 15min**
 (the unpaid debt of section 1.1's "the probe / reconcile period must be ≤ threshold/3"). Data-plane push-down cannot be built on "someone has to click manually".
 
-```
+```text
 // lib/exec-env/reconciler-loop.ts (new): in-process singleton, started by register() in platform/src/instrumentation.ts
 // runtime body = the existing resident platform service (ApplicationLoadBalancedFargateService, desiredCount 2~6); Next.js 14 requires experimental.instrumentationHook to be enabled
 every tick (period ≤ threshold/3, ~4min):
@@ -1004,7 +1004,7 @@ changes from "a person clicks the button" to **periodic and automatic** (still v
 **Recovery entry point (a section 19.8 release blocker)**: `POST /api/admin/exec-envs/{targetId}/recover`.
 Execution order (every step is indispensable; the order is the safety argument):
 
-```
+```text
 ① Strongly consistent read of the exact item (no cache / no list result)
 ② Classify: modern (observed.operation present) | legacy (no dual axis but a top-level lock residue); neither ⇒ 400 "no session awaiting recovery"
 ③ Verify the build: query CodeBuild for **the operation's own** buildId (modern) / the top-level lastBuildId (legacy)
@@ -1091,7 +1091,7 @@ the price is that "adding a component to a live region" requires taking it out o
 
 Input = the `Changes[]` of each stack's change set (`Action` / `Replacement` / `ResourceType` / `LogicalResourceId` / `Scope`).
 
-```
+```text
 Stateful resource set (replacement or removal = downtime or data loss) = Redshift Serverless Namespace/Workgroup · MWAA Environment ·
   S3 Bucket · S3Tables TableBucket · MSK Cluster/ServerlessCluster · KMS Key · DMS ReplicationInstance/SubnetGroup ·
   DynamoDB Table · RDS DBInstance/DBCluster · Glue Database · Athena WorkGroup · EC2 VPC/Subnet/NatGateway
@@ -1171,7 +1171,7 @@ Otherwise the same change text under a different source could reuse an old appro
 
 ### 3.6 🔴 Run-lock identity includes the target (resolves an item of the independent architecture review)
 
-```
+```text
 // Invariant: same target + same task (+ same node) = mutually exclusive; different target + same task = parallel
 //
 // 🔴🔴 Correction in revision 3.0 (the original `lockKey = projectId#targetId#taskId` is **not implementable** on the existing storage layout):
@@ -1227,7 +1227,7 @@ lockAttr = isHome(targetId)                                  // ① home exempti
 
 ### 3.7 🔴 queryHandle (the standalone security fix for the IDOR; unified with the project-isolation design, section 3.6)
 
-```
+```text
 // Submission side: every path that produces a "retrievable result" goes through this wrapper
 async function submitStatement(sql, ctx): Promise<{statementId, handleId}> {
   const statementId = await rsData.executeStatement(...)   // or athena.startQueryExecution
@@ -1280,7 +1280,7 @@ if (h.ownerSub !== ctx.identity.sub && !isMember(ctx, h.projectId)) DENY(403)   
 
 ### 3.8 Axis A — modeling landing fan-out to multiple targets (the "multi-region modeling" question)
 
-```
+```typescript
 // The definition is globally unique (D2) + a targets[] binding; the structural DDL is materialized per target
 async function landCodeTableToTargets(codeTableId, {targets}) {
   for (const targetId of targets) {                       // per target, serial, fail-fast (dispatched as in section 5.2)
@@ -1312,7 +1312,7 @@ async function landCodeTableToTargets(codeTableId, {targets}) {
 
 ### 3.9 🔴 Per-target privileged (admin/DDL) credential factory (new load-bearing P0 item of the design document, section 20.6-A)
 
-```
+```text
 // Current state: getRedshiftSecretArn is pinned to home + a process-level single-value `_arn` cache + a single secret (admin-secret.ts:10-25)
 // → axis A per-target materialization, per-target schema cleanup on project deletion, and the per-target creation of shared/proj_ in the project-isolation design all hang on it
 //
@@ -1408,7 +1408,7 @@ a project-context request lacking projectId is refused outright; the fallback me
 >   governance · metrics · quality · sensitive-data scanning, **model table landing**, **DMS bootstrap**, **code-table landing**, project-deletion cleanup,
 >   and all 7 operations are kept. Unimplemented operations **must not** be turned into a permanent throw / 501 / no-op posing as fail-closed.
 
-```
+```text
 // 🔴 Public interface: **does not accept sql / statements[]**. Any name that can be derived from the single source of truth may never be chosen freely by the caller.
 type AdminDdlRequest =
   | { operation: "create-project-schema";  targetId: string; projectId: string }
@@ -1499,7 +1499,7 @@ wiring into RBAC/approval/audit/target secret/the real runner + migration of eve
 
 #### 3.9d.2 Privileges: **grant per table**, no schema-level write privilege
 
-```
+```sql
 GRANT USAGE ON SCHEMA <landing schema> TO shared_writer            -- USAGE only, no CREATE
 GRANT SELECT, INSERT, UPDATE, DELETE ON <this one code table> TO shared_writer
 ```
@@ -1541,7 +1541,7 @@ and must not be tied to "does the channel work" in the same step (otherwise an 8
 
 #### 3.9d.4 Provisioning sequence and interface (the exhaustive union of section 3.9a gains **one** operation)
 
-```
+```text
 // New operation (enters the AdminDdlRequest union; TS exhaustiveness forces a template + RBAC + audit category + tests to be added)
 | { operation: "grant-shared-writer"; targetId: string; codeTableId: string }
 //   Zero literals in the template: the principal name goes through sharedWriterUserName(), the landing location through codeTableLandingFqn(),
@@ -1588,7 +1588,7 @@ has **two** production callers:
 
 ⇒ **Contract correction**: the union of section 3.9a gains one more operation — **two** new operations in total:
 
-```
+```text
 | { operation: "grant-shared-writer";   targetId: string; codeTableId: string }    // revision 3.48, section 3.9d.4
 | { operation: "land-model-table";      targetId: string; modelTableId: string }   // 🆕 revision 3.49, this section
 | { operation: "alter-model-table";     targetId: string; modelTableId: string }   // 🆕 revision 3.52, model-table alteration (same discipline as land-model-table: accepts only the id, the server reads the ledger; the plan = the ledger row's pendingAlter)
@@ -1620,7 +1620,7 @@ that the table `bgp-table-ownership` has **not a single line of code**, and that
 
 **Decision: the guard becomes "ledger membership"; no new field is invented.**
 
-```
+```text
 Step 2 (cross-validation) of grant-shared-writer / land-model-table:
   codeTableId  → getCodeTable(codeTableId)   not found ⇒ refuse     (table bgp-code-tables)
   modelTableId → getModelTable(modelTableId) not found ⇒ refuse     (model-table ledger)
@@ -1704,7 +1704,7 @@ See the acceptance criteria. This section pins only two **standards**, so that t
 
 ### 3.10 Axis B/C — authoritative FQN (target segment in the same position) + end-to-end consistency fail-closed
 
-```
+```text
 // 🔴 One authoritative function covers [the physical side + the metadata side] (jointly with the project-isolation design: the **9** `||"public"` sites on the metadata side are closed at the same time, including the write side glue-script-generator:344)
 function authoritativeFqn({targetId, db, schema, table}) {
   // 🔴 Revision 3.0 fix: the segment value is **targetId**, not regionOf(targetId) —
@@ -1728,7 +1728,7 @@ function authoritativeFqn({targetId, db, schema, table}) {
 
 ### 3.11 Consumption surface — cookbook context injection / advisor target pass-through
 
-```
+```text
 // 🔴 cookbook (the design document, section 20.6-D, resolving the doctrine conflict): at **generation time** the platform substitutes targetId → the real workgroup/schema/bucket names
 //    into the recipe template before handing it to the LLM / the artifact ⇒ the artifact still contains [real values, no <placeholders>] (the "real values, no placeholders" doctrine of the fissure-B fix is not broken)
 renderRecipe(recipe, {targetId, projectId}) → text with the real values already substituted
@@ -1742,7 +1742,7 @@ renderRecipe(recipe, {targetId, projectId}) → text with the real values alread
 
 ### 3.12 Operations surface — RBAC×target / per-target alerting / cross-target reclamation on project deletion / per-target offlining
 
-```
+```text
 // 🔴 RBAC×target (phase one; the deferral to phase two is cancelled): authorization axes project × env × [target];
 //    🔴 Revision 3.22 landed form (with the cross-jurisdiction target go-live work): the **project allowlist** `access` (section 1.1; general, settable on any target, default all-projects, **no special-casing for cross-jurisdiction**),
 //    the single-author check accessAllows(t, projectId) serves both list filtering and write validation (presentation = authorization);
@@ -1760,7 +1760,7 @@ renderRecipe(recipe, {targetId, projectId}) → text with the real values alread
 
 ### 3.13 Differentiator — one-screen read-only cross-geography metadata overview
 
-```
+```text
 // A central read-only mirror of each region's metadata, per target (AWS has no global catalog, so it must be self-built; RAM does not cross regions)
 async function mirrorMetadata(targetId, {sources}) {          // scheduled (glue only) + manual (may include redshift)
   const meta = await pullReadOnly(targetId, sources)          // pull metadata only, no rows
@@ -1790,7 +1790,7 @@ async function mirrorMetadata(targetId, {sources}) {          // scheduled (glue
 
 > Decided on 2026-09-06: "Every region's scheduled tasks are executed by that region's own MWAA; cross-region scheduling is not allowed." Corollary A: scheduling / orchestration artifacts land, per target, on **that target's own MWAA**; B: a non-home target without MWAA **cannot be given a schedule**, and the refusal must lead the person to the install entry point; C: cost is not a design constraint (the wizard shows it truthfully).
 
-```
+```text
 // ── Component ─────────────────────────────────────────────────────────────────
 // The `mwaa` component stack BgpExecEnv-<slug>-mwaa (depends on base + core):
 //   DAG bucket resourceName("dagBucket") [versioned (required by MWAA) / SSE-S3 / public access blocked / TLS / RETAIN without autoDelete]
@@ -1849,7 +1849,7 @@ The move of all scheduling to MWAA Serverless (decided on 2026-09-11) had alread
 (`XZoneDynamodb`) to carry **the only** cross-region call — the run-ledger write-back to the home region (section 3.14).
 Live measurement: this path **cannot be built** in this account (nor in the two earlier temporary test accounts):
 
-```
+```text
 BgpExecEnv-tgt-usw2-a-base  CREATE_FAILED → ROLLBACK   only one resource is the root failure
 LogicalResourceId : XEpDynamodb            (X prefix = cross-region)
 Reason            : cdk-hnb659fds-cfn-exec-role-…-us-west-2 not authorized to perform
@@ -1967,7 +1967,7 @@ IAM is narrowed with `aws:RequestedRegion = <homeRegion>`).
 
 > Decided on 2026-09-06: "Keep the existing MWAA for now, add an MWAA Serverless entry point, and only after scheduling works end to end in every region consider removing the existing MWAA." Guiding principle: "as serverless as possible at the service layer". Section 3.14 is unchanged word for word; this section only adds.
 
-```
+```text
 // ── Component stack BgpExecEnv-<slug>-airflow-serverless (depends on base + core; minute-scale start-up, zero always-on resources) ────────────────
 //   Definition / code bucket resourceName("workflowBucket") = bgp-airflow-sls-<acct>-<slug> [versioned (the service snapshots by VersionId) / SSE-S3 / block public access / TLS / RETAIN;
 //     🔴 must be in the same region as the workflow (a cross-region bucket returns 301); a brand-new bucket may return 307 for several hours ⇒ create it when the component is installed and back off exponentially on 307 at publish time, ≤ 5 min]
@@ -2034,7 +2034,7 @@ the failure condenser translates a CFN reason containing "maximum number of addr
 > - Decided on 2026-09-11: "Connect all scheduling to the MWAA Serverless version; from now on all scheduling goes through the serverless MWAA. **The regular MWAA will no longer be deployed either.**"
 > - 🔴 Every service-side fact below was **actually run** in `tgt_use1_a` on 2026-09-11 (seven CreateWorkflow calls / four successful runs) and **overturns one sentence in the revision 3.27 header above**; the checks are in the headless acceptance segment for serverless workflows.
 
-```
+```text
 // ── Service-side facts as measured (every design decision in this section rests on these eight; hard-coding any other assumption = a time bomb) ────────────────────
 // F1 `tasks` + per-task `dependencies` **really are supported**: __start → {n1,n2} → __finish, four tasks ran through in one go (fan-out and fan-in both correct).
 // F2 🔴 **`trigger_rule` is supported** (the revision 3.27 header's "unsupported or ignored" was wrong; corrected in this section):
@@ -2158,7 +2158,7 @@ Endpoint SG: allows only **443 from this VPC's CIDR**; one ENI per AZ.
 
 **C. The only cross-region path = cross-region DynamoDB interface endpoint + private hosted zone (zero product-code change)**
 
-```
+```text
 exec-env VPC (us-west-2, zero egress)
   ├─ VPCEndpoint(Interface, com.amazonaws.us-east-1.dynamodb, ServiceRegion=us-east-1, PrivateDnsEnabled=false)
   │    └─ DnsEntries[0] = vpce-<id>-<hash>.dynamodb.us-east-1.vpce.amazonaws.com  (HostedZoneId Z…)
@@ -2232,7 +2232,7 @@ and does not depend on egress to pull packages.
 
 #### 3.17.1 Group status derivation (the only source of truth = the child run rows)
 
-```
+```text
 deriveGroupStatus(children):            # pure function, exhaustive; no children ⇒ "submitting"
   if children is empty:        return "submitting"      # the fan-out loop has not submitted its first run yet
   if any running:              return "running"
@@ -2252,7 +2252,7 @@ deriveGroupStatus(children):            # pure function, exhaustive; no children
 
 **Inputs (single author `scheduledRunGroupId()`, the same formula in TS and Python + a parity unit test comparing byte for byte)**:
 
-```
+```text
 canonical = definitionKind + "\n" + definitionId + "\n" + slotIso
 rgs_<first 24 hex of sha256(canonical)>
 slotIso = "the most recent cron fire point ≤ the moment of this trigger", normalized to whole seconds in UTC: %Y-%m-%dT%H:%M:%SZ
@@ -2418,7 +2418,7 @@ slotIso = "the most recent cron fire point ≤ the moment of this trigger", norm
 
 **Decision (adopting the review's recommendation) — the construction order becomes**:
 
-```
+```text
 Standalone security fix: queryHandle (independent, no prerequisite, can ship / roll back on its own)
  ↓
 G   shared-foundation batch (new; builds only [functions / SSOT / ledger writes], moves no data ⇒ lossless and reversible)

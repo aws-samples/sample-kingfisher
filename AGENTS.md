@@ -77,7 +77,7 @@ aws --profile $P --region $R ecs describe-task-definition \
 
 # Which release the local checkout is
 git describe --tags --exact-match
-```
+```text
 
 - To find the home region, look for the one region where `BgpPlatformStack` exists.
 - The deployed release is shown in the login-page footer, under Settings → Platform version, and by `GET /api/public/version`.

@@ -54,7 +54,7 @@ Three points were made explicit during the review of the AI architecture (record
 
 ## 3. Architecture (following the AgentCore platform standard, cap = `copilot`)
 
-```
+```text
 User (any page) ──opens──> global Copilot drawer (mounted in the Header)
    │  POST /api/copilot/ask  (Next.js; platform-side auth = current signed-in identity / workspace / env)
    ▼
@@ -106,7 +106,7 @@ export const COPILOT = {
   memoryId: process.env.COPILOT_MEMORY_ID || "",
   maxIters: int("COPILOT_MAX_ITERS", 8), maxTokens: int("COPILOT_MAX_TOKENS", 2400),
 };
-```
+```text
 Resource names are always `bgp_copilot_*` / `bgp-copilot-*` (standard naming), with **no account ids, region literals or secrets whatsoever** (they pass `redline-scan.sh`). Table names (if any) are `process.env.COPILOT_*_TABLE || "bgp-copilot-*"`.
 
 ### Principle 3 — Abstraction: tools are a "capability registry", not hard-coded branches

@@ -43,7 +43,7 @@ avoids the Hadoop class-loading failure on Managed Flink.
 ```bash
 mvn -q -B -DskipTests package
 # output: target/flink-sql-runner-s3t-kafka.jar
-```
+```sql
 
 Maven and a JDK are required; `target/` and `*.jar` are not committed. `scripts/deploy-all.sh` builds the JAR when
 it is missing and uploads it to the home-region Glue scripts bucket (`bgp-glue-scripts-<account>`) under

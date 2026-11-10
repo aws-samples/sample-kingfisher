@@ -56,7 +56,7 @@ users define streaming jobs on the platform in **Flink SQL** → consume a **Kin
 
 ## 3. Architecture
 
-```
+```text
 Data generator / CDC ──► Kinesis Data Streams (bgp-flink-source, 1 shard, KMS)
                      │  format=json
                      ▼

@@ -44,7 +44,7 @@
 
 ## 3. Architecture overview
 
-```
+```text
                             ┌──────────────────────────────────────────────────────┐
    Task run final state     │  Alert engine  lib/alerting/evaluate.ts               │
    (bgp-task-runs)    ──▶   │  · watermark scan of recent final-state runs          │
@@ -90,7 +90,7 @@ Reuses the `hardened` option of `database-stack.ts` (CMK encryption / PITR / RET
 > Consistent with the WS6 blueprint (`bgp-alert-rules` / `bgp-alert-events`), **plus `bgp-alert-channels`** so that several rules can share one channel (otherwise every rule would re-enter the webhook). If 3 tables feel like too many, the channel could be embedded in the rule (down to 2 tables) — this design chooses 3 tables (channel reuse is worth a lot).
 
 **Key fields of a rule row (`bgp-alert-rules`)**:
-```
+```text
 ruleId, name, projectId, enabled, version,
 scope: { taskType?: "sync"|"etl"|"emr-serverless"|"workflow"|"flink"|"all", taskId?: string },
 condition: {
@@ -109,7 +109,7 @@ createdAt, updatedAt, createdBy
 ```
 
 **Key fields of an event row (`bgp-alert-events`)**:
-```
+```text
 ruleId, sk, eventId, ruleName, severity, projectId,
 status: "firing"|"notified"|"partial"|"failed"|"resolved",
 dedupeKey: "ruleId#runId" | "ruleId#window#<bucket>",
@@ -124,7 +124,7 @@ createdAt, ttl
 
 ## 5. Alert engine `lib/alerting/`
 
-```
+```text
 platform/src/lib/alerting/
 ├── types.ts        # AlertRule / AlertChannel / AlertEvent / Condition types (single source of truth)
 ├── rules.ts        # rule CRUD (optimistic lock on version)
@@ -192,7 +192,7 @@ Menu: under the `g-ops` (Scheduling & Ops) group of `routes.tsx`, add **Alerting
 
 ## 9. API route list
 
-```
+```text
 api/alerting/rules            GET list / POST create
 api/alerting/rules/[id]       GET / PUT (optimistic lock) / DELETE
 api/alerting/channels         GET / POST

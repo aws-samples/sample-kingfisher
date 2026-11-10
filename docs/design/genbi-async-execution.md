@@ -102,7 +102,7 @@ Single process, no worker, and `InvokeAgentRuntime` is a blocking call of 60 s+.
 ## 5. Detailed design (based on B1, phase one)
 
 ### 5.1 Data model: new table `bgp-genbi-tasks`
-```
+```text
 pk: taskId (ULID)              # one question-answering task
 attributes:
   userId, projectId, conversationId

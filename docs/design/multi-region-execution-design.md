@@ -139,7 +139,7 @@ The current state in one sentence (infrastructure research note, section 1): the
 
 **Selected: single control plane × multiple execution planes.** The control plane stays a single copy (it was made explicit that metadata is reported centrally to the control region); each execution environment is a "pluggable compute + storage partition" of the control plane.
 
-```
+```text
 ┌─ Control plane (home region, unique) ──────────────────────────────────────┐
 │ CloudFront/WAF → ECS platform → Cognito                                     │
 │ All bgp-* DynamoDB tables (including the new registry bgp-execution-envs)   │
@@ -197,7 +197,7 @@ The core step of going multi-region: fold the ~40 flat env variables at platform
 
 ### 2.2 ExecutionEnv runtime type (platform side)
 
-```
+```text
 ExecutionTarget = { targetId, partition, accountId, region, cellId?, stage?, jurisdiction,
                     resources{…}, components[], capabilities[], agentcore?, ready,
                     desiredVersion, observedVersion }

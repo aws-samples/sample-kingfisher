@@ -113,7 +113,7 @@ Example item (phase-one global default):
 ```json
 { "pk":"system", "sk":"ai-model#global", "modelId":"global.anthropic.claude-opus-4-8",
   "probedAt":1756... , "probeOk":true, "updatedBy":"admin@..", "updatedAt":1756..., "version":7 }
-```
+```typescript
 
 ---
 
@@ -179,7 +179,7 @@ interface ProbeResult { ok:boolean; error?:ProbeError; errorDetail?:string;
 
 ### 3.1 🔴 `resolveModelIdRuntime` (P0-1 robust version: three-layer resolution + short-TTL version check + never throws on failure)
 
-```
+```text
 // lib/ai/model.ts —— 新增 async;原同步 resolveModelId()(:19,env||DEFAULT)不删不动(部署期/兜底继续用)
 const _cache    = new Map<string,{modelId,ver,at}>()   // key=scope;正解值
 const _lastGood = new Map<string,string>()             // key=scope;🔴 兜底:最近一次成功解析值(即使过期也用)
@@ -213,7 +213,7 @@ async function resolveModelIdRuntime(capability?:Capability, targetId?:string): 
 
 ### 3.1a `resolveWithProvenance` (P1-1: the "resolve + report the hit layer" primitive shared by three callers)
 
-```
+```typescript
 // 供 resolveModelIdRuntime、GET /model-config(填 source)、DELETE(算 fellBackTo)【共用】,免各写一份口径漂移
 async function resolveWithProvenance(scope, targetId?): Promise<{modelId, source:SourceLayer}> {
   const item = await store.get(scope)                              // store 内部独占拼 sk="ai-model#"+scope(P0-2)
@@ -231,7 +231,7 @@ async function resolveWithProvenance(scope, targetId?): Promise<{modelId, source
 
 ### 3.2 `probeModel` (mandatory probe before saving + error classification + decision-D9 transport branch + probe-cache write)
 
-```
+```text
 async function probeModel(modelId): Promise<ProbeResult> {   // classify() 为净新(此前只换默认模型的改动未留分类,A 核对)
   try {
     const transport = pickTransport(modelId)                 // 见 §3.4 D9 分支
@@ -257,7 +257,7 @@ async function probeModel(modelId): Promise<ProbeResult> {   // classify() 为�
 
 ### 3.3 Conversion Pattern for the 9 Consumption Points (module-load-time constant → evaluation at the call site → uniformly through the section 3.5 wrapper)
 
-```
+```text
 // A 核对:9 能力(copilot 含 :70/:122 两点)所在函数【全部 async】,await 逐点安全;现全读模块加载期常量。
 // BEFORE(固化):config 顶层 const → 调用处直接读
 const GENBI = { modelId: resolveModelId(), workgroup, database }  // genbi/config.ts:16
@@ -292,7 +292,7 @@ await invokeWithFallback("genbi", targetId, (mid)=>new ConverseCommand({modelId:
 
 ### 3.4 Decision-D9 Transport Branch (probe gating; design decision D9)
 
-```
+```typescript
 function pickTransport(modelId) {
   if (BRANCH === "A") return converse                    // 分支A(探测=支持):两系列都走 Converse,仅换 modelId
   return isOpenAIFamily(modelId) ? openAICompat          // 分支B:Mantle(装 openai+@aws/bedrock-token-generator,现均未装,A 核对)
@@ -314,7 +314,7 @@ function pickTransport(modelId) {
 
 ### 3.5 🆕 `invokeWithFallback` (P0-3: throttle back-off + downgrade to the previous layer's model — the only home of the P0-4 cold cliff)
 
-```
+```text
 // lib/ai/invoke.ts(新)—— 9 消费点(+二期容器)统一走它。现 lib/ai/lib/genbi 无任何 backoff(grep 零命中,B 核对)
 // 🔴 v1.1 两形态(原单一 buildCommand 形态【包不住 5 处】):
 //   形态① 命令型 —— 8 个 ConverseCommand 点(genbi/agent:154、copilot/agent:69,121、advisor-agent:106、
@@ -500,7 +500,7 @@ export function vendorOf(id: string): VendorProfile | null;  export function isS
 export function isOpenAIFamily(id: string): boolean;         // 保留,D9 门还用
 export interface FamilySummary { family: Family; label: string; toolUse: VendorProfile["toolUse"]; reasoningBlocks: boolean }
 export function familySummaries(): FamilySummary[];          // GET /catalog 的 families[]
-```
+```text
 
 - `(?![0-9])`: `zai.glm-5` / `zai.glm-5.3` pass, `zai.glm-50` does not; `moonshotai.kimi-k3` passes, `kimi-k30` does not. glm-4.x / kimi-k2.x / sonnet / haiku / other vendors do not pass.
 - `Family` / `GEO_PREFIX_RE` / `stripGeoPrefix` / `familyOf` / `isOpenAIFamily` in `capabilities.ts` have been changed to re-export this file;
@@ -538,7 +538,7 @@ export function isTransientModelError(e: unknown): boolean; // 名 / 原话 / co
 export const TRANSIENT_MAX_RETRIES: 1;                    // 不含首发
 export function transientBackoffMs(attempt: number, rand?: () => number, baseMs = 600, capMs = 2400): number; // 全幅抖动 [0, min(cap, base·2^attempt)]
 export function describeModelError(e: unknown): { name: string; message: string; status: number | null; transient: boolean }; // message 截 400
-```
+```text
 
 - Locations: `infra/agent/genbi/agent.js` and `infra/agent/_runtime/agent-runner.js` (+ the distributed copies under `netadvisor` / `paramadvisor/_runtime/`): `const mkAgent = () => new Agent({ …, messages: [...messages] })`;
   - `for (attempt = 0; ; attempt++) { try { result = await mkAgent().invoke(…); break } catch (e) { const d = describeModelError(e); console.error(…); if (d.transient && attempt < TRANSIENT_MAX_RETRIES) { steps.push({ tool: "model", phase: "retry", … }); await sleep(transientBackoffMs(attempt)); continue } return <existing fallback> } }`.
@@ -554,7 +554,7 @@ toolUseOk = vendorOf(modelId)?.toolUse === "probe" ? await probeToolUse(modelId)
 classifyProbeError:  ① /is not available for this account|contact AWS Sales/i ⇒ "NotAvailableForAccount" (new; placed first — the body is also an AccessDeniedException and contains "not available")
                      ② the former order MarketplaceSCP / AccessDenied / Throttle / NotFound is unchanged
 ProbeError = "AccessDenied" | "NotFound" | "MarketplaceSCP" | "Throttle" | "NotAvailableForAccount"
-```
+```text
 
 ### 7.4 PUT `/api/admin/model-config` flow change (step ③′ inserted after step ④)
 
@@ -564,7 +564,7 @@ ProbeError = "AccessDenied" | "NotFound" | "MarketplaceSCP" | "Throttle" | "NotA
 → ④ probeModel (must pass) → ③′ vendorOf(modelId)?.toolUse === "probe" && probe.toolUseOk !== true ⇒ **400 ToolUseUnavailable**
    { detail: "<modelId> 在 Converse 下不能调用工具(tool-use 探测未通过),问数 / Copilot / 顾问会哑火,不能设为全局默认" } (nothing written to the table, no audit record)
 → ⑤ putGlobalModel (unchanged)
-```
+```text
 The `modelConfigError` error-code union (`lib/settings/admin-guard.ts`) gains `ToolUseUnavailable`. The Claude family (`toolUse:"assumed"`) does not look at `toolUseOk`.
 
 ### 7.5 Catalog GET `/catalog`
@@ -599,7 +599,7 @@ The `modelConfigError` error-code union (`lib/settings/admin-guard.ts`) gains `T
   "candidateModelIds": ["us.anthropic.claude-opus-4-5-20251101-v1:0", "zai.glm-5.3", "moonshotai.kimi-k3"] }
 ```
 `scripts/resolve-home-model.sh <profile> <home-region>` (the real algorithm):
-```
+```text
 candidate chain = ${BGP_MODEL_CANDIDATES:-candidateModelIds} (space-separated; an explicit override is only for troubleshooting / tests and prints 「候选来自 env」 to stderr)
 rows = list-inference-profiles (this region, once; if denied ⇒ rows is empty and the denial reason is recorded)
 for each candidate C in the chain:

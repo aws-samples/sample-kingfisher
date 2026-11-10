@@ -89,7 +89,7 @@
 
 ## 3. Top-Level Architecture
 
-```
+```text
                                   ┌──────────────────────────────────────────────────────────────┐
    create-source / sync wizard ──► │  Single entry point: getProvider(type) → DataSourceProvider │
    introspect / heartbeat / test   │  (callers see only this one facade and no longer branch on type) │
@@ -245,7 +245,7 @@ export interface SourceDataset {
   meta?: Record<string, any>;    // 范式专属（S3 format/压缩、DDB pk/sk、MSK 分区数…）
 }
 export interface SourceColumn { name: string; type?: string; nullable?: boolean; key?: string; comment?: string; }
-```
+```text
 
 ### 4.2 The Provider Interface (`datasource-spi/spi.ts`)
 
@@ -299,7 +299,7 @@ export function getProvider(type: DataSourceType): DataSourceProvider { return P
 export function listSourceTypes(): DataSourceType[] { return Object.keys(PROVIDERS) as DataSourceType[]; }
 // UI 建源下拉：由 provider.capabilities 派生（取代 DS_TYPE_OPTIONS 硬编码）
 export function sourceTypeCatalog() { return listSourceTypes().map(t => ({ type: t, ...getProvider(t).capabilities })); }
-```
+```text
 
 ---
 
@@ -339,7 +339,7 @@ export function readConnection(ds: DataSource): Record<string, any> {
   if (ds.connection) return ds.connection;                         // 新格式直接用
   return { host: ds.host, port: ds.port, database: ds.database };  // 旧 MySQL item 兜底映射
 }
-```
+```text
 
 - Creating a source: write the `connection` bag (the flat fields are no longer written).
 - Reading an old source: the normalizing layer maps the flat fields into the bag; the provider is unaware of the difference.
@@ -489,7 +489,7 @@ interface DataSourceProvider {
 **capabilities gains** `canProvision: boolean` (data-driven UI: only when true does the layer-2 dropdown show "➕ New").
 
 **Interaction chain (entirely on the page, following the red line "major actions require user confirmation")**:
-```
+```text
 The user picks layer 1 = Kinesis → the layer-2 dropdown lists the existing streams (GET /api/datasources?type=kinesis)
   + a final item "➕ New Kinesis stream"
 Pick "New" → a confirmation dialog (states clearly: 1 Kinesis stream will be created, with a note on its standing cost) → the user confirms
@@ -608,13 +608,13 @@ The key to untangling the awkward question "once the page is configured, how is 
 | (plaintext, later) | 9092 | PLAINTEXT | — | none |
 
 **IAM expansion**:
-```
+```text
 'properties.security.protocol'='SASL_SSL', 'properties.sasl.mechanism'='AWS_MSK_IAM',
 'properties.sasl.jaas.config'='software.amazon.msk.auth.iam.IAMLoginModule required;',
 'properties.sasl.client.callback.handler.class'='software.amazon.msk.auth.iam.IAMClientCallbackHandler'
 ```
 **SCRAM expansion** (the credentials are injected from Secrets Manager; the SQL stored in the database keeps the placeholders and the secret never lands in the database — the same red line as `${MYSQL_PASSWORD}` of mysqlSink):
-```
+```text
 'properties.security.protocol'='SASL_SSL', 'properties.sasl.mechanism'='SCRAM-SHA-512',
 'properties.sasl.jaas.config'='org.apache.kafka.common.security.scram.ScramLoginModule required username="<injected>" password="<injected>";'
 ```

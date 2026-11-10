@@ -153,7 +153,7 @@ Where it lives: a new "Execution Environments" management page (🔴 revision 2.
 - The "+ New execution environment" button at the top right: visible to admins only (mechanism C, tiered permissions — 🔴 narrowed to bgp-admin in revision 2.4, see mechanism C in section 1.4; both front-end visibility and the back-end API).
 
 **Wireframe (list page):**
-```
+```text
 ┌─ Execution Environments ─────────────────────────────────────────────[+ New execution environment]─┐
 │ 💡 How it works: manage execution environments across multiple regions… (FeatureGuide, collapsible)   │
 ├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -181,7 +181,7 @@ Where it lives: a new "Execution Environments" management page (🔴 revision 2.
 - 🔴 **Revision 2.17 (no-legal-gate work): when the jurisdiction ≠ home, Step 3 adds the disclaimer** (text = `disclaimer.ts` verbatim, see section 4bis.4) + a checkbox "I have read and agree"; **unchecked ⇒ [Start deployment] disabled**; checked ⇒ the registration request carries `residencyAck`, and the server verifies the version / text hash before writing it into the descriptor. The jurisdiction input is validated against `^[a-z][a-z0-9-]{1,31}$` (`EU` / `Home` are rejected), with the note "a non-home jurisdiction must install residency-api (regional audit / result storage)" — this is a technical prerequisite, not an approval.
 
 **Wireframe (creation wizard Step 3 → one-click deploy → live progress):**
-```
+```text
 ┌─ New execution environment ───────────────────────────────────────────────────────────────────────┐
 │   ① Choose region + naming  ─────  ② Choose services  ─────  ● ③ Confirm and deploy                 │
 ├────────────────────────────────────────────────────────────────────────────────────────────────────┤
@@ -216,7 +216,7 @@ Deletion destroys all execution resources of a region; an accidental deletion = 
 5. **Approved → destroy**: the platform calls `StartBuild` to trigger destruction (CodeBuild runs `cdk destroy` under the same isolated role as deployment) → progress visible → probe that the resources no longer exist → `deleted` (the item stays as a tombstone for audit). 🔴 **Data protection (a top-priority item that must be fixed in code before construction starts)**: the exec-env data buckets **must be explicitly `RemovalPolicy.RETAIN` + drop `autoDeleteObjects`** (the current platform-stack.ts:51-53 is `DESTROY+autoDelete` = a real defect that would delete customer data); S3 Tables table buckets are free-floating orphans created at runtime (not managed by CDK) and need separate retention handling (design document, section 4.4). The page states in red "data buckets have been retained and must be cleaned up separately after manual confirmation"; destruction deletes only recreatable resources.
 
 **Wireframe (deleting an environment; mechanism B → A, two dialogs in sequence):**
-```
+```text
 Gate one · impact preview (mechanism B)            Gate two · typed-name strong confirmation (mechanism A; only shown if the preview passes)
 ┌─ Delete execution environment us-west-2 ───────┐   ┌─ ⚠ Confirm deletion of us-west-2 ─────────────────────────────┐
 │ Pre-deletion checks (all must be 0):           │   │ This operation destroys all execution resources of the region. │
@@ -239,7 +239,7 @@ Gate one · impact preview (mechanism B)            Gate two · typed-name stron
 Corresponds to the design document, section 4.6. Location = the "Components" area of the execution environment detail page; installed components show ✓, uninstalled ones show "+ Supplemental deployment" (admin only; mechanism C, narrowed in revision 2.4). This is the heart of the "start small, grow on demand" convenience — stand up the minimal core first, add the warehouse / streaming when the business needs them, and the platform deploys incrementally and automatically without touching existing data.
 
 **Wireframe (detail page · components area + supplemental deployment):**
-```
+```text
 ┌─ Execution environment us-west-2 · Components ────────────────────────────────────────────────────┐
 │  ✓ core        Compute + storage + network + data lake (required)                                 │
 │  ✓ mwaa        Scheduling                                                                         │
@@ -307,7 +307,7 @@ Decided: "every region's scheduled tasks are executed by that region's own MWAA"
   (🔴 both **must retry with back-off** before being judged red — after an interface endpoint reaches `State=available` there is still a 2–3 minute private-DNS propagation window; reporting "endpoint missing" after a single red judges a good product to be defective; confirmed by a spike investigation).
 - 🆕 **Revision 2.19 correction**: the warning card title becomes "The following execution environments have no scheduler component; scheduling / orchestration cannot be configured for that region", and each row lists the selectable components "airflow-serverless (recommended, minutes) / mwaa"; button "Add a scheduler in Execution Environments →" (`scheduler-missing-fix`; the old testid `mwaa-missing-fix` is kept for one release) ⇒ `highlight=airflow-serverless` (serverless is also highlighted when the target already has mwaa installed but prefers serverless).
 
-```
+```text
 Batch Compute › job ui-redshift-x   bound to: home · us-west-2 (tgt_usw2_b)
 [ cron: 0 * * * * ] [ Publish to MWAA scheduler (2 regions) ]
 ┌─ ⚠ These execution environments have no MWAA scheduler installed, so scheduling / orchestration cannot be configured there ─┐
@@ -329,7 +329,7 @@ Execution Environments › tgt_usw2_b (drawer opened automatically)  Components:
 - 🆕 **[Trigger once]** (Batch Compute page / EMR panel, clickable once published; `scheduler-trigger`): runs the scheduling artifact once immediately for every published target (serverless ⇒ `StartWorkflowRun`, classic ⇒ `dags trigger`), with a second confirmation "Run each published scheduling artifact once now (without changing the cron)?"; trigger ≠ publish (unpublished targets are truthfully reported as skipped). The "Trigger" column of run history carries the tag "Serverless · SCHEDULED / ON_DEMAND" or "MWAA" (ledger fields `scheduler` / `runType`).
 > 🔴 **Revision 2.20 correction (real-environment finding of 2026-09-07)**: run-history **rows show only "Serverless"**. SCHEDULED / ON_DEMAND are not on the row — the worker side cannot tell the trigger source apart (measured: a cron trigger and a manual StartWorkflowRun look exactly alike), and the ledger deliberately does not store this derived value; the trigger source is shown in the **run-log dialog** from the service-side `GetWorkflowRun.RunType` (`run-log-trigger`: "Trigger: scheduled (service-side)" / "Trigger: manual (service-side)").
 
-```
+```text
 Batch Compute › job glue-spark-x   bound to: home · us-west-2 (tgt_usw2_a)
 [ cron: */5 * * * * ] [ Publish schedule (2 regions) ]   Published: home [Serverless] · tgt_usw2_a [Serverless]
 Run history: 09:05  tgt_usw2_a [Serverless · SCHEDULED] succeeded   [Task log → CloudWatch]
@@ -367,7 +367,7 @@ Run history: 09:05  tgt_usw2_a [Serverless · SCHEDULED] succeeded   [Task log �
 - **Reverse guidance**: for a task that selected a region-exclusive data source, the region multi-select locks automatically to that region (the others grayed out) with the note "this task depends on data exclusive to region X and can only execute in X".
 
 **Wireframe (task editor · region binding meets data heterogeneity):**
-```
+```text
 ┌─ Edit sync task "MSK order stream → warehouse" · execution regions ────────────────────────────────────┐
 │  Source data source: kafka-order-stream  📍 us-west-2 only (the MSK cluster is in that region)         │
 │  Bound execution regions (multi-select):                                                               │
@@ -406,7 +406,7 @@ Corresponds to [the design document](./multi-region-execution-design.md), sectio
 - Specialized cells carry a corner marker (they do not take part in the "inconsistent" verdict, because they are supposed to differ).
 
 **Wireframe (multi-region dashboard · version-consistency matrix):**
-```
+```text
 ┌─ Multi-Region Dashboard                          [region: All ▾] [Inconsistent first ▾] ─┐
 │ 💡 Push consistency of every region on one screen; red = failed, yellow = version mismatch, green = consistent (FeatureGuide) │
 ├────────────────────────┬──────────────┬────────────────────┬────────────────┬────────────────────────┤
@@ -449,7 +449,7 @@ modeling-artifact rows look at "what is in the database right now" (`landedByTar
 The user is asking **one and the same question** ⇒ decision: **interleave both into the same matrix, sharing the same set of columns** (no second dashboard —
 two dashboards would mean "does this region lack something" has to be checked in two places, and the place that gets missed is exactly the one nobody looks at).
 
-```
+```text
 ┌ Multi-Region Dashboard ──────────────────────────────────────────────────────────────────────────────┐
 │  Definition                                  │ us-east-1 (home)   │ us-west-2              │ eu-west-1        │
 │  ⏱ Batch job     Order wide table 🌐 shared  │ ✓ v7               │ ⚠ version mismatch v6  │ — not bound      │
@@ -532,7 +532,7 @@ Corresponds to [the design document](./multi-region-execution-design.md), sectio
 ### 4bis.4 🔴 Disclaimer dialog + retained consent (supplementary decision of 2026-09-05)
 - **Moment ① (at registration)**: the last step of the creation wizard (section 1.2) shows the notice text + a checkbox "I have read and agree" for `jurisdiction≠home`; **unchecked ⇒ [Start deployment] is disabled**; checked ⇒ the registration request carries `residencyAck:{version, textHash}`, which the server verifies and writes into the descriptor ([the specification](./multi-region-execution-spec.md), section 1.1).
 - **Moment ② (first time per user)**: when any user performs a data operation on a given cross-jurisdiction target **for the first time** (direct query / binding a task / modeling landing / run) ⇒ the server returns 409 `residency-ack-required` (the response contains the current text and version) ⇒ the front end shows the **disclaimer**:
-  ```
+  ```text
   ┌─ Disclaimer · tgt_euw1_a (🌍 eu-west-1 · eu-sim) ─────────────────────────────────────────┐
   │  This platform assumes no legal risk related to cross-border data transfer or data compliance. │
   │  You must constrain and govern data compliance yourself according to local laws and regulations. │
@@ -637,7 +637,7 @@ a criterion that "can never be verified" must not be left hanging there as debt.
 - **Not done**: cross-target result aggregation / cross-region JOIN (settled in section 4bis.3: to merge, go through an explicit copy job + approval).
 
 **Wireframe (cross-region one-screen overview):**
-```
+```text
 ┌─ Data map                                [View: All targets ▾] [Type ▾] [Project ▾] ─┐
 │ 💡 Cross-region [metadata] panorama (no data rows); click a target to drill into its data (the data stays in that region) │
 ├─────────────────────┬─────────────────────┬─────────────────────┬────────────────────────────┤
@@ -762,7 +762,7 @@ direct query is **read-only** and the results of the other regions are just as v
 
 The most important information across N sheets is **their differences**, and spread over N tabs that requires people to memorize numbers. So the first tab is a side-by-side comparison:
 
-```
+```text
 ┌ ⚖ Compare ─────────────────────────────────────────────────────────────────┐
 │ Region      Status                  Rows     Duration  Column signature       │
 │ us-east-1   ✓                       1,204    0.8s      region,count   ← baseline │

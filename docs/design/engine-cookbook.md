@@ -48,7 +48,7 @@ for **imperative code** (PySpark / Python for Glue / EMR) it only emits **warn-l
 
 ## 2. Core insight: the knowledge base belongs to the platform, not to Copilot
 
-```
+```text
                   ┌────────────────────────────────────────────────────────┐
                   │  Platform-level engineering knowledge base             │
                   │  Engine Cookbook — lib/cookbook/                       │
@@ -84,7 +84,7 @@ So phases 3 through 5 **instrument these existing endpoints with retrieve + guar
 ## 3. Retrieval mechanism (the core of token control, the top concern)
 
 ### 3.1 This phase: deterministic tag / engine retrieval (zero infra, zero extra cost, controllable)
-```
+```text
 retrieve(engine, opts?: { capability?, keywords?, topK? }): CookbookSlice
 ```
 - **First filter: engine**. Load only the knowledge of the target engine (computing Redshift ROI does not load Flink / EMR recipes).
@@ -179,7 +179,7 @@ interface Recipe {                // 验证过的代码范式
   verifiedAt?: string;            // 【新增】验证时间戳(证明"跑通过",非凭记忆)
   source: "system" | "admin";     // 内嵌只读 / 管理员扩展
 }
-```
+```text
 
 **Controlled capability vocabulary (new in revision 2, see section 10, finding E)**: `capability` stays a string so that flexibility is not broken, but a
 **controlled vocabulary + alias mapping** is maintained (for example `aggregate|rollup` and the localized Chinese alias all normalize to `aggregate`); retrieve normalizes during scoring,

@@ -46,7 +46,7 @@ Hard evidence from the three surveys:
 
 ### 2.1 The four-piece kit (horizontal layering; each layer reusable on its own)
 
-```
+```text
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │ ① @platform/agent-kit/core-build   ── core-dist build mechanism                      │
 │    any capability declares its core source dir → one tsc→CJS → copy to Lambda +      │
@@ -87,7 +87,7 @@ The three surveys prove that **AI capabilities come in two tiers, and forcing on
 
 ### ① core-build (generalizing the build mechanism)
 Today `genbi-core-prebuild.sh` hard-codes `genbi`. Generalize it into a declarative form:
-```
+```text
 # agent-kit.manifest.json（每能力一份）
 { "capabilityId": "paramadvisor",
   "coreSrc": "platform/src/lib/param-advisor/core",     // 抽出的纯逻辑
@@ -111,7 +111,7 @@ buildAgent({
   prepare?: (input) => {extras,messages},  // 可选:GenBI 独有(检索/口径预取);advisor 无
   memory?, steps?, toolNameStrategy?,       // 软钩子:默认实现覆盖多数
 })
-```
+```text
 Built in (zero parameters): MCP connection / tool hot-loading / iteration cap / multi-turn history / error feedback / token accounting.
 
 ### ③ AgentCoreStackBase (the CDK base class) — takes 6 kinds of parameters

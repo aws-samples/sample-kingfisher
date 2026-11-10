@@ -176,7 +176,7 @@ Page path: **Data Development → Batch Compute**. First switch "Execution scope
   ```sql
   CREATE TABLE IF NOT EXISTS public.region_probe (at timestamp);
   INSERT INTO public.region_probe VALUES (getdate());
-  ```
+  ```text
 
 - Click "Save".
 

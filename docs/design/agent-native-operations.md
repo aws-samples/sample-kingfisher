@@ -36,7 +36,7 @@ What the agent-native operations module does is to connect these two raw materia
 
 ## 1. The compounding loop (the organizing principle of the agent-native operations module)
 
-```
+```text
    ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
    │                                        Compounding Loop                                                  │
    └──────────────────────────────────────────────────────────────────────────────────────────────────────────┘

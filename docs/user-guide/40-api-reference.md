@@ -27,7 +27,7 @@ The token comes from the platform's Cognito user pool; the server verifies the i
 
 ```json
 { "success": false, "error": { "message": "未认证或登录态已失效，请重新登录", "correlationId": "…" } }
-```
+```text
 
 After signing in through the browser, the pages attach the token for you. When calling from a script, obtain the token yourself: the user pool client has both the `USER_PASSWORD_AUTH` and `USER_SRP_AUTH` flows enabled, so you can get one directly with the AWS CLI (no client secret needed):
 
@@ -109,7 +109,7 @@ GET  /api/athena/tables?targetId=tgt_usw2_a          ← target: list the table 
 GET  /api/sync?scope=tgt_usw2_a                     ← scope: list only the sync tasks bound to this region
 GET  /api/sync?scope=cmp:tgt_home,tgt_usw2_a        ← scope: compare two regions
 POST /api/etl-jobs  { "name": "…", "targets": ["tgt_home","tgt_usw2_a"], … }   ← creating an object names the bound regions
-```
+```text
 
 ### 1.7 Long-running operations (202 + polling) and object leases (409)
 
@@ -128,7 +128,7 @@ Requests that wait for an external system to reach a final state (modeling landi
    ```json
    { "success": true, "data": { "taskId": "01J…", "kind": "modeling-land", "label": "落地码表",
      "status": "succeeded", "result": { … }, "resultStatus": 200, "elapsedMs": 61234 } }
-   ```
+   ```text
 
 - `status` is one of `running` / `succeeded` / `failed` / `timeout`. On `succeeded`, `result` is the `data` of the synchronous response; on `failed`, `error` is the message text and `errorStatus` / `errorBody` are the status code and envelope the synchronous branch would have returned, so they can be restored byte for byte; `timeout` means it exceeded 5 minutes and was terminated automatically (message "The operation exceeded 5 minutes and was terminated automatically; narrow the scope and retry").
 - The pages already do this in the interception layer: when you see "Running in background: <label> (n s elapsed)" in the bottom-right corner, polling is in progress; scripts must implement it themselves.

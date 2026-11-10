@@ -35,7 +35,7 @@
 
 ### 0.3 New files (all newly created)
 
-```
+```text
 infra/lib/finops-stack.ts                    # 3 tables (hardened, dataKey encryption)
 platform/src/lib/finops/
   constants.ts        # table names / service categories / switches (single source of truth inside the module; the shared TABLES is untouched)
