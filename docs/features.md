@@ -651,7 +651,7 @@ plus the per-region VPC, KMS, Redshift Serverless, S3 Tables, Glue, EMR Serverle
 
 ### 8.3 Users (`/admin/users`)
 
-Users manages the Cognito user pool: create users, change roles (Admin, Developer, Viewer), disable accounts and reset passwords.
+Users manages the Cognito user pool: create users, change roles (Admin, Manager, Developer, Analyst, or no platform group), disable accounts and reset passwords.
 
 ![User management](screenshots/admin-users.webp)
 *Figure 8.3: Users.*

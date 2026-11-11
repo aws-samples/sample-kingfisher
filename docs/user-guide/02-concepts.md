@@ -177,8 +177,8 @@ When an execution region is not in the same jurisdiction as the home region, cha
 **Where you see it on the pages**
 
 - "System → Users": "Create user" (fill in "Username", "Email", "Password", "Role"), "Reset password", "Disable" / "Enable".
-  The "Role" dropdown currently offers three entries: "Admin", "Developer", "Viewer".
-  bgp-manager / bgp-analyst cannot be assigned on the page; the customer's account administrator adds the groups in the Cognito user pool console; "Viewer" writes the page's own bgp-viewer group, which is not one of the four groups above and is not read by the server, so it equals "not in any privileged group".
+  The "Role" dropdown offers five entries: "Admin", "Manager", "Developer", "Analyst" and "No platform group (project membership only)"; the first four each map to one group in the table above, the last writes no group at all (project membership only).
+  Changing a role first removes all four platform groups (and the early page-created bgp-viewer) before adding the target group.
 - The role tag (owner / editor / viewer) beside "Workspace" in the top bar.
 
 **Rules that bite**

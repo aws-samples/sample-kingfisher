@@ -33,13 +33,15 @@
 
 ### 2.1 The three tiers assignable on the page
 
-The "Create user" dialog and the in-row "Role" dropdown under "System → Users" offer only three tiers; what they can actually do is decided by the server.
+The "Create user" dialog and the in-row "Role" dropdown under "System → Users" offer five tiers that follow the real platform groups (the four groups plus "no platform group"); what they can actually do is decided by the server.
 
 | Page "Role" | Cognito group written | What it can do |
 |---|---|---|
 | Admin | bgp-admin | Platform-wide superuser: user management, every execution environment action, changing the AI model, saving masking rules, Multi-Region Dashboard landings, approving execution environment deletions, configuration management of any project |
+| Manager | bgp-manager | Creates workspaces; manages configuration and approvals in projects where it is owner; triages, assigns and accepts requests; otherwise per project role |
 | Developer | bgp-developer | All business pages; develops resources in projects as owner / editor / viewer; **cannot** create workspaces, and cannot manage members even as project owner |
-| Viewer | bgp-viewer | A business account in no privileged group: can sign in and open every business page; what it can actually view or change is decided by the project role (usually viewer); not subject to the operations-analyst allow-list. The group is created automatically by the Users page the first time it is needed; no server-side check reads it |
+| Analyst | bgp-analyst | Only GenBI and submitting requests (the operations-analyst allow-list); in a multi-region deployment it can pick a region in the top bar |
+| No platform group (project membership only) | (no group written) | A business account in no privileged group: can sign in and open every business page; what it can actually view or change is decided by the project role (usually viewer). Accounts in the early page-created `bgp-viewer` group, which the server never reads, now show as this tier and are removed from that group the first time their role is changed |
 
 - The admin APIs `/api/admin/*` (listing users, creating accounts, changing roles, disabling, execution environment management, model configuration) require bgp-admin at the gateway and check again inside the route; the other two tiers see a red explanation when they open "Users" ("This action requires platform-administrator (bgp-admin group) permission; please contact a platform administrator"), the list is not loaded, and every action is refused by the server with 403.
 - The "Role" column of the list is derived from the groups: bgp-admin shows Admin, bgp-developer shows Developer, everything else shows Viewer.
@@ -50,7 +52,7 @@ The platform also defines two more role groups; the server checks permissions ag
 
 | Role group | What it can do | How to assign |
 |---|---|---|
-| bgp-manager (R&D manager) | Creates workspaces; manages configuration in projects where it is owner (rename / delete project / add, change, remove members / approval decisions) and sees that project's approvals; triages, assigns and accepts requests; otherwise per project role | The customer's account administrator adds the user to the group in the Cognito user pool console (the "Role" dropdown on the Users page offers only Admin / Developer / Viewer; changing the role on the page only touches those three groups and never removes bgp-manager / bgp-analyst) |
+| bgp-manager (R&D manager) | Creates workspaces; manages configuration in projects where it is owner (rename / delete project / add, change, remove members / approval decisions) and sees that project's approvals; triages, assigns and accepts requests; otherwise per project role | Set the role to "Manager" on the Users page (changing a role first removes the user from all four platform groups, then adds the target group) |
 | bgp-analyst (operations analyst) | The menu shrinks to "Ask-Your-Data" "Requests"; every other API returns 403 "Operations-analyst accounts may only use Ask-Your-Data and submit requests" | As above |
 
 - Only "in bgp-analyst and in none of the other three groups" is treated as an operations analyst; someone in both bgp-analyst and bgp-developer is treated as a developer.
@@ -68,7 +70,7 @@ The platform also defines two more role groups; the server checks permissions ag
 
 - Who can create workspaces: platform administrators or R&D managers; developers see "Workspaces are created by admins / R&D managers; contact them if you need a new one".
 - The configuration-management check is written in one place: platform administrator, or "R&D manager AND owner of this project". When a plain developer is made owner, the page shows "You are the owner of this project (developer permissions). Member management / rename / delete require a platform admin or R&D manager — you can still develop this project's sync tasks / jobs / workflows as usual."
-- The default project "Default Workspace" starts **without any members**: until a non-administrator is added to the project, GenBI returns 403 "No access to this workspace". Its description on the page says "any logged-in user is implicitly an editor"; that is early wording, the server has no implicit membership, and "no members initially" is what counts. Demo installations (`BGP_DEPLOY_MODE=demo`) are the exception: install step 11.6 and upgrade step 3d add the four demo role accounts to the default workspace (`pm-tester` = owner, `rbac-tester` = editor, `ops-analyst` / `biz-tester` = viewer); production installations do not.
+- The default project "Default Workspace" starts **without any members**: until a non-administrator is added to the project, GenBI returns 403 "No access to this workspace". Its description on the page states exactly that: "Platform default workspace (hosts legacy resources; no members initially, members are added by a platform administrator)" (the early wording "any logged-in user is implicitly an editor" has been corrected; existing installations are corrected automatically the next time the project list is read). Demo installations (`BGP_DEPLOY_MODE=demo`) are the exception: install step 11.6 and upgrade step 3d add the four demo role accounts to the default workspace (`pm-tester` = owner, `rbac-tester` = editor, `ops-analyst` / `biz-tester` = viewer); production installations do not.
 - Add members: "Workspace" → the project row's "Members / Approvals" → enter the "Username" (Cognito username), choose a "Role" → "Add / Update"; click "Remove" to remove.
 - Request to join: a non-member clicks "Request to join" under "Other workspaces you can request to join"; a platform administrator or the space's R&D manager owner clicks "Approve" or "Reject" under "Pending approval (access/role requests)".
 - Approval types: promotion (publishing to prod), joining a project (tagged "Join group" on the page), data access (requesting the clear text of masked columns), table creation / change (catalog table creation and changes in the production environment), execution environment deletion (platform administrators only).

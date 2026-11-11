@@ -3,8 +3,14 @@
 export const DEFAULT_PROJECT_ID = "proj-default";
 export const DEFAULT_PROJECT_NAME = "默认空间";
 // 默认工作区描述:平台预置常量(单一事实源,seed 与 i18n 词条共用)。
+// 🔴 文案必须与服务端行为一致:项目准入只认平台管理员或成员行,**没有**隐式成员(resolveRole / listVisibleProjects);
+//   早期文案「任何登录用户隐式为 editor」与行为相悖(2026-11-09 用户指南取证核到),存量库里的旧文案由 ensureDefaultProject 原地改正。
 export const DEFAULT_PROJECT_DESCRIPTION =
-  "平台默认工作空间（承载历史资源；任何登录用户隐式为 editor）";
+  "平台默认工作空间（承载历史资源；初始无成员，由平台管理员添加成员）";
+/** 历史版本的默认空间描述:ensureDefaultProject 读到其中之一就改成现行常量(管理员自己改过的描述不在此列,不动)。 */
+export const LEGACY_DEFAULT_PROJECT_DESCRIPTIONS: readonly string[] = [
+  "平台默认工作空间（承载历史资源；任何登录用户隐式为 editor）",
+];
 
 // 工作区名/描述显示:默认工作区的 name/description 是平台预置常量(中文),走 i18n
 // 翻译;用户自建工作区的是业务数据,原样返回(严禁翻)。渲染处统一调用。

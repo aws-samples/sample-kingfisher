@@ -9,7 +9,7 @@ import { ADMIN_REQUIRED_MESSAGE } from "@/lib/auth/forbidden-messages";
 
 const h = vi.hoisted(() => {
   process.env.COGNITO_USER_POOL_ID = "us-east-1_TESTPOOL";
-  return { sent: [] as any[], admin: true, listFails: false, audits: [] as Array<{ action: string; opts: any }> };
+  return { sent: [] as any[], admin: true, listFails: false, audits: [] as Array<{ action: string; opts: any }>, listUsers: [] as any[], groupsOf: {} as Record<string, string[]> };
 });
 
 vi.mock("@aws-sdk/client-cognito-identity-provider", async (orig) => {
@@ -18,6 +18,8 @@ vi.mock("@aws-sdk/client-cognito-identity-provider", async (orig) => {
     async send(cmd: any) {
       h.sent.push(cmd);
       if (cmd instanceof real.ListUsersCommand && h.listFails) throw new Error("Cognito unreachable (simulated)");
+      if (cmd instanceof real.ListUsersCommand) return { Users: h.listUsers };
+      if (cmd instanceof real.AdminListGroupsForUserCommand) return { Groups: (h.groupsOf[cmd.input.Username] || []).map((g: string) => ({ GroupName: g })) };
       return {};
     }
   }
@@ -38,7 +40,7 @@ const PW = "Newpass#2026x";
 const cmdNames = () => h.sent.map((c) => c.constructor.name);
 
 describe("用户管理路由:读失败如实、拒因准确、写动作全进审计", () => {
-  beforeEach(() => { h.sent.length = 0; h.audits.length = 0; h.admin = true; h.listFails = false; });
+  beforeEach(() => { h.sent.length = 0; h.audits.length = 0; h.admin = true; h.listFails = false; h.listUsers = []; h.groupsOf = {}; });
 
   it("① Cognito 列用户失败 ⇒ 502 + success:false + 原因(不是 200 空列表)", async () => {
     h.listFails = true;
@@ -54,6 +56,14 @@ describe("用户管理路由:读失败如实、拒因准确、写动作全进审
     const r = await GET(req("GET"));
     expect(r.status).toBe(200);
     expect(Array.isArray((await r.json()).data)).toBe(true);
+  });
+
+  it("① 列表的角色按真实四组派生:manager ⇒ Manager · analyst ⇒ Analyst · 仅遗留 bgp-viewer ⇒ None(原来一律显示成 Viewer)", async () => {
+    h.listUsers = ["pm-tester", "ops-analyst", "old-viewer", "dev-and-analyst"].map((u) => ({ Username: u, Enabled: true, UserStatus: "CONFIRMED" }));
+    h.groupsOf = { "pm-tester": ["bgp-manager"], "ops-analyst": ["bgp-analyst"], "old-viewer": ["bgp-viewer"], "dev-and-analyst": ["bgp-analyst", "bgp-developer"] };
+    const r = await GET(req("GET"));
+    const roles = Object.fromEntries(((await r.json()).data as any[]).map((u) => [u.username, u.role]));
+    expect(roles).toEqual({ "pm-tester": "Manager", "ops-analyst": "Analyst", "old-viewer": "None", "dev-and-analyst": "Developer" });
   });
 
   it("② 非平台管理员:GET / POST / PUT 都 403,拒因 = 网关同一句「需要平台管理员」,Cognito 一次没被调", async () => {
@@ -88,6 +98,57 @@ describe("用户管理路由:读失败如实、拒因准确、写动作全进审
     expect(cmdNames()).toEqual([cmd]);
     expect(h.sent[0].input).toMatchObject({ Username: "pm-tester" });
     expect(h.audits).toEqual([{ action: audit, opts: { resourceType: "user", resourceId: "pm-tester" } }]);
+  });
+
+  it("② 建号 role 必填且闭合:缺省 / Viewer(旧三档)/ 乱值 ⇒ 400,Cognito 一次没被调(原来静默落成四组之外的 bgp-viewer)", async () => {
+    for (const body of [{ username: "u2", password: PW }, { username: "u2", password: PW, role: "Viewer" }, { username: "u2", password: PW, role: "root" }]) {
+      const r = await POST(req("POST", body));
+      expect(r.status, JSON.stringify(body)).toBe(400);
+      expect((await r.json()).error.message).toContain("Admin / Manager / Developer / Analyst / None");
+    }
+    expect(h.sent).toHaveLength(0);
+    expect(h.audits).toHaveLength(0);
+  });
+
+  it.each([
+    ["Manager", "bgp-manager"],
+    ["Analyst", "bgp-analyst"],
+  ])("③ 建号 role=%s ⇒ 加进真实平台组 %s(不再只有 Admin / Developer 两档)", async (role, group) => {
+    const r = await POST(req("POST", { username: "u3", password: PW, role }));
+    expect(r.status).toBe(200);
+    const add = h.sent.find((c) => c.constructor.name === "AdminAddUserToGroupCommand");
+    expect(add?.input).toMatchObject({ Username: "u3", GroupName: group });
+    expect(h.audits[0].opts).toMatchObject({ detail: { role, groupName: group } });
+  });
+
+  it("③ 建号 role=None ⇒ 不进任何组(只靠项目成员资格),审计 groupName 为 null", async () => {
+    const r = await POST(req("POST", { username: "u4", password: PW, role: "None" }));
+    expect(r.status).toBe(200);
+    expect(cmdNames()).not.toContain("AdminAddUserToGroupCommand");
+    expect(cmdNames()).not.toContain("CreateGroupCommand");
+    expect(h.audits[0].opts).toMatchObject({ detail: { role: "None", groupName: null } });
+  });
+
+  it("③ 改角色先从四个平台组 + 历史遗留 bgp-viewer 全部摘掉再加目标组(原来只摘三组 ⇒ manager / analyst 残留)", async () => {
+    const r = await PUT(req("PUT", { username: "pm-tester", action: "changeRole", role: "Analyst" }));
+    expect(r.status).toBe(200);
+    const removed = h.sent.filter((c) => c.constructor.name === "AdminRemoveUserFromGroupCommand").map((c) => c.input.GroupName);
+    expect(removed.sort()).toEqual(["bgp-admin", "bgp-analyst", "bgp-developer", "bgp-manager", "bgp-viewer"]);
+    const add = h.sent.find((c) => c.constructor.name === "AdminAddUserToGroupCommand");
+    expect(add?.input).toMatchObject({ Username: "pm-tester", GroupName: "bgp-analyst" });
+    expect(h.audits).toEqual([{ action: "user.role.change", opts: { resourceType: "user", resourceId: "pm-tester", detail: { role: "Analyst", groupName: "bgp-analyst" } } }]);
+  });
+
+  it("③ 改角色成 None ⇒ 只摘组不加组;role 乱值 ⇒ 400 且不动 Cognito", async () => {
+    const r = await PUT(req("PUT", { username: "pm-tester", action: "changeRole", role: "None" }));
+    expect(r.status).toBe(200);
+    expect(cmdNames()).not.toContain("AdminAddUserToGroupCommand");
+    expect(h.audits[0].opts).toMatchObject({ detail: { role: "None", groupName: null } });
+    h.sent.length = 0; h.audits.length = 0;
+    const bad = await PUT(req("PUT", { username: "pm-tester", action: "changeRole", role: "Viewer" }));
+    expect(bad.status).toBe(400);
+    expect(h.sent).toHaveLength(0);
+    expect(h.audits).toHaveLength(0);
   });
 
   it("③ 改角色 ⇒ 审计 user.role.change 带新角色与组名", async () => {

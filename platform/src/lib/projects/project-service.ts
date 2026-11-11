@@ -18,6 +18,7 @@ import {
   DEFAULT_PROJECT_ID,
   DEFAULT_PROJECT_NAME,
   DEFAULT_PROJECT_DESCRIPTION,
+  LEGACY_DEFAULT_PROJECT_DESCRIPTIONS,
   PROJECTS_PK,
   APPROVALS_PK,
   ProjectRole,
@@ -95,7 +96,23 @@ export async function listAllProjects(): Promise<Project[]> {
 // the project switcher always has at least one entry. Idempotent.
 export async function ensureDefaultProject(): Promise<Project> {
   const existing = await getProject(DEFAULT_PROJECT_ID);
-  if (existing) return existing;
+  if (existing) {
+    // 存量环境的默认空间还写着与行为相悖的旧描述 ⇒ 原地改成现行常量(条件写:只在仍是那句旧文案时改,管理员改过的不动)
+    if (existing.description && LEGACY_DEFAULT_PROJECT_DESCRIPTIONS.includes(existing.description)) {
+      const now = new Date().toISOString();
+      await docClient.send(
+        new UpdateCommand({
+          TableName: TABLES.PROJECTS,
+          Key: { pk: PROJECTS_PK, projectId: DEFAULT_PROJECT_ID },
+          UpdateExpression: "SET description = :d, updatedAt = :now",
+          ConditionExpression: "description = :old",
+          ExpressionAttributeValues: { ":d": DEFAULT_PROJECT_DESCRIPTION, ":now": now, ":old": existing.description },
+        })
+      ).catch(() => {});
+      return { ...existing, description: DEFAULT_PROJECT_DESCRIPTION, updatedAt: now };
+    }
+    return existing;
+  }
   const now = new Date().toISOString();
   const project: Project & { pk: string } = {
     pk: PROJECTS_PK,

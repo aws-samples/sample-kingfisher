@@ -5,8 +5,7 @@ import { Table, Button, Space, Tag, Modal, Form, Input, Select, message, Popconf
 import { PlusOutlined, UserOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { passwordPolicyError } from "@/lib/auth/password-policy";
-
-const roleColor: Record<string, string> = { Admin: "red", Developer: "blue", Viewer: "default" };
+import { PLATFORM_ROLES, PLATFORM_ROLE_LABEL } from "@/lib/auth/groups";
 
 export default function UsersPage() {
   const t = useT();
@@ -69,8 +68,9 @@ export default function UsersPage() {
     { title: t("用户名"), dataIndex: "username", render: (v: string) => <Space><UserOutlined /><b>{v}</b></Space> },
     { title: t("邮箱"), dataIndex: "email" },
     { title: t("角色"), dataIndex: "role", render: (v: string, r: any) => (
-      <Select size="small" value={v} style={{ width: 110 }} onChange={(role) => handleAction(r.username, "changeRole", { role })}
-        options={[{ label: "Admin", value: "Admin" }, { label: "Developer", value: "Developer" }, { label: "Viewer", value: "Viewer" }]} />
+      <Select size="small" value={v} style={{ width: 200 }} data-testid={`user-role-${r.username}`}
+        onChange={(role) => handleAction(r.username, "changeRole", { role })}
+        options={PLATFORM_ROLES.map((role) => ({ label: t(PLATFORM_ROLE_LABEL[role]), value: role }))} />
     )},
     { title: t("状态"), key: "status", render: (_: any, r: any) => (
       <Badge status={r.enabled ? "success" : "error"} text={r.enabled ? t("启用") : t("禁用")} />
@@ -106,7 +106,7 @@ export default function UsersPage() {
           <Form.Item name="email" label={t("邮箱")}><Input /></Form.Item>
           <Form.Item name="password" label={t("密码")} rules={[{ required: true, min: 8 }]}><Input.Password /></Form.Item>
           <Form.Item name="role" label={t("角色")} initialValue="Developer">
-            <Select options={[{ label: t("Admin - 管理员"), value: "Admin" }, { label: t("Developer - 开发者"), value: "Developer" }, { label: t("Viewer - 只读"), value: "Viewer" }]} />
+            <Select data-testid="user-create-role" options={PLATFORM_ROLES.map((role) => ({ label: t(PLATFORM_ROLE_LABEL[role]), value: role }))} />
           </Form.Item>
         </Form>
       </Modal>

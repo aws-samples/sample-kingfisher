@@ -10,6 +10,8 @@ import { resolve } from "node:path";
 
 const SCRIPTS = resolve(__dirname, "../../../../../scripts");
 const script = readFileSync(resolve(SCRIPTS, "10-bootstrap-cognito.sh"), "utf8");
+// 函数本体按**内容**拼进片段(不是把路径拼进 shell 命令:路径进命令行会被静态分析判成不受控的绝对路径)
+const libSrc = readFileSync(resolve(SCRIPTS, "lib/deploy-mode.sh"), "utf8");
 const sourcesLib = script.includes('source "$HERE/lib/deploy-mode.sh"');
 const lines = script.split("\n");
 const i = lines.findIndex((l) => l.startsWith("USERS=("));
@@ -18,7 +20,7 @@ const callsResolver = lines.slice(i, j + 1).some((l) => l.startsWith('DEPLOY_MOD
 
 function usersFor(mode: string | null): string[] {
   // aws 桩:SSM 读不到(非 0 退出、无输出)⇒ 脚本按 env 缺省 production;PROFILE / REGION 只为让 resolve_deploy_mode 的引用有值
-  const snippet = `aws() { return 1; }\nPROFILE=x; REGION=x\nsource ${JSON.stringify(resolve(SCRIPTS, "lib/deploy-mode.sh"))}\n${lines.slice(i, j + 1).join("\n")}\necho "\${USERS[@]}"`;
+  const snippet = `aws() { return 1; }\nPROFILE=x; REGION=x\n${libSrc}\n${lines.slice(i, j + 1).join("\n")}\necho "\${USERS[@]}"`;
   const env: Record<string, string> = { PATH: process.env.PATH || "/usr/bin:/bin" };
   if (mode !== null) env.BGP_DEPLOY_MODE = mode;
   return execFileSync("bash", ["-c", snippet], { env, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim().split(/\s+/);

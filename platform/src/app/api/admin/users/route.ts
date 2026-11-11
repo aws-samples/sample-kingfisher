@@ -9,6 +9,7 @@ import { resolveIdentity } from "@/lib/auth/identity";
 import { passwordPolicyError } from "@/lib/auth/password-policy";
 import { recordAudit } from "@/lib/audit";
 import { ADMIN_REQUIRED_MESSAGE } from "@/lib/auth/forbidden-messages";
+import { PLATFORM_GROUPS, LEGACY_VIEWER_GROUP, PLATFORM_ROLE_GROUP, PLATFORM_ROLES, isPlatformRole, roleFromGroups, type PlatformRole } from "@/lib/auth/groups";
 
 const cognito = sdkClient("control-plane", CognitoIdentityProviderClient, { region: homeRegion() });
 const POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || "";
@@ -20,6 +21,18 @@ async function requireAdmin(req: NextRequest) {
   if (!identity) return apiError("未认证或登录态已失效，请重新登录", 401);
   if (!identity.isPlatformAdmin) return apiError(ADMIN_REQUIRED_MESSAGE, 403);
   return null;
+}
+
+/** 把用户加进角色对应的平台组(组不在就先建,幂等);None ⇒ 不加、回 null。回值 = 组名,进审计。 */
+async function assignPlatformGroup(username: string, role: PlatformRole): Promise<string | null> {
+  if (role === "None") return null;
+  const groupName = PLATFORM_ROLE_GROUP[role];
+  try {
+    const { CreateGroupCommand } = await import("@aws-sdk/client-cognito-identity-provider");
+    await cognito.send(new (CreateGroupCommand as any)({ UserPoolId: POOL_ID, GroupName: groupName }));
+  } catch {}
+  await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: groupName }));
+  return groupName;
 }
 
 export async function GET(req: NextRequest) {
@@ -39,7 +52,8 @@ export async function GET(req: NextRequest) {
       users.push({
         username: u.Username, email, status: u.UserStatus, enabled: u.Enabled,
         groups, createdAt: u.UserCreateDate?.toISOString(),
-        role: groups.includes("bgp-admin") ? "Admin" : groups.includes("bgp-developer") ? "Developer" : "Viewer",
+        // 角色 = 四个真实平台组按特权取最高;都不在(含历史遗留 bgp-viewer)⇒ None「无平台组」
+        role: roleFromGroups(groups),
       });
     }
     return apiOk(users);
@@ -55,6 +69,8 @@ export async function POST(req: NextRequest) {
   if (!POOL_ID) return apiError("Cognito 未配置");
   const { username, email, password, role } = await req.json();
   if (!username || !password) return apiError("缺少 username 或 password");
+  // 角色必填且在闭合清单内(原来没给 / 给错都静默落成 bgp-viewer —— 四组之外、无任何守卫认它)
+  if (!isPlatformRole(role)) return apiError(`role 必须是 ${PLATFORM_ROLES.join(" / ")}`);
 
   try {
     await cognito.send(new AdminCreateUserCommand({
@@ -64,13 +80,8 @@ export async function POST(req: NextRequest) {
     }));
     await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: POOL_ID, Username: username, Password: password, Permanent: true }));
 
-    // Ensure groups exist and assign
-    const groupName = role === "Admin" ? "bgp-admin" : role === "Developer" ? "bgp-developer" : "bgp-viewer";
-    try {
-      const { CreateGroupCommand } = await import("@aws-sdk/client-cognito-identity-provider");
-      await cognito.send(new (CreateGroupCommand as any)({ UserPoolId: POOL_ID, GroupName: groupName }));
-    } catch {}
-    await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: groupName }));
+    // 角色 → 平台组(单一作者 lib/auth/groups.ts);None = 不进任何组,只靠项目成员资格
+    const groupName = await assignPlatformGroup(username, role);
     // 审计只记谁建了谁、给了哪个角色,绝不记口令 / 邮箱
     recordAudit(req, "user.create", { resourceType: "user", resourceId: String(username), detail: { role, groupName } });
 
@@ -110,16 +121,13 @@ export async function PUT(req: NextRequest) {
       await cognito.send(new AdminEnableUserCommand({ UserPoolId: POOL_ID, Username: username }));
       recordAudit(req, "user.enable", { resourceType: "user", resourceId: String(username) });
     }
-    if (action === "changeRole" && role) {
-      for (const g of ["bgp-admin", "bgp-developer", "bgp-viewer"]) {
+    if (action === "changeRole") {
+      if (!isPlatformRole(role)) return apiError(`role 必须是 ${PLATFORM_ROLES.join(" / ")}`);
+      // 先从四个平台组 + 历史遗留 bgp-viewer 全部摘掉(原来只摘 admin / developer / viewer ⇒ manager / analyst 残留),再加进目标组
+      for (const g of [...PLATFORM_GROUPS, LEGACY_VIEWER_GROUP]) {
         try { await cognito.send(new AdminRemoveUserFromGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: g })); } catch {}
       }
-      const groupName = role === "Admin" ? "bgp-admin" : role === "Developer" ? "bgp-developer" : "bgp-viewer";
-      try {
-        const { CreateGroupCommand } = await import("@aws-sdk/client-cognito-identity-provider");
-        await cognito.send(new (CreateGroupCommand as any)({ UserPoolId: POOL_ID, GroupName: groupName }));
-      } catch {}
-      await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: groupName }));
+      const groupName = await assignPlatformGroup(username, role);
       recordAudit(req, "user.role.change", { resourceType: "user", resourceId: String(username), detail: { role, groupName } });
     }
     return apiOk({ success: true });

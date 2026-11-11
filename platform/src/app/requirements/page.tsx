@@ -12,6 +12,7 @@ import {
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useT } from "@/lib/i18n/useT";
+import { PLATFORM_ADMIN_GROUP, MANAGER_GROUP, DEVELOPER_GROUP } from "@/lib/auth/groups";
 import { useScope } from "@/components/scope/ScopeProvider";
 import { landingOfScope } from "@/lib/scope/scope";
 // 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
@@ -63,8 +64,8 @@ export default function RequirementsPage() {
   const { scope } = useScope();
   const reqLanding = landingOfScope(scope);
   const [me, setMe] = useState<{ sub?: string; username?: string; groups: string[] }>({ groups: [] });
-  const isManager = me.groups.includes("bgp-admin") || me.groups.includes("bgp-manager");
-  const isDeveloper = me.groups.includes("bgp-admin") || me.groups.includes("bgp-developer");
+  const isManager = me.groups.includes(PLATFORM_ADMIN_GROUP) || me.groups.includes(MANAGER_GROUP);
+  const isDeveloper = me.groups.includes(PLATFORM_ADMIN_GROUP) || me.groups.includes(DEVELOPER_GROUP);
 
   const [box, setBox] = useState<string>("mine");
   const [list, setList] = useState<any[]>([]);
@@ -105,9 +106,9 @@ export default function RequirementsPage() {
       const tok = await getToken();
       const decoded = decodeToken(tok);
       setMe(decoded);
-      const initial = (decoded.groups.includes("bgp-admin") || decoded.groups.includes("bgp-manager"))
+      const initial = (decoded.groups.includes(PLATFORM_ADMIN_GROUP) || decoded.groups.includes(MANAGER_GROUP))
         ? "inbox"
-        : (decoded.groups.includes("bgp-developer") ? "assigned" : "mine");
+        : (decoded.groups.includes(DEVELOPER_GROUP) ? "assigned" : "mine");
       setBox(initial);
       load(initial);
     })();

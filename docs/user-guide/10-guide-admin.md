@@ -77,13 +77,15 @@ Page: "System → Users". Only platform administrators can open it; other roles 
 
 Set the password according to the user pool rules (at least 12 characters, with upper- and lower-case, digits and symbols). The create dialog itself only checks that the length is at least 8; a password that violates the user pool policy is rejected by Cognito and the page shows the raw AWS message.
 
-### 2.2 The three platform roles
+### 2.2 The five platform roles
 
 | Role on the page | Role group | What it can do |
 |---|---|---|
 | Admin | bgp-admin | Every administrative action: user management, creating / deleting workspaces, all approvals, execution environments, changes to settings |
+| Manager | bgp-manager | Creates workspaces, manages configuration and approvals in projects where it is owner, triages / assigns / accepts requests |
 | Developer | bgp-developer | Develops in the workspaces they were granted (what exactly they may change is decided by the project role, see section 3) |
-| Viewer | bgp-viewer | The platform places no specific restriction on this group (the code only has the display mapping on the Users page); whether they can view or edit is entirely decided by the project role; for read-only, give them the viewer project role in the workspace |
+| Analyst | bgp-analyst | GenBI and submitting requests only |
+| No platform group (project membership only) | (no group written) | The platform places no restriction of its own; whether they can view or edit is entirely decided by the project role; for read-only, give them the viewer project role in the workspace. Accounts in the early `bgp-viewer` group show as this tier |
 
 Key points:
 
@@ -466,7 +468,7 @@ Key points:
 - Deleting an execution environment does not delete data resources (data buckets / table buckets / warehouse snapshots / CMK / DAG bucket); they keep incurring charges and must be cleaned up manually.
 - Deleting a workspace does not cascade; resources, members and data-plane tables must all be 0 before it can be deleted.
 - Data sources are not split by environment (dev / staging / prod share the connection); sync / jobs / orchestration / query tasks are isolated by project + environment.
-- The Users page has only the three roles Admin / Developer / Viewer; the two role groups R&D manager (bgp-manager) / operations analyst (bgp-analyst) cannot be assigned on the page and are added by an administrator in the Cognito console.
+- The roles on the Users page are the five platform roles (Admin / Manager / Developer / Analyst / no platform group); R&D managers and operations analysts are assigned directly on the page; changing a role first removes all four platform groups (and the early `bgp-viewer`) before adding the target group.
 - "Lake table buckets and routes" supports only table buckets in the same account and region; cross-account table buckets are out of scope.
 - The AI model is one platform-wide default; per-region settings are not yet supported; GPT series entries are visible but not open in phase 1.
 - The pages have an English mode (switcher at top right; all text and the tour in English); on first visit the language is suggested from the visitor's IP country (then the browser language), defaulting to Chinese.
