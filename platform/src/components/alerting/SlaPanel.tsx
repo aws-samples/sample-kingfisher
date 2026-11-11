@@ -13,6 +13,8 @@ import {
 } from "antd";
 import { PlusOutlined, ReloadOutlined, AlertOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
+// 后台预测周期的单一作者(文案按它换算,不另写一份数字)
+import { ALERTING_PUMP_INTERVAL_MS } from "@/lib/alerting/types";
 // 2026-11-04(B):错误信封文案的唯一读法(原 `d?.error || …` 把信封对象递给 antd ⇒ React error #31 ⇒ 零提示)
 import { errorMessageOf } from "@/lib/http/error-envelope";
 import FeatureGuide from "@/components/common/FeatureGuide";
@@ -179,13 +181,13 @@ export default function SlaPanel({ active }: { active: boolean }) {
       </Space>
         <FeatureGuide
           title={t("SLA 基线预警")}
-          what="从历史运行自动学习每个任务的「正常耗时基线」(p50/p90/EWMA),并对配了 SLA 的工作流在运行途中滚动预测完成时刻(ETA);预计会晚于承诺时刻时,在破线之前就告警,给你处置窗口——而不是破线之后才发现。"
+          what="从历史运行自动学习每个任务的「正常耗时基线」(p50/p90/EWMA),并对配了 SLA 的工作流 / 任务在运行途中由后台自动滚动预测完成时刻(ETA);预计会晚于承诺时刻时,在破线之前就告警,给你处置窗口——而不是破线之后才发现。"
           steps={[
             "先到「动态基线」页点「重新学习基线」,系统从历史运行学出每任务的时长基线(自动排除补数运行)。",
             "在「SLA 定义」页点「新建 SLA」,选一个工作流/任务。",
             "设承诺完成时刻:相对触发(如触发后 90 分钟)或绝对时刻(如每日 02:00)。",
             "设预警提前量(如提前 30 分钟预测到破线就告警)并选通知通道(复用告警中心的通道)。",
-            "运行途中系统滚动预测:预计破线时经通道推送,并在运维大屏「SLA 风险看板」标红。",
+            "运行途中后台自动滚动预测(周期见列表上方):预计破线时经通道推送,并在运维大屏「SLA 风险看板」标红。",
           ]}
           tips={[
             "基线学习已排除补数(backfill)运行,并用 MAD 去异常,补数大跑不会拉高基线。",
@@ -200,6 +202,9 @@ export default function SlaPanel({ active }: { active: boolean }) {
               children: <>
                 <Space style={{ marginBottom: 12 }}>
                   <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t("新建 SLA")}</Button>
+                  <span style={{ color: "var(--bgp-text-dim, #8fb0c2)", fontSize: 13 }} data-testid="sla-auto-predict-hint">
+                    {t("后台每 {n} 分钟对在途运行自动预测一次;「最近预测」列随之刷新", { n: Math.max(1, Math.round(ALERTING_PUMP_INTERVAL_MS / 60_000)) })}
+                  </span>
                 </Space>
                 <Table rowKey="slaId" size="small" loading={loading} columns={slaColumns as any} dataSource={slas} pagination={{ pageSize: 10 }} />
               </>,

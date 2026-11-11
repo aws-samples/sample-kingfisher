@@ -5,7 +5,8 @@
 //   4. putEventIfNew 幂等写事件(同一 run/窗口只告一次)→ 分发到通道 → 回写投递结果;
 //   5. 失败类且开了 enrichWithDiagnosis → 挂 AI 诊断(复用startDiagnosis)。
 //
-// 首期由前端轮询/手动触发调用(无常驻 worker,零常驻成本);无人值守(定时)留二期。
+// 调用方两处,同一个函数:告警中心「立即评估」(`/api/alerting/evaluate`)与后台评估泵(`lib/alerting/tick.ts`,
+// 每 ALERTING_PUMP_INTERVAL_MS 逐项目一次,见 `lib/alerting/pump.ts`)。原来只有按钮一个调用方 ⇒ 不点就永远不告警。
 // 水位 lastEvaluatedAt:失败/超时类只看水位之后完成的终态 run,避免历史 run 反复触发。
 
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";

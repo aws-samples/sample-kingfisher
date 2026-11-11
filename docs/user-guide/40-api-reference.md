@@ -223,7 +223,7 @@ A few older endpoints return the flat `{ "error": "<text>" }` (noted in the tabl
 | `genbi` | `/api/genbi` | 16 | GenBI: ask · history · cards and scheduled refresh · business definitions · skills | Ask-Your-Data / Business Glossary & Rules / Skills |
 | `governance` | `/api/governance` | 22 | Governance: catalog · classification and masking · quality · lineage / impact · sensitive scan · scheduled tasks · create / alter tables | Data Governance / Governance Workbench |
 | `incidents` | `/api/incidents` | 6 | Incident knowledge base: incident categories · fix runbooks · silence · masked export | Incident Knowledge Base |
-| `internal` | `/api/internal` | 4 | Platform-internal endpoints (dispatch Lambda / in-process advance pump), unreachable from the internet | — |
+| `internal` | `/api/internal` | 5 | Platform-internal endpoints (dispatch Lambda / in-process advance pumps / evaluation pump), unreachable from the internet | — |
 | `lineage` | `/api/lineage` | 1 | SQL lineage parsing preview | Batch Compute |
 | `long-ops` | `/api/long-ops` | 1 | Long-running operation polling (unified framework) | Site-wide ("Running in background" in the bottom-right corner) |
 | `metadata-mirror` | `/api/metadata-mirror` | 1 | Read-only overview of the cross-region metadata mirror | Data Governance |
@@ -567,6 +567,7 @@ The "Requires" column uses short tags; their meaning is in the tag table of §1.
 |---|---|---|---|---|
 | POST | `/api/internal/actions/run` | `{ commandId }` a platform action node in an execution-region DAG → the home-region command table → the dispatch Lambda calls back this endpoint | internal | — |
 | POST | `/api/internal/backfill/tick` | `{ projectId, planId }` the loop-back endpoint of the backfill plan advance pump (same function as the tick on the backfill page) | internal | — |
+| POST | `/api/internal/alerting/tick` | `{ projectId }` the loop-back endpoint of the alert / SLA evaluation pump: evaluates all rules of the project (same function as "Evaluate now") and rolls the prediction of enabled SLAs' in-flight runs forward | internal | — |
 | POST | `/api/internal/dataplane-jobs/step` | `{ jobId }` advances a data-plane background job by one step (take the lease → execute → write back) | internal | — |
 | POST | `/api/internal/dataplane-jobs/sweep` | "Auto-supply on binding" catch-up (every 10 minutes, leader replica only) | internal | — |
 

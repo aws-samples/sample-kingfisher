@@ -16,6 +16,8 @@ import { acquireOrRenewLeaderLease, RECONCILER_LEASE_MS, type LeaderLease } from
 import { startDataplaneJobPump } from "@/lib/dataplane-jobs/pump";
 // 补数计划的后台推进泵(独立计时器;泵侧零执行器 import,见 backfill/pump.ts 文件头)
 import { startBackfillPump } from "@/lib/backfill/pump";
+// 告警 / SLA 评估泵(独立计时器;泵侧零执行器 import,见 alerting/pump.ts 文件头)
+import { startAlertingPump } from "@/lib/alerting/pump";
 // 请求外的循环**自己建显式落点上下文**(context.ts 文件头 ① 的原话)。
 //   第四十三轮 observe 实测,未归因榜 13 类里 11 类是「(请求外)」—— 全是本文件两个 tick 按 target 发出的探活 / 镜像调用
 //   客户端建在 target 自己的区(没越区),只是没人告诉观测器「这一串调用是替谁做的」。
@@ -219,4 +221,6 @@ export function startReconcilerLoop(): void {
   startDataplaneJobPump({ isLeader: () => holdsLeaderLease() });
   // 补数计划不再只靠页面开着推进;选主口径与数据面作业泵相同。
   startBackfillPump({ isLeader: () => holdsLeaderLease() });
+  // 告警规则不再只靠「立即评估」按钮、SLA 破线预测不再没人调用:每分钟逐项目评估 + 对在途运行滚动预测;选主口径相同。
+  startAlertingPump({ isLeader: () => holdsLeaderLease() });
 }

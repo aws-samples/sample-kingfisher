@@ -241,7 +241,7 @@ locales: the language is suggested from the visitor's location and can be switch
 
 | Path | Contents |
 |---|---|
-| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (54 groups / 317 files), business libraries `src/lib/`, components `src/components/`; unit tests with vitest |
+| `platform/` | The platform application: Next.js 15 (App Router, `output: standalone`) + React 19 + antd 6 + TypeScript; pages `src/app/<route>/page.tsx` (40 routes), APIs `src/app/api/<group>/…/route.ts` (54 groups / 318 files), business libraries `src/lib/`, components `src/components/`; unit tests with vitest |
 | `infra/` | AWS CDK v2 (TypeScript): 23 control-plane stacks `lib/*.ts` (entry `bin/app.ts`) + execution-environment stack group `lib/exec-env/` + execution-environment deployment buildspec + IAM call manifest `iam/` + Lambda (`lambda/`) + three AgentCore agent containers (`agent/`) |
 | `scripts/` | Deployment and operations scripts (`01-preflight-account.sh` pre-flight · `deploy-all.sh` first install · `02-postdeploy-truth.sh` truth check · `redeploy-platform.sh` upgrade / authorise a new region · `redeploy-agents.sh` refresh agents · `cut-release.sh` cut a release) and the offline gates |
 | `flink-sql-runner*/`, `flink-connector-modules/` | Managed Flink 1.20 SQL runners (generic / + S3 Tables Iceberg / + Kafka) and connector Maven modules |

@@ -40,7 +40,7 @@ Running example: `Showcase-<region-slug>-ETL-ChannelROI` (a Redshift SQL job) an
 - Four conditions: "Alert on task failure", "Run timeout (duration over threshold)", "Success rate below threshold", "No-run (no success within window)".
 - On evaluation the platform scans the run records and matches each rule. The two aggregate conditions, success rate and no-run, are **evaluated per execution environment**: one region fully down is not averaged away by another region's healthy data.
 - The same run (or the same statistics window) alerts only once; repeated evaluation does not resend.
-- Evaluation is triggered only by the "Evaluate now" button on the "Alert Rules" tab; the platform has no scheduled evaluation, so no new alert events appear unless you click it.
+- The platform evaluates automatically in the background, one round per minute (the rules tab says "Evaluated automatically every N min in the background · last …"); the "Evaluate now" button only runs one round early. Both go through the same evaluation function, and the same run alerts only once.
 
 ### 1.3 Channels and delivery
 
@@ -194,7 +194,7 @@ Practice: create one rule with "Offline Compute (ETL)" + "Alert on task failure"
 
 ### 6.2 Evaluate now
 
-1. Click "Evaluate now" at the top right of the rules tab. When finished, the message is "Evaluated: N new alert(s)" or "Evaluated: no new alerts".
+1. Click "Evaluate now" at the top right of the rules tab (optional: the background evaluator runs every minute anyway; the steps below just avoid the wait). When finished, the message is "Evaluated: N new alert(s)" or "Evaluated: no new alerts".
 2. With the failed run from §2.2, the first rule should hit 1 alert; clicking "Evaluate now" again adds nothing new (the same run alerts only once).
 
 ### 6.3 Alert events
@@ -231,7 +231,7 @@ Page path: "Scheduling & Ops → Alerting Center", tab "SLA & Baseline Alerts". 
    - "Notification Channels": reuses the Alerting Center's channels.
    - "Enable" switch.
 2. After saving, the list columns are: name / target (task · workflow) / committed deadline ("N min after trigger" or "daily HH:mm") / warn lead time / channel / enable / last prediction / actions.
-3. "Last prediction": shows "Not run" when it has never run; with a prediction it shows "Normal" or "Breach predicted" plus the margin in minutes. The current version has no scheduler that calls the prediction automatically mid-run, so this column usually stays at "Not run"; the demo environment has no pre-built SLA and this table is empty — to see this column, create one as in the previous step first.
+3. "Last prediction": shows "Not run" while the bound object has never had a run in flight; the background evaluator re-predicts runs in flight every minute (the interval is shown above the list), and with a prediction the column shows "Normal" or "Breach predicted" plus the margin in minutes. The demo environment has no pre-built SLA and this table is empty — to see this column, create one as in the previous step and let the object run once.
 
 ![SLA & Baseline Alerts](../screenshots/alerting-sla.webp)
 

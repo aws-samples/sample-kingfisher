@@ -7,11 +7,18 @@ export const INTERNAL_SOURCE_ACTION_DISPATCHER = "action-dispatcher";
 export const INTERNAL_SOURCE_DATAPLANE_JOB_PUMP = "dataplane-job-pump";
 /** 补数计划的后台推进泵(回环调 `/api/internal/backfill/tick`)。 */
 export const INTERNAL_SOURCE_BACKFILL_PUMP = "backfill-pump";
+/** 告警 / SLA 评估泵(回环调 `/api/internal/alerting/tick`;逐项目评估规则 + 对在途运行滚动预测破线)。 */
+export const INTERNAL_SOURCE_ALERTING_PUMP = "alerting-pump";
 /**
  * 登记过的内部来源(封闭集合)。🔴 中间件只判「是不是登记过的来源」;**哪个端点收哪个来源**由路由守卫按
  * `expectedSource` 精确判(泵的密钥头敲不开分发 Lambda 的端点,反之亦然)。
  */
-export const INTERNAL_SOURCES: readonly string[] = [INTERNAL_SOURCE_ACTION_DISPATCHER, INTERNAL_SOURCE_DATAPLANE_JOB_PUMP, INTERNAL_SOURCE_BACKFILL_PUMP];
+export const INTERNAL_SOURCES: readonly string[] = [
+  INTERNAL_SOURCE_ACTION_DISPATCHER,
+  INTERNAL_SOURCE_DATAPLANE_JOB_PUMP,
+  INTERNAL_SOURCE_BACKFILL_PUMP,
+  INTERNAL_SOURCE_ALERTING_PUMP,
+];
 /** CloudFront 回源一定会带的头(大小写不敏感)。 */
 export const CLOUDFRONT_ORIGIN_HEADER = "x-amz-cf-id";
 /** 系统主体(审计 actor;没有 Cognito 身份)。 */
@@ -20,8 +27,14 @@ export const INTERNAL_PRINCIPAL = { actor: "system:action-dispatcher", via: "sch
 export const DATAPLANE_JOB_PUMP_PRINCIPAL = { actor: "system:dataplane-job-pump", via: "dataplane-job" } as const;
 /** 补数推进泵的系统主体 */
 export const BACKFILL_PUMP_PRINCIPAL = { actor: "system:backfill-pump", via: "backfill" } as const;
+/** 告警 / SLA 评估泵的系统主体(评估产生的事件 / 审计都记在它名下) */
+export const ALERTING_PUMP_PRINCIPAL = { actor: "system:alerting-pump", via: "alerting" } as const;
 
-export type InternalPrincipal = typeof INTERNAL_PRINCIPAL | typeof DATAPLANE_JOB_PUMP_PRINCIPAL | typeof BACKFILL_PUMP_PRINCIPAL;
+export type InternalPrincipal =
+  | typeof INTERNAL_PRINCIPAL
+  | typeof DATAPLANE_JOB_PUMP_PRINCIPAL
+  | typeof BACKFILL_PUMP_PRINCIPAL
+  | typeof ALERTING_PUMP_PRINCIPAL;
 
 export type InternalVerdict =
   | { ok: true; principal: InternalPrincipal }

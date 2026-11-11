@@ -137,3 +137,11 @@ export interface AlertEvent {
   createdAt: string;
   ttl: number; // epoch 秒,~90 天
 }
+
+/**
+ * 告警 / SLA 评估泵的周期(毫秒)—— 后台每隔这么久对每个项目评估一次规则、对在途运行滚动预测一次破线。
+ * 🔴 单一作者:泵(`lib/alerting/pump.ts`)按它排班,告警中心 / SLA 面板的文案按它换算成「每 N 分钟」,
+ *    改周期只改这里;文案与真实周期不许各写一份(用户看到「滚动预测」却没人告诉他多久一次,就是这次修的缺口)。
+ * 本文件零依赖,页面与服务端都能 import。
+ */
+export const ALERTING_PUMP_INTERVAL_MS = 60_000;

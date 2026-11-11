@@ -95,6 +95,12 @@ export interface SlaRow {
   warnLeadMin: number; // 提前多少分钟预测破线即告警
   channelIds: string[]; // 复用通道
   lastPrediction?: SlaPrediction;
+  /**
+   * 多窗口破线确认用的预测历史(只保留最近几次的 willBreach;换了 runId 就从头记)。
+   * 🔴 由后台评估泵维护:预测接口原来让前端自己攒 `breachHistory` 再传回来,后台没有前端 ⇒ 历史得落在 SLA 行上,
+   *    否则「短窗 2 次连续破线才确认」永远凑不齐 2 次。
+   */
+  breachHistory?: { runId: string; flags: boolean[] };
   createdAt: string;
   updatedAt: string;
   createdBy: string;

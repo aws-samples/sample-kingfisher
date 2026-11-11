@@ -14,6 +14,8 @@ import {
 } from "@ant-design/icons";
 import SlaPanel from "@/components/alerting/SlaPanel";
 import { useT } from "@/lib/i18n/useT";
+// 后台评估周期的单一作者(文案按它换算,不另写一份数字)
+import { ALERTING_PUMP_INTERVAL_MS } from "@/lib/alerting/types";
 // 执行范围。🔴 这一页最要紧的不是过滤,
 // 而是**聚合类条件默认按区分别评估**(见 lib/alerting/evaluate.ts):池化会让一个区全挂
 // 被健康区平均掉 ⇒ 不告警。页面这里做两件事:按区看规则/事件 + 事件列表显示「哪个区」。
@@ -160,6 +162,10 @@ function RulesTab({ active }: { active: boolean }) {
     }
   };
 
+  // 后台泵每轮都会推进每条规则的水位 ⇒ 「上次评估」= 规则水位的最大值(页面不另问服务端)
+  const lastEvaluatedAt = rules.map((r) => String(r.lastEvaluatedAt || "")).filter(Boolean).sort().pop();
+  const autoEvalEveryMin = Math.max(1, Math.round(ALERTING_PUMP_INTERVAL_MS / 60_000));
+
   const condText = (c: any) => {
     if (c?.type === "failure") return t("任务失败");
     if (c?.type === "timeout") return t("超时 > {m} 分钟", { m: c.thresholdMinutes });
@@ -171,9 +177,17 @@ function RulesTab({ active }: { active: boolean }) {
   return (
     <Card
       size="small"
+      title={
+        <Text type="secondary" style={{ fontWeight: "normal", fontSize: 13 }} data-testid="alerting-auto-eval-hint">
+          {t("后台每 {n} 分钟自动评估一次", { n: autoEvalEveryMin })}
+          {lastEvaluatedAt ? ` · ${t("上次 {time}", { time: lastEvaluatedAt.slice(11, 19) + " UTC" })}` : ""}
+        </Text>
+      }
       extra={
         <Space>
-          <Button icon={<ExperimentOutlined />} loading={evaluating} onClick={runEvaluate}>{t("立即评估")}</Button>
+          <Tooltip title={t("后台每 {n} 分钟自动评估一次", { n: autoEvalEveryMin }) + t(";点这里只是提前一轮")}>
+            <Button icon={<ExperimentOutlined />} loading={evaluating} onClick={runEvaluate}>{t("立即评估")}</Button>
+          </Tooltip>
           <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>{t("刷新")}</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t("新建规则")}</Button>
         </Space>

@@ -533,7 +533,7 @@ Alerting Center evaluates rules against the run ledger and delivers notification
 - Rule types: failure, timeout, success rate and data stall; events are de-duplicated.
 - Channels: DingTalk, WeCom, e-mail, HTTP and generic webhook, each with a test delivery.
 - Failure alerts can trigger an AI diagnosis automatically.
-- SLA baselines for freshness and duration, breach prediction and a risk board.
+- SLA baselines for freshness and duration, breach prediction and a risk board; rules are evaluated and in-flight runs re-predicted automatically every minute in the background, "Evaluate now" only runs one round early.
 
 ![Alert rules and events](screenshots/alerting.webp)
 *Figure 7.4a: Alerting Center.*

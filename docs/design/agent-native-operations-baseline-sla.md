@@ -57,7 +57,7 @@ This design delivers:
 | POST | `/api/baseline/learn` | editor | Manually trigger one learning pass (single task or all); the learner DAG also calls it periodically |
 | GET | `/api/sla` | viewer | SLA definition list + today's attainment forecast |
 | POST/PUT/DELETE | `/api/sla` `/api/sla/[id]` | editor | SLA CRUD (optimistic lock `version`) |
-| POST | `/api/sla/predict` | internal / front-end refresh | Rolling ETA prediction + breach decision for in-progress runs (idempotent; the event dedupe key is described in section 6.3) |
+| POST | `/api/sla/predict` | background evaluation pump (every minute, runs in flight; since 2026-11-11) / front-end refresh | Rolling ETA prediction + breach decision for in-progress runs (idempotent; the event dedupe key is described in section 6.3; the prediction core is `lib/baseline/sla-predict.ts`, shared by the route and the pump) |
 | GET | `/api/sla/risk-board` | viewer | Aggregate for the dashboard's "SLA risk board" |
 
 ---

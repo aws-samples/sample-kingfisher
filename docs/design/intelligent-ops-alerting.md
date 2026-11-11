@@ -73,6 +73,8 @@
 - (a) **Evaluate on auto refresh of the dashboard / alerting page** (reusing the 5s/10s/30s polling mode of the monitor; the front end triggers `POST api/alerting/evaluate`);
 - (b) a manual **"Evaluate now"** button;
 - (c) reserved (second phase): a scheduled MWAA DAG / periodic EventBridge trigger, to reach unattended operation.
+
+> 📌 Calibration (2026-11-11): (a) was never wired; (c) is implemented by an **in-process evaluation pump** — the leader replica of the platform service loops back to `POST /api/internal/alerting/tick` once per minute for every project (rule evaluation goes through the same function as "Evaluate now"; the same round also rolls the breach prediction of enabled SLAs' in-flight runs forward), without a separate MWAA / EventBridge trigger.
 > The engine is **idempotent**: the event de-duplication key = `ruleId#runId` (or the interruption-window key); triggering several times never alerts twice. The watermark `lastEvaluatedAt` is stored on the rule row, and only final-state runs after the watermark are examined.
 
 ---

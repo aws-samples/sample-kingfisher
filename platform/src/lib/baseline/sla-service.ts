@@ -145,6 +145,19 @@ export async function saveLastPrediction(projectId: string, slaId: string, predi
   })).catch(() => {});
 }
 
+/** 多窗口确认历史最多保留几次(短窗 2 / 长窗占比按它算;再长只是旧运行的噪声)。 */
+export const BREACH_HISTORY_MAX = 12;
+
+// 保存某次运行的破线预测历史(后台泵每轮预测后追加一位;换 run 从头记)。
+export async function saveBreachHistory(projectId: string, slaId: string, runId: string, flags: boolean[]): Promise<void> {
+  await docClient.send(new UpdateCommand({
+    TableName: TABLES.SLAS,
+    Key: { pk: slaPk(projectId), slaId },
+    UpdateExpression: "SET breachHistory = :h",
+    ExpressionAttributeValues: { ":h": { runId, flags: flags.slice(-BREACH_HISTORY_MAX) } },
+  })).catch(() => {});
+}
+
 // 推送"预测破线"告警(复用通道 + 事件幂等去重)。dedupeKey=sla#<slaId>#<runId>#predicted:
 // 同一 (slaId, runId) 只推一次;不同语义(固定 timeout 规则)dedupeKey 不同,互不覆盖。
 export async function pushBreachAlert(sla: SlaRow, prediction: SlaPrediction, extra: { node?: string }): Promise<{ pushed: boolean; status?: string }> {
