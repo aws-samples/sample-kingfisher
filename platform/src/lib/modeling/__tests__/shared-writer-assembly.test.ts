@@ -180,6 +180,8 @@ vi.mock("@/lib/exec-env/target-clients", async (orig) => {
       return { affected: 0, statementId: "x" };
     }),
     describeSecretArnByName: vi.fn(async (region: string, name: string) => h.secrets[`${region}|${name}`]?.arn),
+    // 假 Secrets Manager 强一致:写后读与普通读同一张表(最终一致的传播等待本身由 target-clients 的判据钉)
+    awaitSecretArnByName: vi.fn(async (region: string, name: string) => h.secrets[`${region}|${name}`]?.arn),
     putSecretJson: vi.fn(async (region: string, name: string, value: Record<string, unknown>) => {
       const created = !h.secrets[`${region}|${name}`];
       h.secrets[`${region}|${name}`] = { arn: `arn:aws:secretsmanager:${region}:1:secret:${name}-AbCdEf`, value };

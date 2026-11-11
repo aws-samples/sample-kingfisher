@@ -8,6 +8,7 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { resolveIdentity } from "@/lib/auth/identity";
 import { passwordPolicyError } from "@/lib/auth/password-policy";
 import { recordAudit } from "@/lib/audit";
+import { ADMIN_REQUIRED_MESSAGE } from "@/lib/auth/forbidden-messages";
 
 const cognito = sdkClient("control-plane", CognitoIdentityProviderClient, { region: homeRegion() });
 const POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || "";
@@ -17,7 +18,7 @@ const POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGN
 async function requireAdmin(req: NextRequest) {
   const identity = await resolveIdentity(req);
   if (!identity) return apiError("未认证或登录态已失效，请重新登录", 401);
-  if (!identity.isPlatformAdmin) return apiError("仅平台管理员可管理用户", 403);
+  if (!identity.isPlatformAdmin) return apiError(ADMIN_REQUIRED_MESSAGE, 403);
   return null;
 }
 
@@ -43,7 +44,8 @@ export async function GET(req: NextRequest) {
     }
     return apiOk(users);
   } catch (e: any) {
-    return apiOk([]);
+    // 读失败不许呈成「空列表」(页面会把它当成「没有用户」):如实回上游错误,页面红字说明
+    return apiError(`读取用户列表失败:${e?.message ?? String(e)}`, 502, { code: "UPSTREAM_ERROR" });
   }
 }
 
@@ -69,6 +71,8 @@ export async function POST(req: NextRequest) {
       await cognito.send(new (CreateGroupCommand as any)({ UserPoolId: POOL_ID, GroupName: groupName }));
     } catch {}
     await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: groupName }));
+    // 审计只记谁建了谁、给了哪个角色,绝不记口令 / 邮箱
+    recordAudit(req, "user.create", { resourceType: "user", resourceId: String(username), detail: { role, groupName } });
 
     return apiOk({ username, role });
   } catch (e: any) {
@@ -97,8 +101,15 @@ export async function PUT(req: NextRequest) {
       // 审计只记谁给谁改了,绝不记口令
       recordAudit(req, "user.password.reset", { resourceType: "user", resourceId: String(username) });
     }
-    if (action === "disable") await cognito.send(new AdminDisableUserCommand({ UserPoolId: POOL_ID, Username: username }));
-    if (action === "enable") await cognito.send(new AdminEnableUserCommand({ UserPoolId: POOL_ID, Username: username }));
+    // 用户管理的每个写动作都进审计(「全部写操作进 bgp-audit」):此前只有重置密码记了
+    if (action === "disable") {
+      await cognito.send(new AdminDisableUserCommand({ UserPoolId: POOL_ID, Username: username }));
+      recordAudit(req, "user.disable", { resourceType: "user", resourceId: String(username) });
+    }
+    if (action === "enable") {
+      await cognito.send(new AdminEnableUserCommand({ UserPoolId: POOL_ID, Username: username }));
+      recordAudit(req, "user.enable", { resourceType: "user", resourceId: String(username) });
+    }
     if (action === "changeRole" && role) {
       for (const g of ["bgp-admin", "bgp-developer", "bgp-viewer"]) {
         try { await cognito.send(new AdminRemoveUserFromGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: g })); } catch {}
@@ -109,6 +120,7 @@ export async function PUT(req: NextRequest) {
         await cognito.send(new (CreateGroupCommand as any)({ UserPoolId: POOL_ID, GroupName: groupName }));
       } catch {}
       await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId: POOL_ID, Username: username, GroupName: groupName }));
+      recordAudit(req, "user.role.change", { resourceType: "user", resourceId: String(username), detail: { role, groupName } });
     }
     return apiOk({ success: true });
   } catch (e: any) {

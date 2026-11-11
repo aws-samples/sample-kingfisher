@@ -173,6 +173,7 @@ So when you see that close-out list: **the infrastructure is fine**; only the st
 
 ```bash
 BGP_DEPLOY_MODE=<same as first install> ./scripts/10-bootstrap-cognito.sh <profile> <region>   # step 11: create groups and users (passwords can be given explicitly with BGP_*_PASSWORD; without a mode it follows production and creates only admin; 🔴 on the release tag then in production the script does not check the deployment mode in SSM, and passing `demo` by mistake creates 4 test accounts in production; since the 2026-10-27 release the script first reads SSM `/bgp/deploy-mode`, refuses with exit 2 when the given value differs, and follows env only when SSM cannot be read)
+./scripts/11-seed-demo-memberships.sh <profile> <region>   # step 11.6: add the four demo role accounts to the default workspace (🔴 demo mode only; production skips it; `--check` = read-only verification, truth-check item 12)
 ./scripts/20-seed-data.sh        <profile> <region>   # step 12: seed the e-commerce dataset (🔴 demo mode only; production seeds nothing)
 BGP_DEPLOY_MODE=<same as first install> ./scripts/redeploy-platform.sh <profile> <region>   # equivalent of step 13: re-wire + check (no bare cdk deploy); its step 2b also redeploys BgpExecEnvDeployStack (the execution-environment deployer of step 6.5; without it, creating an execution environment fails with Function not found)
 ```text

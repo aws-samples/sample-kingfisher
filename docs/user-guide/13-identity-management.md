@@ -41,7 +41,7 @@ The "Create user" dialog and the in-row "Role" dropdown under "System → Users"
 | Developer | bgp-developer | All business pages; develops resources in projects as owner / editor / viewer; **cannot** create workspaces, and cannot manage members even as project owner |
 | Viewer | bgp-viewer | A business account in no privileged group: can sign in and open every business page; what it can actually view or change is decided by the project role (usually viewer); not subject to the operations-analyst allow-list. The group is created automatically by the Users page the first time it is needed; no server-side check reads it |
 
-- The admin APIs `/api/admin/*` (listing users, creating accounts, changing roles, disabling, execution environment management, model configuration) require bgp-admin at the gateway and check again inside the route; the other two tiers see an empty list when they open "Users" and every action is refused by the server with 403 (the gateway's message reuses "Operations-analyst accounts may only use Ask-Your-Data and submit requests"; the page shows no separate hint).
+- The admin APIs `/api/admin/*` (listing users, creating accounts, changing roles, disabling, execution environment management, model configuration) require bgp-admin at the gateway and check again inside the route; the other two tiers see a red explanation when they open "Users" ("This action requires platform-administrator (bgp-admin group) permission; please contact a platform administrator"), the list is not loaded, and every action is refused by the server with 403.
 - The "Role" column of the list is derived from the groups: bgp-admin shows Admin, bgp-developer shows Developer, everything else shows Viewer.
 
 ### 2.2 The other two role groups: R&D manager and operations analyst
@@ -68,7 +68,7 @@ The platform also defines two more role groups; the server checks permissions ag
 
 - Who can create workspaces: platform administrators or R&D managers; developers see "Workspaces are created by admins / R&D managers; contact them if you need a new one".
 - The configuration-management check is written in one place: platform administrator, or "R&D manager AND owner of this project". When a plain developer is made owner, the page shows "You are the owner of this project (developer permissions). Member management / rename / delete require a platform admin or R&D manager — you can still develop this project's sync tasks / jobs / workflows as usual."
-- The default project "Default Workspace" starts **without any members**: until a non-administrator is added to the project, GenBI returns 403 "No access to this workspace". Its description on the page says "any logged-in user is implicitly an editor"; that is early wording, the server has no implicit membership, and "no members initially" is what counts.
+- The default project "Default Workspace" starts **without any members**: until a non-administrator is added to the project, GenBI returns 403 "No access to this workspace". Its description on the page says "any logged-in user is implicitly an editor"; that is early wording, the server has no implicit membership, and "no members initially" is what counts. Demo installations (`BGP_DEPLOY_MODE=demo`) are the exception: install step 11.6 and upgrade step 3d add the four demo role accounts to the default workspace (`pm-tester` = owner, `rbac-tester` = editor, `ops-analyst` / `biz-tester` = viewer); production installations do not.
 - Add members: "Workspace" → the project row's "Members / Approvals" → enter the "Username" (Cognito username), choose a "Role" → "Add / Update"; click "Remove" to remove.
 - Request to join: a non-member clicks "Request to join" under "Other workspaces you can request to join"; a platform administrator or the space's R&D manager owner clicks "Approve" or "Reject" under "Pending approval (access/role requests)".
 - Approval types: promotion (publishing to prod), joining a project (tagged "Join group" on the page), data access (requesting the clear text of masked columns), table creation / change (catalog table creation and changes in the production environment), execution environment deletion (platform administrators only).
@@ -80,7 +80,7 @@ The detailed scenario is in [Scenario: several teams sharing one platform](29-sc
 
 ## 4. Day-to-day operations (Users page)
 
-Page path: "System → Users". The menu entry is visible to every non-operations-analyst account, but the APIs only admit bgp-admin; anyone else sees an empty list and every action is refused with 403.
+Page path: "System → Users". The menu entry is visible to every non-operations-analyst account, but the APIs only admit bgp-admin; anyone else sees a red explanation that platform-administrator permission is required, and every action is refused with 403.
 
 ![Users](../screenshots/admin-users.webp)
 
@@ -106,7 +106,7 @@ Page path: "System → Users". The menu entry is visible to every non-operations
 
 - "System → Audit Log": search by "operator / action / resource / path", or "Filter by action type", then click "Refresh".
 - Identity actions you can find (action names shown as-is): `user.password.reset` (who reset whose password; the password is not recorded), `project.create`, `project.member.put`, `project.member.remove`, `exec-env.access.set` (execution environment authorized to projects).
-- Creating users, disabling / enabling and changing role groups are **not** written to the platform audit log (on the Users page only password resets are audited); at the AWS layer these actions can always be found in CloudTrail's Cognito events.
+- Creating users, disabling / enabling, changing role groups and resetting passwords are all written to the platform audit log (`user.create` · `user.disable` · `user.enable` · `user.role.change` · `user.password.reset`; passwords and e-mail addresses are never recorded); CloudTrail's Cognito events at the AWS layer remain available for cross-checking.
 - Audit entries carry an execution environment stamp; identity actions belong to the control plane and are shown under the home region.
 
 ![Audit log](../screenshots/audit.webp)

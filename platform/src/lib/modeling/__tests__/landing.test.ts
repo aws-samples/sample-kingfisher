@@ -22,6 +22,12 @@ const h = vi.hoisted(() => ({
   // 非 home 通道的观察点
   /** 已存在的 secret:名 → ARN */
   secrets: {} as Record<string, string>,
+  /** 写后读(awaitSecretArnByName)被调的 secret 名(按序)—— 供给之后必须走它,不是单次 describe */
+  awaitCalls: [] as string[],
+  /** 模拟传播预算用尽仍查不到(真外部 Secrets Manager 迟迟不可见) */
+  awaitMissing: false,
+  /** 写后读是否进 h.order 事件序 */
+  traceAwait: false,
   /** admin 执行器收到的结构化请求(按序) */
   admin: [] as Array<Record<string, unknown>>,
   /** 供给窄权写者的次数(按 target) */
@@ -87,6 +93,11 @@ vi.mock("@/lib/exec-env/target-clients", () => ({
   // 非 home 通道用到的三个出口(真外部:Secrets Manager / Data API)
   resolveTargetWarehouse: (t: { targetId: string }) => ({ targetId: t.targetId, region: t.targetId, workgroup: "wg-" + t.targetId, database: "dev" }),
   describeSecretArnByName: vi.fn(async (_region: string, name: string) => h.secrets[name]),
+  awaitSecretArnByName: vi.fn(async (_region: string, name: string) => {
+    h.awaitCalls.push(name);
+    if (h.traceAwait) h.order.push("await-secret"); // 只在专门验顺序的判据里进事件序,不改其它判据的期望序列
+    return h.awaitMissing ? undefined : h.secrets[name];
+  }),
   execOnTarget: vi.fn(async (a: { warehouse: { region: string }; sql: string; secretArn: string }) => {
     if (h.writerThrowOnce) {
       const m = h.writerThrowOnce;
@@ -189,6 +200,9 @@ beforeEach(() => {
   h.crossJurisdiction = [];
   h.throwFor = [];
   h.secrets = {};
+  h.awaitCalls = [];
+  h.awaitMissing = false;
+  h.traceAwait = false;
   h.admin = [];
   h.provisioned = [];
   h.observedWith = [];
@@ -411,6 +425,35 @@ describe("🔴🔴 非 home 建模落地:窄权写者通道(单测侧)", () => {
     expect(r.status).toBe("ok");
     expect(h.provisioned).toEqual([USW2]);
     expect(h.writerExec.length).toBe(2);
+  });
+
+  it("🔴 供给之后的按名读是**写后读**(有界等待传播),发生在供给之后、灌数之前;供给前的「有没有」仍是单次 describe", async () => {
+    h.existing[USW2] = CODE_TABLE_COLUMNS;
+    h.traceAwait = true;
+    const r = (await landToTargets(args({ targets: [USW2] })))[USW2];
+    expect(r.status).toBe("ok");
+    expect(h.awaitCalls).toEqual([SW(USW2)]);
+    expect(h.order.indexOf("provision")).toBeLessThan(h.order.indexOf("await-secret"));
+    expect(h.order.indexOf("await-secret")).toBeLessThan(h.order.indexOf("writer-dml"));
+  });
+
+  it("秘密已存在 ⇒ 不供给、也不走写后读(那条路只给刚写过的名字)", async () => {
+    h.secrets[SW(USW2)] = "arn:aws:secretsmanager:x:1:secret:bgp/shared-writer/tgt-usw2-a-OK";
+    h.existing[USW2] = CODE_TABLE_COLUMNS;
+    const r = (await landToTargets(args({ targets: [USW2] })))[USW2];
+    expect(r.status).toBe("ok");
+    expect(h.provisioned).toEqual([]);
+    expect(h.awaitCalls).toEqual([]);
+  });
+
+  it("🔴 供给后传播预算用尽仍查不到 ⇒ failed 说清「传播预算内仍查不到」,一条 DML 都不发(不猜 ARN)", async () => {
+    h.existing[USW2] = CODE_TABLE_COLUMNS;
+    h.awaitMissing = true;
+    const r = (await landToTargets(args({ targets: [USW2] })))[USW2];
+    expect(r.status).toBe("failed");
+    expect(r.error).toContain("传播预算内仍查不到 secret");
+    expect(h.provisioned).toEqual([USW2]);
+    expect(h.writerExec).toEqual([]);
   });
 
   it("🔴 别的错误不重试(权限不足就是权限不足)⇒ failed 带原文", async () => {

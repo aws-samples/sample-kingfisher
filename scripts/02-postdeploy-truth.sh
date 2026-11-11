@@ -5,7 +5,7 @@
 #   ./scripts/02-postdeploy-truth.sh <aws-profile> [region]
 #
 # 🔴 为什么(docs/DEPLOY-RUNBOOK.md §5):`deploy-all` 退出 0 只覆盖它自己想到的判据 ——
-#   「绿的只是当时想到的东西」。这 11 条是真值查询(加到 11),哪一条红就说明平台**装好了但不可用**。
+#   「绿的只是当时想到的东西」。这 12 条是真值查询(加到 12),哪一条红就说明平台**装好了但不可用**。
 #   这一串命令以前只写在手册里 ⇒ 换账号就得人肉敲(而人肉会漏)。
 #
 # 🔴 这**不是**无头页面验收的替代品:它查的是基础设施与接线的真值;
@@ -125,6 +125,16 @@ case "$RC" in
   0) ok "主控区同步任务没有引用未登记的自有表桶";;
   1) bad "主控区同步任务引用了未登记的自有表桶:$(printf '%s' "$UNREG" | tr '\n' ' ') ⇒ 跑 scripts/redeploy-platform.sh(2c‴ 步)或 node scripts/lib/lake-routes-migrate.mjs --profile $PROFILE --region $REGION";;
   *) bad "读不到同步任务 / 路由表($(head -c 200 /tmp/kf-lake-routes-check.err 2>/dev/null | tr '\n' ' '))⇒ 判不了,不算过";;
+esac
+
+sec "12) demo 模式:四个演示角色账号在默认空间有成员行(没有 ⇒ 非管理员演示账号处处 403「无权访问该项目空间」)"
+# 🔴 读的是 SSM /bgp/deploy-mode + bgp-project-members 的真值(scripts/11-seed-demo-memberships.sh --check:只读、不要口令;
+#   退 0 = 齐 / 1 = 缺(stdout 每行一个「缺:<用户>」)/ 2 = 读不到;production 环境退 0 并说明本条不适用)。读不到也算不过:判不了就不许说绿。
+CHK=$(bash "$HERE/11-seed-demo-memberships.sh" "$PROFILE" "$REGION" --check 2>/tmp/kf-demo-members-check.err); RC=$?
+case "$RC" in
+  0) ok "$(printf '%s' "$CHK" | tail -n 1)";;
+  1) bad "演示账号缺成员行:$(printf '%s' "$CHK" | grep '^缺' | tr '\n' ' ')⇒ 跑 scripts/11-seed-demo-memberships.sh $PROFILE $REGION(redeploy-platform.sh 3d 步也会补)";;
+  *) bad "读不到部署模式 / 成员表($(head -c 200 /tmp/kf-demo-members-check.err 2>/dev/null | tr '\n' ' '))⇒ 判不了,不算过";;
 esac
 
 printf '\n\033[1;36m== 真就位结论 ==\033[0m\n'

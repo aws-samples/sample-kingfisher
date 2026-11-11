@@ -67,23 +67,10 @@ USERS=(admin pm-tester rbac-tester ops-analyst biz-tester)
 # 🔴 护栏:**单独重跑**本脚本时核 SSM /bgp/deploy-mode(deploy-all 定下模式后不许换)—— 否则在生产环境上
 #   手敲 BGP_DEPLOY_MODE=demo 重跑本脚本就会冒出四个测试账号。规则:SSM 有值 ⇒ 以它为准,env 给了**别的**值 ⇒ 拒绝(exit 2);
 #   SSM 读不到(没写 / 无权)⇒ 按 env,缺省 production,并把依据打到 stderr。离线判据 infra/test/cognito-mode-guard/test_mode_guard.sh。
-resolve_deploy_mode() {  # stdout = 生效模式;冲突时 exit 2(stderr 已说明)
-  local ssm_mode env_mode="${BGP_DEPLOY_MODE:-}"
-  ssm_mode="$(aws ssm get-parameter --name /bgp/deploy-mode --query Parameter.Value --output text \
-                --profile "$PROFILE" --region "$REGION" 2>/dev/null || true)"
-  [ "$ssm_mode" = "None" ] && ssm_mode=""
-  if [ -n "$ssm_mode" ]; then
-    if [ -n "$env_mode" ] && [ "$env_mode" != "$ssm_mode" ]; then
-      echo "[cognito] ❌ 本环境已按 $ssm_mode 模式部署(SSM /bgp/deploy-mode),这次给的是 BGP_DEPLOY_MODE=$env_mode —— 拒绝按别的模式建用户" >&2
-      exit 2
-    fi
-    echo "[cognito] 部署模式 = $ssm_mode(SSM /bgp/deploy-mode)" >&2
-    printf '%s' "$ssm_mode"
-    return 0
-  fi
-  echo "[cognito] SSM /bgp/deploy-mode 读不到(未写或无权)⇒ 按 BGP_DEPLOY_MODE=${env_mode:-production}(缺省 production)" >&2
-  printf '%s' "${env_mode:-production}"
-}
+# 🔴 函数本体是 scripts/lib/deploy-mode.sh(单一作者;11-seed-demo-memberships.sh 也 source 它)。
+DEPLOY_MODE_LOG_PREFIX="[cognito]"
+# shellcheck source=lib/deploy-mode.sh
+source "$HERE/lib/deploy-mode.sh"
 DEPLOY_MODE="$(resolve_deploy_mode)" || exit 2
 if [ "$DEPLOY_MODE" != "demo" ]; then USERS=(admin); fi
 declare -A GROUP=(  [admin]=bgp-admin           [pm-tester]=bgp-manager      [rbac-tester]=bgp-developer   [ops-analyst]=bgp-analyst      [biz-tester]="" )

@@ -473,14 +473,51 @@ export async function describeSecretArnByName(region: string, name: string): Pro
 }
 
 /**
+ * 写后读的传播预算。Secrets Manager 建 secret 后**按名读是最终一致**:2026-11-09 两区演示环境真撞 ——
+ * CloudTrail 里 CreateSecret 之后 1 秒内的 DescribeSecret 回 ResourceNotFound,而紧接着的另一次 Describe 成功。
+ * 单一作者:凡「刚写过、马上按名读」都走 `awaitSecretArnByName`,不在各调用点各自重试。
+ */
+export const SECRET_PROPAGATION_ATTEMPTS = 10;
+export const SECRET_PROPAGATION_INTERVAL_MS = 500;
+export interface SecretPropagationTiming {
+  attempts?: number;
+  intervalMs?: number;
+}
+
+/**
+ * **写后**按名读:等 secret 按名可见再回 ARN(有界:缺省 10 × 500 ms)。
+ *
+ * 🔴 与 `describeSecretArnByName` 只差一点:这里一次「查不到」不是结论,而是「还没传播到」。
+ *    所以它**只许用在刚写过这个名字的路径上**;「有没有这个 secret」的判断照旧用 `describeSecretArnByName`。
+ * 预算内仍查不到 ⇒ 回 undefined,由调用方按自己的语义拒 / 抛;非 ResourceNotFound 的错误照旧立即抛(不吞)。
+ */
+export async function awaitSecretArnByName(
+  region: string,
+  name: string,
+  timing: SecretPropagationTiming = {}
+): Promise<string | undefined> {
+  const attempts = Math.max(1, timing.attempts ?? SECRET_PROPAGATION_ATTEMPTS);
+  const intervalMs = Math.max(0, timing.intervalMs ?? SECRET_PROPAGATION_INTERVAL_MS);
+  for (let i = 0; i < attempts; i++) {
+    const arn = await describeSecretArnByName(region, name);
+    if (arn) return arn;
+    if (i < attempts - 1) await new Promise<void>((r) => setTimeout(r, intervalMs));
+  }
+  return undefined;
+}
+
+/**
  * 幂等写入一个 JSON 值的 secret,返回真 ARN。
  *
  * 🔴 **调用方绝不要把返回值以外的东西记下来**:`value` 里含口令。本函数不打日志、不进审计。
+ * 🔴 **返回即按名可读**:新建分支在 CreateSecret 之后等它按名可见(`awaitSecretArnByName`)再返回 ——
+ *    调用方拿到返回值后就是按名去 Describe 的(供给接口刻意不递 ARN),写得进去 ≠ 读得到。
  */
 export async function putSecretJson(
   region: string,
   name: string,
-  value: Record<string, unknown>
+  value: Record<string, unknown>,
+  timing: SecretPropagationTiming = {}
 ): Promise<{ arn: string; created: boolean }> {
   const sm = await secretsClientFor(region);
   const { CreateSecretCommand, PutSecretValueCommand, DescribeSecretCommand } = await import(
@@ -490,6 +527,11 @@ export async function putSecretJson(
   try {
     const r = await sm.send(new CreateSecretCommand({ Name: name, SecretString }));
     if (!r.ARN) throw new Error(`CreateSecret(${name}) 没有返回 ARN ⇒ 拒绝当成功`);
+    const visible = await awaitSecretArnByName(region, name, timing);
+    if (!visible) {
+      const budget = Math.max(1, timing.attempts ?? SECRET_PROPAGATION_ATTEMPTS) * Math.max(0, timing.intervalMs ?? SECRET_PROPAGATION_INTERVAL_MS);
+      throw new Error(`CreateSecret(${name}) 已返回 ARN,但 ${budget} ms 内按名仍查不到 ⇒ 传播未完成,拒绝当成功`);
+    }
     return { arn: r.ARN, created: true };
   } catch (e) {
     if ((e as { name?: string })?.name !== "ResourceExistsException") throw e;

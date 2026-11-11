@@ -274,6 +274,18 @@
       "reason": "covered-by-fresh-account-rebuild"
     },
     {
+      "id": "script:11-seed-demo-memberships.sh",
+      "what": "demo 模式:四个演示角色账号加进默认空间(走产品成员路由,幂等;--check 只读核对);production 零写入",
+      "executor": "部署机 bash(deploy-all 11.6 / redeploy-platform 3d / 02-postdeploy-truth 第 12 条)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/demo-memberships/test_seed_demo_memberships.sh",
+        "marker": "demo-memberships 离线判据全过",
+        "cases": 63
+      },
+      "note": "2026-11-10 测试账号页面驱动段真撞:演示账号登得进去却处处 403「无权访问该项目空间」—— 建号脚本从不给成员资格"
+    },
+    {
       "id": "script:20-seed-data.sh",
       "what": "造电商样例数据",
       "executor": "本机 bash → AWS",
@@ -605,6 +617,17 @@
       "executor": "本机 python3 -I(开发机手工跑一次;之后由 platform/src/lib/__tests__/docs-format-guard.test.ts 用同一口径守住两份文档)",
       "reason": "local-tooling",
       "note": "不在客户部署 / 升级 / 执行环境 CodeBuild 的任何路径上;只读写 docs/*.md。改坏的后果是重构失败或 check 误判(当场可见,且 verify 以旧文为据);`--self-test` 用合成台账 / 排期 / generic 样例做正向 + 变异(删片段 / 改字 / 301 字符行 / 201 字符格)判别力自检"
+    },
+    {
+      "id": "script:lib/deploy-mode.sh",
+      "what": "部署模式(production / demo)shell 侧唯一作者:SSM /bgp/deploy-mode 优先、env 冲突拒绝、读不到按 env 缺省 production",
+      "executor": "部署机 bash(被 10-bootstrap-cognito.sh / 11-seed-demo-memberships.sh source)",
+      "harness": {
+        "kind": "offline-real-run",
+        "where": "infra/test/cognito-mode-guard/test_mode_guard.sh",
+        "marker": "resolve_deploy_mode",
+        "cases": 9
+      }
     },
     {
       "id": "script:lib/execution-regions.sh",

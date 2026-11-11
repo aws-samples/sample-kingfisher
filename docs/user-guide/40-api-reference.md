@@ -65,7 +65,7 @@ Notes:
 
 ### 1.4 Role restrictions
 
-- **Platform admin group `bgp-admin`**: `/api/admin/**` requires this group at the gateway layer, and non-admins always get 403 (the gateway returns the same text as for analyst accounts: "Analyst accounts may only use GenBI and submit requests"); each admin route checks again internally. GET is no exception: reads such as `/api/admin/lake-routes` and `/api/admin/lake-buckets/candidates` also return 403 to non-admin scripts.
+- **Platform admin group `bgp-admin`**: `/api/admin/**` requires this group at the gateway layer, and non-admins always get 403 (the gateway returns "This action requires platform-administrator (bgp-admin group) permission; please contact a platform administrator"); each admin route checks again internally. GET is no exception: reads such as `/api/admin/lake-routes` and `/api/admin/lake-buckets/candidates` also return 403 to non-admin scripts.
 - **Accounts that belong only to `bgp-analyst` (operations analyst)**: the gateway lets through only the routes below; every other `/api/*` returns 403 "Analyst accounts may only use GenBI and submit requests":
 
   | Prefix | Methods | Purpose |
@@ -75,6 +75,8 @@ Notes:
   | `/api/redshift/databases` | GET | The database selector on the GenBI page |
   | `/api/requirements/**` | GET · POST | Submit requests / my requests |
   | `/api/projects` | GET | The project switcher (read-only) |
+  | `/api/exec-targets` | GET | The top-bar "Execution scope" list (in a multi-region deployment GenBI needs a region selected first) |
+  | `/api/athena/tables` | GET | Lake namespaces / tables for the GenBI data-lake option |
 
 - **Project roles** (owner ⊇ editor ⊇ viewer): most business endpoints check the minimum role against the "current project" or "the project the resource belongs to"; not a member ⇒ 403 "No access to this workspace", role too low ⇒ 403 "Insufficient permission: a higher project role is required".
 - **Project config admin** = a platform admin, or a `bgp-manager` who is the owner of this project: renaming / deleting the project, adding / removing members and approval decisions use this level.

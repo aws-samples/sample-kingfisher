@@ -590,8 +590,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
         {/* ===== Step 2: 目标配置 ===== */}
         <div style={{ display: step === 2 ? undefined : "none" }}>
-          {/* SYNC-07: target table naming */}
-          <Divider>{t("目标表命名 (SYNC-07)")}</Divider>
+          {/* target table naming */}
+          <Divider>{t("目标表命名")}</Divider>
           <Space size={16}>
             <Form.Item name="targetTablePrefix" label={t("表名前缀")} tooltip={t("应用到所有目标表，默认与源表同名")}>
               <Input placeholder={t("如 ods_")} style={{ width: 180 }} allowClear />
@@ -924,7 +924,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
               </div>
             ) : null}
           </Form.Item>
-          <Divider>{t("依赖调度 (SCH-03)")}</Divider>
+          <Divider>{t("依赖调度")}</Divider>
           <Form.Item name="triggers" label={t("下游依赖")} tooltip={t("本任务运行成功后，自动触发选中的下游同步任务 / 工作流")}>
             <Select
               mode="multiple"

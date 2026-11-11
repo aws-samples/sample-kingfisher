@@ -67,7 +67,7 @@ describe("③ 页面读调用点全在只读路径上;/api/admin 之下不再有
 describe("④ 网关对 /api/admin/** 的管理员门一字未动(修法是挪读点,不是给两条 GET 开洞)", () => {
   it("middleware.ts 仍对 /api/admin 前缀任何方法要求 bgp-admin,且没有按路径放行 lake-*", () => {
     const mw = read("middleware.ts");
-    expect(mw).toContain('if (pathname.startsWith("/api/admin") && !groups.includes("bgp-admin")) return forbidden(cid);');
+    expect(mw).toContain('if (pathname.startsWith("/api/admin") && !groups.includes("bgp-admin")) return forbidden(cid, ADMIN_REQUIRED_MESSAGE);');
     expect(mw).not.toMatch(/lake-routes|lake-buckets/);
   });
 });

@@ -362,6 +362,7 @@ Plus three production-specific checks:
 2. Under "System → Users" create an account and assign a role for every user; a forgotten password is reset by a platform administrator on that page with "Reset password" (including admin's own). The audit log records only who reset whom, never the password.
 3. 🔴 **Add users to a workspace**: Ask-Your-Data / saving cards / direct warehouse queries and so on are all checked against **workspace membership**. The default workspace starts **without any members** ⇒ until a non-administrator is added to a workspace,
    Ask-Your-Data returns 403 "no access to this workspace". Add people on the "Workspace" page (viewer = read / ask only, editor = can develop).
+   Demo installations (`BGP_DEPLOY_MODE=demo`) are the exception: install step 11.6 and upgrade step 3d add the four demo role accounts to the default workspace (`pm-tester` = owner, `rbac-tester` = editor, `ops-analyst` / `biz-tester` = viewer); production installations do not.
 4. **When the only administrator has forgotten the password** (nobody else on the page can reset it for them), the customer's own account administrator runs one Cognito command (this is a write to the customer account; neither the platform nor the handover person does it on their behalf):
    ```bash
    P=<profile>; R=<home-region>

@@ -27,6 +27,7 @@ import {
   redshiftDataClientFor,
   resolveTargetWarehouse,
   describeSecretArnByName,
+  awaitSecretArnByName,
   execOnTarget,
   type TargetWarehouse,
 } from "@/lib/exec-env/target-clients";
@@ -294,6 +295,9 @@ function isWriterAuthFailure(e: unknown): boolean {
 /**
  * 取窄权写者 secret 的 ARN;**不存在就先供给**(`provisionSharedWriter`,幂等:用户已在 ⇒ 轮换口令)。
  * 🔴 按名现查,不读描述符(§3.9d.1:资源袋的唯一作者是部署期读 CFN Output)。
+ * 🔴 供给之后的那次按名读是**写后读**:Secrets Manager 建后 1 秒内按名可能 ResourceNotFound(最终一致,
+ *    2026-11-09 真环境首次落地撞到并被当成「拒绝继续」)⇒ 走有界等待 `awaitSecretArnByName`,不把传播窗口当「没有」;
+ *    预算内仍查不到才拒(写得进去 ≠ 是对的)。「有没有」的首次判断仍是单次 describe。
  */
 async function ensureSharedWriter(actor: AuthenticatedActor, targetId: string, wh: TargetWarehouse): Promise<string> {
   const name = sharedWriterSecretName(targetId);
@@ -301,8 +305,8 @@ async function ensureSharedWriter(actor: AuthenticatedActor, targetId: string, w
   if (have) return have;
   const { provisionSharedWriter } = await import("@/lib/exec-env/admin-ddl-executor");
   await provisionSharedWriter(actor, { targetId });
-  const arn = await describeSecretArnByName(wh.region, name);
-  if (!arn) throw new Error(`窄权写者已供给,但按名 ${name} 在 ${wh.region} 查不到 secret ⇒ 拒绝继续(写得进去 ≠ 是对的)`);
+  const arn = await awaitSecretArnByName(wh.region, name);
+  if (!arn) throw new Error(`窄权写者已供给,但按名 ${name} 在 ${wh.region} 传播预算内仍查不到 secret ⇒ 拒绝继续(写得进去 ≠ 是对的)`);
   return arn;
 }
 
@@ -323,7 +327,8 @@ async function asWriter<T>(
     if (!isWriterAuthFailure(e)) throw e;
     const { provisionSharedWriter } = await import("@/lib/exec-env/admin-ddl-executor");
     await provisionSharedWriter(actor, { targetId });
-    const again = await describeSecretArnByName(wh.region, sharedWriterSecretName(targetId));
+    // 重新供给之后同样是写后读(轮换走 PutSecretValue 时 secret 早已存在,等待会立即返回)
+    const again = await awaitSecretArnByName(wh.region, sharedWriterSecretName(targetId));
     if (!again) throw e;
     return await step(writerPlace(wh, again));
   }

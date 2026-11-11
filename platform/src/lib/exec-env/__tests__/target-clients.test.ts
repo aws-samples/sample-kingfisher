@@ -68,9 +68,28 @@ const {
   resolveTargetEmr,
   redshiftDataClientFor,
   describeSecretArnByName,
+  awaitSecretArnByName,
   putSecretJson,
   __resetTargetClients,
 } = await import("@/lib/exec-env/target-clients");
+
+const notFound = () => {
+  const e = new Error("nf");
+  e.name = "ResourceNotFoundException";
+  throw e;
+};
+/** 前 n 次 Describe 回 ResourceNotFound(Secrets Manager 建后按名读的最终一致窗口),之后命中 */
+const staleThenFound = (n: number, arn = "arn:aws:secretsmanager:us-east-1:1:secret:new-AbCdEf") => {
+  let left = n;
+  describeSecretBehavior = () => {
+    if (left > 0) {
+      left -= 1;
+      notFound();
+    }
+    return { ARN: arn };
+  };
+};
+const FAST = { intervalMs: 1 };
 
 type Target = Parameters<typeof resolveTargetWarehouse>[0];
 const HOME = { targetId: "tgt_home", region: "us-east-1" } as unknown as Target;
@@ -199,11 +218,35 @@ describe("🔴 secret 读:只有 ResourceNotFound 才等于「没有」", () => 
   });
 });
 
-describe("secret 写:幂等 + 一定拿到真 ARN", () => {
-  it("新建 ⇒ created=true,ARN 取自 CreateSecret 返回", async () => {
+describe("secret 写:幂等 + 一定拿到真 ARN + 返回即按名可读", () => {
+  it("新建 ⇒ created=true,ARN 取自 CreateSecret 返回;返回前按名 Describe 一次确认已可读(写得进去 ≠ 读得到)", async () => {
     const r = await putSecretJson("us-west-2", "bgp/project/a/b", { username: "u", password: "p" });
     expect(r).toEqual({ arn: "arn:aws:secretsmanager:us-east-1:1:secret:new-AbCdEf", created: true });
-    expect(smSent.map((s) => s.kind)).toEqual(["create"]);
+    expect(smSent.map((s) => s.kind)).toEqual(["create", "describe"]);
+    expect(smSent[1]).toMatchObject({ kind: "describe", region: "us-west-2", SecretId: "bgp/project/a/b" });
+  });
+
+  it("🔴 新建后按名读撞最终一致(前两次 ResourceNotFound)⇒ 等到可见再返回,不把传播窗口当失败", async () => {
+    staleThenFound(2);
+    const r = await putSecretJson("us-west-2", "bgp/project/a/b", { username: "u", password: "p" }, FAST);
+    expect(r.created).toBe(true);
+    expect(smSent.map((s) => s.kind)).toEqual(["create", "describe", "describe", "describe"]);
+  });
+
+  it("🔴 预算内按名始终查不到 ⇒ 抛「传播未完成」(不把半份 secret 当成功),Describe 次数 = 预算次数", async () => {
+    describeSecretBehavior = notFound;
+    await expect(putSecretJson("us-west-2", "bgp/project/a/b", { username: "u" }, { attempts: 3, intervalMs: 1 })).rejects.toThrow(/传播未完成/);
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(3);
+  });
+
+  it("新建后的确认读撞到**非** NotFound 的错误(限流 / AccessDenied)⇒ 立即抛原错,不重试、不吞", async () => {
+    describeSecretBehavior = () => {
+      const e = new Error("throttled");
+      e.name = "ThrottlingException";
+      throw e;
+    };
+    await expect(putSecretJson("us-west-2", "bgp/project/a/b", { username: "u" }, FAST)).rejects.toThrow(/throttled/);
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(1);
   });
 
   it("已存在 ⇒ PutSecretValue 覆盖 + DescribeSecret 换真 ARN,created=false", async () => {
@@ -220,6 +263,38 @@ describe("secret 写:幂等 + 一定拿到真 ARN", () => {
   it("CreateSecret 没回 ARN ⇒ 抛(不许把「建了但拿不到 ARN」当成功)", async () => {
     createSecretBehavior = () => ({});
     await expect(putSecretJson("us-east-1", "n", {})).rejects.toThrow(/没有返回 ARN/);
+  });
+});
+
+describe("🔴 写后按名读 awaitSecretArnByName:只在刚写过的路径上用,查不到 = 还没传播到", () => {
+  it("立即可见 ⇒ 一次 Describe 就回 ARN", async () => {
+    expect(await awaitSecretArnByName("us-west-2", "n", FAST)).toBe("arn:aws:secretsmanager:us-east-1:1:secret:x-AbCdEf");
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(1);
+  });
+
+  it("前 3 次 NotFound、第 4 次命中 ⇒ 回 ARN,Describe 恰 4 次", async () => {
+    staleThenFound(3, "arn:aws:secretsmanager:us-west-2:1:secret:late-AbCdEf");
+    expect(await awaitSecretArnByName("us-west-2", "n", { attempts: 5, intervalMs: 1 })).toBe("arn:aws:secretsmanager:us-west-2:1:secret:late-AbCdEf");
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(4);
+  });
+
+  it("预算用尽仍 NotFound ⇒ undefined(由调用方拒),Describe 次数 = attempts;attempts 下限 1", async () => {
+    describeSecretBehavior = notFound;
+    expect(await awaitSecretArnByName("us-west-2", "n", { attempts: 4, intervalMs: 1 })).toBeUndefined();
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(4);
+    smSent.length = 0;
+    expect(await awaitSecretArnByName("us-west-2", "n", { attempts: 0, intervalMs: 1 })).toBeUndefined();
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(1);
+  });
+
+  it("非 NotFound 的错误 ⇒ 立即抛(与 describeSecretArnByName 同一条方向:查失败 ≠ 没有)", async () => {
+    describeSecretBehavior = () => {
+      const e = new Error("denied");
+      e.name = "AccessDeniedException";
+      throw e;
+    };
+    await expect(awaitSecretArnByName("us-west-2", "n", FAST)).rejects.toThrow(/denied/);
+    expect(smSent.filter((s) => s.kind === "describe")).toHaveLength(1);
   });
 });
 

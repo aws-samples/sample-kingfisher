@@ -206,7 +206,7 @@ export default function TargetDetail({
       : ["draining", "decommissioning", "deleted"].includes(target.status);
   const deployBlockedReason = recUnknown
     ? t("恢复状态读取失败 —— 无法确认是否有在途部署会话,已先禁用部署入口(fail-closed);请刷新重试")
-    : t("有在途部署会话未收口 —— 禁止静默重试新部署(审核 §19.8);会话结束/恢复后自动可用");
+    : t("有在途部署会话未收口 —— 不自动重试新部署;会话结束/恢复后自动可用");
 
   const doProbe = async () => {
     setProbing(true);

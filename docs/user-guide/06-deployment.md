@@ -53,7 +53,7 @@ For developer or evaluation accounts only; **not a production step**. Details ar
 | Role groups | bgp-admin / bgp-manager / bgp-developer / bgp-analyst already exist in the Cognito user pool |
 | Default workspace | "Default Workspace" exists but **has no members**; non-admins must be added to it first |
 | Home-region execution environment | `tgt_home` is already running under "System → Execution Environments"; no other regions exist at this point |
-| Demo content (demo mode only) | Four role test accounts, a demo MySQL source database, sample datasets; what the install script seeds at the end is the e-commerce sample dataset; the game user-acquisition database `gamedata` and the `Showcase-*` sample objects used by the scenarios exist only if you ran the evaluation-environment orchestration script |
+| Demo content (demo mode only) | Four role test accounts (already members of the Default Workspace: `pm-tester` owner, `rbac-tester` editor, `ops-analyst` / `biz-tester` viewer), a demo MySQL source database, sample datasets; what the install script seeds at the end is the e-commerce sample dataset; the game user-acquisition database `gamedata` and the `Showcase-*` sample objects used by the scenarios exist only if you ran the evaluation-environment orchestration script |
 | AI model | The first usable model the deployment script picked from the candidate chain by really invoking it; after go-live you can change it under "Settings → AI model" |
 
 - Verification points for production mode: there is no demo source-database stack in the account; the Cognito user pool contains only `admin`; unauthenticated calls to the API return 401; the platform does not serve requests when authentication is not configured (returns 503).

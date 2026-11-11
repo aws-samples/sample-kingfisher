@@ -154,7 +154,7 @@ The three project roles (as worded in the page dropdown):
 
 ### 3.4 The default space
 
-After installation there is a "Default Workspace" tagged "Default". It starts without any members. Until a non-administrator is added to some space, GenBI, saving cards and Redshift Query all return 403 "No access to this workspace".
+After installation there is a "Default Workspace" tagged "Default". It starts without any members. Until a non-administrator is added to some space, GenBI, saving cards and Redshift Query all return 403 "No access to this workspace". Demo installations (`BGP_DEPLOY_MODE=demo`) are the exception: install step 11.6 and upgrade step 3d add the four demo role accounts to the default workspace (`pm-tester` = owner, `rbac-tester` = editor, `ops-analyst` / `biz-tester` = viewer); production installations do not.
 Recommended go-live agreement: open only one project and grant editor only to trusted users (see the [production deployment manual](../deployment.md) §6).
 
 ### 3.5 Handling requests: two entry points
@@ -419,7 +419,7 @@ Action names for administrative actions (paste them straight into the search):
 
 Cross-jurisdiction lookup: the "Audit" column in run history / Task Monitor carries an "Audit #"; paste it into the search box to find the home-region summary; the "Consents" card on the execution environment details page shows who agreed to which version of the disclaimer and when.
 
-Note: creating users / disabling / enabling / changing roles on the Users page **does not write** audit entries; only resetting a password writes `user.password.reset`; to trace account changes, look at the AWS account's CloudTrail (Cognito management operations).
+Note: creating users / disabling / enabling / changing roles / resetting passwords on the Users page all write audit entries (`user.create` · `user.disable` · `user.enable` · `user.role.change` · `user.password.reset`); passwords are never recorded; to cross-check at the AWS layer, look at CloudTrail (Cognito management operations).
 
 ---
 

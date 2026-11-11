@@ -27,7 +27,7 @@ import { toScopeParam } from "@/lib/scope/scope";
 const { Text } = Typography;
 const roleColor: Record<string, string> = { owner: "red", editor: "blue", viewer: "default" };
 const roleOptions = [
-  { label: "owner — 项目负责人（配置管理另需 admin/manager 平台角色，见 D4）", value: "owner" },
+  { label: "owner — 项目负责人（配置管理另需 admin/manager 平台角色）", value: "owner" },
   { label: "editor — 增删改资源", value: "editor" },
   { label: "viewer — 只读", value: "viewer" },
 ];

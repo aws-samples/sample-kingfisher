@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Table, Button, Space, Tag, Modal, Form, Input, Select, message, Popconfirm, Badge } from "antd";
+import { Table, Button, Space, Tag, Modal, Form, Input, Select, message, Popconfirm, Badge, Alert } from "antd";
 import { PlusOutlined, UserOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { passwordPolicyError } from "@/lib/auth/password-policy";
@@ -12,6 +12,8 @@ export default function UsersPage() {
   const t = useT();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  /** 列表读失败的拒因(null = 读成功)。非管理员打开本页撞到的是网关 403,要把拒因与出路说出来,不许呈成空列表 */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [form] = Form.useForm();
   /** 正在被管理员重置密码的用户(null = 弹窗关着) */
@@ -22,7 +24,13 @@ export default function UsersPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/users");
-      const d = await res.json();
+      const d = await res.json().catch(() => null);
+      if (!res.ok || d?.success === false) {
+        setUsers([]);
+        setLoadError(d?.error?.message || `HTTP ${res.status}`);
+        return;
+      }
+      setLoadError(null);
       setUsers(Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : []);
     } finally { setLoading(false); }
   };
@@ -86,6 +94,10 @@ export default function UsersPage() {
         <h2 style={{ margin: 0 }}><UserOutlined /> {t("用户管理")}</h2>
         <Button type="primary" data-testid="user-create-btn" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>{t("创建用户")}</Button>
       </div>
+      {loadError && (
+        <Alert type="error" showIcon data-testid="admin-users-load-error" style={{ marginBottom: 16 }}
+          message={t("无法读取用户列表")} description={loadError} />
+      )}
       <Table columns={columns} dataSource={users} rowKey="username" loading={loading} />
 
       <Modal title={t("创建用户")} open={createOpen} onOk={handleCreate} onCancel={() => setCreateOpen(false)}>

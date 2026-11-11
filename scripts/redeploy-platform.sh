@@ -259,6 +259,16 @@ bash "$HERE/om-secure-admin.sh" "$PROFILE" "$REGION" || die "OM 管理员口令�
 say "3c) S3 Tables 联邦目录 s3tablescatalog(regions=$EXEC_REGIONS_ACTUAL;候选区不建)"
 for r in ${EXEC_REGIONS_ACTUAL//,/ }; do ensure_s3tables_catalog "$r"; done
 
+# ── 3d) 演示账号的项目成员资格(仅 demo;production 跳过)──────────────────────────────────────────
+# 🔴 为什么要这一步:demo 造数建了四个演示角色账号(10-bootstrap-cognito.sh)却从不给任何项目成员资格,而服务端没有隐式成员
+#   ⇒ 非管理员演示账号一登录就处处 403「无权访问该项目空间」(2026-11-10 测试账号页面驱动段真撞)。这里对已按 demo 部署的存量环境
+#   幂等补齐(走产品成员路由,已有成员行不动);production 环境由脚本按 SSM /bgp/deploy-mode 判定后直接跳过、零写入。
+#   失败不中止升级(平台已滚上去,演示成员不在生产路径上),只打黄字;02-postdeploy-truth.sh 第 12 条会把缺口判红。
+#   管理员已改过 admin 口令的 demo 环境:export BGP_ADMIN_PASSWORD=… 后单独补跑该脚本。
+say "3d) 演示账号项目成员资格(仅 demo;production 跳过)"
+bash "$HERE/11-seed-demo-memberships.sh" "$PROFILE" "$REGION" \
+  || printf '\033[1;33m⚠️ 演示账号成员资格未补齐(见上)—— 单独补跑:BGP_ADMIN_PASSWORD=… ./scripts/11-seed-demo-memberships.sh %s %s\033[0m\n' "$PROFILE" "$REGION"
+
 # ── 4) IAM 模拟门────────────────────────────────────────────
 # 🔴 为什么在这里:一刀内 IAM 类缺陷三次(缺 iam:GetRole 缺 codebuild:ListBuildsForProject CreateWorkflow 资源模式
 #   bgp* 永不匹配 workflow/*),每次都是部署完、验收跑到下发那一步才炸。SimulatePrincipalPolicy 是离线的(不真调服务、零副作用、十几秒),

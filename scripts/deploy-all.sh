@@ -649,6 +649,20 @@ PYPW
 run_step "11.5) home seed(执行环境注册表 tgt_home)" seed_home
 
 ###############################################################################
+say "11.6) Demo role accounts join the default workspace (demo only)"
+###############################################################################
+# 🔴 2026-11-10 测试账号页面驱动段真撞:第 11 步在 demo 模式建出四个演示角色账号,却从不给任何项目成员资格;服务端项目准入
+#   没有隐式成员(resolveRole = 平台管理员或成员行)⇒ 四个账号登得进去但执行范围 / 问数 / 同步列表等一切项目级读接口 403
+#   「无权访问该项目空间」。这里走产品自己的成员路由(admin 令牌 POST /api/projects/<默认空间>/members,写审计)幂等补齐:
+#   pm-tester=owner · rbac-tester=editor · ops-analyst=viewer · biz-tester=viewer;已有成员行不动。production 不跑(成员由管理员在
+#   「项目空间」页添加,手册 §4);脚本自己也按 SSM /bgp/deploy-mode 再判一次。真就位判据 02-postdeploy-truth.sh 第 12 条复核。
+if [ "$BGP_DEPLOY_MODE" = "demo" ]; then
+  run_step "11.6) 演示账号项目成员资格(默认空间)" "$HERE/11-seed-demo-memberships.sh" "$PROFILE" "$REGION"
+else
+  info "production 模式:不造演示成员(项目成员由管理员在「项目空间」页添加,手册 §4)"
+fi
+
+###############################################################################
 say "12) Seed the golden e-commerce dataset (optional)"
 ###############################################################################
 # Loads products=50 / fx_rates=70 / orders=100000 / order_items=~299778 into the

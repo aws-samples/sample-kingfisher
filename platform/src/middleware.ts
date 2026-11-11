@@ -4,6 +4,9 @@ import { jwtVerify, createRemoteJWKSet } from "jose";
 import { CORRELATION_HEADER, newCorrelationId } from "@/lib/observability/logger";
 import { OBSERVE_URL_HEADER } from "@/lib/place/observe-header";
 import { authMode, cognitoPoolId, cognitoClientId, AUTH_UNCONFIGURED_MESSAGE } from "@/lib/auth/auth-mode";
+// 角色判定与 403 拒因文案都只有一个作者(前端菜单 / 页面 / 单测与这里同一份)
+import { isAnalystOnly } from "@/lib/auth/roles";
+import { ANALYST_FORBIDDEN_MESSAGE, ADMIN_REQUIRED_MESSAGE } from "@/lib/auth/forbidden-messages";
 // 内部端点的头部判定(纯函数,零 node 内置,edge 安全)
 import { INTERNAL_API_PREFIX, internalSourceVerdict } from "@/lib/scheduler/internal-source";
 
@@ -54,10 +57,11 @@ function unauthorized(cid: string) {
   );
 }
 
-function forbidden(cid: string) {
+// 403 的文案按**实际原因**给(分析账号越界 vs 非管理员打管理面),不许两种原因共用一句。
+function forbidden(cid: string, message: string) {
   return withCid(
     NextResponse.json(
-      { success: false, error: { message: "运营分析账号仅可使用智能问数与提交需求", correlationId: cid } },
+      { success: false, error: { message, correlationId: cid } },
       { status: 403 }
     ),
     cid
@@ -72,12 +76,12 @@ const ANALYST_ALLOW: { prefix: string; methods: string[] }[] = [
   { prefix: "/api/redshift/databases", methods: ["GET"] }, // GenBI 数据库选择器（只读元数据）
   { prefix: "/api/requirements", methods: ["GET", "POST"] }, // 提需求 + 我的需求（特权子动作由路由守卫再拦）
   { prefix: "/api/projects", methods: ["GET"] }, // 项目切换器（只读，禁建/改）
+  // 顶栏「执行范围」的清单(只读;路由内按项目准入 ∩ 已就位过滤)。不放行它,多区域下分析账号的下拉只剩「全部」,
+  // 智能问数选不了区(2026-11-09 两区演示环境真撞)。
+  { prefix: "/api/exec-targets", methods: ["GET"] },
+  // GenBI 数据湖档位的命名空间 / 表清单(只读元数据,落点必填;与 redshift/connections · databases 同一类)
+  { prefix: "/api/athena/tables", methods: ["GET"] },
 ];
-
-function isAnalystOnly(groups: string[]): boolean {
-  const g = new Set(groups);
-  return g.has("bgp-analyst") && !g.has("bgp-admin") && !g.has("bgp-manager") && !g.has("bgp-developer");
-}
 
 function analystAllowed(pathname: string, method: string): boolean {
   return ANALYST_ALLOW.some((a) => pathname.startsWith(a.prefix) && a.methods.includes(method));
@@ -124,10 +128,11 @@ export async function middleware(req: NextRequest) {
     if (!audOk || payload["token_use"] !== "id") return unauthorized(cid);
     // 运营分析账号：网关层白名单收口（仅智能问数 + 提需求）。
     const groups = (payload["cognito:groups"] as string[]) || [];
-    if (isAnalystOnly(groups) && !analystAllowed(pathname, req.method)) return forbidden(cid);
+    if (isAnalystOnly(groups) && !analystAllowed(pathname, req.method)) return forbidden(cid, ANALYST_FORBIDDEN_MESSAGE);
     // 平台管理面（/api/admin/**：列用户 / 建号 / 改角色-可提权 / 禁用）网关层收口:必须 bgp-admin。
     // 与路由内 requireAdmin 守卫构成纵深防御(避免任何 /api/admin 子路由漏加守卫导致越权)。
-    if (pathname.startsWith("/api/admin") && !groups.includes("bgp-admin")) return forbidden(cid);
+    // 拒因要说「需要平台管理员」—— 研发 / 经理账号撞到这里时,套运营分析那句是错的解释。
+    if (pathname.startsWith("/api/admin") && !groups.includes("bgp-admin")) return forbidden(cid, ADMIN_REQUIRED_MESSAGE);
     return proceed(req, cid);
   } catch {
     return unauthorized(cid);
