@@ -4065,7 +4065,6 @@ export const EN: Record<string, string> = {
   "阶段": "Phase",
   "入队时间": "Enqueued at",
   "仍有 {n} 张网卡引用,等待释放": "{n} network interface(s) still attached, waiting for release",
-  "平台自建的安全组在网卡释放后自动删除;「failed」= 30 分钟内仍被占用,需人工确认网卡释放后删除该组": "Platform-created security groups are deleted automatically once their network interfaces are released; 'failed' = still in use after 30 minutes, please verify and delete the group manually",
   // 数据源外部网络对象漂移:状态格标签 + 系统设置「数据源网络对象」卡
   "数据源依赖的网络对象已不存在": "A network object this data source depends on no longer exists",
   "网络对象缺失": "Network object missing",
@@ -4126,4 +4125,13 @@ export const EN: Record<string, string> = {
   "候选读取失败:{msg}": "Failed to load candidates: {msg}",
   "候选按本工作流的执行区过滤:{targets}": "Candidates are filtered by this workflow's execution regions: {targets}",
   "离线作业节点:把本项目里绑定了本工作流执行区的离线计算作业(Glue / Redshift)或 EMR Serverless 作业拖进 DAG,与同步节点串成一条链;发布时作业必须绑在工作流的执行区(否则 400 点名节点),作业运行历史会出现「由工作流触发」的一行;被工作流引用的作业不能删(409)": "Batch Job node: drag a batch compute job (Glue / Redshift) or EMR Serverless job from this project that is bound to the workflow's execution region into the DAG and chain it with sync nodes; on publish the job must be bound to the workflow's region (otherwise 400 naming the node), the job's run history shows a 'triggered by workflow' row, and a job referenced by a workflow cannot be deleted (409)",
+  "平台自建的安全组在网卡释放后自动删除;最后一条 DMS 任务删掉后,复制实例在空闲宽限后自动回收(停止态任务保留检查点,实例不回收);「failed」= 预算内仍收口不了,需人工": "Platform-created security groups are deleted automatically once their network interfaces are released; after the last DMS task is deleted, the replication instance is reclaimed automatically after an idle grace period (stopped tasks keep their checkpoint, so the instance is kept); “failed” = could not be settled within budget, needs a human",
+  "复制实例": "Replication instance",
+  "实例上已无复制任务,空闲宽限后回收(预计 {time})": "No replication tasks left on the instance; reclaimed after the idle grace period (expected {time})",
+  "刚删掉的复制任务还在 DMS 里消失中({n} 条),消失后再判空闲": "The replication task just deleted is still disappearing in DMS ({n}); idleness is judged once it is gone",
+  "仍有 {n} 条任务正在启动中,等它们就位": "{n} task(s) still starting; waiting for them to settle",
+  "实例处于 {s},等它到稳态": "Instance is {s}; waiting for a stable state",
+  "实例上仍有 {n} 条复制任务(含停止态,保留检查点),不回收": "{n} replication task(s) still on the instance (including stopped ones, which keep their checkpoint); not reclaimed",
+  "已回收": "Reclaimed",
+  "若删后该区再无 DMS 任务,复制实例将在空闲宽限后由后台自动回收(下次启动需重新创建,约 10–15 分钟);停止态任务保留检查点、实例不回收。": "If no DMS task remains in this region after deletion, the replication instance is reclaimed automatically after an idle grace period (the next start recreates it, about 10–15 minutes); stopped tasks keep their checkpoint and the instance is kept.",
 };

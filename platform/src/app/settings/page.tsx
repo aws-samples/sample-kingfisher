@@ -61,6 +61,17 @@ export default function SettingsPage() {
   // 数据源网络对象清单(全平台;孤儿一键清理走该缺陷的持久清理作业)
   const [netObjects, setNetObjects] = useState<NetObjectsView | null>(null);
   const [netObjectsError, setNetObjectsError] = useState<string>("");
+  // DMS 复制实例回收作业的一句话说明(证据 → 用户看得懂的话;终态 outcome 由列表过滤,这里主要是等待态)
+  const cleanupNote = (r: any): string => {
+    const ev = r.evidence ?? {};
+    if (ev.waitingFor === "idle-grace") return t("实例上已无复制任务,空闲宽限后回收(预计 {time})", { time: String(ev.reclaimAt ?? "").slice(11, 16) + " UTC" });
+    if (ev.waitingFor === "task-deleting") return t("刚删掉的复制任务还在 DMS 里消失中({n} 条),消失后再判空闲", { n: ev.deleting ?? 0 });
+    if (ev.waitingFor === "provisioning-task") return t("仍有 {n} 条任务正在启动中,等它们就位", { n: ev.provisioning ?? 0 });
+    if (ev.waitingFor === "instance-available" || ev.waitingFor === "deleting") return t("实例处于 {s},等它到稳态", { s: ev.instanceStatus ?? "-" });
+    if (ev.outcome === "kept-in-use") return t("实例上仍有 {n} 条复制任务(含停止态,保留检查点),不回收", { n: ev.tasks ?? 0 });
+    if (ev.outcome === "deleted") return t("已回收");
+    return "-";
+  };
   const [netCleanupBusy, setNetCleanupBusy] = useState<string>("");
   const loadNetObjects = async () => {
     try {
@@ -241,19 +252,22 @@ export default function SettingsPage() {
         ) : <Spin />}
       </Card>
 
-      {/* 后台清理任务:平台自建安全组按网卡事实收口;failed = 30 分钟仍被占用 ⇒ 需人工 */}
+      {/* 后台清理任务:平台自建安全组按网卡事实收口 · DMS 复制实例按「零复制任务」事实回收;failed = 预算内仍收口不了 ⇒ 需人工 */}
       {isPlatformAdmin && (
         <Card title={t("后台清理任务")} size="small" style={{ marginTop: 16 }} data-testid="pending-cleanups-card"
           extra={<Button size="small" icon={<ReloadOutlined />} onClick={loadCleanups}>{t("刷新")}</Button>}>
-          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{t("平台自建的安全组在网卡释放后自动删除;「failed」= 30 分钟内仍被占用,需人工确认网卡释放后删除该组")}</div>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>{t("平台自建的安全组在网卡释放后自动删除;最后一条 DMS 任务删掉后,复制实例在空闲宽限后自动回收(停止态任务保留检查点,实例不回收);「failed」= 预算内仍收口不了,需人工")}</div>
           <Table size="small" rowKey="jobId" pagination={false} dataSource={cleanups ?? []} loading={cleanups === null}
             locale={{ emptyText: t("没有待处理的清理任务") }}
             columns={[
-              { title: t("安全组"), key: "sg", render: (_: unknown, r: any) => r.evidence?.sgId || "-" },
+              { title: t("对象"), key: "obj", render: (_: unknown, r: any) => r.kind === "dms-instance-reclaim"
+                ? <span data-testid="cleanup-dms-instance">{t("复制实例")} {r.evidence?.instanceId || "-"}</span>
+                : <span>{t("安全组")} {r.evidence?.sgId || "-"}</span> },
               { title: t("区域"), key: "region", render: (_: unknown, r: any) => r.evidence?.region || "-" },
               { title: t("数据源"), key: "ds", render: (_: unknown, r: any) => r.evidence?.datasourceId || "-" },
               { title: t("阶段"), dataIndex: "phase", key: "phase", render: (p: string) => <Tag color={p === "failed" ? "red" : "blue"}>{p}</Tag> },
-              { title: t("说明"), key: "note", render: (_: unknown, r: any) => r.lastError || (typeof r.evidence?.eniCount === "number" ? t("仍有 {n} 张网卡引用,等待释放", { n: r.evidence.eniCount }) : "-") },
+              { title: t("说明"), key: "note", render: (_: unknown, r: any) => r.lastError
+                || (r.kind === "dms-instance-reclaim" ? cleanupNote(r) : (typeof r.evidence?.eniCount === "number" ? t("仍有 {n} 张网卡引用,等待释放", { n: r.evidence.eniCount }) : "-")) },
               { title: t("入队时间"), dataIndex: "createdAt", key: "createdAt" },
             ]} />
         </Card>

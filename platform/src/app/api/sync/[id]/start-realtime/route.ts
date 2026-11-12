@@ -22,11 +22,15 @@ import {
   testEndpoints,
   getReplicationInstanceArn,
   probeReplicationInstance,
+  REPLICATION_INSTANCE_ID,
   REPLICATION_INSTANCE_BROKEN_STATUSES,
   waitTaskStartable,
 } from "@/lib/realtime/dms-service";
 // 停 / 删 / 「启动被接管后停回去」共用**同一个**下线作者
 import { teardownSyncChannel } from "@/lib/sync/teardown";
+// 编排失败时复制实例可能刚建出来却没有任务引用 ⇒ 登记回收作业(作业按「零复制任务」事实决定,实例在用就收口为「在用」)
+import { enqueueDmsInstanceReclaim } from "@/lib/realtime/dms-instance-reclaim-job";
+import { getTarget } from "@/lib/exec-env/registry";
 import {
   ensureRedshiftDmsUser,
   ensureTargetSchema,
@@ -295,6 +299,13 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       // 同样只在仍归我管时才写 error —— 别把用户已经「停止」的任务又翻成「异常」。
       if ((await writeOwned("error", { error: String(e?.message || e).slice(0, 300) })) === "superseded") return bail("failed");
       await writeRun("failed", { error: String(e?.message || e).slice(0, 300), logs: steps });
+      // 落点取任务绑定的执行区(实例建在那个区),不默认主控区
+      const [boundTargetId] = bindingTargets(task as { targets?: unknown; targetId?: unknown });
+      await (async () => {
+        const target = boundTargetId ? await getTarget(boundTargetId) : null;
+        if (!target) throw new Error("任务没有绑定可解析的执行区");
+        await enqueueDmsInstanceReclaim({ targetId: target.targetId, region: target.region, instanceId: REPLICATION_INSTANCE_ID, reason: "start-failed", createdBy: "system:realtime-start" });
+      })().catch((e2) => logger.error("realtime.instance-reclaim.enqueue-failed", e2, { correlationId: cid, taskId: params.id }));
     }
   })();
 

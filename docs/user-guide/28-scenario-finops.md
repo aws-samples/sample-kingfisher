@@ -148,12 +148,12 @@ Lower on the same tab, the "Advice (deterministic rules)" list is probed when th
 
 | Advice title | When it appears | What you should do |
 |---|---|---|
-| "DMS replication instance idle (<region>; no running task but still billing)" | The region has a DMS replication instance but no running replication task; probed per region | Delete the instance if you will not need it soon (task / endpoint configuration is kept; recreating restores it); marked "Est. monthly saving ~$120" |
+| "DMS replication instance idle (<region>; no running task but still billing)" | The region has a DMS replication instance but no running replication task; probed per region | The advice text explains the reclaim policy and points the way: delete the region's real-time sync tasks you no longer need; once the last one is deleted the instance is reclaimed after a 10-minute idle grace; marked "Est. monthly saving ~$120" |
 | "Glue job with tiny per-run usage at high frequency" | A task had ≥5 recent runs averaging under 120 DPU-seconds | Glue bills at least 1 minute per run; consolidate the schedule or lower the worker count |
 | "Large gap between task attribution and the bill (price list or coverage needs calibration)" | The platform's attributed monthly Glue cost differs from the Glue amount in the bill by more than half | Usually Crawler / interactive-session or other non-task usage, or an outdated price list; trust the bill |
 | "Sync task fell back from COPY to INSERT (the slow path costs more)" | A sync task's history contains a run where COPY fell back to row-by-row INSERT | Check the type mapping, then rerun |
 
-> All advice values are computed by deterministic rules; AI is not involved. Deleting a DMS replication instance currently has to be done in the AWS console; "Stop" in the platform only stops the task and does not delete the instance, and the page has no entry for deleting it.
+> All advice values are computed by deterministic rules; AI is not involved. The DMS replication instance is reclaimed by the platform: once the region's last DMS task is **deleted**, the background cleanup job deletes the instance after a 10-minute idle grace and writes an audit entry; "Stop" only stops the task (keeping its CDC checkpoint) and does not reclaim the instance.
 
 ---
 
@@ -175,7 +175,7 @@ The figures come from the cost model in the repository (public on-demand prices 
 | Object | When billing starts | Approx. / month | Where to stop it |
 |---|---|---|---|
 | Kinesis source stream (1 shard per region) | Once stream compute is enabled in the execution region | ≈ $11 | Goes with the execution environment; not stopped separately |
-| DMS replication instance (one per region, shared by all real-time sync tasks) | Lazily created when the first DMS real-time sync task is started with "Start", then standing | ≈ $27 (small class) | Stop the task under "Data Sync"; delete the instance in the AWS console |
+| DMS replication instance (one per region, shared by all real-time sync tasks) | Lazily created when the first DMS real-time sync task is started with "Start"; reclaimed automatically 10 minutes after the region's last DMS task is deleted | ≈ $27 (small class) | Delete all DMS tasks of the region under "Data Sync"; progress under "System Settings → Background cleanup jobs" |
 | Zero-ETL integration | After a sync task with the Zero-ETL channel is created | Billed per the corresponding AWS item | "Stop" / delete the task under "Data Sync" |
 | Flink streaming job (at least 2 KPU per job) | Runs continuously after the job is started with "Start" | ≈ $170 / job | "Stop" or "Delete" the job under "Stream Compute" |
 | Redshift Serverless | Active while queries run (base 8 RPU ≈ $3 / active hour, minimum 60 seconds per wake-up) | Depends on query time | Reduce the frequency of dashboards / GenBI cards / governance catalog sync |
@@ -190,7 +190,7 @@ In the "Execution Environments" details, "1. Stop accepting work (drain)" → "2
 
 | Money to save | Page path | Action | Note |
 |---|---|---|---|
-| Idle real-time sync tasks | "Data Integration → Data Sync" → task row | Click "Stop"; delete the task if you will not use it for a long time | The replication instance remains; check whether "Budgets → Advice" shows "DMS replication instance idle" |
+| Idle real-time sync tasks | "Data Integration → Data Sync" → task row | Click "Stop"; delete the task if you will not use it for a long time | After "Stop" the replication instance remains (checkpoint kept); once the region's last task is deleted the instance is reclaimed within about 10 minutes; check whether "Budgets → Advice" still shows "DMS replication instance idle" |
 | Streaming jobs no longer needed | "Data Development → Stream Compute" → job | "Stop"; to drop it entirely click "Delete", which shows "Deletion accepted — the application will be destroyed and removed from the list once it has fully stopped" | Each job keeps at least 2 KPU standing; the money stops only once the job is stopped |
 | A warehouse woken too often | "Smart Analytics → Ask-Your-Data / Report Builder"; "Data Governance → Schedule" | Lengthen the scheduled refresh of GenBI cards and the dashboard refresh interval; do not schedule governance catalog sync too densely (the UI warns "incurs warehouse compute charges") | The platform's own health checks do not wake the warehouse; users opening dashboards / GenBI do |
 | Frequent small jobs | "Data Development → Batch Compute / Data Sync" | Consolidate the schedule; lower the worker count | Compare with the "Task costs" ranking and the "Advice" |
@@ -248,7 +248,7 @@ Cause: fewer than 7 samples, or the increase is in the billing layer while the c
 
 **"Advice" says the DMS instance is idle, but I cannot find a button to delete the instance in the platform.**
 
-Cause: the platform only stops tasks and does not delete instances. Next step: once you are sure the region has no real-time sync task that needs to run, delete the replication instance in the AWS console; the next "Start" of a real-time task lazily creates it again.
+Cause: the instance is not deleted on its own; it is reclaimed when the region's last DMS task is deleted, and tasks that are only stopped keep their CDC checkpoints, so the instance stays. Next step: once you are sure the region has no real-time sync task that needs to run, delete those tasks under "Data Sync"; after a 10-minute idle grace the instance is reclaimed, with progress under "System Settings → Background cleanup jobs"; the next "Start" recreates it.
 
 **Creating a budget reports no permission.**
 

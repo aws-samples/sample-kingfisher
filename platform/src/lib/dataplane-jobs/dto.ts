@@ -55,6 +55,23 @@ export interface SgCleanupEvidence {
 }
 const SG_CLEANUP_OUTCOMES = new Set(["deleted", "gone", "skipped-not-platform", "needs-manual"]);
 
+/** DMS 复制实例回收作业的证据(系统设置「后台清理任务」卡用它写说明)。 */
+export interface DmsReclaimEvidence {
+  instanceId?: string;
+  region?: string;
+  reason?: "task-deleted" | "start-failed";
+  tasks?: number;
+  deleting?: number;
+  provisioning?: number;
+  instanceStatus?: string;
+  waitingFor?: "task-deleting" | "provisioning-task" | "instance-available" | "deleting" | "idle-grace";
+  reclaimAt?: string;
+  idleMin?: number;
+  outcome?: "deleted" | "gone" | "kept-in-use" | "needs-manual";
+}
+const DMS_RECLAIM_OUTCOMES = new Set(["deleted", "gone", "kept-in-use", "needs-manual"]);
+const DMS_RECLAIM_WAITING = new Set(["task-deleting", "provisioning-task", "instance-available", "deleting", "idle-grace"]);
+
 interface PublicJobBase {
   jobId: string;
   targetId: string;
@@ -72,7 +89,8 @@ export type PublicJob =
   | (PublicJobBase & { kind: "supply"; evidence: SupplyEvidence })
   | (PublicJobBase & { kind: "canary"; evidence: CanaryEvidence })
   | (PublicJobBase & { kind: "reclaim"; evidence: ReclaimEvidence })
-  | (PublicJobBase & { kind: "sg-cleanup"; evidence: SgCleanupEvidence });
+  | (PublicJobBase & { kind: "sg-cleanup"; evidence: SgCleanupEvidence })
+  | (PublicJobBase & { kind: "dms-instance-reclaim"; evidence: DmsReclaimEvidence });
 
 const CANARY_IDS = new Set(["C-1", "C-2", "C-3", "C-4", "C-5", "C-6", "C-7"]);
 const OUTCOMES = new Set(["pass", "fail", "unverifiable"]);
@@ -130,6 +148,23 @@ function sgCleanupEvidenceOf(ev: Record<string, unknown>): SgCleanupEvidence {
   };
 }
 
+function dmsReclaimEvidenceOf(ev: Record<string, unknown>): DmsReclaimEvidence {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+  return {
+    ...(str(ev.instanceId, 64) ? { instanceId: str(ev.instanceId, 64) } : {}),
+    ...(str(ev.region, 32) ? { region: str(ev.region, 32) } : {}),
+    ...(ev.reason === "task-deleted" || ev.reason === "start-failed" ? { reason: ev.reason } : {}),
+    ...(num(ev.tasks) !== undefined ? { tasks: num(ev.tasks) } : {}),
+    ...(num(ev.deleting) !== undefined ? { deleting: num(ev.deleting) } : {}),
+    ...(num(ev.provisioning) !== undefined ? { provisioning: num(ev.provisioning) } : {}),
+    ...(str(ev.instanceStatus, 32) ? { instanceStatus: str(ev.instanceStatus, 32) } : {}),
+    ...(typeof ev.waitingFor === "string" && DMS_RECLAIM_WAITING.has(ev.waitingFor) ? { waitingFor: ev.waitingFor as DmsReclaimEvidence["waitingFor"] } : {}),
+    ...(str(ev.reclaimAt, 32) ? { reclaimAt: str(ev.reclaimAt, 32) } : {}),
+    ...(num(ev.idleMin) !== undefined ? { idleMin: num(ev.idleMin) } : {}),
+    ...(typeof ev.outcome === "string" && DMS_RECLAIM_OUTCOMES.has(ev.outcome) ? { outcome: ev.outcome as DmsReclaimEvidence["outcome"] } : {}),
+  };
+}
+
 /** 作业行 → 对外形态(判别联合;种类不认识就抛 —— 不许把未知形态的行原样透出)。 */
 export function toPublicJob(row: DataplaneJobRow): PublicJob {
   const base: PublicJobBase = {
@@ -159,6 +194,8 @@ export function toPublicJob(row: DataplaneJobRow): PublicJob {
       return { ...base, kind, evidence: reclaimEvidenceOf(ev) };
     case "sg-cleanup":
       return { ...base, kind, evidence: sgCleanupEvidenceOf(ev) };
+    case "dms-instance-reclaim":
+      return { ...base, kind, evidence: dmsReclaimEvidenceOf(ev) };
     default: {
       const never: never = kind;
       throw new Error(`未知作业种类 ${String(never)} ⇒ 拒绝透出`);

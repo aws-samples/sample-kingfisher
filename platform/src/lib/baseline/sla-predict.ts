@@ -7,7 +7,7 @@
 // 原来这段逻辑只住在路由文件里 ⇒ 后台要预测就得再抄一份;抄两份的下场是「页面预测的数字与后台推送的数字对不上」。
 import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-import { saveLastPrediction, saveBreachHistory, pushBreachAlert, BREACH_HISTORY_MAX } from "@/lib/baseline/sla-service";
+import { saveLastPrediction, saveBreachHistory, pushBreachAlert, boundObjectName, BREACH_HISTORY_MAX } from "@/lib/baseline/sla-service";
 import { getBaseline } from "@/lib/baseline/learn";
 // 🔴 预测必须用**这条 run 所在区**的基线。
 // 用合计基线的后果不是「差一点」:两个区的时长分布混在一起,ETA 对两个区都不准,
@@ -40,14 +40,19 @@ export interface PredictRunResult {
 }
 
 /** 这条 run 跑在哪个区:真值只来自 run 记录本身(调用方传的 targetId 不接受 —— 传错了就是「用 A 区基线给 B 区预测」且无声)。 */
-async function targetOfRun(sla: SlaRow, runId: string): Promise<string | undefined> {
+async function runFactsOf(sla: SlaRow, runId: string): Promise<{ runTargetId: string | undefined }> {
+  const r = await runRowOf(sla, runId);
+  return { runTargetId: typeof r?.targetId === "string" && r.targetId ? r.targetId : undefined };
+}
+
+async function runRowOf(sla: SlaRow, runId: string): Promise<Record<string, unknown> | undefined> {
   const taskIdForRun = sla.target.taskId || sla.target.workflowId || "";
   if (!taskIdForRun) return undefined;
   try {
     const { Item } = await docClient.send(
       new GetCommand({ TableName: TABLES.TASK_RUNS, Key: { taskId: taskIdForRun, runId }, ProjectionExpression: "targetId" })
     );
-    return typeof Item?.targetId === "string" && Item.targetId ? Item.targetId : undefined;
+    return (Item as Record<string, unknown> | undefined) ?? undefined;
   } catch {
     return undefined; // best-effort:取不到就走回落
   }
@@ -70,7 +75,8 @@ export async function predictSlaRun(projectId: string, sla: SlaRow, input: Predi
   }
   const nodeIds = ((dag.nodes || []) as Array<{ id: unknown }>).map((n) => String(n.id));
 
-  const runTargetId = await targetOfRun(sla, input.runId);
+  const runFacts = await runFactsOf(sla, input.runId);
+  const runTargetId = runFacts.runTargetId;
 
   // 每节点基线时长(缺基线用 0;冷启动节点不阻断预测)。
   const baselineCache: Record<string, number> = {};
@@ -109,7 +115,8 @@ export async function predictSlaRun(projectId: string, sla: SlaRow, input: Predi
   // 推送:仅当多窗口确认破线且调用方允许 push(默认 true)。幂等由 dedupeKey 保证。
   let push: { pushed: boolean; status?: string } = { pushed: false };
   if (confirmedBreach && input.push !== false) {
-    push = await pushBreachAlert(sla, prediction, { node: pred.criticalPathNode });
+    // 对象名取绑定对象行的现名(运行行从不写 taskName,从它取名字在真环境里永远是裸 id)
+    push = await pushBreachAlert(sla, prediction, { node: pred.criticalPathNode, targetName: await boundObjectName(sla.target) });
   }
   return { prediction, confirmedBreach, remainingSec: pred.remainingSec, push };
 }

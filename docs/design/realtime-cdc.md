@@ -124,6 +124,8 @@ Reason for gating: real-time components are billed continuously; zero cost when 
 > ② **The Kinesis stream has been deleted** (`realtime-stack.ts:14`); the stack keeps only the ≈ zero-cost durable infrastructure (subnet group / SG / roles).
 > ③ The gated stack is **enabled by default** (deploy-all.sh deploys with `DEPLOY_REALTIME=1` by default, `-c enable-realtime=1 -c skip-dms-roles=1`),
 >    not "not created by default"; since only near-zero-cost infrastructure is created, enabling it by default costs almost nothing in always-on billing.
+> ④ (2026-11-12 note) The lazily created instance is no longer permanent: when the region's last DMS task is deleted (or a start orchestration fails), the data-plane job pump's `dms-instance-reclaim` job calls `DeleteReplicationInstance` by fact (zero replication tasks on the instance plus a 10-minute idle grace)
+>    and writes the audit entry `realtime.instance.reclaimed`; stopped tasks keep their CDC checkpoints and block the reclaim (`platform/src/lib/realtime/dms-instance-reclaim-job.ts`).
 
 > IAM follows the platform's least-privilege style: the DMS role is restricted to the platform's own resource ARNs. Encryption at rest for Kinesis / DMS uses the platform
 > data CMK (where DMS supports KMS target encryption).

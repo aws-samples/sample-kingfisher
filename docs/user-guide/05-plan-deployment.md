@@ -28,7 +28,7 @@ The figures come from [`../cost-model.md`](../cost-model.md) (public on-demand p
 | Home region + a second CloudTrail | About 530 (derived: idle base + 68) | When the account already has another CloudTrail, the platform's own multi-region trail is billed per management event (about +68 when idle) |
 | Each idle execution region | 165 | Almost entirely the 11 VPC interface endpoints × 2 availability zones required for zero egress; warehouse / scheduling / data lake cost 0 when idle |
 | Demo mode extra | About +320 | The demo source database RDS MySQL (Multi-AZ, including the extended support fee); absent in production mode |
-| After enabling real-time (per region) | +11 standing; another +27 after the first real-time sync | Kinesis source stream with 1 shard; the DMS replication instance is created lazily when the first real-time sync task is set up and then stays on |
+| After enabling real-time (per region) | +11 standing; another +27 after the first real-time sync | Kinesis source stream with 1 shard; the DMS replication instance is created lazily when the first real-time sync task starts and is reclaimed 10 minutes after the region's last DMS task is deleted |
 
 In one sentence: the minimum production topology (1 home region + 1 execution region) costs about 620 to 990 USD / month when idle (lower bound = 460 + 165; the upper bound includes the second CloudTrail and the database extended support fee, and removing those two brings it close to the lower bound); each additional execution region adds about 165 USD / month.
 

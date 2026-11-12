@@ -363,6 +363,13 @@
       "source": "platform/src/lib/realtime/dms-service.ts"
     },
     {
+      "action": "dms:DeleteReplicationInstance",
+      "axis": "execution",
+      "resource": "*",
+      "why": "最后一条 DMS 任务删掉之后回收懒创建的复制实例(实例上零复制任务 + 空闲宽限后才删;此前实例只建不删、常驻按小时计费)(函数:dmsInstanceReclaimJobHandler.step)",
+      "source": "platform/src/lib/realtime/dms-instance-reclaim-job.ts"
+    },
+    {
       "action": "glue:GetJobRuns",
       "axis": "execution",
       "resource": "arn:aws:glue:{region}:{acct}:job/bgp-sync-01EXAMPLE",

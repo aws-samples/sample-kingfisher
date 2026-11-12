@@ -535,7 +535,7 @@ The detailed model with measured figures is in [cost-model.md](cost-model.md). I
   the cross-region DynamoDB interface endpoint, WAF, customer-managed keys and secrets.
 - Each execution region, always on: the interface endpoints that make zero-egress networking possible, one customer-managed key and a few secrets.
   Warehouse, scheduler, lake and compute bill nothing while idle.
-- Per execution region once real-time features are used: a provisioned stream shard, and a DMS replication instance that is created on the first real-time task and then stays.
+- Per execution region once real-time features are used: a provisioned stream shard, and a DMS replication instance that is created on the first real-time task and reclaimed automatically 10 minutes after the region's last DMS task is deleted.
 - Usage-driven: warehouse active time, Spark jobs, Glue jobs, scheduler task time, model tokens, storage and logs. A continuously running Flink job is the largest fixed per-job item.
 - After a decommission: data buckets, table bucket, warehouse namespace and workgroup with final snapshot, the regional key and the DAG bucket are retained
   and keep billing until removed by you.

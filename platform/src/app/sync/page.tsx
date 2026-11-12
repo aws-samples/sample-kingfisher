@@ -134,7 +134,8 @@ export default function SyncPage() {
           )}
           <a onClick={() => router.push(`/sync/${record.taskId}`)}>{t("详情")}</a>
           <a onClick={() => { setEditing(record); setModalOpen(true); }}>{t("编辑")}</a>
-          <Popconfirm title={t("确认删除？")} onConfirm={() => handleDelete(record.taskId)} okButtonProps={{ loading: busyId === record.taskId }}>
+          <Popconfirm title={t("确认删除？")} onConfirm={() => handleDelete(record.taskId)} okButtonProps={{ loading: busyId === record.taskId }}
+            description={record.channel === "dms" ? <span data-testid="sync-delete-dms-note" style={{ maxWidth: 360, display: "inline-block" }}>{t("若删后该区再无 DMS 任务,复制实例将在空闲宽限后由后台自动回收(下次启动需重新创建,约 10–15 分钟);停止态任务保留检查点、实例不回收。")}</span> : undefined}>
             <a style={{ color: "red" }}>{t("删除")}</a>
           </Popconfirm>
         </Space>

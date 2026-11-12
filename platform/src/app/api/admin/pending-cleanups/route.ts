@@ -10,6 +10,7 @@ import { requireExecEnvAdmin } from "@/lib/exec-env/admin-guard";
 import { listTargetsRaw } from "@/lib/exec-env/registry";
 import { listJobsByTarget } from "@/lib/dataplane-jobs/store";
 import { toPublicJob, type PublicJob } from "@/lib/dataplane-jobs/dto";
+import type { JobKind } from "@/lib/dataplane-jobs/schema";
 import { dataplaneJobsPaused } from "@/lib/dataplane-jobs/schema";
 import { isTerminalPhase } from "@/lib/dataplane-jobs/model";
 
@@ -18,10 +19,14 @@ export async function GET(req: NextRequest) {
   if (identity instanceof NextResponse) return identity;
   try {
     const jobs: PublicJob[] = [];
+    // 清理类作业两种:平台自建安全组按网卡事实收口 · DMS 复制实例按「零复制任务」事实回收
+    const CLEANUP_KINDS: readonly JobKind[] = ["sg-cleanup", "dms-instance-reclaim"];
     for (const t of await listTargetsRaw()) {
-      const rows = await listJobsByTarget(t.targetId, { kind: "sg-cleanup", maxItems: 200 });
-      for (const row of rows) {
-        if (!isTerminalPhase(row.phase) || row.phase === "failed") jobs.push(toPublicJob(row));
+      for (const kind of CLEANUP_KINDS) {
+        const rows = await listJobsByTarget(t.targetId, { kind, maxItems: 200 });
+        for (const row of rows) {
+          if (!isTerminalPhase(row.phase) || row.phase === "failed") jobs.push(toPublicJob(row));
+        }
       }
     }
     jobs.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));

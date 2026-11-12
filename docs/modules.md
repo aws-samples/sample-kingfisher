@@ -149,6 +149,7 @@
 
 - **What it does**: source database → Redshift full load + CDC (DMS), plus zero-ETL integration status; exists as two channels of a sync task, without a page of its own.
 - **Core code**: `src/lib/realtime/dms-service.ts` (idempotent orchestration: endpoints / tasks / users / schemas are looked up before they are created) · `zeroetl-service.ts` · `redshift-target.ts` · `failure-advisor.ts`.
+- **Mechanism**: one replication instance `bgp-dms` per region, created lazily on the first start (about 10–15 minutes). When the last DMS task of the region is deleted (or a start orchestration fails), the data-plane job pump's background cleanup job `dms-instance-reclaim` (`src/lib/realtime/dms-instance-reclaim-job.ts`) reclaims the instance by fact (zero replication tasks on the instance plus a 10-minute idle grace) and writes the audit entry `realtime.instance.reclaimed`; stopped tasks keep their CDC checkpoints and the instance is not reclaimed while they exist; progress is shown under "System Settings → Background cleanup jobs".
 - **AWS dependencies**: DMS (replication infrastructure provided by the gated `BgpRealtimeStack` / the per-region `-dms` stack) · Redshift.
 - **Design note**: the [real-time CDC design](design/realtime-cdc.md) (including the [DMS Serverless study](design/realtime-cdc-dms-serverless.md)).
 

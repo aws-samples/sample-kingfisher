@@ -25,25 +25,44 @@ const USER_ID = "default-user";
  * 而读侧 `bindingTargets` 的三级回落本来就会把无章的行算进主控区 —— 让唯一那份回落规则说话。
  */
 async function targetsOfBinding(taskId?: string, workflowId?: string): Promise<string[]> {
+  return (await boundObjectOf(taskId, workflowId))?.targets ?? [];
+}
+
+/**
+ * SLA 绑定对象的行(工作流表,或同步 / 离线 / 引擎作业三张表之一)—— 区维与**对象名**都从这里取,唯一作者。
+ * 🔴 对象名不能从运行行取:运行台账的行从不写 taskName(监控页 / 运维大屏都是读时再按 id 从各资源表 join 名字),
+ *    靠运行行取名字的文案在真环境里永远是裸 id。
+ * 读不到 ⇒ undefined(调用方决定回落)。
+ */
+async function boundObjectOf(taskId?: string, workflowId?: string): Promise<{ targets: string[]; name?: string } | undefined> {
+  const shape = (Item: Record<string, unknown>) => ({
+    targets: bindingTargets(Item as { targets?: unknown; targetId?: unknown }),
+    name: typeof Item.name === "string" && Item.name.trim() ? Item.name.trim() : undefined,
+  });
   try {
     if (workflowId) {
       const { Item } = await docClient.send(
-        new GetCommand({ TableName: TABLES.WORKFLOWS, Key: { userId: USER_ID, workflowId }, ProjectionExpression: "#t, targetId", ExpressionAttributeNames: { "#t": "targets" } })
+        new GetCommand({ TableName: TABLES.WORKFLOWS, Key: { userId: USER_ID, workflowId }, ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } })
       );
-      return Item ? bindingTargets(Item as { targets?: unknown; targetId?: unknown }) : [];
+      return Item ? shape(Item as Record<string, unknown>) : undefined;
     }
     if (taskId) {
-      // 任务可能是同步 / 离线 / 引擎作业三张表之一 —— 逐张试(低频操作,一次建 SLA 才走)。
+      // 任务可能是同步 / 离线 / 引擎作业三张表之一 —— 逐张试(低频:建 SLA 与确认破线推送时才走)。
       for (const table of [TABLES.SYNC_TASKS, TABLES.ETL_JOBS, TABLES.ENGINE_JOBS]) {
         const key = table === TABLES.SYNC_TASKS ? { userId: USER_ID, taskId } : { userId: USER_ID, jobId: taskId };
         const { Item } = await docClient
-          .send(new GetCommand({ TableName: table, Key: key, ProjectionExpression: "#t, targetId", ExpressionAttributeNames: { "#t": "targets" } }))
+          .send(new GetCommand({ TableName: table, Key: key, ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } }))
           .catch(() => ({ Item: undefined }));
-        if (Item) return bindingTargets(Item as { targets?: unknown; targetId?: unknown });
+        if (Item) return shape(Item as Record<string, unknown>);
       }
     }
-  } catch { /* best-effort:读不到就回空,由读侧回落规则处理 */ }
-  return [];
+  } catch { /* best-effort:读不到就回 undefined,由调用方回落 */ }
+  return undefined;
+}
+
+/** SLA 绑定对象现在叫什么(改过名也按现名说话);读不到 ⇒ undefined,文案回落到对象 id。 */
+export async function boundObjectName(target: SlaRow["target"]): Promise<string | undefined> {
+  return (await boundObjectOf(target.taskId, target.workflowId))?.name;
 }
 
 export async function listSlas(projectId: string): Promise<SlaRow[]> {
@@ -160,11 +179,20 @@ export async function saveBreachHistory(projectId: string, slaId: string, runId:
 
 // 推送"预测破线"告警(复用通道 + 事件幂等去重)。dedupeKey=sla#<slaId>#<runId>#predicted:
 // 同一 (slaId, runId) 只推一次;不同语义(固定 timeout 规则)dedupeKey 不同,互不覆盖。
-export async function pushBreachAlert(sla: SlaRow, prediction: SlaPrediction, extra: { node?: string }): Promise<{ pushed: boolean; status?: string }> {
+// 2026-11-11 真环境事件行坐实:原模板把任何对象都写成「工作流「<SLA 名>」」—— 任务型 SLA 也被说成工作流,括号里是 SLA 名不是对象名,
+//   用户据此找不到是哪个对象要破线。现在按 SLA 绑定对象的 scope 分「任务 / 工作流」,对象名由调用方从绑定对象行带来(`boundObjectName`;读不到则用对象 id),SLA 名单列。
+export function breachAlertSubject(sla: SlaRow, targetName?: string): { kind: "任务" | "工作流"; name: string } {
+  const kind = sla.target.scope === "workflow" ? "工作流" : "任务";
+  const id = sla.target.scope === "workflow" ? sla.target.workflowId : sla.target.taskId;
+  return { kind, name: (targetName && targetName.trim()) || id || sla.name };
+}
+
+export async function pushBreachAlert(sla: SlaRow, prediction: SlaPrediction, extra: { node?: string; targetName?: string }): Promise<{ pushed: boolean; status?: string }> {
   const dedupeKey = `sla#${sla.slaId}#${prediction.runId}#predicted`;
   const etaLocal = new Date(prediction.etaAt).toISOString().slice(11, 16);
   const slaLocal = new Date(prediction.slaAt).toISOString().slice(11, 16);
-  const message = `工作流「${sla.name}」预计 ${etaLocal} 完成,SLA ${slaLocal},大概率破线(余量 ${prediction.marginMin} 分钟)${extra.node ? `,当前卡在 ${extra.node}` : ""}。`;
+  const subject = breachAlertSubject(sla, extra.targetName);
+  const message = `${subject.kind}「${subject.name}」(SLA「${sla.name}」)预计 ${etaLocal} 完成,SLA ${slaLocal},大概率破线(余量 ${prediction.marginMin} 分钟)${extra.node ? `,当前卡在 ${extra.node}` : ""}。`;
   // trigger 用既有 AlertEvent.trigger 字段(taskId/taskName/runId/taskType/metricValue),
   // 不扩展其类型(红线:不改)。SLA 语义(etaAt/slaAt/卡点)已进 message 成品串。
   const event = await putEventIfNew({

@@ -40,13 +40,13 @@ The "Sync mode" step of the "Data Sync" wizard has three options: "Full-load syn
 
 | Channel | Supported sources | Target | Startup wait | Always-on billing |
 |---|---|---|---|---|
-| DMS CDC (mode "Real-time sync (DMS CDC)") | MySQL / Aurora MySQL / PostgreSQL / Oracle / SQL Server | Redshift (target schema = source database name) | About 10–15 minutes the first time (creating the replication instance); a few minutes afterwards | One replication instance stays resident and is shared by all DMS tasks |
+| DMS CDC (mode "Real-time sync (DMS CDC)") | MySQL / Aurora MySQL / PostgreSQL / Oracle / SQL Server | Redshift (target schema = source database name) | About 10–15 minutes the first time (creating the replication instance); a few minutes afterwards | One replication instance per region, shared by all DMS tasks; reclaimed automatically 10 minutes after the region's last DMS task is deleted |
 | Zero-ETL (mode "Incremental sync (CDC)" + channel Zero-ETL) | RDS MySQL / Aurora MySQL managed instances only | Redshift (a dedicated Zero-ETL workgroup and database) | Integration activation takes tens of minutes | AWS-managed integration + a dedicated Redshift Serverless workgroup |
 | Glue ETL (batch) | All JDBC / DynamoDB / S3 sources | S3 data lake / Redshift / both | About 1–3 minutes per run to start the Glue job | By run duration; zero when idle |
 
 Key points:
 
-- **DMS CDC**: the first time you start a DMS task, the platform automatically creates one replication instance (resident and reused from then on), then creates source / target endpoints and one "full load + continuous CDC" replication task for each task. The target is Redshift; the platform first creates a dedicated user and a schema named after the source database.
+- **DMS CDC**: the first time you start a DMS task, the platform automatically creates one replication instance (reused from then on; once the region's last DMS task is deleted, the background reclaims it after 10 idle minutes), then creates source / target endpoints and one "full load + continuous CDC" replication task for each task. The target is Redshift; the platform first creates a dedicated user and a schema named after the source database.
 - **Zero-ETL**: the AWS-managed RDS → Redshift integration. The platform creates a dedicated Redshift Serverless workgroup and namespace for it (not mixed with the platform's main warehouse); each task gets one target database `zeroetl_<task-suffix>`, and the schema name inside it = the source database name.
 - **Home region only**: both channels currently land only in the home-region warehouse. Clicking "Start" on a task bound to another execution region is rejected (HTTP 409, verbatim message in section 13); the platform will not quietly run it in the home region instead.
 - **Real status**: when the list is read it reconciles with DMS / Zero-ETL; if the replication task failed on the AWS side, the list shows "Failed" directly, with no need to open the detail page first.
@@ -159,7 +159,8 @@ Meaning of the status column (the list and the detail page share one set of word
 
 ### Always-on billing reminder (must read)
 
-- The DMS replication instance is created the first time a DMS task starts and then stays **resident**; even when all DMS tasks are "Stopped" or deleted, the instance keeps billing (about USD 27 / month, see the [Cost model](../cost-model.md)). When you are sure real-time sync is no longer needed, ask the platform administrator to delete the replication instance `bgp-dms` in the AWS console.
+- The DMS replication instance is created the first time a DMS task starts and is then reused by every DMS task of the region; while tasks are only "Stopped" the instance keeps billing (about USD 27 / month, see the [Cost model](../cost-model.md)), because stopped tasks keep their CDC checkpoints and the instance is not reclaimed.
+  When you are sure real-time sync is no longer needed, **delete** all DMS tasks of the region on the "Data Sync" page: once the last one is gone, the platform reclaims the replication instance after a 10-minute idle grace and writes an audit entry; progress is shown under "System Settings → Background cleanup jobs"; the next start recreates it (about 10–15 minutes).
 - Zero-ETL's dedicated Redshift Serverless workgroup bills by active time; for Zero-ETL, "Stop" = delete the integration (see section 6), and replication stops afterwards.
 - The page's "How to use this page" hint states: "DMS and Zero-ETL channels bill continuously; stop them when not in use".
 
@@ -373,7 +374,7 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 2. **Kinesis data source** (the practice stream you created yourself): "Data Sources" → "Delete" in the row. It is rejected while a streaming job still references it (409 `DATASOURCE_IN_USE`, with a dialog listing every referencing streaming job); delete the jobs first. The Kinesis stream itself bills per shard-hour, so delete it once you are sure it is no longer needed.
 3. **DMS real-time sync task**: "Data Sync" → "Stop" → wait for "Stopped" → "Delete". The platform deletes the DMS replication task along with it.
 4. **Zero-ETL task**: "Stop" deletes the integration and drops the `zeroetl_<task-suffix>` database; then "Delete" the task row.
-5. **Replication instance** (administrator): the platform does not delete the resident replication instance `bgp-dms`; when you are sure DMS is no longer needed, delete it manually in the AWS console, otherwise it keeps billing.
+5. **Replication instance**: once the region's last DMS task is deleted, the platform reclaims the replication instance `bgp-dms` after a 10-minute idle grace ("System Settings → Background cleanup jobs" shows progress and outcome); tasks that are only stopped, not deleted, keep the instance alive and billing.
 6. **S3 Tables result table**: `realtime.flink_region_agg` stays in that region's platform table bucket and keeps using storage; if you do not want it, have the administrator delete it in S3 Tables (the platform pages offer no drop-table entry).
 7. **Do not delete the sample objects**: the `Showcase-*` series is maintained by the administrator for everyone's reference.
 

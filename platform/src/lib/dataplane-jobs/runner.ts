@@ -20,6 +20,7 @@ import { supplyJobHandler } from "@/lib/exec-env/project-cred-supply";
 import { canaryJobHandler } from "@/lib/exec-env/permission-canary";
 import { reclaimJobHandler } from "@/lib/exec-env/project-cred-reclaim";
 import { sgCleanupJobHandler } from "@/lib/datasource/sg-cleanup-job";
+import { dmsInstanceReclaimJobHandler } from "@/lib/realtime/dms-instance-reclaim-job";
 
 /** 种类 → handler(穷尽表:新增种类不登记 handler 编译不过)。 */
 const HANDLERS: Record<JobKind, JobHandler> = {
@@ -27,6 +28,7 @@ const HANDLERS: Record<JobKind, JobHandler> = {
   canary: canaryJobHandler,
   reclaim: reclaimJobHandler,
   "sg-cleanup": sgCleanupJobHandler,
+  "dms-instance-reclaim": dmsInstanceReclaimJobHandler,
 };
 
 export type StepOutcome =

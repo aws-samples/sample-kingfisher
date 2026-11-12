@@ -140,7 +140,7 @@
 - Security (masking): column classification drives server-side masking in three places, the warehouse query page, reports and GenBI; aliased columns and expression columns are resolved back to physical columns, so renaming in SQL cannot bypass it; platform admins and users whose "Data access" request was approved see plaintext.
 - Reliability: while a long-running operation on an object is in progress, landing / editing / deleting the same object gets 409 "In progress; please wait for it to finish before acting"; before a data source is deleted the platform checks whether sync / real-time tasks still reference it, and before a batch job is deleted it checks for in-flight runs.
 - Cost optimization: the home region costs about 460 USD / month idle and each execution region about 165 USD / month idle (almost entirely interface endpoints); task costs are fully usage-based; see [plan the deployment](05-plan-deployment.md) and the scenario [FinOps](28-scenario-finops.md).
-- Sustainability: Redshift Serverless is free when idle; the DMS replication instance stays on after the first real-time task is created, and Flink jobs are billed while running, so "Stop" them on the page when not in use.
+- Sustainability: Redshift Serverless is free when idle; the DMS replication instance stays on while the region has DMS tasks (it is reclaimed 10 minutes after the last one is deleted), and Flink jobs are billed while running, so "Stop" them on the page when not in use.
 
 ## 8. Note (boundaries, stated candidly)
 

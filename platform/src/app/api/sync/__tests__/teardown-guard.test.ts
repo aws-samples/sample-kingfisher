@@ -92,6 +92,7 @@ vi.mock("@/lib/projects/guard", () => ({
   guardResourceAccess: vi.fn(async () => ({ identity: { username: "admin" }, projectId: "p1" })),
 }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
+vi.mock("@/lib/exec-env/registry", () => ({ getTarget: vi.fn(async (id: string) => ({ targetId: id, region: "us-east-1", status: "active" })) }));
 vi.mock("@/lib/versions/version-service", () => ({ snapshotVersion: vi.fn(async () => {}) }));
 vi.mock("@/lib/monitor/run-records", () => ({
   settleRunningRuns: vi.fn(async () => {}),
@@ -103,7 +104,7 @@ const glueTask = (over: Record<string, unknown> = {}) => ({
   glueJobName: "bgp-sync-01TASKGLUE", status: "running", projectId: "p1", ...over,
 });
 const dmsTask = (over: Record<string, unknown> = {}) => ({
-  userId: "default-user", taskId: "01TASKDMS0", name: "t2", channel: "dms", status: "running", projectId: "p1", ...over,
+  userId: "default-user", taskId: "01TASKDMS0", name: "t2", channel: "dms", status: "running", projectId: "p1", targetId: "tgt_home", ...over,
 });
 const stop = async () => {
   const { POST } = await import("../[id]/stop/route");
@@ -176,6 +177,27 @@ describe("同步通道的下线", () => {
     const r = await del();
     expect(r.status).toBe(502);
     expect(deletes()).toHaveLength(0);
+  });
+
+  it("🔴 删 DMS 任务成功 ⇒ 同笔登记复制实例回收作业(主控区 bgp-dms,理由 task-deleted,主体 = 操作者),响应与审计都带上它", async () => {
+    h.task = dmsTask({ status: "stopped" }); h.dmsStatus = "stopped";
+    const r = await del();
+    expect(r.status).toBe(200);
+    const put = h.ddb.find((x) => x.ctor === "PutCommand" && (x.input as any)?.Item?.kind === "dms-instance-reclaim");
+    expect(put, "删 DMS 任务后必须入队回收作业").toBeTruthy();
+    // 落点 = 任务绑定的执行区(注册表给区),不是写死的主控区
+    expect((put!.input as any).Item).toMatchObject({ phase: "queued", targetId: "tgt_home", createdBy: "user:admin", state: { instanceId: "bgp-dms", region: "us-east-1", reason: "task-deleted" } });
+    expect(r.body.instanceReclaim).toMatchObject({ created: true, phase: "queued" });
+    // 行照删
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("删 Glue 任务不入队复制实例回收(与 DMS 无关)", async () => {
+    h.task = glueTask({ status: "stopped" });
+    const r = await del();
+    expect(r.status).toBe(200);
+    expect(h.ddb.some((x) => x.ctor === "PutCommand" && (x.input as any)?.Item?.kind === "dms-instance-reclaim")).toBe(false);
+    expect(r.body.instanceReclaim).toBeUndefined();
   });
 
   it("删 Glue 任务:停完 run 还要**删作业**(否则 Glue 里留一个没人管的作业)", async () => {

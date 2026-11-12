@@ -35,6 +35,9 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
     [T.SLAS]: ["pk", "slaId"],
     [T.BASELINES]: ["pk", "taskId"],
     [T.WORKFLOWS]: ["userId", "workflowId"],
+    [T.SYNC_TASKS]: ["userId", "taskId"],
+    [T.ETL_JOBS]: ["userId", "jobId"],
+    [T.ENGINE_JOBS]: ["userId", "jobId"],
   };
   const rows = (table: string) => (h.tables[table] ??= []);
   const send = async (c: { constructor: { name: string }; input: Row }) => {
@@ -118,11 +121,15 @@ beforeEach(() => {
   h.tables = {};
   h.failTables = [];
   h.tables[TABLES.ALERT_RULES] = [rule()];
+  // 🔴 运行行与真落库同形:运行台账从不写 taskName(真环境 78 行 0 带名),名字只住在资源表里
   h.tables[TABLES.TASK_RUNS] = [
-    { taskId: "job-1", runId: "F1", taskType: "etl-glue", status: "failed", startedAt: iso(20), finishedAt: iso(15), duration: 300, error: "boom", taskName: "job-1", targetId: "tgt_home" },
-    { taskId: "job-1", runId: "S1", taskType: "etl-glue", status: "succeeded", startedAt: iso(40), finishedAt: iso(35), duration: 300, taskName: "job-1", targetId: "tgt_home" },
-    { taskId: "job-1", runId: "RUN-A", taskType: "etl-glue", status: "running", startedAt: iso(10), taskName: "job-1", targetId: "tgt_home" },
+    { taskId: "job-1", runId: "F1", taskType: "etl-glue", status: "failed", startedAt: iso(20), finishedAt: iso(15), duration: 300, error: "boom", targetId: "tgt_home", projectId: P, triggeredBy: "manual" },
+    { taskId: "job-1", runId: "S1", taskType: "etl-glue", status: "succeeded", startedAt: iso(40), finishedAt: iso(35), duration: 300, targetId: "tgt_home", projectId: P, triggeredBy: "manual" },
+    { taskId: "job-1", runId: "RUN-A", taskType: "etl-glue", status: "running", startedAt: iso(10), targetId: "tgt_home", projectId: P, triggeredBy: "manual" },
   ];
+  h.tables[TABLES.SYNC_TASKS] = [];
+  h.tables[TABLES.ENGINE_JOBS] = [];
+  h.tables[TABLES.ETL_JOBS] = [{ userId: "default-user", jobId: "job-1", name: "订单日汇总", targetId: "tgt_home", projectId: P }];
   h.tables[TABLES.SLAS] = [sla()];
 });
 
@@ -149,6 +156,11 @@ describe("🔴 后台一轮评估 = 规则评估 + SLA 滚动预测(没人点按
     expect(slaEv).toMatchObject({ sk: "sla#01SLA#RUN-A#predicted", severity: "P1", status: "notified" });
     expect(String(slaEv!.ruleName)).toContain("SLA预测破线");
     expect(String(slaEv!.message)).toContain("大概率破线");
+    // 文案按对象说话:任务型 SLA 写「任务「<绑定对象行的 name>」(SLA「<名>」)」,不再把任何对象都写成「工作流「<SLA 名>」」;
+    // 名字来自离线作业表那一行(运行行没有 taskName 可取)
+    expect(String(slaEv!.message)).toContain("任务「订单日汇总」(SLA「job-1 一分钟内完成」)");
+    expect(String(slaEv!.message)).not.toContain("任务「job-1」");
+    expect(String(slaEv!.message)).not.toContain("工作流「");
   });
 
   it("第二轮:事件不重复(条件写去重)、SLA 不重推、历史追加一位", async () => {
@@ -162,7 +174,7 @@ describe("🔴 后台一轮评估 = 规则评估 + SLA 滚动预测(没人点按
   it("换了一次运行 ⇒ 历史从头记(旧运行的破线不许算进新运行的确认)", async () => {
     await alertingTick(P, NOW);
     h.tables[TABLES.TASK_RUNS] = h.tables[TABLES.TASK_RUNS].map((r) => (r.runId === "RUN-A" ? { ...r, status: "succeeded", finishedAt: iso(1) } : r));
-    h.tables[TABLES.TASK_RUNS].push({ taskId: "job-1", runId: "RUN-B", taskType: "etl-glue", status: "running", startedAt: iso(0), taskName: "job-1", targetId: "tgt_home" });
+    h.tables[TABLES.TASK_RUNS].push({ taskId: "job-1", runId: "RUN-B", taskType: "etl-glue", status: "running", startedAt: iso(0), targetId: "tgt_home", projectId: P, triggeredBy: "manual" });
     await alertingTick(P, NOW + 60_000);
     const row = h.tables[TABLES.SLAS][0];
     expect(row.lastPrediction.runId).toBe("RUN-B");

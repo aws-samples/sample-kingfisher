@@ -187,6 +187,8 @@ export class PlatformStack extends cdk.Stack {
         // 🔴 **停 + 删**:改动前平台压根不发这两个调用
         //   (于是 DMS 通道从来没被真正停过);真环境实测 502 的拒因就是缺 `dms:DeleteReplicationTask`。
         "dms:StopReplicationTask", "dms:DeleteReplicationTask",
+        // 最后一条 DMS 任务删掉后,懒创建的复制实例由后台作业按「零复制任务」事实回收(此前实例只建不删、常驻计费)
+        "dms:DeleteReplicationInstance",
         "dms:TestConnection", "dms:DescribeConnections",
         "dms:DescribeReplicationInstances", "dms:DescribeReplicationSubnetGroups", "dms:DescribeTableStatistics",
       ],

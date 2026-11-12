@@ -139,7 +139,7 @@ Each entry follows the format **symptom** → cause → next step. The next step
 ### 4.8 Do DMS and Zero-ETL channels keep incurring charges after the task is stopped
 
 - Cause: the replication instance / managed integration of these two channels has an ongoing cost regardless of whether the task is moving data.
-- Next step: "Stop" it under "Data Sync" when not in use. For Zero-ETL, "Stop" deletes the managed integration and billing stops; for DMS, "Stop" only stops the replication task, the replication instance is not deleted by the platform and is still billed by the hour; when no longer needed, the account administrator deletes it on the AWS side. Actual costs are shown under "Scheduling & Ops → FinOps"; see the [cost model](../cost-model.md) for the breakdown.
+- Next step: "Stop" it under "Data Sync" when not in use. For Zero-ETL, "Stop" deletes the managed integration and billing stops; for DMS, "Stop" only stops the replication task (keeping its CDC checkpoint) and the replication instance is still billed by the hour; when no longer needed, **delete** all DMS tasks of the region — once the last one is deleted the platform reclaims the instance after a 10-minute idle grace (visible under "System Settings → Background cleanup jobs"). Actual costs are shown under "Scheduling & Ops → FinOps"; see the [cost model](../cost-model.md) for the breakdown.
 
 ## 5. Batch compute, EMR jobs and orchestration
 

@@ -42,7 +42,7 @@ const ec2 = sdkClient("data-plane", EC2Client, { region });
 // 复制实例 identifier(由 BgpRealtimeStack 固定为 bgp-dms;稳定不变)。
 // ⚠️ 不再用静态 ARN env:实时栈每次 destroy/recreate,实例 ARN 都会变,
 //    静态注入必然过期(历史坑)。改为运行时按 id 发现真实 ARN,根治漂移。
-const REPLICATION_INSTANCE_ID = process.env.DMS_REPLICATION_INSTANCE_ID || "bgp-dms";
+export const REPLICATION_INSTANCE_ID = process.env.DMS_REPLICATION_INSTANCE_ID || "bgp-dms";
 // DMS 访问 secret / 写 Kinesis / Redshift COPY 用的角色(同一角色,信任 dms + 区域化 dms + redshift)。
 const DMS_ROLE_ARN = process.env.DMS_ROLE_ARN || "";
 // 懒创建实例的耐久依赖(BgpRealtimeStack 提供,固定名):子网组 + 安全组。

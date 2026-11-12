@@ -9,6 +9,10 @@ import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OV
 import { recordAudit } from "@/lib/audit";
 // 停/删共用**同一个**下线作者
 import { teardownSyncChannel, teardownFailureMessage, teardownIsRetryable } from "@/lib/sync/teardown";
+// 最后一条 DMS 任务删掉之后,懒创建的复制实例就没人引用了 ⇒ 登记一条持久回收作业(实例上仍有任务时作业自己收口为「在用」)
+import { enqueueDmsInstanceReclaim, type DmsReclaimEnqueueResult } from "@/lib/realtime/dms-instance-reclaim-job";
+import { REPLICATION_INSTANCE_ID } from "@/lib/realtime/dms-service";
+import { getTarget } from "@/lib/exec-env/registry";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
 // 新字段的合法形态(唯一作者)
 import { validateSyncCapabilityFields, whereOf, syncTaskUsesRunDate } from "@/lib/sync/run-vars";
@@ -204,9 +208,25 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
         : { code: "UPSTREAM_ERROR", detail: { teardown: td } }
     );
   }
+  // DMS 通道:复制任务已撤 ⇒ 复制实例可能再无任务引用 ⇒ 入队回收作业;落点取任务自己绑定的执行区(实例就建在那个区),不默认主控区。
+  // 入队失败不挡删除(实例仍被成本页 R1 建议盯着),但要如实进响应与审计,不许静默。
+  let reclaim: DmsReclaimEnqueueResult | { enqueued: false; error: string } | undefined;
+  if ((Item as { channel?: string }).channel === "dms") {
+    try {
+      const [boundTargetId] = bindingTargets(Item as { targets?: unknown; targetId?: unknown });
+      const target = boundTargetId ? await getTarget(boundTargetId) : null;
+      if (!target) throw new Error("任务没有绑定可解析的执行区 ⇒ 不知道复制实例在哪个区");
+      reclaim = await enqueueDmsInstanceReclaim({
+        targetId: target.targetId, region: target.region, instanceId: REPLICATION_INSTANCE_ID,
+        reason: "task-deleted", createdBy: `user:${guard.identity.username}`,
+      });
+    } catch (e) {
+      reclaim = { enqueued: false, error: String((e as Error)?.message ?? e).slice(0, 200) };
+    }
+  }
   await docClient.send(
     new DeleteCommand({ TableName: TABLES.SYNC_TASKS, Key: { userId: USER_ID, taskId: params.id } })
   );
-  recordAudit(req, "sync.delete", { resourceType: "sync", resourceId: params.id, detail: { name: (Item as { name?: string }).name, teardown: td } }).catch(() => {});
-  return NextResponse.json({ success: true, teardown: td });
+  recordAudit(req, "sync.delete", { resourceType: "sync", resourceId: params.id, detail: { name: (Item as { name?: string }).name, teardown: td, ...(reclaim ? { instanceReclaim: reclaim } : {}) } }).catch(() => {});
+  return NextResponse.json({ success: true, teardown: td, ...(reclaim ? { instanceReclaim: reclaim } : {}) });
 }

@@ -25,7 +25,9 @@ export const DUE_SHARD = "due";
 //   (一区一条,确定性 id;handler 在 `lib/exec-env/project-cred-reclaim.ts`)。
 // + `sg-cleanup`:删数据源 / 建源失败清理后,平台自建安全组 `bgp-ds-*` 按网卡事实收口的持久清理
 //   (handler 在 `lib/datasource/sg-cleanup-job.ts`;原来是进程内存里 10 × 30 秒的定时重试,耗尽即永久遗留)。
-export const JOB_KINDS = ["supply", "canary", "reclaim", "sg-cleanup"] as const;
+// + `dms-instance-reclaim`:最后一条 DMS 实时同步任务删掉之后,懒创建的复制实例按「实例上零复制任务」事实回收
+//   (handler 在 `lib/realtime/dms-instance-reclaim-job.ts`;原来实例只建不删,成本页只能建议「去控制台删」)。
+export const JOB_KINDS = ["supply", "canary", "reclaim", "sg-cleanup", "dms-instance-reclaim"] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
 /** 作业阶段。🔴 前三个是「未终态」(带 dueShard),后两个是终态(dueShard 被 REMOVE)。 */

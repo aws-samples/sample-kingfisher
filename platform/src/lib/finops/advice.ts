@@ -11,6 +11,7 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { listCostDaily, scanAllCostRuns } from "./store";
 import { UNIT_PRICES } from "./pricing";
 import type { Advice } from "./types";
+import { DMS_INSTANCE_IDLE_GRACE_MS } from "@/lib/realtime/dms-instance-reclaim-job";
 
 // 🔴 这里原来是一个模块级主控区 DMS 客户端 ⇒ **别的区的空转实例永远不会被建议出来**,
 // 而它一直在按小时计费。成本建议漏一个区,等于那个区的浪费永远看不见 —— 比没有建议更坏,
@@ -20,7 +21,8 @@ type AdviceRule = { ruleId: string; run: (regions: readonly string[]) => Promise
 
 // ── 规则实现 ──────────────────────────────────────────────────
 
-// R1 空转 DMS 复制实例:实例常驻计费,但无 running 任务 → 建议删除(任务配置保留可重建)。
+// R1 空转 DMS 复制实例:实例常驻计费,但无 running 任务 → 指路:删掉不再需要的任务,平台后台按「零任务」事实自动回收实例;
+//    停止态任务保留 CDC 检查点、实例不回收(回收作业见 lib/realtime/dms-instance-reclaim-job.ts)。
 async function idleDmsInstance(regions: readonly string[]): Promise<Advice[]> {
   const { dmsClientFor } = await import("@/lib/exec-env/target-clients");
   const out: Advice[] = [];
@@ -28,7 +30,10 @@ async function idleDmsInstance(regions: readonly string[]): Promise<Advice[]> {
   for (const region of regions) {
     try {
       const dms = await dmsClientFor(region);
-      const { ReplicationInstances = [] } = await dms.send(new DescribeReplicationInstancesCommand({}));
+      const { ReplicationInstances: allInstances = [] } = await dms.send(new DescribeReplicationInstancesCommand({}));
+      // 🔴 「空转」只对 available 的实例成立:正在创建的实例马上就要挂任务,正在删除的实例(后台回收已发出)几分钟后就没了 ——
+      //    把它们列成「无运行任务仍计费、建议删任务」会让用户去追一个不存在的浪费(真环境回收后的几分钟里就这样误报过)。
+      const ReplicationInstances = (allInstances as Array<{ ReplicationInstanceStatus?: string }>).filter((ri) => ri.ReplicationInstanceStatus === "available");
       if (!ReplicationInstances.length) continue;
       const { ReplicationTasks = [] } = await dms.send(new DescribeReplicationTasksCommand({}));
       const hasRunning = ReplicationTasks.some((t: { Status?: string }) => t.Status === "running");
@@ -38,7 +43,9 @@ async function idleDmsInstance(regions: readonly string[]): Promise<Advice[]> {
           ruleId: "idle-dms-instance",
           severity: "high" as const,
           title: `DMS 复制实例空转(${region};无 running 任务仍常驻计费)`,
-          detail: `复制实例 ${ri.ReplicationInstanceIdentifier}(${ri.ReplicationInstanceClass},${region})当前无运行中的复制任务,但按小时计费。若近期不用,建议删除实例(任务/端点配置保留,重建即恢复)。`,
+          detail: `复制实例 ${ri.ReplicationInstanceIdentifier}(${ri.ReplicationInstanceClass},${region})当前无运行中的复制任务,但按小时计费。`
+            + `停止态任务保留 CDC 检查点,实例不会被回收;要止血请在「数据集成 → 数据同步」删除不再需要的实时同步任务:该区最后一条 DMS 任务删掉后,`
+            + `平台在 ${Math.round(DMS_INSTANCE_IDLE_GRACE_MS / 60_000)} 分钟空闲宽限后自动回收实例(下次启动重新创建,约 10–15 分钟),进度看「系统设置 → 后台清理任务」。`,
           estMonthlySavingUsd: 120, // dms.t3.medium 按需约 $0.164/h ≈ $120/月(量级提示)
           resource: ri.ReplicationInstanceIdentifier,
           region,

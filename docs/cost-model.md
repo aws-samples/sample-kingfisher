@@ -21,7 +21,7 @@
 | Idle home region + extended support + second CloudTrail trail | ≈ $820 (measured $822) | When the account **already has** another CloudTrail trail, the platform's own multi-region trail is the second one and management events are billed at $2 per 100,000 events; an idle platform produces about 110,000 events per day ⇒ +$68 / month |
 | **Each idle execution region** | **≈ $165 (measured $180)** | Almost entirely the **11 VPC interface endpoints × 2 AZs = $161** that zero-egress networking requires; warehouse / scheduler / data lake cost **$0** while idle |
 | Demo-mode extra | +≈ $320 | Demonstration source database RDS MySQL db.t3.micro Multi-AZ (including $292 of extended support). **Absent in production mode** |
-| Real-time compute enabled (per region) | +$11 standing, +$27 after the first real-time sync | Kinesis source stream with 1 shard, $11 / month; the DMS replication instance dms.t3.small is created lazily when the first real-time sync task is set up and then stays at $27 / month |
+| Real-time compute enabled (per region) | +$11 standing, +$27 after the first real-time sync | Kinesis source stream with 1 shard, $11 / month; the DMS replication instance dms.t3.small is created lazily when the first real-time sync task starts, $27 / month, and is reclaimed automatically 10 minutes after the region's last DMS task is deleted |
 | **Running workloads (per execution region)** | small ≈ $140 · medium ≈ $2,100 · large ≈ $22,500 | Tier definitions and formulas in §6; model Q&A is extra (small $90 · medium $540 · large $3,600 per month, at Kimi K3 prices) |
 
 **In one sentence**: the smallest production shape (1 home region + 1 execution region) costs **≈ $620–990 per month** idle (depending on whether the extended-support fee and the second CloudTrail trail are eliminated);
@@ -64,7 +64,7 @@ Engine and image versions named below are listed with their code locations in [S
 | Execution | VPC (zero egress) | 2 AZs, **no NAT**; **11** interface endpoints (sts · logs · monitoring · kms · secretsmanager · glue · emr-serverless · redshift-data · s3tables · redshift-serverless · airflow-serverless; `infra/lib/exec-env/endpoints.ts`) + S3 / DynamoDB gateway endpoints (free) |
 | Execution | KMS CMK × 1; about 2 secrets; private hosted zone × 1 (cross-region write-back) | `exec-env/base-stack.ts` |
 | Execution | Redshift Serverless base 8 RPU · MWAA Serverless · S3 Tables table bucket · Glue · EMR Serverless | all usage-billed |
-| Execution (real-time enabled) | Kinesis source stream, 1 shard (standing) · Flink applications (billed only while running) · DMS replication instance dms.t3.small (standing after lazy creation) | `realtime-stack.ts` · `platform/src/lib/realtime/dms-service.ts` |
+| Execution (real-time enabled) | Kinesis source stream, 1 shard (standing) · Flink applications (billed only while running) · DMS replication instance dms.t3.small (lazily created; reclaimed once the region has no DMS task) | `realtime-stack.ts` · `platform/src/lib/realtime/dms-service.ts` |
 
 ---
 
@@ -115,7 +115,7 @@ The repository pins a database engine within standard support, so line 20 does n
 | | **Baseline subtotal** | | | **≈ $163** | **$5.3 per day** | |
 | 9 | CloudTrail paid events (same condition as §3 #21) | ≈ 20,000 events per day | $2 per 100,000 events | $12 | $0.39 | |
 | 10 | Real-time compute enabled: Kinesis source stream | 1 provisioned shard | $0.015 per shard-hour | $11 | (test accounts B / C: 1 shard standing per region) | |
-| 11 | After the first real-time sync task: DMS replication instance | dms.t3.small single-AZ, 20 GB | $0.0372 per hour | $27 | (test account B: 79 h measured) | created lazily, standing afterwards |
+| 11 | After the first real-time sync task: DMS replication instance | dms.t3.small single-AZ, 20 GB | $0.0372 per hour | $27 | (test account B: 79 h measured) | created lazily; reclaimed automatically 10 minutes after the region's last DMS task is deleted |
 | | **Total including #9 (real-time off)** | | | **≈ $175 (measured $180, including a small amount of test residue)** | | |
 
 The measured $180 includes a small amount of test residue. The interface endpoints are the price of zero-egress networking and cannot be removed.
@@ -131,7 +131,7 @@ The measured $180 includes a small amount of test residue. The interface endpoin
 | Warehouse query (Redshift Serverless) | base **8 RPU** | $0.375 per RPU-hour ⇒ **$3.00 per active hour**, 60-second minimum per wake-up ≈ $0.05 | one dashboard refresh (30 seconds) ≈ $0.05; one hour of continuous queries $3 | **active whenever anything queries the warehouse**; the leading item among the large ones; recovery time after a cold start is billed too |
 | Orchestration / scheduling (MWAA Serverless) | | **$0.08 per task-hour** (by the actual run time of each task) | 10 tasks of 5 minutes each ≈ $0.07 per run | test account B: 13.7 task-hours = $1.1 |
 | Stream job (Flink, MSAF) | parallelism 1 ⇒ **2 KPU** (1 + coordinator) | $0.11 per KPU-hour + 50 GB per KPU of running storage at $0.10 per GB-month | **≈ $170 per month per continuously running stream job** | test account B: 163 KPU-hours in each of its two regions = $18 over 3.4 days, consistent with 2 KPU standing |
-| Real-time sync (DMS) | dms.t3.small | $0.0372 per hour | standing $27 per month (one instance per region, shared by all tasks) | |
+| Real-time sync (DMS) | dms.t3.small | $0.0372 per hour | $27 per month while tasks exist (one instance per region, shared by all tasks; reclaimed once there are none) | |
 | Ask-Your-Data / Copilot / advisors (Bedrock, **Kimi K3**) | the platform scales output tokens × 2.1 (reasoning blocks) | input **$3.30 per million tokens**, output **$16.50 per million tokens**, cache read $0.165 | one question ≈ 8k input + 2k output ≈ **$0.06** | a cache hit can cut the input part to 1/20 |
 | Same, Claude Opus 4.5 (factory default) | | input $5 per million, output $25 per million | one question ≈ 8k + 1k ≈ $0.065 | |
 | Agent runtime (AgentCore) | by consumption | $0.0895 per vCPU-hour + $0.00945 per GB-hour, active time only | one question ≈ $0.002 | test account B, all acceptance runs: $0.4 |
