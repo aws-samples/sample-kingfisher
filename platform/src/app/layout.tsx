@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import RootLayoutClient from "./layoutClient";
-import { earlySkinScript } from "@/lib/skins/ThemeProvider";
+import { earlySkinScript } from "@/lib/skins/early-skin-script";
 
 export const metadata: Metadata = {
   title: "Kingfisher",

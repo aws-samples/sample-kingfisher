@@ -4,7 +4,8 @@
 //
 // 无闪烁策略:SSR 与首帧都用 DEFAULT_SKIN_ID(现青蓝)渲染,与服务端一致;挂载后从
 // localStorage 读回用户选择并应用。故未切换用户全程看到现青蓝,已切换用户在首帧后瞬间应用。
-// 一个 <head> 内联脚本在 React 之前先把已存皮肤的 body 背景刷上,进一步消除深色→其它色的闪动。
+// 一个 <head> 内联脚本在 React 之前先把已存皮肤的 body 背景刷上,进一步消除深色→其它色的闪动
+// (脚本与存储键定义在 ./early-skin-script —— 普通模块;根布局是服务端组件,不能从本文件这种客户端模块取值)。
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { ConfigProvider } from "antd";
@@ -21,8 +22,7 @@ import {
   type Skin,
 } from "./skins";
 import { skinToAntdTheme } from "./antdTheme";
-
-const STORAGE_KEY = "bgp-skin";
+import { SKIN_STORAGE_KEY } from "./early-skin-script";
 
 interface SkinCtx {
   skinId: string;
@@ -62,7 +62,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   // 挂载:读 localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(SKIN_STORAGE_KEY);
       if (saved && saved !== skinId && SKINS.some((s) => s.id === saved)) {
         setSkinIdState(saved);
       }
@@ -82,7 +82,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   const setSkinId = useCallback((id: string) => {
     setSkinIdState(id);
     try {
-      localStorage.setItem(STORAGE_KEY, id);
+      localStorage.setItem(SKIN_STORAGE_KEY, id);
     } catch {
       /* ignore */
     }
@@ -106,22 +106,3 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     </Ctx.Provider>
   );
 }
-
-/**
- * 早期背景脚本(放 <head>,在 React 之前执行):从 localStorage 读皮肤并预刷 body 背景。
- * 消除「已切换非默认皮肤的用户」刷新时的一帧默认色闪动。只做背景色,轻量安全。
- */
-export const earlySkinScript = `(function(){try{
-  var id=localStorage.getItem(${JSON.stringify(STORAGE_KEY)});
-  if(!id)return;
-  var m=${JSON.stringify(
-    SKINS.reduce((acc, s) => {
-      acc[s.id] = { bg: skinBodyBackground(s), size: skinBodyBackgroundSize(s), text: s.text };
-      return acc;
-    }, {} as Record<string, { bg: string; size: string; text: string }>),
-  )};
-  var s=m[id]; if(!s)return;
-  var b=document.body||document.documentElement;
-  document.documentElement.setAttribute('data-skin',id);
-  if(document.body){document.body.style.background=s.bg;document.body.style.backgroundSize=s.size;document.body.style.backgroundAttachment='fixed';document.body.style.color=s.text;}
-}catch(e){}})();`;
