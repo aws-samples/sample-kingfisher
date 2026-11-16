@@ -14,7 +14,9 @@ export const BI_CHART_TYPES: BiChartType[] = ["table", "metric", "bar", "barh", 
 export type BiEngine = "redshift" | "athena";
 export const BI_ENGINES: BiEngine[] = ["redshift", "athena"];
 
-// 取数来源(三源归一)。sql / genbi 本质相同(engine + 只读 SQL),genbi 仅标记"由 AI 生成"便于展示/再编辑。
+// 取数来源。sql / genbi 本质相同(engine + 只读 SQL),genbi 仅标记"由 AI 生成"便于展示/再编辑。
+// metric = 引用数据建模里的一个指标:视觉对象只存指标 id,**每次取数时**按指标当前定义生成 SQL
+// (不把 SQL 快照进视觉对象 ⇒ 指标口径改了,引用它的视觉对象下次取数自动跟随)。
 // v2:sql source 可选带 `builder` spec(字段配置器所建),用于"再编辑时还原字段面板";执行仍只认 sql,
 // builder 仅是 UI 元数据。老 v1 报表无此字段,向后兼容(读取时为 undefined 即纯 SQL 模式)。
 /**
@@ -28,9 +30,11 @@ export type WidgetSource =
   | { kind: "sql"; engine: BiEngine; sql: string; builder?: unknown; targetId?: string }
   // dataapi 已下线(2026-09-05,50 SPEC §3.9c):分支**保留**让存量行反序列化不炸;取数一律 410,编辑器不再提供。
   | { kind: "dataapi"; apiId: string; params?: Record<string, string> }
-  | { kind: "genbi"; engine: BiEngine; sql: string; question?: string; targetId?: string };
+  | { kind: "genbi"; engine: BiEngine; sql: string; question?: string; targetId?: string }
+  // 指标来源的落点**必填**:它是新来源,没有存量行,不沿用上面「没有这个字段 = 主控区」的历史口径。
+  | { kind: "metric"; modelMetricId: string; targetId: string };
 
-export const WIDGET_SOURCE_KINDS = ["sql", "dataapi", "genbi"] as const;
+export const WIDGET_SOURCE_KINDS = ["sql", "dataapi", "genbi", "metric"] as const;
 export type WidgetSourceKind = (typeof WIDGET_SOURCE_KINDS)[number];
 
 export interface WidgetViz {
@@ -112,7 +116,7 @@ export interface BiQueryResult {
 export interface BiWidget {
   widgetId: string; // 画布内唯一(ULID)
   name: string;
-  source: WidgetSource; // 复用:sql / dataapi / genbi(可视化配置编译成 sql,并存 builder spec)
+  source: WidgetSource; // 复用:sql / dataapi / genbi / metric(可视化配置编译成 sql,并存 builder spec)
   viz: WidgetViz; // 复用:v3 多系列 / 分组 / 堆叠 / 横向
 }
 

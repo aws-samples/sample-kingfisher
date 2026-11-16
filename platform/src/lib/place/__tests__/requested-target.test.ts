@@ -334,6 +334,11 @@ describe("接线:前端取 /api/flink/network 的每一处都带 ?targetId=", ()
     expect(rd("components/bi/FieldConfigurator.tsx")).toMatch(/const fcTarget = landingOfScope\(fcScope\);/);
     const wb = rd("components/bi/AnalysisWorkbench.tsx");
     expect((wb.match(/targetId: widgetTarget \|\| landingOfScope\(wScope\)/g) || []).length, "两处预览取数").toBe(2);
+    // 指标来源:落点只有一个作者(沿用已存的,否则当前视角的落点),预览请求与存进视觉对象的是同一个值
+    expect(wb).toMatch(/const metricLanding = widgetTarget \|\| landingOfScope\(wScope\);/);
+    expect(wb, "指标预览取数带落点").toMatch(/source: \{ kind: "metric", modelMetricId: metricId, targetId: metricLanding \}, targetId: metricLanding \}\)/);
+    expect(wb, "指标来源保存时把落点写进视觉对象").toMatch(/source: \{ kind: "metric", modelMetricId: metricId, targetId: metricLanding \}, viz:/);
+    expect(wb, "指标来源不许按条件写落点").not.toMatch(/kind: "metric", modelMetricId: metricId, \.\.\.\(widgetTarget \?/);
   });
 
   it("前端新建作业的每一处请求体都带 targets(由 landingOfScope 给,不靠后端缺省)", () => {

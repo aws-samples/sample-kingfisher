@@ -8,6 +8,7 @@ import type { ContextEntry, ContextKind } from "./types";
 // 口径 kind → 展示标签(语义层单一事实源:prompt 文本与前端可观测项共用同一份 label)。
 export const CONTEXT_KIND_LABEL: Record<ContextKind, string> = {
   caliber: "口径/指标定义", term: "术语/别名", rule: "规则/注意事项",
+  metric: "建模指标",
 };
 
 // 注入提示块的统一 section 头(语义层单一事实源:codegen / GenBI / 诊断 共用同一措辞,

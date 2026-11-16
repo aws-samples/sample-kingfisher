@@ -102,7 +102,7 @@ Each turn's answer is an "Assistant" card, from top to bottom:
 | "This SQL actually ran in: <region>" | Which region the SQL really ran in | If it differs from the current view a red warning appears: "This SQL actually ran in <A>, not the current view <B> — this answer is NOT that region's data" |
 | Masking note | "Some sensitive fields are masked per data classification: <columns> (for plaintext, use 'Request Access' in Data Governance)" | Classification lives on the physical column; aliased and expression columns are masked all the same; see §1.9 |
 | "Matched tables:" | The tables retrieved this turn and why | Those tagged "Finalized" are tables consolidated through request delivery and are preferred |
-| "Applied N business definition(s) (results follow these definitions):" | The definition entries that were referenced | Not shown = your definition was not referenced; go back to §2 and check the wording |
+| "Applied N business definition(s) (results follow these definitions):" | The entries that were referenced (tags read "type · name"; "Modeling metric · metric name (table)" is a metric definition from "Data Modeling → Metric system") | Not shown = your definition was not referenced; go back to §2 and check the wording |
 | Data area | A single value shows as a large metric; multiple rows show as a table or chart | "Display mode:" can switch between "Auto", "Table", "Bar chart", "Line chart"; tables paginate and show "N rows" |
 | "View generated SQL" | The collapsed SQL text | Expand and check the definitions every time before deciding whether to save |
 | "Execution path (N steps)" | Each step's tool, phase (prepare / reason), success / failure, duration, inputs, result | Look here to investigate "why this table was chosen" or "why it was slow" |
@@ -194,6 +194,8 @@ Key points:
 
 - The wording decides the hit rate: the name must match how you phrase it when asking; the content should name the table, the columns and the exclusion conditions. Page examples: "GMV = total paid order amount, excluding status='cancelled'", "rows starting with QAREG are test data, exclude from analysis".
 - How to verify: ask in Ask-Your-Data with the term you defined; if "Applied N business definition(s)" appears in the answer area, it was referenced.
+- Metrics defined under "Data Modeling → Metric system" need not be copied here: retrieving business definitions automatically includes the matching metric definitions (tag "Modeling metric"), and once a metric's definition changes, the next question follows the new one.
+  Write here only what the metric system cannot express (term aliases, exclusion rules, notes on how to fetch the data).
 - Permissions: creating / editing requires project `editor`; "Global" entries can only be created and edited by platform admins.
 - When an admin clicks "Load common definitions", a set of common examples is filled in with one click, with the toast "Common definitions loaded (N added, M updated)".
 
@@ -257,6 +259,7 @@ The "Current scope only" switch at the top right is off by default — switching
    | "Visual builder" | Choose "Warehouse (Redshift)" / "Data lake (Athena)" → "Select a table (no SQL needed)" → drag fields into "X axis / dimension", "Group / color", "Value / measure", "Filters" → choose a chart type → "Preview" | Chart types: bar / line / pie / table / metric card / gauge; stacking, horizontal, sorting and limit can be set |
    | "Free SQL" | Choose the engine → write SQL → "Preview data" → choose "Chart type" (table / bar chart / horizontal bar / line chart / pie chart / metric card) | The SQL must be SELECT / WITH, otherwise the hint "SQL must be a read-only SELECT / WITH query" appears |
    | "Import from reports" | "Select a report" | After import it becomes an independent visual on the canvas (the data configuration is copied and decoupled from the original report) |
+   | "Metric" | In the selector "Select a metric", choose a metric defined under "Data Modeling → Metric system" → "Preview data" | Always a metric card labelled "metric name (unit)"; only "which metric is referenced" is stored and every fetch computes on the warehouse from the metric's current definition, so the dashboard follows a changed definition; after the metric is deleted the card shows a red hint asking you to select again |
 
 3. Click "OK". Each visual on the canvas has "Edit", "Refresh", "Export CSV", "Remove" at its top right.
 4. Fill in "Analysis name" and click "Save". An empty name gives "Please enter an analysis name"; no visuals gives "Please add at least one visual".
@@ -270,7 +273,7 @@ Key points:
 
 - Data retrieval reuses the platform query engine and is **automatically masked**, with the same classification rules as Ask-Your-Data.
 - Every visual carries its own target: the execution scope in the top bar only decides the default target when creating; one dashboard can place charts from different regions side by side.
-- The legacy "data service" data source has been retired; affected cards show "Data service retired" — rebuild them with one of the three data methods above.
+- The legacy "data service" data source has been retired; affected cards show "Data service retired" — rebuild them with one of the four data methods above.
 
 ![Report Builder](../screenshots/bi.webp)
 

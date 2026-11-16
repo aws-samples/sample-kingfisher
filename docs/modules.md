@@ -229,7 +229,7 @@
 
 ### 4.1 Ask-Your-Data, GenBI (key module)
 
-- **What it does**: natural language → SQL → a real query **in the region where the data lives** (Redshift / Athena, read-only) → table / chart / explanation; grounded in the business glossary, published datasets and short- / long-term memory;
+- **What it does**: natural language → SQL → a real query **in the region where the data lives** (Redshift / Athena, read-only) → table / chart / explanation; grounded in the business glossary, modeling metric definitions, published datasets and short- / long-term memory;
   a result can be saved as a **session card** (continue the conversation, scheduled refresh, at most 100 cards per user); asynchronous execution (202 + polling); hot-loaded skills; observability dashboard.
 - **Pages**: `/genbi` (questions) · `/skills` (skills) · `/observability` (observability) · `/knowledge` (business glossary and rules).
 - **API**: `genbi` (`ask` · `tasks/[taskId]` · `history` · `cards` · `cards/[cardId]` (`refresh` · `resume` · `runs` · `schedule`) · `cards/schedules` · `context` · `context/[id]` · `context/seed` · `skills` · `skills/[id]` · `skills/seed`) · `observability/genbi`.
@@ -249,6 +249,9 @@
   three-layer model resolution (factory default → Settings → takes effect only after a run-time probe passes; see the [model configuration design](design/model-configuration.md)), and the response `_meta` echoes the model actually used
   (implemented after this baseline and released on 2026-10-27: the result card shows "Model used: <id> · backend", `data-testid=genbi-model-used`); masking follows the classification rules ([classification and masking design](design/classification-masking.md));
   before a scheduled refresh **runs on the author's behalf**, the account / workspace membership / the card's region are re-verified.
+- **Modeling metrics in grounding**: on every retrieval the skill `lookup_business_context` merges the metric definitions of "Data Modeling → Metric system" (table / aggregation / filters / time range / unit, dialect-neutral) with the business-glossary entries and runs them through the same filtering / ranking / truncation; the entry kind is "Modeling metric";
+  the shaping code has a single author, `src/lib/genbi/core/metric-context.ts` (no IO), shared by the in-process path (`context.ts#getContextForGrounding`) and the AgentCore skills Lambda (`infra/lambda/genbi-skills/index.js`);
+  when the metric table cannot be read, grounding degrades to glossary entries only; upgrading to a version that changes this part requires `redeploy-agents.sh`.
 - **Known boundaries**: if Bedrock is unavailable in the customer account (model access denied), Ask-Your-Data and all other AI features are unavailable; the remaining features are unaffected.
   - Since the release of 2026-10-27 the selectable models have been extended to four families (Claude Opus / GPT-5.6 / GLM 5 / Kimi K3, single author `platform/src/lib/ai/core/vendors.ts`), so an account whose access to Anthropic models is denied at the account level can switch to GLM / Kimi;
   - Kimi K3 always returns reasoning blocks and produces roughly twice as many output tokens as Claude (the platform scales maxTokens by a factor), and GLM 5.3 may not be enabled at the account level (probe classification `NotAvailableForAccount`).
@@ -256,9 +259,12 @@
 
 ### 4.2 Report Builder
 
-- **What it does**: maintains report widgets, dashboards and ad-hoc analyses per workspace; data comes from Ask-Your-Data results / warehouse queries; export.
+- **What it does**: maintains report widgets, dashboards and ad-hoc analyses per workspace; data comes from Ask-Your-Data results / warehouse queries / modeling metrics; export.
 - **Pages**: `/bi`. **API**: `bi` (`reports` · `reports/[id]` · `dashboards` · `dashboards/[id]` · `analyses` · `analyses/[id]` · `analysis-query` · `query` · `schema` · `export`).
 - **Core code**: `src/lib/bi/` (`reports.ts` key-based isolation with pk=projectId and optimistic locking; `query-builder.ts` · `chart-series.ts` · `definition-regions.ts`).
+- **Key mechanisms**: a visual has four data methods (visual builder / free SQL / import from reports / metric). The "Metric" method stores only the metric id and the execution target;
+  every fetch goes through the single entry `src/lib/modeling/model-metrics.ts#modelMetricSqlById`, which generates SQL from the metric's current definition (a changed definition is followed automatically), runs on the warehouse only, is masked as usual and labels the result column "metric name (unit)";
+  a missing metric ⇒ 404 pointing to re-selection, a definition that cannot be turned into SQL ⇒ 400 with the reason. The execution target of every visual is persisted as given on save (`reports.ts#normalizeSource`; an invalid target is rejected; the metric method requires one), and the list column "Regions involved" is computed from it.
 - **Design note**: the [BI report / dashboard design](design/bi-report-dashboard.md) (its early v2 – v4 drafts are archived).
 
 ### 4.3 Requests
@@ -320,6 +326,8 @@
 - **Core code**: `src/lib/modeling/` (`service.ts` · `landing.ts` · `dimensions.ts` · `redshift.ts` safe SQL + unified execution · `unbind.ts`). **AWS dependencies**: Redshift Data API.
 - **Key mechanisms**: code tables and dimension tables can be landed in non-home regions (single author of the physical place); since the graphical create / alter table feature (released on 2026-10-27) the ledger row carries `origin` (modeling / catalog / catalog-adopted)
   and, for alterations in non-home regions, the pending execution plan `pendingAlter` (the admin executor operation `alter-model-table` reads only that). **Design note**: the [data modeling design](design/data-modeling.md).
+- **Metric reuse**: one definition per metric for the whole platform (table `bgp-model-metrics`); the executable SQL has a single author, `src/lib/modeling/metric-sql.ts#buildMetricSql`, and the derived → atomic resolution rule has a single author, `src/lib/genbi/core/metric-context.ts#resolveMetricSpec`;
+  consumers = the home-page "Core business metrics" card · the "Metric" data method of Report Builder visuals (section 4.2) · Ask-Your-Data grounding (section 4.1) · the Copilot discovery tool; computed values are stored per region, the definition is not.
 
 ### 5.4 Metrics Store
 

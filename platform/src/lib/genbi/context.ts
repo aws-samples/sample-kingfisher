@@ -6,9 +6,10 @@ import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 // 类型与格式化逻辑已收敛进 @genbi/core（语义层单一来源,容器/Lambda 共用）。
 // 此文件保留 DynamoDB 读写(适配器)+ re-export core 的类型/格式化,现有 import 路径不变。
-import type { ContextKind, ContextEntry } from "./core/types";
-import { filterAndRankContext } from "./core/context-format";
-export type { ContextKind, ContextEntry } from "./core/types";
+import type { StoredContextKind, ContextEntry } from "./core/types";
+import { groundingEntries } from "./core/metric-context";
+import { listModelMetrics } from "@/lib/modeling/model-metrics";
+export type { ContextKind, StoredContextKind, ContextEntry } from "./core/types";
 export {
   CONTEXT_KIND_LABEL, CONTEXT_SECTION_TITLE,
   contextToPromptText, contextToUsedItems,
@@ -17,8 +18,9 @@ export type { UsedContextItem } from "./core/context-format";
 
 export const GLOBAL_SCOPE = "global";
 
-const KINDS: ContextKind[] = ["caliber", "term", "rule"];
-export function isKind(v: unknown): v is ContextKind {
+// 用户能建 / 改成的种类(闭合清单)。建模指标那一种不在这里:它由指标表的定义实时转换而来,不落口径表。
+const KINDS: StoredContextKind[] = ["caliber", "term", "rule"];
+export function isKind(v: unknown): v is StoredContextKind {
   return typeof v === "string" && (KINDS as string[]).includes(v);
 }
 
@@ -82,15 +84,21 @@ export async function queryAllPagesOwned(table: string, projectId: string, maxPa
 }
 
 // 供 Agent/codegen grounding 用：返回启用条目（关键词仅用于相关项排前，不丢弃任何条目）。
-// 过滤/排序/截断逻辑收敛于 @genbi/core filterAndRankContext（与 Lambda lookup_business_context 共用同一算法）；
-// 本函数只负责从 DynamoDB 读出条目（IO 适配器）。
+// 条目 = 业务口径行(本项目 ∪ global)∪ 建模指标的定义(指标表,全平台共享)。
+// 指标 → 条目的转换、合并顺序、过滤 / 排序 / 截断全部收敛于 @genbi/core groundingEntries
+// （与 Lambda lookup_business_context 共用同一份）；本函数只负责把两张表的行读出来（IO 适配器）。
+// 指标表读失败与口径表读失败同一取舍:降级为不带指标,绝不阻塞问数。
 export async function getContextForGrounding(projectId: string, keywords?: string): Promise<ContextEntry[]> {
-  return filterAndRankContext(await listContext(projectId), keywords);
+  const [contextRows, metricRows] = await Promise.all([
+    listContext(projectId),
+    listModelMetrics().catch(() => []),
+  ]);
+  return groundingEntries(contextRows, metricRows, keywords);
 }
 
 export async function createContext(input: {
   projectId: string;
-  kind: ContextKind;
+  kind: StoredContextKind;
   title: string;
   body: string;
   scope?: string;
@@ -124,7 +132,7 @@ export async function deleteContext(projectId: string, entryId: string): Promise
 export async function updateContext(
   projectId: string,
   entryId: string,
-  patch: { kind?: ContextKind; title?: string; body?: string; scope?: string; tags?: string[] }
+  patch: { kind?: StoredContextKind; title?: string; body?: string; scope?: string; tags?: string[] }
 ): Promise<ContextEntry> {
   const cur = await getContext(projectId, entryId);
   if (!cur) throw new Error("条目不存在");

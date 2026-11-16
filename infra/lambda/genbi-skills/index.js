@@ -6,7 +6,10 @@ const { DynamoDBClient, QueryCommand } = require("@aws-sdk/client-dynamodb");
 const { unmarshall } = require("@aws-sdk/util-dynamodb");
 // @genbi/core 编译产物:口径 grounding 检索(过滤+相关性排序+截断)与 body→definition 映射
 // 收敛于 core,与平台 getContextForGrounding 共用同一算法（消灭 Lambda 本地副本）。
-const { filterAndRankContext, contextToGroundingItems } = require("./core-dist/context-format");
+const { contextToGroundingItems } = require("./core-dist/context-format");
+// 建模指标的定义也经这条通道给智能体:指标行 → 条目的转换、与口径行的合并顺序、过滤 / 排序 / 截断
+// 全在 core 的 groundingEntries(平台 getContextForGrounding 调的是同一个函数)。
+const { groundingEntries } = require("./core-dist/metric-context");
 // Athena/Trino 只读守卫:放行 SHOW/DESCRIBE/EXPLAIN 元数据语句(Redshift 版 sanitizeSelect
 // 会误拒),写/DDL 仍全拒。与平台 athena/sql-guard 共用同一份(消灭 Athena 守卫方言副本)。
 const { sanitizeReadOnly } = require("./core-dist/sql-guard");
@@ -14,6 +17,9 @@ const { sanitizeReadOnly } = require("./core-dist/sql-guard");
 const ddb = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
 const CTX_TABLE = process.env.GENBI_CONTEXT_TABLE || "bgp-genbi-context";
 const SKILLS_TABLE = process.env.GENBI_SKILLS_TABLE || "bgp-genbi-skills";
+// 建模指标表(全平台共享的指标定义,单逻辑分区)。
+const METRICS_TABLE = process.env.MODEL_METRICS_TABLE || "bgp-model-metrics";
+const METRICS_PK = "modelmetric";
 // HTTP 技能出站域名白名单（逗号分隔；为空表示不限定域名，仍受内网 IP 守卫约束）。
 const HTTP_ALLOWLIST = (process.env.GENBI_HTTP_ALLOWLIST || "")
   .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -156,7 +162,7 @@ async function fetchOmDescriptions() {
 }
 
 async function lookupBusinessContext(args) {
-  // 查业务知识/口径/规则:项目 + global。返回紧凑条目供 Agent grounding。
+  // 查业务知识/口径/规则(项目 + global)与建模指标的定义。返回紧凑条目供 Agent grounding。
   // 只保留 DynamoDB 读取(IO);过滤/相关性排序/截断 + body→definition 映射均走 @genbi/core
   // (与平台 getContextForGrounding 共用同一算法,消灭跨语言副本)。
   const projectId = (args && args.projectId) || "proj-default";
@@ -171,8 +177,19 @@ async function lookupBusinessContext(args) {
       return (r.Items || []).map((it) => unmarshall(it));
     } catch { return []; }
   };
+  // 指标表读失败与口径表同一取舍:降级为不带指标,不影响问数。
+  const queryMetrics = async () => {
+    try {
+      const r = await ddb.send(new QueryCommand({
+        TableName: METRICS_TABLE,
+        KeyConditionExpression: "pk = :p",
+        ExpressionAttributeValues: { ":p": { S: METRICS_PK } },
+      }));
+      return (r.Items || []).map((it) => unmarshall(it));
+    } catch { return []; }
+  };
   const raw = [...(await queryPk(projectId)), ...(projectId === "global" ? [] : await queryPk("global"))];
-  const entries = filterAndRankContext(raw, keywords);
+  const entries = groundingEntries(raw, await queryMetrics(), keywords);
   return { success: true, count: entries.length, entries: contextToGroundingItems(entries) };
 }
 

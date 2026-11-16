@@ -12,10 +12,10 @@
 // 保持中立:不假设具体表名/列名(那是各项目的事),口径用通用表述并给出「如何落到 SQL」的提示,
 // 让 Agent 生成 SQL 时遵循正确口径而非猜测。
 
-import type { ContextKind } from "./context";
+import type { StoredContextKind } from "./context";
 
 export interface GlobalContextSeed {
-  kind: ContextKind;
+  kind: StoredContextKind;
   title: string;
   body: string;
   scope?: string;

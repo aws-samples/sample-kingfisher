@@ -1,12 +1,15 @@
 # Customer Production Deployment Manual (Multi-Region Edition)
 
-> Document revision: **v1.33** (2026-11-09: section 7ter step 2 documents the two new upgrade-script steps 2c‴ (auto-registers external buckets referenced by existing home-region sync tasks as routes) and 2f (refreshes the EMR / Flink stacks);
-> new section 7ter.1j, four things to know when upgrading to the version with lake table-bucket routing; section 8 marks the cross-bucket entry as fixed in 2.2.0, the 2.1.2 transition stays) ·
+> Document revision: **v1.34** (2026-11-16: new section 7ter.1k, three things to know when upgrading to the version with "sync-node business date, scoped downstream dependencies and the Glue version of new jobs";
+> new section 7ter.1l, three things to know when upgrading to the version with "metric reuse (modeling metrics in Ask-Your-Data + the "Metric" data method of report visuals)" —
+> run `redeploy-agents.sh` as well · save once more the visuals that were saved in an execution-region view before the upgrade · no new table, execution regions need no redeployment) ·
 >
-> Earlier revisions (39) are in the collapsible list below.
+> Earlier revisions (40) are in the collapsible list below.
 
 <details><summary>Revision history</summary>
 
+- **v1.33** (2026-11-09: section 7ter step 2 documents the two new upgrade-script steps 2c‴ (auto-registers external buckets referenced by existing home-region sync tasks as routes) and 2f (refreshes the EMR / Flink stacks);
+  new section 7ter.1j, four things to know when upgrading to the version with lake table-bucket routing; section 8 marks the cross-bucket entry as fixed in 2.2.0, the 2.1.2 transition stays) ·
 - **v1.32** (2026-11-03: section 8 adds the production transition for "one batch job reading from and writing to several S3 Tables table buckets"
   (Job parameters `--conf` registering several catalogs + three-part names; the root fix ships with the lake-bucket-routing work, see [lake-bucket-routing.md](design/lake-bucket-routing.md));
   the customer has separately received the "Cross-table-bucket read/write handbook (2.1.2)") ·
@@ -587,6 +590,16 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 2. **New Glue jobs persist their version at creation**: a job created with "New" now carries `glueVersion` (nothing selected = default 6.0, the highest version in the supported list), reopening it no longer shows 5.1, and its first run creates the Glue job definition as 6.0. **Existing** jobs without a stored version keep running and displaying 5.1: an upgrade never changes the Glue version of an existing job.
    Glue 6.0 is Spark 4 (ANSI mode on by default, AWS SDK for Java v2 only, Scala 2.13); check new job scripts against [docs/supported-versions.md](supported-versions.md) and the migration hints shown in the version selector, and pick 5.1 in the selector for a job that needs the old behaviour.
 3. **The "Downstream dependencies" selector on the workflow page lists only the sync tasks and workflows of the workflow's execution regions** (before: objects of every region). Downstream dependencies configured before the upgrade that point at objects of another region are **not changed automatically**; review them on the workflow page and reselect where needed. The Batch Compute run-history table now scrolls horizontally (the "Started" and "Error" columns stay visible at a 1600 px viewport); no upgrade action.
+
+### 7ter.1l Three things to know when upgrading to the version with "metric reuse (modeling metrics in Ask-Your-Data + the "Metric" data method of report visuals)" (ships with 2.2.0)
+
+1. **Run `redeploy-agents.sh` as well** (`--check` first): the half that feeds metric definitions to Ask-Your-Data lives in the Ask-Your-Data skills Lambda (deployed with the agent stack), which `redeploy-platform.sh` does not refresh —
+   with a platform-only upgrade the "Metric" method of reports works, but Ask-Your-Data answers still carry no "Modeling metric". The skills Lambda gains one read-only permission on the metric-definition table and one environment variable; both take effect with the same `redeploy-agents.sh` run; no new table.
+2. **Report / analysis-dashboard visuals that were saved in an execution-region view before the upgrade must be saved once more**: earlier versions dropped a visual's execution target on save, so such visuals fetch from the home region when reopened and the list column "Regions involved" shows the home region;
+   the target was never persisted at that time, so the upgrade cannot restore it for you. How: switch "Execution scope" in the top bar to the execution region the visual was meant to read → open the dashboard → "Edit" the visual → "OK" → "Save" the dashboard; "Regions involved" is corrected accordingly.
+   Visuals built in the home-region view are not affected.
+3. **Report visuals gain the data method "Metric"**: only the metric id and the execution target are stored, and every fetch computes from the current definition in "Data Modeling → Metric system" ⇒ changing a metric's definition immediately affects every dashboard that references it;
+   before deleting a metric, make sure no dashboard uses it (after a referenced metric is deleted, its card shows a red hint pointing the way and no value). Execution regions need no redeployment.
 
 ### 7ter.1 Six things to know when upgrading to the "data-sync capability completion" version (`release-2026-10-13`)
 

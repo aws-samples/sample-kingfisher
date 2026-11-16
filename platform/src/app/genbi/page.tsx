@@ -137,7 +137,7 @@ function TurnResult({ result, onPromote, onSaveCard, expectRegion }: { result: G
           <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 6 }}>
             {result.usedContext.map((c, i) => (
               <Tag key={i} color="gold" style={{ fontSize: 12 }}>
-                {c.kindLabel} · {c.title}{c.scope ? `（${c.scope}）` : ""}
+                {t(c.kindLabel)} · {c.title}{c.scope ? `（${c.scope}）` : ""}
               </Tag>
             ))}
           </div>

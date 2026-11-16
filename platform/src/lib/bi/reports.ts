@@ -4,6 +4,7 @@
 import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { isValidTargetId } from "@/lib/exec-env/target-id";
 import {
   BiReport,
   WidgetSource,
@@ -22,10 +23,35 @@ export class OptimisticLockError extends Error {
   }
 }
 
+/**
+ * 读出视觉对象的落点章(在哪个区取数)并校验:没给 ⇒ 空串(由调用方决定是不写字段还是拒绝);
+ * 给了就必须是合法的执行环境 id,**原样返回**供存下来。
+ * 2026-11-12 真环境坐实:归一化只挑 kind / engine / sql 几个字段回写,把页面写进来的落点丢了
+ * ⇒ 在某个执行区视角建的视觉对象,保存后重新打开就回到主控区取数,列表「涉及区域」也恒为主控区。
+ */
+function landingStampOf(input: any): string {
+  const raw = input?.targetId;
+  if (raw === undefined || raw === null || raw === "") return "";
+  if (!isValidTargetId(raw)) throw new Error(`取数落点非法:${JSON.stringify(raw)}(应为执行环境 id)`);
+  return raw;
+}
+
+/** 指标 id 的形状(只做形状校验;指标是否存在在取数时如实报)。 */
+const MODEL_METRIC_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
+
 // 校验 + 规范化取数来源。抛出的 message 直接回前端。
 // 导出:v4 分析看板的视觉对象内嵌同构的 source,复用同一校验(不重造、不改行为)。
 export function normalizeSource(input: any): WidgetSource {
   const kind = input?.kind;
+  if (kind === "metric") {
+    const modelMetricId = String(input?.modelMetricId || "").trim();
+    if (!modelMetricId) throw new Error("指标来源需要选择一个指标");
+    if (!MODEL_METRIC_ID_RE.test(modelMetricId)) throw new Error("指标来源的指标 id 非法");
+    // 指标来源的落点必填:存下来的视觉对象必须说清在哪个执行环境的数仓上算,缺了就拒,不默认主控区。
+    const stamp = landingStampOf(input);
+    if (!stamp) throw new Error("指标来源需要取数落点(在哪个执行环境的数仓上计算)");
+    return { kind: "metric", modelMetricId, targetId: stamp };
+  }
   if (kind === "dataapi") {
     const apiId = String(input?.apiId || "").trim();
     if (!apiId) throw new Error("数据服务来源需要 apiId");
@@ -38,15 +64,17 @@ export function normalizeSource(input: any): WidgetSource {
     if (!sql) throw new Error("SQL 来源需要 sql");
     if (!/^(select|with)\b/i.test(sql)) throw new Error("SQL 必须是 SELECT / WITH 只读查询");
     if (sql.includes(";")) throw new Error("SQL 不允许包含分号(单语句)");
+    // 这两种来源有存量行:没给落点就不写字段(= 主控区,见 WidgetSource 的说明);给了原样存。
+    const stamp = landingStampOf(input);
     if (kind === "genbi") {
       const question = input?.question ? String(input.question).slice(0, 500) : undefined;
-      return { kind: "genbi", engine, sql, ...(question ? { question } : {}) };
+      return { kind: "genbi", engine, sql, ...(question ? { question } : {}), ...(stamp ? { targetId: stamp } : {}) };
     }
     // v2:字段配置器所建的 sql source 可带 builder spec(纯 UI 元数据,用于再编辑还原字段面板)。
     const builder = input?.builder && typeof input.builder === "object" ? input.builder : undefined;
-    return { kind: "sql", engine, sql, ...(builder ? { builder } : {}) };
+    return { kind: "sql", engine, sql, ...(builder ? { builder } : {}), ...(stamp ? { targetId: stamp } : {}) };
   }
-  throw new Error("source.kind 必须是 sql / dataapi / genbi");
+  throw new Error("source.kind 必须是 sql / dataapi / genbi / metric");
 }
 
 // 导出:v4 分析看板的视觉对象复用同一 viz 归一(含 v3 多系列/分组/堆叠/横向白名单)。

@@ -10,9 +10,10 @@
 import { safeIdent, sqlString } from "./redshift";
 import type { MetricAgg, ModifierOp, TimeWindow, MetricModifier } from "./types";
 
-const AGGS: MetricAgg[] = ["count", "count_distinct", "sum", "avg", "min", "max"];
-const OPS: ModifierOp[] = ["=", "!=", ">", ">=", "<", "<=", "in"];
-const TIME_WINDOWS: TimeWindow[] = ["all", "today", "7d", "30d", "90d", "mtd", "ytd"];
+// 三份闭合清单(导出供「给问数读的指标定义文本」逐项对齐:新增一种而那边没有对应文本,单测即红)。
+export const AGGS: MetricAgg[] = ["count", "count_distinct", "sum", "avg", "min", "max"];
+export const OPS: ModifierOp[] = ["=", "!=", ">", ">=", "<", "<=", "in"];
+export const TIME_WINDOWS: TimeWindow[] = ["all", "today", "7d", "30d", "90d", "mtd", "ytd"];
 
 export function isAgg(v: unknown): v is MetricAgg {
   return typeof v === "string" && (AGGS as string[]).includes(v);

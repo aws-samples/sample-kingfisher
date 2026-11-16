@@ -12,7 +12,7 @@ import { bindingForNewSyncTask } from "@/lib/exec-env/definition-binding";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
-import { createContext, isKind, type ContextKind } from "@/lib/genbi/context";
+import { createContext, isKind, type StoredContextKind } from "@/lib/genbi/context";
 import type { CopilotCaller } from "./types";
 
 // 单租户分区键(与 sync/etl-jobs/flink route 的 USER_ID 一致——建出来的草稿才和页面列表同分区可见)。
@@ -171,7 +171,7 @@ export async function createContextEntry(args: any, caller: CopilotCaller): Prom
   const body = String(args?.body || "").trim();
   if (!title) throw new Error("缺少口径标题 title");
   if (!body) throw new Error("缺少口径内容 body");
-  const kind: ContextKind = isKind(args?.kind) ? args.kind : "caliber";
+  const kind: StoredContextKind = isKind(args?.kind) ? args.kind : "caliber";
   const e = await createContext({ projectId: caller.projectId, kind, title, body, createdBy: "copilot" });
   return { entryId: e.entryId, title: e.title };
 }

@@ -9,10 +9,11 @@ import { PutCommand, QueryCommand, GetCommand, UpdateCommand, DeleteCommand } fr
 import { ulid } from "ulid";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
-import { buildMetricSql, isAgg, isTimeWindow, isOp, quoteTable } from "./metric-sql";
+import { buildMetricSql, isAgg, isTimeWindow, isOp, quoteTable, type MetricQuerySpec } from "./metric-sql";
 // 指标计算按区(只读标量,与 DDL 的 home-only 无关)
 import { execScalarAt, safeIdent } from "./redshift";
 import { pushMetricGlossary } from "@/lib/openmetadata/om-glossary";
+import { resolveMetricSpec } from "@/lib/genbi/core/metric-context";
 import type { ModelMetric, MetricModifier, MetricAgg, TimeWindow, MetricFormat } from "./types";
 
 const METRIC_PK = "modelmetric";
@@ -146,24 +147,30 @@ export async function deleteModelMetric(modelMetricId: string): Promise<void> {
 
 // ─── 计算 ──────────────────────────────────────────────────────────────────────
 // 解析指标(原子直接用自身;派生先取引用的原子拿 fqn/agg/measureColumn,再叠加派生的修饰词/时间窗)。
-async function resolveQuerySpec(m: ModelMetric) {
-  if (m.metricType === "atomic") {
-    if (!m.fqn || !m.agg) throw new Error("原子指标定义不完整");
-    return { fqn: m.fqn, agg: m.agg, measureColumn: m.measureColumn, timeColumn: m.timeColumn, timeWindow: undefined as TimeWindow | undefined, modifiers: [] as MetricModifier[] };
+// 「派生怎么落到原子上」的规则只有一个作者(与问数读到的指标定义同一份),这里只负责把引用的原子行读出来。
+async function resolveQuerySpec(m: ModelMetric): Promise<MetricQuerySpec> {
+  const atomic = m.metricType !== "atomic" && m.atomicId ? await getModelMetric(m.atomicId) : null;
+  const r = resolveMetricSpec(m, atomic);
+  if (!r.ok) throw new Error(r.reason);
+  return r.spec;
+}
+
+/** 指标 id 查不到行(被删了 / id 写错)。与「定义不完整」分开:调用方据此回 404 而不是 400。 */
+export class ModelMetricNotFoundError extends Error {
+  constructor() {
+    super("指标不存在");
+    this.name = "ModelMetricNotFoundError";
   }
-  if (!m.atomicId) throw new Error("派生指标缺少原子引用");
-  const atomic = await getModelMetric(m.atomicId);
-  if (!atomic) throw new Error("派生指标引用的原子指标不存在");
-  if (atomic.metricType !== "atomic" || !atomic.fqn || !atomic.agg) throw new Error("引用的指标不是合法原子指标");
-  return {
-    fqn: atomic.fqn,
-    agg: atomic.agg,
-    measureColumn: atomic.measureColumn,
-    // 派生可覆盖时间列;否则用原子的
-    timeColumn: m.timeColumn || atomic.timeColumn,
-    timeWindow: m.timeWindow,
-    modifiers: m.modifiers || [],
-  };
+}
+
+/**
+ * 「这个指标的可执行 SQL」的唯一入口:计算指标值与报表按指标取数都走它,
+ * SQL 只由指标 SQL 构造器生成 —— 指标定义改了,两处同时跟着变,不存在第二份快照。
+ */
+export async function modelMetricSqlById(modelMetricId: string): Promise<{ metric: ModelMetric; sql: string }> {
+  const metric = await getModelMetric(modelMetricId);
+  if (!metric) throw new ModelMetricNotFoundError();
+  return { metric, sql: buildMetricSql(await resolveQuerySpec(metric)) };
 }
 
 export interface ComputeResult {
@@ -176,10 +183,7 @@ export interface ComputeResult {
 }
 
 export async function computeModelMetric(modelMetricId: string, targetId: string, projectId: string): Promise<ComputeResult> {
-  const m = await getModelMetric(modelMetricId);
-  if (!m) throw new Error("指标不存在");
-  const spec = await resolveQuerySpec(m);
-  const sql = buildMetricSql(spec);
+  const { sql } = await modelMetricSqlById(modelMetricId);
   // 🔴 在**指定的那个区**算,并把结果按区存。
   // 落点必填。`resolveRedshiftBinding` 会核准入 / 组件 / 落点 / 凭证,
   // 解析不出来就抛 —— 绝不静默改到主控区算一个数再标成那个区的(那才是最坏的错数字)。

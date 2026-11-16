@@ -1,7 +1,9 @@
 // BI 取数统一入口(纯逻辑,复用既有底座,不重造)。
 //
-// 三种 WidgetSource 归一到一个 executeBiQuery:
+// 各种 WidgetSource 归一到一个 executeBiQuery:
 //  - sql / genbi:引擎分支 runSelect / runSelectAthena → **必过 maskRows**(R2 铁律)。
+//  - metric:引用数据建模里的一个指标 —— 取数时按指标**当前定义**生成 SQL(唯一入口 modelMetricSqlById,
+//    SQL 仍由指标 SQL 构造器出),在数仓上跑,同样必过 maskRows;视觉对象里不存 SQL。
 //  - dataapi:「数据服务」已于 2026-09-05 下线:**类型保留、能力下线**,
 //    任何 dataapi 取数一律抛同一句 410(DATA_SERVICE_GONE),本文件不再 import data-service。
 //
@@ -17,7 +19,8 @@ import type { ApiErrorCode } from "@/lib/api-response";
 import type { Identity } from "@/lib/auth/identity";
 // 共享件搬家:renderSql / coerceParams / ApiParam 从已下线的 data-service 搬到 lib/sql/param-render(逐字节)。
 import { coerceParams, renderSql, type ApiParam } from "@/lib/sql/param-render";
-import type { WidgetSource, DashboardFilter, BiQueryResult } from "./types";
+import { modelMetricSqlById, ModelMetricNotFoundError } from "@/lib/modeling/model-metrics";
+import type { WidgetSource, DashboardFilter, BiQueryResult, BiEngine } from "./types";
 
 const PLACEHOLDER_RE = /\{\{\s*([a-z0-9_]+)\s*\}\}/gi;
 
@@ -86,6 +89,25 @@ function upstreamError(msg: string | undefined): BiQueryError {
   return { status: isTimeout ? 504 : 502, error: m };
 }
 
+/**
+ * 指标来源 → 这一次取数要跑的 SQL 与结果列的显示名。指标查不到 ⇒ 404 并指路;定义落不成 SQL(派生引用的原子没了 /
+ * 定义不完整 / 标识符非法)⇒ 400 带原因。绝不回落成「空结果」—— 那会让指标卡显示一个没有来历的 0。
+ */
+async function metricSourceSql(modelMetricId: unknown): Promise<{ sql: string; label: string }> {
+  const id = typeof modelMetricId === "string" ? modelMetricId.trim() : "";
+  if (!id) throw { status: 400, error: "指标来源需要选择一个指标" } as BiQueryError;
+  try {
+    const { metric, sql } = await modelMetricSqlById(id);
+    // 结果列按指标名(带单位)呈现:指标卡下方的标签与导出 CSV 的表头是用户认识的名字,不是 SQL 里的别名。
+    return { sql, label: metric.unit ? `${metric.name}(${metric.unit})` : metric.name };
+  } catch (e) {
+    if (e instanceof ModelMetricNotFoundError) {
+      throw { status: 404, code: "NOT_FOUND", error: "该视觉对象引用的指标不存在(可能已在数据建模里删除),请编辑视觉对象重新选择指标" } as BiQueryError;
+    }
+    throw { status: 400, error: `指标定义无法取数:${e instanceof Error ? e.message : String(e)}` } as BiQueryError;
+  }
+}
+
 // 执行一个 widget 的取数。filters/filterValues 来自仪表盘筛选器(编辑期预览可为空)。
 // 成功返回 BiQueryResult;失败抛 BiQueryError(带建议 HTTP status)。
 /**
@@ -125,15 +147,23 @@ export async function executeBiQuery(
   // ── dataapi:能力已下线(2026-09-05)—— 类型仍在联合里(存量行不炸),取数一律 410 同一句 ──────────
   if (source.kind === "dataapi") throw DATA_SERVICE_GONE;
 
-  // ── sql / genbi:引擎分支 + 必过脱敏 ──────────────────────────────────────
-  const engine = source.engine;
+  // ── sql / genbi / metric:引擎分支 + 必过脱敏 ──────────────────────────────
   // widget 自己声明的落点赢(见 opts.targetId 注释)
   const targetId = (source as { targetId?: string }).targetId || opts.targetId;
+  let engine: BiEngine;
   let sql: string;
-  try {
-    sql = renderWithFilters(source.sql, opts.filters, opts.filterValues);
-  } catch (e) {
-    throw { status: 400, error: e instanceof Error ? e.message : String(e) } as BiQueryError;
+  let metricLabel: string | undefined;
+  if (source.kind === "metric") {
+    // 指标只在数仓上算(与数据建模「计算」同一个引擎、同一条 SQL);它的 SQL 里没有占位符,仪表盘筛选器不注入。
+    engine = "redshift";
+    ({ sql, label: metricLabel } = await metricSourceSql(source.modelMetricId));
+  } else {
+    engine = source.engine;
+    try {
+      sql = renderWithFilters(source.sql, opts.filters, opts.filterValues);
+    } catch (e) {
+      throw { status: 400, error: e instanceof Error ? e.message : String(e) } as BiQueryError;
+    }
   }
 
   let columns: string[] = [];
@@ -176,6 +206,13 @@ export async function executeBiQuery(
     maskedColumns = m.maskedColumns;
   } catch {
     /* maskRows 内部 best-effort 返回原行;此处仅吞异常不改其契约 */
+  }
+
+  // 指标来源:脱敏判定用的是 SQL 里的真实列,判完再把唯一的结果列换成指标的显示名。
+  if (metricLabel && columns.length === 1) {
+    const raw = columns[0];
+    maskedColumns = maskedColumns.map((c) => (c === raw ? (metricLabel as string) : c));
+    columns = [metricLabel];
   }
 
   return { columns, columnTypes, rows, rowCount: rows.length, elapsedMs: Date.now() - t0, maskedColumns };

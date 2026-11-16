@@ -405,7 +405,7 @@ function AnalysisEditor({ editing, onClose, onSaved }: { editing: any; onClose: 
 }
 
 // ═══════════════════════════ 视觉对象编辑器(Modal) ═══════════════════════════
-// 复用 FieldConfigurator(可视化配置,不写 SQL)+ 自由 SQL + 从报表库导入。产出 BiWidget。
+// 复用 FieldConfigurator(可视化配置,不写 SQL)+ 自由 SQL + 从报表库导入 + 引用数据建模里的指标。产出 BiWidget。
 function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; onClose: () => void; onSave: (w: BiWidget) => void }) {
   // 预览与编译在**当前视角那个区**执行;保存时把落点写进 widget
   // (widget 级落点 = SPEC §8.3;不写进去的话切一次区这张图就换了数据源而没人知道)。
@@ -417,11 +417,14 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
   const widgetTarget: string | undefined =
     (editing?.source as { targetId?: string } | undefined)?.targetId ||
     (wScope.kind === "target" ? wScope.targetId : undefined);
+  /** 指标来源的落点(必填,预览与保存用同一个):沿用已存的;新建取当前视角的落点(「全部」视角 = 主控区,同样明写进视觉对象)。 */
+  const metricLanding = widgetTarget || landingOfScope(wScope);
   // 新建视觉对象默认「可视化配置」(推荐的不写 SQL 路径);编辑时按已存来源回填模式。
   const initialMode = !editing ? "builder"
+    : editing.source?.kind === "metric" ? "metric"
     : editing.source?.kind === "sql" && (editing.source as any).builder ? "builder"
     : editing.source?.kind === "sql" ? "sql" : "import";
-  const [mode, setMode] = useState<"builder" | "sql" | "import">(initialMode as any);
+  const [mode, setMode] = useState<"builder" | "sql" | "import" | "metric">(initialMode as any);
   const [wname, setWname] = useState(editing?.name || "");
 
   // builder
@@ -444,6 +447,31 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
     // 每个候选后面标出它取哪个区的数,选的时候看得见。
     if (mode === "import") fetch("/api/bi/reports").then((x) => x.json()).then((d) => setReports(d?.success ? (d.data || []).filter((r: any) => r?.source?.kind !== "dataapi") : [])).catch(() => {});
   }, [mode]);
+
+  // 指标来源:视觉对象只存指标 id,每次取数按指标当前定义出 SQL(口径改了,这里自动跟随)。
+  const [metrics, setMetrics] = useState<any[]>([]);
+  const [metricsError, setMetricsError] = useState("");
+  const [metricId, setMetricId] = useState<string>(editing?.source?.kind === "metric" ? editing.source.modelMetricId : "");
+  useEffect(() => {
+    if (mode !== "metric") return;
+    setMetricsError("");
+    fetch("/api/modeling/model-metrics").then((x) => x.json())
+      .then((d) => { if (d?.success) setMetrics(d.data || []); else setMetricsError(d?.error?.message || "READ_FAILED"); })
+      .catch(() => setMetricsError("READ_FAILED"));
+  }, [mode]);
+  const metricsErrorText = metricsError === "READ_FAILED" ? t("读取指标列表失败") : metricsError;
+  const doPreviewMetric = async () => {
+    if (!metricId) { message.warning(t("请选择一个指标")); return; }
+    setPreviewing(true); setPreview(null);
+    try {
+      const r = await fetch("/api/bi/query", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: { kind: "metric", modelMetricId: metricId, targetId: metricLanding }, targetId: metricLanding }),
+      }).then((x) => x.json());
+      if (r?.success) setPreview({ columns: r.data.columns, rows: r.data.rows });
+      else message.error(r?.error?.message || t("预览失败"));
+    } finally { setPreviewing(false); }
+  };
 
   const doPreviewSql = async () => {
     setPreviewing(true); setPreview(null);
@@ -482,6 +510,13 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
       onSave({ widgetId, name: nm || t("视觉对象"), source: { kind: "sql", engine, sql: sql.trim(), ...(widgetTarget ? { targetId: widgetTarget } : {}) }, viz: { chart, auto: false } });
       return;
     }
+    if (mode === "metric") {
+      const m = metrics.find((x) => x.modelMetricId === metricId);
+      if (!metricId) { message.warning(t("请选择一个指标")); return; }
+      // 指标来源的落点必填,恒写进 widget(与预览用的是同一个);名字缺省用指标名
+      onSave({ widgetId, name: nm || m?.name || t("视觉对象"), source: { kind: "metric", modelMetricId: metricId, targetId: metricLanding }, viz: { chart: "metric", auto: false } });
+      return;
+    }
     // import
     const rep = reports.find((r) => r.reportId === reportId);
     if (!rep) { message.warning(t("请选择要导入的报表")); return; }
@@ -506,6 +541,7 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
             { value: "builder", label: t("可视化配置") },
             { value: "sql", label: t("自由 SQL") },
             { value: "import", label: t("从报表库导入") },
+            { value: "metric", label: t("指标") },
           ]}
         />
 
@@ -548,6 +584,36 @@ function WidgetEditor({ editing, onClose, onSave }: { editing: BiWidget | null; 
               </Card>
             )}
           </>
+        )}
+
+        {mode === "metric" && (
+          <div data-testid="bi-widget-metric-pane">
+            <Text strong>{t("选择数据建模里定义的指标(口径只在指标上定义一次,这里直接引用)")}</Text>
+            <Select
+              data-testid="bi-widget-metric-select"
+              style={{ width: "100%", marginTop: 6 }} showSearch value={metricId || undefined}
+              onChange={(v) => { setMetricId(v); setPreview(null); }}
+              placeholder={t("选择一个指标")}
+              filterOption={(i, o) => String(o?.label || "").toLowerCase().includes(i.toLowerCase())}
+              options={metrics.map((m) => ({
+                value: m.modelMetricId,
+                label: `${m.name}${m.unit ? `(${m.unit})` : ""} · ${m.metricType === "derived" ? t("派生指标") : t("原子指标")}`,
+              }))}
+              notFoundContent={metricsErrorText || t("还没有指标,请先到「数据建模 → 指标体系」定义")}
+            />
+            {metricsErrorText && <Text type="danger" style={{ display: "block", fontSize: 12, marginTop: 6 }}>{metricsErrorText}</Text>}
+            <Text type="secondary" style={{ display: "block", fontSize: 12, marginTop: 6 }}>
+              {t("每次取数都按指标当前的定义在数仓上计算;在数据建模里改了指标口径,这个视觉对象自动跟随。")}
+            </Text>
+            <Space style={{ marginTop: 10 }}>
+              <Button icon={<EyeOutlined />} loading={previewing} onClick={doPreviewMetric}>{t("预览数据")}</Button>
+            </Space>
+            {preview && (
+              <Card size="small" title={t("预览")} style={{ marginTop: 10, background: "var(--bgp-panel, transparent)" }}>
+                <WidgetRenderer data={preview} viz={{ chart: "metric", auto: false }} />
+              </Card>
+            )}
+          </div>
         )}
 
         {mode === "import" && (

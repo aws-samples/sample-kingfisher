@@ -64,6 +64,8 @@ export class AgentCoreStack extends cdk.Stack {
         GENBI_MAX_ROWS: "200",
         GENBI_CONTEXT_TABLE: "bgp-genbi-context",
         GENBI_SKILLS_TABLE: "bgp-genbi-skills",
+        // 建模指标表:lookup_business_context 把指标定义与业务口径一并给智能体。
+        MODEL_METRICS_TABLE: "bgp-model-metrics",
         // v1.29.0 — HTTP/外部 API 技能出站域名白名单（逗号分隔；空=不限定域名，仍受内网 IP 守卫约束）。
         GENBI_HTTP_ALLOWLIST: (this.node.tryGetContext("genbi-http-allowlist") as string) || "",
         //当前阶段3 路线B:fetch_om_descriptions 工具读 OM 表描述(容器 retrieval 语义检索用)。
@@ -86,16 +88,17 @@ export class AgentCoreStack extends cdk.Stack {
       ],
       resources: ["*"],
     }));
-    // 业务知识/口径/规则表只读（lookup_business_context 技能）。
+    // 业务知识/口径/规则表与建模指标表只读（lookup_business_context 技能）。
     skillFn.addToRolePolicy(regionalStatement(this, {
       axis: "home",
-      reason: "控制面单份:GenBI 业务口径/技能表按 50 SPEC §1.1 只在 home 存一份,各 target 共读同一份知识",
+      reason: "控制面单份:GenBI 业务口径/技能表与建模指标表按 50 SPEC §1.1 只在 home 存一份,各 target 共读同一份知识",
       actions: ["dynamodb:Query", "dynamodb:GetItem"],
       resources: (r) => [
         `arn:aws:dynamodb:${r}:${account}:table/bgp-genbi-context`,
         `arn:aws:dynamodb:${r}:${account}:table/bgp-genbi-context/index/*`,
         `arn:aws:dynamodb:${r}:${account}:table/bgp-genbi-skills`,
         `arn:aws:dynamodb:${r}:${account}:table/bgp-genbi-skills/index/*`,
+        `arn:aws:dynamodb:${r}:${account}:table/bgp-model-metrics`,
       ],
     }));
     // 上述两表用数据域 CMK 加密,技能 Lambda 读取需用该 key 解密。

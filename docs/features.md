@@ -319,6 +319,7 @@ Observability is the operational view of Ask-Your-Data and the AgentCore stack.
 ### 5.4 Report Builder (`/bi`)
 
 Report Builder is a QuickSight-style self-service BI canvas: add several visuals to one dashboard, bind top-level filters to fields and let them drive every visual.
+A visual's data can come from the visual builder, free SQL or the report library, or directly from a metric of "Data Modeling → Metric system" (change the definition and the dashboard follows).
 Data is fetched through the platform's query engines with the same automatic masking as Ask-Your-Data.
 
 **Key capabilities**
@@ -406,7 +407,7 @@ The score (0 to 100) weights four dimensions: security and classification covera
 ### 6.3 Data Modeling (`/modeling`)
 
 Data Modeling covers warehouse planning end to end: layers, data domains, data standards, code tables, dimension and fact models, and a metrics system.
-Models can be landed and applied to the Redshift warehouse of any execution region, and the resulting metrics are reused by Ask-Your-Data, Report Builder and the home page.
+Models can be landed and applied to the Redshift warehouse of any execution region; the resulting metrics are shown on the home page, can be picked directly by Report Builder visuals, and Ask-Your-Data answers by their definitions.
 A "how to use" illustration sits at the top of the page.
 
 **Key capabilities**

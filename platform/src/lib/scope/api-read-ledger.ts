@@ -77,6 +77,11 @@ export const UNSCOPED_READS: readonly UnscopedRead[] = [
     reason: "cross-scope-by-design",
     note: "画布里「导入已有报表」的候选清单:把**别区**的报表放进当前看板是合法用法(一张仪表盘可以并排放不同区的图,SPEC §8.3)⇒ 刻意不按范围筛,而是在每个候选后面标出它取哪个区的数;看板**列表**侧另有一个默认关的按区过滤开关(定案:增加过滤能力、默认不过滤)",
   },
+  {
+    page: "/bi", file: "components/bi/AnalysisWorkbench.tsx", api: "/api/modeling/model-metrics",
+    reason: "platform-singleton",
+    note: "视觉对象编辑器「指标」来源的下拉:只用指标的**定义**(名字 / 类型 / 单位),而指标定义全平台只有一份(不分区、不分项目);按区的是指标的计算值,这里不读它 —— 视觉对象的数值每次取数时在它自己的落点上现算",
+  },
   // ── Copilot 计划中心 ────────────────────────────────────────────────
   {
     page: "/copilot/plans", file: "app/copilot/plans/page.tsx", api: "/api/copilot/plan",

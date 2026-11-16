@@ -49,7 +49,10 @@ export interface RetrievalResult {
 }
 
 // 业务口径（context）的类型（context.ts 的纯类型下沉,与 DynamoDB 存储契约完全一致）。
-export type ContextKind = "caliber" | "term" | "rule"; // 口径/指标定义 | 术语别名 | 规则注意事项
+// 用户能在业务口径页建的三种:口径/指标定义 | 术语别名 | 规则注意事项。
+export type StoredContextKind = "caliber" | "term" | "rule";
+// 上下文条目的全部种类 = 上面三种 + 建模指标(metric:由指标表的定义实时转换而来,不落口径表,用户不能手建)。
+export type ContextKind = StoredContextKind | "metric";
 export interface ContextEntry {
   projectId: string;
   entryId: string;

@@ -16,7 +16,7 @@ After this scenario, you will have turned "modeling" from a design sketch into t
 - The "Data Modeling" page defines layers, data domains, data standards, code tables, dimension / fact tables and metrics;
 - Code tables and dimension / fact tables are landed in Redshift region by region through the "Landing panel"; the panel and the "Multi-Region Dashboard" use observed state to tell you whether each region is ✓ landed, ⚠ version mismatch or 🔴 drift;
 - When no longer needed, "Unbind and clean up" in the panel; a definition that still has landed artifacts cannot be deleted directly (a 409 blocks it and offers two ways out);
-- Metrics are defined on the "Metric system" tab and "Compute"-d; the "Core business metrics" card on the home page shows them directly; the report builder uses a "Metric card" with the same definition.
+- Metrics are defined on the "Metric system" tab and "Compute"-d; the "Core business metrics" card on the home page shows them directly; a Report Builder visual picks a metric directly as a "Metric card"; Ask-Your-Data answers by the metric's definition.
 
 Overview of the route:
 
@@ -263,13 +263,9 @@ In the left menu "Smart Analytics → Report Builder".
 
 1. Click "New analysis" and enter `Channel ad-spend daily` as "Analysis name".
 2. Click "Add visual":
-   - "Visual name" `Total ad spend`; switch to "Free SQL" at the top; choose "Warehouse (Redshift)" as the engine; enter one statement with the same definition as the metric:
-
-     ```sql
-     SELECT SUM(cost_usd) AS cost_usd FROM showcase.ad_campaigns
-     ```
-
-   - Click "Preview data", choose "Metric card" as "Chart type"; a big number appears in the preview and should equal the latest value of "Total ad spend" in the "Metric system"; click "OK".
+   - "Visual name" `Total ad spend` (left blank, the metric name is used); switch to "Metric" at the top; in the selector "Select a metric" choose "Total ad spend" (listed with its unit and the kind "Atomic metric");
+   - Click "Preview data"; a big number appears in the preview, labelled with the metric name and its unit, and should equal the latest value of "Total ad spend" for that region in the "Metric system"; click "OK".
+     This visual stores only "which metric is referenced" and the execution target, not SQL: when the definition is changed later in the "Metric system", this dashboard follows the new definition without being touched.
 3. "Add visual" again: name `ROAS by channel`; switch to "Visual builder", engine "Warehouse (Redshift)"; choose `showcase.dws_channel_roi_daily` under "Select a table (no SQL needed)";
    drag `channel_name` to "X axis / dimension" and `roas` to "Value / measure", choose "Bar chart" as "Chart type", click "Preview", then "OK".
 4. Click "Add filter": "Bind field" `channel_type`, "Label" `Channel type`, "Scope" all visuals, "OK"; a drop-down appears at the top; choose `paid` and click "Apply filters"; the bar chart keeps only paid channels.
@@ -279,9 +275,12 @@ In the left menu "Smart Analytics → Report Builder".
 
 Notes:
 
-- The report builder's data sources are SQL or the visual builder; it cannot yet pick a metric from the "Metric system" directly as a data source; the metric system is the single source of definitions, and reports write SQL with the same definition. (The report builder's only data sources are "Visual builder", "Free SQL" and "Import from reports")
+- The report builder has four data methods: "Visual builder", "Free SQL", "Import from reports" and "Metric". The metric system is the single source of definitions: when the "Metric" method fits, do not write the same definition again as SQL in a report;
+  the "Metric" method computes on the warehouse (Redshift) and is always a metric card; use the first two methods when you need a breakdown by dimension.
+- When a referenced metric is deleted in the "Metric system", its card on the dashboard shows a red hint saying that the referenced metric no longer exists and asking you to edit the visual and select a metric again; it is never shown as 0.
 - Report results also go through data-classification masking (see [Scenario 6](25-scenario-governance-loop.md)).
-- To make Ask-Your-Data respect these metric definitions too, write the business definition of each metric into an entry on the "Business Glossary & Rules" page as well (see the [analyst guide](12-guide-analyst.md)).
+- Ask-Your-Data answers by these metric definitions automatically: name the metric in your question and the result card lists "Modeling metric · <metric name> (<table>)" under "Applied N business definition(s)";
+  supplementary rules the metric system cannot express (term aliases, exclusion conditions) still go into the "Business Glossary & Rules" page (see the [analyst guide](12-guide-analyst.md)).
 
 ---
 

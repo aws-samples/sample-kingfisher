@@ -37,7 +37,8 @@ export interface RetrievalResult {
     note?: string;
     usedFallback: boolean;
 }
-export type ContextKind = "caliber" | "term" | "rule";
+export type StoredContextKind = "caliber" | "term" | "rule";
+export type ContextKind = StoredContextKind | "metric";
 export interface ContextEntry {
     projectId: string;
     entryId: string;

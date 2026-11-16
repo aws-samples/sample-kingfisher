@@ -101,7 +101,7 @@ export default function ModelingGuide() {
 
           {/* 结果一句话 */}
           <div style={{ fontSize: 12, color: "var(--bgp-text, #cfe6f0)", marginTop: 14, padding: "8px 12px", background: "var(--bgp-primary, #22d3ee)14", borderRadius: 6, borderLeft: `3px solid ${C.metric}` }}>
-            ⭐ {t("建好后:事实表 JOIN 维度表就能做分析(如「各广告渠道的点击率 CTR 排名」),指标可被 BI 报表、数据服务、问数直接复用 —— 这就是「建一次、处处用」。")}
+            ⭐ {t("建好后:事实表 JOIN 维度表就能做分析(如「各广告渠道的点击率 CTR 排名」);指标体系里定义的指标,报表的视觉对象可以直接选用,智能问数也会按它的口径回答 —— 这就是「建一次、处处用」。")}
           </div>
         </div>
       )}

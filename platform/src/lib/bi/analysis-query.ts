@@ -46,7 +46,7 @@ export interface ResolvedSource {
  * 计算一个视觉对象"筛选生效后"的取数 source。
  * - builder(有 builder spec)→ 命中作用域的筛选器追加进 builder.filters 重编译 buildSql。
  * - 手写 sql/genbi → source 原样,命中筛选器映射成占位符 filters(executeBiQuery 内 renderWithFilters 注入 {{key}})。
- * - dataapi → 原样,不做字段注入。
+ * - metric / dataapi → 原样,不做字段注入。
  */
 export function resolveWidgetSource(
   widget: BiWidget,
@@ -104,6 +104,7 @@ export function resolveWidgetSource(
     return { source, passthroughFilters: pf, passthroughValues: pv };
   }
 
+  // ── metric:原样透传(取数时按指标当前定义出 SQL,筛选器不注入)──
   // ── dataapi:原样透传(能力已于 2026-09-05 下线,;路由里 executeBiDataApi 会抛 410 同一句)──
   return { source, passthroughFilters: [], passthroughValues: {} };
 }
