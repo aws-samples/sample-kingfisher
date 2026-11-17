@@ -90,6 +90,7 @@ Component versions are listed in [docs/supported-versions.md](docs/supported-ver
 
 ### Security
 
+- The transitive dependency `@hono/node-server` moves from 2.1.5 to 2.1.8 in the lockfiles of the platform and the three agent packages (GHSA-jpvv-r467-5p4w, GHSA-qv5m-9pm6-hqp3); `package.json` is unchanged. An upgrade must also run `redeploy-agents.sh` so that the agent images pick it up.
 - Vitest and its coverage package were upgraded to 4.1.12 (GHSA-82fw-gwwq-j7x9, GHSA-qxg6-89mg-rqv8). The three agent packages pin patched versions of optional transitive dependencies (simple-git, @simple-git/argv-parser, zod, @modelcontextprotocol/server) through `overrides`; the agent images never install them (`--omit=optional`), so runtime bytes are unchanged.
 - Dependency security updates for the platform and infrastructure packages, with explicit overrides for transitive packages that upstream does not fix.
 - The transitive `postcss` package bundled by the web framework is pinned to a patched release through `overrides`, and continuous integration now fails on high or critical advisories in production dependencies.
