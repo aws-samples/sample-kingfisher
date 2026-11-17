@@ -58,6 +58,18 @@ async function runRowOf(sla: SlaRow, runId: string): Promise<Record<string, unkn
   }
 }
 
+/**
+ * 破线文案里「当前卡在 <节点>」这半句写什么。
+ * 任务型 SLA 退化成单节点图,节点就是任务自己 ⇒ 这半句没有信息量(2026-11-11 真环境的事件行尾巴是任务自己的裸 id),不写;
+ * 工作流型写节点在画布上的显示名(定义里没有显示名才回落到节点 id)。落库的 `criticalPathNode` 仍是节点 id,不受影响。
+ */
+export function stuckNodeLabel(sla: SlaRow, dag: { nodes?: unknown[] }, nodeId: string | undefined): string | undefined {
+  if (!nodeId || sla.target.scope !== "workflow") return undefined;
+  const node = ((dag.nodes || []) as Array<{ id?: unknown; data?: { label?: unknown } }>).find((n) => String(n.id) === nodeId);
+  const label = typeof node?.data?.label === "string" ? node.data.label.trim() : "";
+  return label || nodeId;
+}
+
 /** 对一条启用的 SLA 的一次运行算一次预测;落 lastPrediction;确认破线且允许推送 ⇒ 经通道推送。 */
 export async function predictSlaRun(projectId: string, sla: SlaRow, input: PredictRunInput): Promise<PredictRunResult> {
   const now = input.now ?? Date.now();
@@ -116,7 +128,7 @@ export async function predictSlaRun(projectId: string, sla: SlaRow, input: Predi
   let push: { pushed: boolean; status?: string } = { pushed: false };
   if (confirmedBreach && input.push !== false) {
     // 对象名取绑定对象行的现名(运行行从不写 taskName,从它取名字在真环境里永远是裸 id)
-    push = await pushBreachAlert(sla, prediction, { node: pred.criticalPathNode, targetName: await boundObjectName(sla.target) });
+    push = await pushBreachAlert(sla, prediction, { node: stuckNodeLabel(sla, dag, pred.criticalPathNode), targetName: await boundObjectName(sla.target) });
   }
   return { prediction, confirmedBreach, remainingSec: pred.remainingSec, push };
 }

@@ -384,7 +384,8 @@
 - **Pages**: `/alerting` (includes the SLA tab) · `/sla`. **API**: `alerting` (`rules` · `rules/[id]` · `channels` · `channels/[id]` · `channels/[id]/test` · `events` · `evaluate` · `test-sink`) · `sla` (root · `[id]` · `predict` · `risk-board`) · `baseline` (root · `[taskId]` ·
   `learn`) · `public/alerting-sink` · `internal/alerting/tick`.
 - **Core code**: `src/lib/alerting/` (`evaluate.ts` · `rules.ts` · `channels/` · `events.ts` · `notify.ts` · `redact.ts`) · `src/lib/baseline/`.
-- **Key mechanisms**: evaluate scans `bgp-task-runs`; events are idempotent through `putEventIfNew`; a background evaluation pump (leader replica, one round per minute, loop-back `/api/internal/alerting/tick`) evaluates the rules of every project and rolls the breach prediction of every enabled SLA's in-flight runs forward (the multi-window confirmation history lives on the SLA row); "Evaluate now" only runs one round early.
+- **Key mechanisms**: evaluate scans `bgp-task-runs`; the task name in an event message is looked up by id in the resource table (run rows store no name; single author `src/lib/monitor/run-object-name.ts`, shared with Task Monitor and the operations wallboard) and falls back to the id only when the object has been deleted;
+  events are idempotent through `putEventIfNew`; a background evaluation pump (leader replica, one round per minute, loop-back `/api/internal/alerting/tick`) evaluates the rules of every project and rolls the breach prediction of every enabled SLA's in-flight runs forward (the multi-window confirmation history lives on the SLA row); "Evaluate now" only runs one round early.
   **Design note**: the [intelligent operations and alerting design](design/intelligent-ops-alerting.md) · the [baselines / SLA design](design/agent-native-operations-baseline-sla.md) of the agent-native operations set.
 
 ### 6.5 FinOps

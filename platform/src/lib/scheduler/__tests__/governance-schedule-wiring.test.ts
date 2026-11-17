@@ -57,9 +57,10 @@ describe("定时治理任务的接线", () => {
   });
 
   it("监控页:run 行名字能反查到调度对象;类型下拉 / 类型标签 / 跳转都认 governance 与 genbi-card", () => {
+    // 名字表来自「运行对象 id → 现名」的唯一作者:资源表清单在那里(含平台动作的调度对象表),监控页自己不再逐表扫
     const runs = code("app/api/monitor/runs/route.ts");
-    expect(runs).toContain('nameIndex(TABLES.ACTION_SCHEDULES, "taskId", pf)');
-    expect(runs).toContain("actionNames");
+    expect(runs).toMatch(/await scanRunObjectNames\(pf\)/);
+    expect(code("lib/monitor/run-object-name.ts")).toContain('{ kind: "action", table: TABLES.ACTION_SCHEDULES, idAttr: "taskId" }');
     const page = code("app/monitor/page.tsx");
     expect(page).toContain('value: "governance"');
     expect(page).toContain('value: "genbi-card"');

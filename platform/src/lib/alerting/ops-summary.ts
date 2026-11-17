@@ -5,6 +5,7 @@
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { listRecentEvents } from "./events";
+import { scanRunObjectNames } from "@/lib/monitor/run-object-name";
 // 按区(run 与告警事件都过同一套标量过滤)
 import { filterRowsByScalar, type TargetScope } from "@/lib/exec-env/scope";
 
@@ -32,17 +33,6 @@ export interface OpsSummary {
 
 const DEFAULT_PUNCTUAL_SECONDS = 30 * 60; // 首期固定"准点"阈值 30 分钟
 
-async function scanTable(table: string, proj: string): Promise<any[]> {
-  try {
-    const { Items = [] } = await docClient.send(
-      new ScanCommand({ TableName: table, ProjectionExpression: proj, ExpressionAttributeNames: { "#n": "name" } })
-    );
-    return Items;
-  } catch {
-    return [];
-  }
-}
-
 /**
  * @param opts.scope 传了就只统计**该执行范围**的 run 与告警事件。
  *
@@ -52,20 +42,13 @@ async function scanTable(table: string, proj: string): Promise<any[]> {
  */
 export async function buildOpsSummary(opts: { scope?: TargetScope } = {}): Promise<OpsSummary> {
   const now = new Date();
-  const [{ Items: runsRaw = [] }, syncTasks, workflows, etlJobs, engineJobs, recentEvents] = await Promise.all([
+  // 名字表与监控页、告警文案同一份(`lib/monitor/run-object-name.ts`);原来这里自己扫四张表、不翻页,
+  //   少了平台动作调度那张 ⇒ 治理定时任务 / 卡片定时刷新的运行在大屏上只剩一截 id。
+  const [{ Items: runsRaw = [] }, { names: nameMap }, recentEvents] = await Promise.all([
     docClient.send(new ScanCommand({ TableName: TABLES.TASK_RUNS, Limit: 500 })),
-    scanTable(TABLES.SYNC_TASKS, "taskId, #n"),
-    scanTable(TABLES.WORKFLOWS, "workflowId, #n"),
-    scanTable(TABLES.ETL_JOBS, "jobId, #n"),
-    scanTable(TABLES.ENGINE_JOBS, "jobId, #n"),
+    scanRunObjectNames(),
     listRecentEvents({ limit: 12 }),
   ]);
-
-  const nameMap: Record<string, string> = {};
-  for (const t of syncTasks) nameMap[t.taskId] = t.name;
-  for (const w of workflows) nameMap[w.workflowId] = w.name;
-  for (const j of etlJobs) nameMap[j.jobId] = j.name;
-  for (const j of engineJobs) nameMap[j.jobId] = j.name;
 
   // 先按区过滤 run,再算所有派生指标(分布 / 今日 / 甘特 / 趋势)
   const runsScoped = opts.scope

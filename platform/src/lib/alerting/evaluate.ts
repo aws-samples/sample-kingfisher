@@ -19,6 +19,8 @@ import { startDiagnosis } from "@/lib/diagnostics/service";
 import type { AlertRule, AlertScope, Severity } from "./types";
 // run 行的区章(`SCOPE_SCALAR_ATTR.run`)唯一判定
 import { scalarTargetOf } from "@/lib/exec-env/scope";
+// 任务 id → 现名的唯一作者(监控页 / 运维大屏同一份)
+import { runObjectNamesByIds } from "@/lib/monitor/run-object-name";
 
 // bgp-task-runs 行(只取引擎用得到的字段)。
 interface TaskRun {
@@ -30,7 +32,7 @@ interface TaskRun {
   finishedAt?: string;
   duration?: number; // 秒
   error?: string;
-  taskName?: string;
+  // 🔴 运行行**没有**对象名:运行台账从不写它(对象会改名)。文案里的名字由调用方按 id 取现名后经 `nameOf` 传进 matchRule。
   /** run 章(52 SPEC §1;缺省经 `scalarTargetOf` 归主控区) */
   targetId?: string;
 }
@@ -93,8 +95,15 @@ interface Candidate {
   diagRef?: { taskId: string; runId: string }; // 失败类可挂诊断
 }
 
+/** 文案里怎么称呼一个任务:id → 现名;取不到名字就是 id 本身。 */
+type NameOf = (taskId: string) => string;
+const idAsName: NameOf = (taskId) => taskId;
+/** 触发信息里的任务名只在真取到名字时才带(回落成 id 的那种不算名字)。 */
+const realName = (name: string, taskId: string): string | undefined => (name !== taskId ? name : undefined);
+
 // 针对一条规则,在给定 run 集合上算出候选告警(可能 0..N 条)。
-function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[] {
+//   `nameOf`:失败 / 超时两类文案里的任务名。缺省 = 用 id(第一遍只为知道哪些任务会进文案,见 evaluate)。
+function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number, nameOf: NameOf = idAsName): Candidate[] {
   const scoped = runs.filter((r) => inScope(r, rule.scope));
   const c = rule.condition;
 
@@ -103,7 +112,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
     return scoped
       .filter((r) => isFailed(r) && runTime(r) > wm) // 只看水位之后的失败
       .map((r) => {
-        const name = r.taskName || r.taskId;
+        const name = nameOf(r.taskId);
         const err = r.error ? `：${String(r.error).slice(0, 200)}` : "";
         return {
           dedupeKey: `run#${r.runId}`,
@@ -112,7 +121,7 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
           msgParams: { name, ...(r.error ? { err: String(r.error).slice(0, 200) } : {}) },
           // 单条 run 的告警天然属于一个区,但**得说出来**:
           // 值班的人第一件事就是问「哪个区挂了」(dedupeKey 用 runId 已唯一,不用带区)
-          trigger: { taskId: r.taskId, taskName: r.taskName, runId: r.runId, taskType: r.taskType, targetId: targetOf(r) },
+          trigger: { taskId: r.taskId, taskName: realName(name, r.taskId), runId: r.runId, taskType: r.taskType, targetId: targetOf(r) },
           diagRef: r.runId ? { taskId: r.taskId, runId: r.runId } : undefined,
         };
       });
@@ -124,14 +133,14 @@ function matchRule(rule: AlertRule, runs: TaskRun[], nowMs: number): Candidate[]
     return scoped
       .filter((r) => Number(r.duration) > thr * 60 && runTime(r) > wm && (isSucceeded(r) || isFailed(r)))
       .map((r) => {
-        const name = r.taskName || r.taskId;
+        const name = nameOf(r.taskId);
         const mins = Math.round(Number(r.duration) / 60);
         return {
           dedupeKey: `run#${r.runId}`,
           message: `任务「${name}」运行时长 ${mins} 分钟，超过阈值 ${thr} 分钟`,
           msgKey: "任务「{name}」运行时长 {mins} 分钟，超过阈值 {thr} 分钟",
           msgParams: { name, mins, thr },
-          trigger: { taskId: r.taskId, taskName: r.taskName, runId: r.runId, taskType: r.taskType, metricValue: Number(r.duration), targetId: targetOf(r) },
+          trigger: { taskId: r.taskId, taskName: realName(name, r.taskId), runId: r.runId, taskType: r.taskType, metricValue: Number(r.duration), targetId: targetOf(r) },
         };
       });
   }
@@ -224,8 +233,16 @@ export async function evaluate(projectId: string, createdBy: string): Promise<Ev
 
   const summary: EvaluateSummary = { rulesEvaluated: rules.length, runsScanned: runs.length, newEvents: 0, events: [] };
 
+  // 文案里的任务名 = 资源表里的**现名**(运行行不带名字;2026-11-11 真环境的事件消息因此全是裸 id)。
+  //   先不带名字匹配一遍,只为知道哪些任务会进文案 —— 水位之后通常一条候选都没有 ⇒ 一次读都不发;
+  //   有候选才按 id 集合取现名,再带名字成文。取不到名字(对象已删 / 读失败)⇒ 文案回落到 id,告警照发。
+  const idsInText = new Set<string>();
+  for (const rule of rules) for (const c of matchRule(rule, runs, nowMs)) if (c.trigger.taskId) idsInText.add(c.trigger.taskId);
+  const currentNames = await runObjectNamesByIds(idsInText);
+  const nameOf: NameOf = (taskId) => currentNames[taskId] || taskId;
+
   for (const rule of rules) {
-    const candidates = matchRule(rule, runs, nowMs);
+    const candidates = matchRule(rule, runs, nowMs, nameOf);
     for (const cand of candidates) {
       // 幂等:同一 (ruleId, dedupeKey) 已告过 → putEventIfNew 返回 null,跳过。
       const ev = await putEventIfNew({

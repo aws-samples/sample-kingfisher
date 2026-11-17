@@ -23,6 +23,7 @@ import { requireScope, scalarTargetOf } from "@/lib/exec-env/scope";
 import { scopeIncludesTarget } from "@/lib/scope/scope";
 import { listActiveTargets } from "@/lib/exec-env/registry";
 import { auditObservedScheduledRun } from "@/lib/exec-env/residency-audit";
+import { scanRunObjectNames } from "@/lib/monitor/run-object-name";
 
 /** 翻页扫表。`stop` 返回 true 时提前结束(带 limit 的场景不必扫完整张表)。 */
 async function scanAll(
@@ -40,31 +41,6 @@ async function scanAll(
   }
 }
 
-/** 名字表:只取 id + name,翻页扫全,并按调用方项目过滤(省流量也少泄露)。 */
-async function nameIndex(
-  table: string,
-  idAttr: string,
-  pf: { clause: string; values: Record<string, unknown> }
-): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  try {
-    await scanAll(
-      {
-        TableName: table,
-        ProjectionExpression: `${idAttr}, #n`,
-        ExpressionAttributeNames: { "#n": "name" },
-        FilterExpression: pf.clause,
-        ExpressionAttributeValues: pf.values,
-      },
-      (items) => {
-        for (const it of items) if (it[idAttr]) out[String(it[idAttr])] = String(it.name ?? "");
-      }
-    );
-  } catch {
-    /* 名字是展示增强,查不到就退回裸 ID —— 不因此让整个列表 500 */
-  }
-  return out;
-}
 
 export async function GET(req: NextRequest) {
   const ctx = await requireProject(req, "viewer");
@@ -151,19 +127,11 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    const nameMap: Record<string, string> = {};
-    const [syncNames, wfNames, etlNames, engineNames, actionNames] = await Promise.all([
-      nameIndex(TABLES.SYNC_TASKS, "taskId", pf),
-      nameIndex(TABLES.WORKFLOWS, "workflowId", pf),
-      nameIndex(TABLES.ETL_JOBS, "jobId", pf),
-      nameIndex(TABLES.ENGINE_JOBS, "jobId", pf),
-      // 平台动作的调度对象(治理定时任务 / 卡片定时刷新)
-      //   🔴 少这一张表,它们的 run 行在监控页上只剩一截裸 id(「接口 200 而用户认不出这是哪次运行」)
-      nameIndex(TABLES.ACTION_SCHEDULES, "taskId", pf),
-    ]);
-    Object.assign(nameMap, syncNames, wfNames, etlNames, engineNames, actionNames);
-    const etlIds = new Set(Object.keys(etlNames));
-    const syncIds = new Set(Object.keys(syncNames));
+    // 名字表:资源表清单与翻页扫描只在 `lib/monitor/run-object-name.ts` 一处(告警文案、运维大屏同一份);
+    //   按调用方项目过滤(省流量也少泄露);某张表读失败 ⇒ 那部分退回裸 id,不让整个列表 500。
+    const { names: nameMap, idsByKind } = await scanRunObjectNames(pf);
+    const etlIds = idsByKind.etl;
+    const syncIds = idsByKind.sync;
 
     let enriched = runs.map((r: Record<string, unknown>) => {
       const tid = String(r.targetId ?? "");

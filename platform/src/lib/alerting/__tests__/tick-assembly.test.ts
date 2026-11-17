@@ -12,6 +12,8 @@ const h = vi.hoisted(() => ({
   tables: {} as Record<string, Row[]>,
   keys: {} as Record<string, [string, string]>,
   failTables: [] as string[],
+  /** 批量读的次数(「没有候选就不取名字」的判据用) */
+  batchGets: 0,
 }));
 
 function keyOf(table: string, row: Row): string {
@@ -38,12 +40,14 @@ vi.mock("@/lib/aws/dynamodb", async (orig) => {
     [T.SYNC_TASKS]: ["userId", "taskId"],
     [T.ETL_JOBS]: ["userId", "jobId"],
     [T.ENGINE_JOBS]: ["userId", "jobId"],
+    [T.ACTION_SCHEDULES]: ["userId", "taskId"],
   };
   const rows = (table: string) => (h.tables[table] ??= []);
   const send = async (c: { constructor: { name: string }; input: Row }) => {
     const i = c.input;
     const kind = c.constructor.name;
     if (kind === "BatchGetCommand") {
+      h.batchGets++;
       const out: Record<string, Row[]> = {};
       for (const [table, spec] of Object.entries(i.RequestItems as Record<string, { Keys: Row[] }>)) {
         out[table] = spec.Keys.map((k) => rows(table).find((r) => keyOf(table, r) === keyOf(table, k))).filter(Boolean) as Row[];
@@ -140,7 +144,11 @@ describe("🔴 后台一轮评估 = 规则评估 + SLA 滚动预测(没人点按
     const events = h.tables[TABLES.ALERT_EVENTS];
     const failEv = events.find((e) => e.ruleId === "01RULE");
     expect(failEv).toMatchObject({ sk: "run#F1", projectId: P, status: "notified", targetId: "tgt_home" });
-    expect(failEv!.message).toContain("job-1");
+    // 文案里的任务名 = 资源表那一行的现名(运行行不带名字);裸 id 不许出现在消息里
+    expect(failEv!.message).toBe("任务「订单日汇总」运行失败：boom");
+    expect(failEv!.msgParams).toMatchObject({ name: "订单日汇总", err: "boom" });
+    expect(failEv!.trigger).toMatchObject({ taskId: "job-1", taskName: "订单日汇总", runId: "F1" });
+    expect(String(failEv!.message)).not.toContain("job-1");
     expect(h.tables[TABLES.ALERT_RULES][0].lastEvaluatedAt).toBeTruthy();
     expect(ALERTING_PUMP_PRINCIPAL.actor).toBe("system:alerting-pump");
   });
@@ -161,6 +169,29 @@ describe("🔴 后台一轮评估 = 规则评估 + SLA 滚动预测(没人点按
     expect(String(slaEv!.message)).toContain("任务「订单日汇总」(SLA「job-1 一分钟内完成」)");
     expect(String(slaEv!.message)).not.toContain("任务「job-1」");
     expect(String(slaEv!.message)).not.toContain("工作流「");
+    // 任务型 SLA 的节点就是任务自己 ⇒ 不写「当前卡在 <任务自己的 id>」这半句
+    expect(String(slaEv!.message)).not.toContain("当前卡在");
+    expect(String(slaEv!.message)).not.toContain("job-1,");
+  });
+
+  it("任务改了名 ⇒ 下一条告警按现名说话;对象已删(资源表里没有这一行)⇒ 文案回落到 id,告警照发", async () => {
+    h.tables[TABLES.ETL_JOBS] = [{ userId: "default-user", jobId: "job-1", name: "订单日汇总(新)", targetId: "tgt_home", projectId: P }];
+    h.tables[TABLES.TASK_RUNS].push({ taskId: "gone-9", runId: "F9", taskType: "sync", status: "failed", startedAt: iso(9), finishedAt: iso(8), duration: 60, targetId: "tgt_home", projectId: P, triggeredBy: "manual" });
+    await alertingTick(P, NOW);
+    const events = h.tables[TABLES.ALERT_EVENTS];
+    expect(events.find((e) => e.sk === "run#F1")!.message).toBe("任务「订单日汇总(新)」运行失败：boom");
+    const gone = events.find((e) => e.sk === "run#F9")!;
+    expect(gone.message).toBe("任务「gone-9」运行失败");
+    expect(gone.trigger.taskName).toBeUndefined();
+  });
+
+  it("没有候选告警的一轮 ⇒ 不为取名字发任何读(水位之后没有新失败是常态)", async () => {
+    h.tables[TABLES.TASK_RUNS] = h.tables[TABLES.TASK_RUNS].filter((r) => r.status !== "failed");
+    h.tables[TABLES.SLAS] = [];
+    const before = h.batchGets;
+    await alertingTick(P, NOW);
+    expect(h.tables[TABLES.ALERT_EVENTS] ?? []).toHaveLength(0);
+    expect(h.batchGets - before).toBe(0);
   });
 
   it("第二轮:事件不重复(条件写去重)、SLA 不重推、历史追加一位", async () => {

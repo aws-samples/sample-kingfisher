@@ -10,10 +10,9 @@ import { getChannels } from "@/lib/alerting/channels";
 import type { SlaRow, SlaPrediction } from "./types";
 // SLA 的区维**从绑定对象派生**,不让用户再填一次。
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
+import { RUN_OBJECT_TABLES, runObjectKey, type RunObjectKind } from "@/lib/monitor/run-object-name";
 
 const slaPk = (projectId: string) => `sla#${projectId}`;
-
-const USER_ID = "default-user";
 
 /**
  * 这条 SLA 管的对象(任务 / 工作流)跑在哪些区。
@@ -34,24 +33,27 @@ async function targetsOfBinding(taskId?: string, workflowId?: string): Promise<s
  *    靠运行行取名字的文案在真环境里永远是裸 id。
  * 读不到 ⇒ undefined(调用方决定回落)。
  */
+/** 任务型 SLA 能绑定的对象种类(工作流型另走 workflowId)。 */
+const SLA_TASK_KINDS: readonly RunObjectKind[] = ["sync", "etl", "engine"];
+
 async function boundObjectOf(taskId?: string, workflowId?: string): Promise<{ targets: string[]; name?: string } | undefined> {
   const shape = (Item: Record<string, unknown>) => ({
     targets: bindingTargets(Item as { targets?: unknown; targetId?: unknown }),
     name: typeof Item.name === "string" && Item.name.trim() ? Item.name.trim() : undefined,
   });
   try {
+    // 表与主键形状取自运行对象的唯一清单(`lib/monitor/run-object-name.ts`),这里只决定「问哪几种」。
     if (workflowId) {
       const { Item } = await docClient.send(
-        new GetCommand({ TableName: TABLES.WORKFLOWS, Key: { userId: USER_ID, workflowId }, ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } })
+        new GetCommand({ TableName: TABLES.WORKFLOWS, Key: runObjectKey("workflow", workflowId), ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } })
       );
       return Item ? shape(Item as Record<string, unknown>) : undefined;
     }
     if (taskId) {
       // 任务可能是同步 / 离线 / 引擎作业三张表之一 —— 逐张试(低频:建 SLA 与确认破线推送时才走)。
-      for (const table of [TABLES.SYNC_TASKS, TABLES.ETL_JOBS, TABLES.ENGINE_JOBS]) {
-        const key = table === TABLES.SYNC_TASKS ? { userId: USER_ID, taskId } : { userId: USER_ID, jobId: taskId };
+      for (const { kind, table } of RUN_OBJECT_TABLES.filter((t) => SLA_TASK_KINDS.includes(t.kind))) {
         const { Item } = await docClient
-          .send(new GetCommand({ TableName: table, Key: key, ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } }))
+          .send(new GetCommand({ TableName: table, Key: runObjectKey(kind, taskId), ProjectionExpression: "#t, targetId, #n", ExpressionAttributeNames: { "#t": "targets", "#n": "name" } }))
           .catch(() => ({ Item: undefined }));
         if (Item) return shape(Item as Record<string, unknown>);
       }
