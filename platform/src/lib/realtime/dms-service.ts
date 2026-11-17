@@ -54,8 +54,9 @@ const DMS_ENGINE_VERSION = process.env.DMS_ENGINE_VERSION || "3.5.4";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// 复制实例 ARN 进程内缓存(ARN 在实例生命周期内不变)。
-let _instanceArnCache = "";
+// 🔴 复制实例的 ARN **不在进程里记**:实例会被空闲回收(或人工删除)再由下一次「启动」重建,ARN 随之更换。
+//   2026-11-16 真环境:回收之后同一进程里再点「启动」,拿着已删实例的 ARN 去建复制任务 ⇒
+//   「Replication Instance ARN … does not exist」,平台不重启就一直失败。每次用之前都问 DMS(一次 Describe)。
 
 // 按名查 bgp-dms-sg 的 SG id(懒创建 CreateReplicationInstance 需要 SG id,非名)。
 async function findDmsSgId(): Promise<string | null> {
@@ -91,8 +92,12 @@ async function describeInstance(): Promise<{ arn: string; status: string } | nul
   return { arn: inst.ReplicationInstanceArn, status: inst.ReplicationInstanceStatus || "unknown" };
 }
 
-/** 复制实例这些状态下不会再自己好起来(等也白等):探测与轮询两处用同一份(单一作者)。 */
-export const REPLICATION_INSTANCE_BROKEN_STATUSES: readonly string[] = ["deleting", "failed", "incompatible-network"];
+/**
+ * 复制实例这些状态下不会再自己好起来(等也白等,要人处理):探测与轮询两处用同一份(单一作者)。
+ * 「deleting」不在其列:空闲回收(或人工止血)之后它是正常的过渡态 —— 删完就能重建,由后台编排等(见 getReplicationInstanceArn);
+ *   当成「坏了」的话,用户在回收的那几分钟里点「启动」只会拿到一句「状态异常」,得自己猜什么时候再点。
+ */
+export const REPLICATION_INSTANCE_BROKEN_STATUSES: readonly string[] = ["failed", "incompatible-network"];
 
 export interface ReplicationInstanceProbe {
   /** DMS 回的实例状态;实例不存在且没能发起创建时为 `missing`。 */
@@ -113,12 +118,11 @@ export interface ReplicationInstanceProbe {
  *   ⇒ 请求路径只许做**不等待**的前置检查(基建缺就 503、状态坏就 503),等待一律进后台编排。
  */
 export async function probeReplicationInstance(): Promise<ReplicationInstanceProbe> {
-  if (_instanceArnCache) return { status: "available", arn: _instanceArnCache, requestedCreate: false };
-
   let cur = await describeInstance();
   let requestedCreate = false;
 
   // 不存在 → 懒创建(只发起,不等)。
+  // 正在删除(deleting)的旧实例还占着这个 id,此刻建不了 ⇒ 如实回 deleting,由后台编排等它删完再来看这一眼。
   if (!cur) {
     const sgId = await findDmsSgId();
     if (!sgId) {
@@ -127,22 +131,26 @@ export async function probeReplicationInstance(): Promise<ReplicationInstancePro
       );
     }
     logger.info?.("dms.instance.lazy_create", { id: REPLICATION_INSTANCE_ID, class: DMS_INSTANCE_CLASS });
-    await dms.send(
-      new CreateReplicationInstanceCommand({
-        ReplicationInstanceIdentifier: REPLICATION_INSTANCE_ID,
-        ReplicationInstanceClass: DMS_INSTANCE_CLASS,
-        AllocatedStorage: 20,
-        EngineVersion: DMS_ENGINE_VERSION,
-        MultiAZ: false,
-        PubliclyAccessible: false,
-        ReplicationSubnetGroupIdentifier: DMS_SUBNET_GROUP_ID,
-        VpcSecurityGroupIds: [sgId],
-      })
-    );
-    requestedCreate = true;
+    try {
+      await dms.send(
+        new CreateReplicationInstanceCommand({
+          ReplicationInstanceIdentifier: REPLICATION_INSTANCE_ID,
+          ReplicationInstanceClass: DMS_INSTANCE_CLASS,
+          AllocatedStorage: 20,
+          EngineVersion: DMS_ENGINE_VERSION,
+          MultiAZ: false,
+          PubliclyAccessible: false,
+          ReplicationSubnetGroupIdentifier: DMS_SUBNET_GROUP_ID,
+          VpcSecurityGroupIds: [sgId],
+        })
+      );
+      requestedCreate = true;
+    } catch (e) {
+      // 另一条启动(或另一个副本)刚好先一步发起了创建 ⇒ 不是失败:实例正在建,读它的现状即可
+      if (String((e as { name?: string })?.name ?? "") !== "ResourceAlreadyExistsFault") throw e;
+    }
     cur = await describeInstance();
   }
-  if (cur?.status === "available") _instanceArnCache = cur.arn;
   return { status: cur?.status || "missing", arn: cur?.arn, requestedCreate };
 }
 
@@ -156,34 +164,41 @@ export async function probeReplicationInstance(): Promise<ReplicationInstancePro
  */
 export const REPLICATION_INSTANCE_WAIT = { intervalMs: 20_000, maxAttempts: 90 } as const;
 
-// 运行时发现复制实例 ARN(按稳定 id 查),解决 ARN 漂移。进程内缓存(ARN 在实例生命周期内不变)。
+/**
+ * 旧实例「删除中」的等待预算(同样只给后台编排用):同名实例要等旧的删完才能重建。
+ * 2026-11-16 真环境实测删除 5–8 分钟 ⇒ 预算 20 分钟(60 × 20s);与冷建预算分开计 —— 删完之后的冷建仍有完整的 30 分钟。
+ */
+export const REPLICATION_INSTANCE_DELETE_WAIT = { intervalMs: 20_000, maxAttempts: 60 } as const;
+
+// 运行时发现复制实例 ARN(按稳定 id 查);不缓存 —— 实例会被回收再重建,ARN 随之更换(见上文「不在进程里记」的说明)。
 // **懒创建(2026-07-07 成本改造)**:实例不再随 BgpRealtimeStack 常驻。若 bgp-dms 不存在,则用栈提供的
-// 固定名子网组 + SG 现场 CreateReplicationInstance(首次 10–15 分钟,实测 13.3 分钟),之后复用;用完可 delete 止血,
-// 基建(子网组/SG/角色)留着零成本复用。若正在创建中(creating/modifying),轮询到 available。
+// 固定名子网组 + SG 现场 CreateReplicationInstance(首次 10–15 分钟,实测 13.3 分钟),之后复用;空闲时由后台回收,
+// 基建(子网组/SG/角色)留着零成本复用。实例的五种常态这里都接得住:
+//   不存在 ⇒ 建;创建中 / 修改中 ⇒ 等到 available;删除中(刚被回收)⇒ 等它删完再建;available ⇒ 直接用。
+// 🔴 只许**后台编排**调本函数(要等分钟级);HTTP 请求路径用 probeReplicationInstance()。
 export async function getReplicationInstanceArn(): Promise<string> {
-  if (_instanceArnCache) return _instanceArnCache;
-
-  const probe = await probeReplicationInstance();
-  let cur: { arn: string; status: string } | null = probe.arn ? { arn: probe.arn, status: probe.status } : null;
-
-  // 轮询到 available(首次冷建 10–15 分钟;调用方是长驻编排,可等)。
-  // 上限 30 分钟(REPLICATION_INSTANCE_WAIT);超时抛错,由调用方决定重试(下次进来实例可能已 available,直接复用)。
-  // 🔴 只许**后台编排**调本函数;HTTP 请求路径用 probeReplicationInstance()。
-  for (let i = 0; i < REPLICATION_INSTANCE_WAIT.maxAttempts && cur && cur.status !== "available"; i++) {
+  let waitedDelete = 0;
+  let waitedCreate = 0;
+  for (;;) {
+    // 每一轮都从「看一眼」开始:实例不在(从未建过 / 旧的刚删完)⇒ 这一眼就发起懒创建
+    const cur = await probeReplicationInstance();
+    if (cur.status === "available" && cur.arn) return cur.arn;
     if (REPLICATION_INSTANCE_BROKEN_STATUSES.includes(cur.status)) {
       throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 状态异常:${cur.status}`);
     }
-    if (i > 0 && i % 15 === 0) {
-      logger.info?.("dms.instance.waiting", { id: REPLICATION_INSTANCE_ID, status: cur.status, waitedSec: (i * REPLICATION_INSTANCE_WAIT.intervalMs) / 1000 });
+    // 两段预算分开计:等旧实例删完(REPLICATION_INSTANCE_DELETE_WAIT)· 等新实例就位(REPLICATION_INSTANCE_WAIT);
+    // 超时抛错,由调用方决定重试(下次进来实例可能已 available,直接用)。
+    const deleting = cur.status === "deleting";
+    const budget = deleting ? REPLICATION_INSTANCE_DELETE_WAIT : REPLICATION_INSTANCE_WAIT;
+    const waited = deleting ? waitedDelete++ : waitedCreate++;
+    if (waited >= budget.maxAttempts) {
+      throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 未就绪(当前状态 ${cur.status || "缺失"},可稍后重试)`);
     }
-    await sleep(REPLICATION_INSTANCE_WAIT.intervalMs);
-    cur = await describeInstance();
+    if (waited > 0 && waited % 15 === 0) {
+      logger.info?.("dms.instance.waiting", { id: REPLICATION_INSTANCE_ID, status: cur.status, waitedSec: (waited * budget.intervalMs) / 1000 });
+    }
+    await sleep(budget.intervalMs);
   }
-  if (!cur || cur.status !== "available") {
-    throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 未就绪(当前状态 ${cur?.status || "缺失"},可稍后重试)`);
-  }
-  _instanceArnCache = cur.arn;
-  return cur.arn;
 }
 
 export interface RealtimeTaskInput {
@@ -391,6 +406,23 @@ export interface DmsTeardownResult {
   error?: string;
 }
 
+/** Stop 被拒的原因是「任务此刻不在运行」(状态刚变)—— 不是下线失败,重读状态即可。 */
+function isNotRunningRejection(e: unknown): boolean {
+  return /not running/i.test(String((e as Error)?.message ?? e));
+}
+
+/** 按标识查复制任务时服务回「没有这个任务」。 */
+function isTaskNotFound(e: unknown): boolean {
+  const name = String((e as { name?: string })?.name ?? "");
+  return name === "ResourceNotFoundFault" || /ResourceNotFound|No Tasks found/i.test(String((e as Error)?.message ?? e));
+}
+
+/**
+ * 我们发 Stop 之后,「已停止」要带着停止原因才算停稳;服务始终不给停止原因时,连续这么久都是「已停止」也算。
+ * 2026-11-16 真环境实测(三个样本):跑稳的任务停下后 2 秒就带上停止原因;刚启动就被停的要 30–38 秒(中途可能弹回运行中)⇒ 取 60 秒。
+ */
+export const STOP_SETTLE_FALLBACK_MS = 60_000;
+
 /** 停 + 等终态 + (可选)删掉这个同步任务的 DMS 复制任务。
  *
  * 🔴🔴 **为什么必须有它**(2026-09-16 全仓核实):`StopReplicationTaskCommand` 在改动前
@@ -407,7 +439,7 @@ export async function teardownReplicationTask(
 ): Promise<DmsTeardownResult> {
   const { taskIdent } = names(taskId);
   const NON_TERMINAL = ["running", "starting", "stopping", "modifying", "testing", "creating", "deleting"];
-  let cur: { ReplicationTaskArn?: string; Status?: string } | undefined;
+  let cur: { ReplicationTaskArn?: string; Status?: string; StopReason?: string } | undefined;
   try {
     const r = await dms.send(new DescribeReplicationTasksCommand({
       Filters: [{ Name: "replication-task-id", Values: [taskIdent] }],
@@ -419,47 +451,106 @@ export async function teardownReplicationTask(
   }
   if (!cur?.ReplicationTaskArn) return { found: false, stopped: false, deleted: false };
   const arn = cur.ReplicationTaskArn;
-  let stopped = false;
   let status = String(cur.Status || "");
-  if (status === "running" || status === "starting") {
-    try {
-      await dms.send(new StopReplicationTaskCommand({ ReplicationTaskArn: arn }));
-    } catch (e) {
-      return { found: true, stopped: false, deleted: false, finalStatus: status,
-               error: `StopReplicationTask 失败:${String((e as Error)?.message ?? e).slice(0, 240)}` };
-    }
-  }
-  // 等终态(DMS 停止是异步的;不等就去删会被服务拒 —— 与 serverless workflow 那条同款教训)
-  // 🔴 默认只等 **20s**:这段代码跑在一次 HTTP 请求里,而入口(CloudFront/ALB)是 **60s 边缘超时**。
+  let stopReason = String(cur.StopReason || "");
+  /** 有一次 Stop 发出去了、还没见分晓(这期间不重复发) */
+  let stopSent = false;
+  /** 本次下线发过 Stop(只有我们亲手停的任务才需要确认「停稳」) */
+  let stopEver = false;
+  /** 最近一次 Stop 之后读到过「已停止」(再回到运行中 = 那一次没停稳) */
+  let sawStopped = false;
+  /** 连续读到「已停止」的起点(毫秒;中途回到非终态就清零) */
+  let stoppedSince = 0;
+  let polls = 0;
+  /** 重读一次:任务没了 ⇒ gone;读失败(限流之类)⇒ 状态未知,调用处沿用上一次的。 */
+  const reread = async (): Promise<{ gone: boolean; status?: string; stopReason?: string }> => {
+    let gone = false;
+    const r = await dms.send(new DescribeReplicationTasksCommand({
+      Filters: [{ Name: "replication-task-id", Values: [taskIdent] }],
+    })).catch((e) => { gone = isTaskNotFound(e); return undefined; });
+    if (gone || (r && !r.ReplicationTasks?.length)) return { gone: true };
+    const t = r?.ReplicationTasks?.[0];
+    return { gone: false, status: t?.Status ? String(t.Status) : undefined, stopReason: t ? String(t.StopReason || "") : undefined };
+  };
+  // 等终态(DMS 的启动 / 停止都是异步的;不等就去删会被服务拒 —— 与 serverless workflow 那条同款教训)
+  // 🔴 默认只等 **20s**:不带 waitMs 的调用方跑在一次 HTTP 请求里,而入口(CloudFront/ALB)是 **60s 边缘超时**。
   //   原来默认 240s ⇒ 任务正在 creating/stopping 时请求必然 **504**(真环境实测:段 wp24 的
   //   WP24-3 拿到 504、平台行停在 provisioning)—— 而 504 是「不知道成没成」,最坏的一种答复。
-  //   现在:等不到终态就**如实回一个可重试的拒因**,让调用方稍后再点(见 teardown.ts 的 retryable)。
+  //   等不到终态就**如实回一个可重试的拒因**(见 teardown.ts 的 retryable);停止 / 删除路由走长操作,给的是分钟级预算。
   const deadline = Date.now() + (opts.waitMs ?? 20_000);
   // 🔴 每次休眠都要**被剩余预算夹住**:原来固定睡 5s ⇒ 即使预算只剩 30ms 也会先睡满 5s
   //   (判据里一条测试因此恒超时;生产里则是白占 5s 的请求时间)。
   for (;;) {
-    const r2 = await dms.send(new DescribeReplicationTasksCommand({
-      Filters: [{ Name: "replication-task-id", Values: [taskIdent] }],
-    })).catch(() => undefined);
-    status = String(r2?.ReplicationTasks?.[0]?.Status || status);
-    if (!NON_TERMINAL.includes(status)) break;
+    // 🔴 只有「运行中」才发 Stop。DMS 不许停一个还在启动的任务(回「is currently not running」):
+    //   2026-11-12 真环境,页面「启动」后立刻「删除」⇒ 对 starting 发 Stop 被拒 ⇒ 被当成「撤不下来」502,而任务根本没跑起来。
+    //   启动中 / 创建中 / 修改中 ⇒ 留在循环里等它变成运行中(那时再停)或自己落到终态。
+    if (NON_TERMINAL.includes(status)) {
+      stoppedSince = 0;
+      // 🔴 停过、也读到过「已停止」,却又回到运行中 ⇒ 那一次没停稳,再停一次。
+      //   2026-11-16 真环境(任务刚进运行中几秒就被停):DMS 先报一次不带停止原因的「已停止」,约 8 秒后状态回到运行中 ——
+      //   引擎这时才真正起来、把全量搬完 —— 再过约 30 秒才落到带停止原因的「已停止」。读到头一次就算数的话,
+      //   页面说「已停止」而通道还在搬数据,用户紧接着点「启动」/「删除」正好撞上去。
+      if (status === "running" && stopSent && sawStopped) { stopSent = false; sawStopped = false; }
+    }
+    if (status === "running" && !stopSent) {
+      try {
+        await dms.send(new StopReplicationTaskCommand({ ReplicationTaskArn: arn }));
+        stopSent = true;
+        stopEver = true;
+      } catch (e) {
+        // 读到 running 与发出 Stop 之间状态变了(刚跑完 / 刚失败 / 别人已停)⇒ 这不是下线失败,下一轮重读状态再判
+        if (!isNotRunningRejection(e)) {
+          return { found: true, stopped: false, deleted: false, finalStatus: status,
+                   error: `StopReplicationTask 失败:${String((e as Error)?.message ?? e).slice(0, 240)}` };
+        }
+      }
+    }
+    if (!NON_TERMINAL.includes(status)) {
+      // 到终态了:「停止」到此为止(我们亲手停的要先确认停稳);「删除」接着撤掉复制任务(撤不撤得掉由 DMS 说了算,被拒就回循环)
+      if (!opts.purge) {
+        // 停稳 = 「已停止」带着停止原因(引擎确认停下);万一服务始终不给停止原因,连续 STOP_SETTLE_FALLBACK_MS 都是「已停止」也算。
+        const unsettled = stopEver && status === "stopped" && !stopReason;
+        if (unsettled) {
+          sawStopped = true;
+          if (!stoppedSince) stoppedSince = Date.now();
+        }
+        if (!unsettled || Date.now() - stoppedSince >= STOP_SETTLE_FALLBACK_MS) {
+          return { found: true, stopped: true, deleted: false, finalStatus: status };
+        }
+      } else {
+        try {
+          await dms.send(new DeleteReplicationTaskCommand({ ReplicationTaskArn: arn }));
+          return { found: true, stopped: true, deleted: true, finalStatus: status };
+        } catch (e) {
+          // 🔴 读到终态与发出 Delete 之间状态可能变了:后台的启动编排恰好在这一瞬把任务启动(ready → starting),DMS 就会拒掉 Delete。
+          //   那不是「撤不下来」⇒ 重读:任务已没了 = 目的达成;又回到非终态 = 回循环接着等(跑起来了就停、停稳了再删);
+          //   状态没变还被拒(权限 / 服务故障)才如实报删除失败。
+          const now = await reread();
+          if (now.gone) return { found: true, stopped: true, deleted: true, finalStatus: "deleted" };
+          if (!now.status || !NON_TERMINAL.includes(now.status)) {
+            return { found: true, stopped: true, deleted: false, finalStatus: now.status ?? status,
+                     error: `DeleteReplicationTask 失败:${String((e as Error)?.message ?? e).slice(0, 240)}` };
+          }
+          status = now.status;
+          stopReason = now.stopReason ?? "";
+          stopSent = false;
+          continue;
+        }
+      }
+    }
     const left = deadline - Date.now();
     if (left <= 0) break;
-    await new Promise((r) => setTimeout(r, Math.min(5000, left)));
+    // 轮询间隔 1s → 2s → 4s → 5s 封顶:已经在终态边上的任务不必白等 5 秒,真要等几分钟的也不会打爆 Describe
+    await new Promise((r) => setTimeout(r, Math.min(5000, 1000 * 2 ** Math.min(polls++, 3), left)));
+    const now = await reread();
+    // 等的过程中任务没了(被别的操作删掉)⇒ 已经没有东西可下线,不必抱着旧状态等到预算耗尽
+    if (now.gone) return { found: true, stopped: true, deleted: true, finalStatus: "deleted" };
+    status = now.status ?? status;
+    stopReason = now.stopReason ?? stopReason;
   }
-  stopped = !NON_TERMINAL.includes(status);
-  if (!stopped) {
-    return { found: true, stopped: false, deleted: false, finalStatus: status,
-             error: `复制任务没到终态(status=${status})⇒ 拒绝当成已下线` };
-  }
-  if (!opts.purge) return { found: true, stopped: true, deleted: false, finalStatus: status };
-  try {
-    await dms.send(new DeleteReplicationTaskCommand({ ReplicationTaskArn: arn }));
-  } catch (e) {
-    return { found: true, stopped: true, deleted: false, finalStatus: status,
-             error: `DeleteReplicationTask 失败:${String((e as Error)?.message ?? e).slice(0, 240)}` };
-  }
-  return { found: true, stopped: true, deleted: true, finalStatus: status };
+  // 预算用完仍在非终态(启动中 / 停止中 / 删除中 …)或「已停止」还没停稳 ⇒ 如实回「没到终态」(调用方按可重试处理),绝不当成已下线
+  return { found: true, stopped: false, deleted: false, finalStatus: status,
+           error: `复制任务没到终态(status=${status}${NON_TERMINAL.includes(status) ? "" : ",还没停稳"})⇒ 拒绝当成已下线` };
 }
 
 export async function getTaskStatus(taskArn: string): Promise<string> {

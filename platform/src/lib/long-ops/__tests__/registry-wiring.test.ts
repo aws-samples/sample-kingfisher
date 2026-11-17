@@ -72,6 +72,9 @@ const ROUTES: Array<[file: string, kind: (typeof LONG_OP_KINDS)[number], bodyCal
   ["app/api/datasources/route.ts", "datasource-create", /ensureGlueRole\(|detectNetwork\(|userSpecifiedNetwork\(|createGlueConnection\(|(?<!\.)\btestConnection\(|readSourceSchema\(/],
   // 第三批第二条:提交段(逐区 submit / 运行组逐 target 记账 / 扇出循环)全在执行体,路由里一个都不许留
   ["app/api/engines/[engine]/[id]/run/route.ts", "engine-run", /\.submit\(|forEachTargetPlace\(|noteFanoutResult\(|recordAudit\(/],
+  // 同步任务的停止 / 删除:下线通道 + 改状态 / 删行 + 收口运行行 + 入队复制实例回收全在执行体
+  ["app/api/sync/[id]/stop/route.ts", "sync-stop", /teardownSyncChannel\(|updateSyncTaskIfExists\(|settleRunningRuns\(|recordAudit\(/],
+  ["app/api/sync/[id]/route.ts", "sync-delete", /teardownSyncChannel\(|enqueueDmsInstanceReclaim\(|new DeleteCommand\(|settleRunningRuns\(/],
 ];
 
 describe("接线 ①:kind 闭合清单 ↔ 执行体 ↔ 标签 ↔ 参数类型", () => {
@@ -87,7 +90,7 @@ describe("接线 ①:kind 闭合清单 ↔ 执行体 ↔ 标签 ↔ 参数类型
     expect([...all].sort()).toEqual([...LONG_OP_KINDS].sort());
     // 第二批 14 种确实在它们该在的域(不是塞进别的域凑数)
     expect(literalKeys("lib/projects/long-ops.ts", "PROJECT_LONG_OP_EXECUTORS")).toEqual(["project-delete"]);
-    expect(literalKeys("lib/sync/long-ops.ts", "SYNC_LONG_OP_EXECUTORS").sort()).toEqual(["sync-execute-ddl", "sync-generate-ddl"]);
+    expect(literalKeys("lib/sync/long-ops.ts", "SYNC_LONG_OP_EXECUTORS").sort()).toEqual(["sync-delete", "sync-execute-ddl", "sync-generate-ddl", "sync-stop"]);
     expect(literalKeys("lib/realtime/long-ops.ts", "REALTIME_LONG_OP_EXECUTORS").sort()).toEqual(["flink-delete", "flink-start", "flink-stop"]);
     expect(literalKeys("lib/workflow/long-ops.ts", "WORKFLOW_LONG_OP_EXECUTORS").sort()).toEqual(["workflow-delete", "workflow-publish", "workflow-trigger", "workflow-unpublish"]);
     expect(literalKeys("lib/datasource/long-ops.ts", "DATASOURCE_LONG_OP_EXECUTORS").sort()).toEqual(["datasource-create", "datasource-s3-external"]);
@@ -140,7 +143,12 @@ describe("接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 kind", () =>
     const marks: Record<string, string[]> = {
       "lib/governance/long-ops.ts": ["runSchemaSyncRecorded(", "work: schemaSyncWork", "schemaSyncMessage(", '"governance-schema-sync":'],
       "lib/projects/long-ops.ts": ["inventoryProject(", "enqueueProjectCredReclaim(", "deleteProject(", '"project.delete.cred-reclaim-refused"', '"project.delete"', 'code: "VALIDATION_FAILED"', 'code: "UPSTREAM_ERROR"'],
-      "lib/sync/long-ops.ts": ["probeTables(", "resolveRedshiftBinding(", '"sync.execute-ddl"', "new ExecuteStatementCommand(", "TargetBindingRejected", "awaitTerminal", "SYNC_DDL_WAIT_POLLS"],
+      "lib/sync/long-ops.ts": [
+        "probeTables(", "resolveRedshiftBinding(", '"sync.execute-ddl"', "new ExecuteStatementCommand(", "TargetBindingRejected", "awaitTerminal", "SYNC_DDL_WAIT_POLLS",
+        // 停止 / 删除主体:单一下线作者 + 等待预算 + 条件写状态 / 删行 + 收口运行行 + 复制实例回收 + 两种拒因 + 审计动作名
+        "teardownSyncChannel(", "waitMs: TEARDOWN_LONG_OP_WAIT_MS", "updateSyncTaskIfExists(", "new DeleteCommand(", "settleRunningRuns(", "enqueueDmsInstanceReclaim(",
+        'code: "TEARDOWN_IN_PROGRESS"', 'code: "UPSTREAM_ERROR"', '"sync.stop"', '"sync.delete"',
+      ],
       "lib/realtime/long-ops.ts": ["startFlinkJob(", "pauseFlinkJob(", "requestFlinkDeletion(", '"flink.start"', '"flink.stop"', '"flink.delete"', '"flink.delete.accepted"', 'code: "DECISION_REQUIRED"', "resultStatus: 202", 'code: "UPSTREAM_ERROR"'],
       "lib/workflow/long-ops.ts": ["publishWorkflowDag(", "await ensureDagUnpaused(", "unpublishWorkflowDag(", "startWorkflowRun(", "putRunRecord(", "fanoutRunBody(", '"workflow.publish"', '"workflow.unpublish"', '"workflow.trigger"', '"workflow.delete"', "rawBody: true", 'code: "DAG_CLEANUP_FAILED"', '"SCHEDULER_ARTIFACT_MISSING"'],
       "lib/datasource/long-ops.ts": [
@@ -163,9 +171,12 @@ describe("接线 ④:已接入路由 ↔ submitLongOp ↔ 自己的 kind", () =>
       const src = read(file);
       for (const mark of list) expect(src, `${file} 缺 ${mark}`).toContain(mark);
     }
-    // 编排四种全部 rawBody(历史响应是摊平形状);其它域一处都不许用(信封口径不变)
+    // 编排四种全部 rawBody、删除同步任务一种(这五条路由的历史响应是摊平形状);其它域一处都不许用(信封口径不变)
     expect(stripComments(read("lib/workflow/long-ops.ts")).match(/rawBody: true/g)?.length).toBe(4);
-    for (const file of ["lib/governance/long-ops.ts", "lib/projects/long-ops.ts", "lib/sync/long-ops.ts", "lib/realtime/long-ops.ts", "lib/datasource/long-ops.ts", "lib/metrics/long-ops.ts", "lib/modeling/long-ops.ts", "lib/ai/long-op-executors.ts"]) {
+    const syncSrc = stripComments(read("lib/sync/long-ops.ts"));
+    expect(syncSrc.match(/rawBody/g)?.length).toBe(1);
+    expect(syncSrc).toMatch(/return \{ data: \{ success: true, teardown: td, .*\}, rawBody: true \};/);
+    for (const file of ["lib/governance/long-ops.ts", "lib/projects/long-ops.ts", "lib/realtime/long-ops.ts", "lib/datasource/long-ops.ts", "lib/metrics/long-ops.ts", "lib/modeling/long-ops.ts", "lib/ai/long-op-executors.ts"]) {
       expect(stripComments(read(file)), `${file} 不该用 rawBody`).not.toMatch(/rawBody/);
     }
   });

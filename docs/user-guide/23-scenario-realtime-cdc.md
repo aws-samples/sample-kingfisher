@@ -120,6 +120,7 @@ Page path: "Data Integration → Data Sync".
 
 1. Click "Start" in the list row (or open the detail page and click "Start" at the top right).
 2. On first use a message appears (verbatim): "DMS sync orchestration started (full-load-and-cdc): first use must create the replication instance first (about 10–15 minutes); the task shows 'Starting' meanwhile and you can 'Stop' at any time; check the status later on the detail page / monitor". When the instance already exists the message is "DMS sync orchestration started (full-load-and-cdc); check the status later on the detail page / monitor".
+   You can also click "Start" while the idle replication instance is being reclaimed; the message then is "DMS sync orchestration started (full-load-and-cdc): the idle replication instance is being reclaimed and will be recreated automatically once that completes (about 15–25 minutes); the task shows 'Starting' meanwhile and you can 'Stop' at any time; check the status later on the detail page / monitor".
 3. The status column changes to "Starting" and the row action becomes "Stop". With "Auto refresh" at the top right of the list turned on, the list is re-fetched every few seconds until it reaches a terminal state.
 4. Click the task name to open the detail page and switch to the "Run Logs" tab; the orchestration steps appear line by line, for example:
    - `[orchestration] DMS sync start accepted; replication instance being created for the first time (about 10–15 minutes); the replication channel (endpoints / replication task) is created once it is ready...`
@@ -151,16 +152,20 @@ Meaning of the status column (the list and the detail page share one set of word
 | Stopped | You clicked "Stop"; the replication task is kept and can be started again | Start |
 | Failed / Abnormal | Failed on the DMS side or orchestration failed; the "Error" row on the detail page has the verbatim message | Start |
 
-- **Stop**: click "Stop" in the row. The platform sends the stop to DMS and waits for a terminal state; the replication task itself is kept and the next "Start" reuses it. If the replication task is still on its way to stopping, you get HTTP 409 with the message "Task status **unchanged** — the replication task **is still stopping**; click 'Stop' again in a few tens of seconds."
+- **Stop**: one click on "Stop" in the row is enough; there is no need to click repeatedly. The platform waits until the replication task has really settled (DMS confirms the engine has stopped) before it changes the status to "Stopped"; if the task is still "Starting", it is first waited through its start-up and then stopped (DMS does not allow stopping a task that is starting), so the whole thing may take a minute or two.
+  - After 45 seconds the bottom right of the page shows "Running in background: Stop sync task (n s elapsed)"; it closes by itself when done and the list refreshes. The replication task itself is kept and the next "Start" reuses it.
+  - If it has still not reached a terminal state after about 240 seconds you get HTTP 409, with a message ending in "Task status **unchanged** — waited about 240 seconds and the replication task **is still stopping**; click 'Stop' again later."; the status has not moved, so click once more later.
+  - While a stop / delete is in progress, clicking "Start / Edit / Stop / Delete" on the same task is rejected (HTTP 409 "in progress"); wait until the bottom-right hint disappears.
 - **Clicking Start while Starting**: no second orchestration is sent. The verbatim message: "This task is already starting (replication channel being created; first use includes creating the replication instance, about 10–15 minutes); no second start was sent — wait for it to finish; to abort, click 'Stop'. If it stays in 'Starting' for a long time, 'Stop' and then 'Start' again".
 - **Your "Stop" always wins**: if you click "Stop" during the start orchestration, the background orchestration yields and will not flip the status back to "Running".
 - **Failure reconciliation**: if the replication task fails on the DMS side (most often because binlog is not enabled on the source), the list shows "Failed" as soon as it is read, and the verbatim "Error" is in "DMS Sync Monitor" on the detail page; fix the source database and click "Start" to retry.
-- **Delete**: "Delete" in the row → confirm. The platform first stops, then deletes the DMS replication task; if AWS refuses to stop, it reports an error and leaves the record unchanged, so "deleted on the page, still replicating in the background" cannot happen.
+- **Delete**: "Delete" in the row → confirm; again one click is enough (a task can be deleted directly while it is "Starting" or "Running"). The platform first waits for the replication task to reach a terminal state, then deletes the DMS replication task and finally the record, and closes the task's run records that still show "Running" in the same step;
+  after 45 seconds the bottom right shows "Running in background: Delete sync task (n s elapsed)". If AWS refuses to stop, it reports an error and leaves the record unchanged, so "deleted on the page, still replicating in the background" cannot happen.
 
 ### Always-on billing reminder (must read)
 
 - The DMS replication instance is created the first time a DMS task starts and is then reused by every DMS task of the region; while tasks are only "Stopped" the instance keeps billing (about USD 27 / month, see the [Cost model](../cost-model.md)), because stopped tasks keep their CDC checkpoints and the instance is not reclaimed.
-  When you are sure real-time sync is no longer needed, **delete** all DMS tasks of the region on the "Data Sync" page: once the last one is gone, the platform reclaims the replication instance after a 10-minute idle grace and writes an audit entry; progress is shown under "System Settings → Background cleanup jobs"; the next start recreates it (about 10–15 minutes).
+  When you are sure real-time sync is no longer needed, **delete** all DMS tasks of the region on the "Data Sync" page: once the last one is gone, the platform reclaims the replication instance after a 10-minute idle grace and writes an audit entry; progress is shown under "System Settings → Background cleanup jobs"; the next start recreates it (about 10–15 minutes); you may also click "Start" before the reclaim has finished — the platform waits for the old instance to be deleted and then recreates it (about 15–25 minutes in total).
 - Zero-ETL's dedicated Redshift Serverless workgroup bills by active time; for Zero-ETL, "Stop" = delete the integration (see section 6), and replication stops afterwards.
 - The page's "How to use this page" hint states: "DMS and Zero-ETL channels bill continuously; stop them when not in use".
 
@@ -344,9 +349,9 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 - **Zero-ETL is tagged "Not supported" in "Channel Recommendation"**.
   - Cause: the reason is written right next to it — "Only MySQL/Aurora sources are supported" / "Only Redshift targets are supported" / "full-load only is not supported"; starting also requires the data source to be an RDS managed instance (otherwise 400 "The data source is not an RDS managed instance; cannot create a Zero-ETL integration (missing rdsInstanceId)").
   - Next step: switch to the DMS CDC channel.
-- **Clicking "Stop" reports 409 "the replication task is still stopping"**.
-  - Cause: the DMS stop is asynchronous and has not reached a terminal state.
-  - Next step: click "Stop" again after a few tens of seconds; the status stays unchanged meanwhile.
+- **"Stop" or "Delete" reports 409 "still stopping" after waiting a few minutes**.
+  - Cause: the platform has already waited about 240 seconds and the DMS replication task has still not reached a terminal state (for example a very slow start); neither the status nor the record has changed.
+  - Next step: click the same button again later.
 - **After "Generate Data", the Flink job's "Aggregated result" stays at 0 rows**.
   - Cause: the window has not closed or the checkpoint has not committed (default interval 30 seconds); or the job is not RUNNING; or, for an S3 Tables job, "Query results (Athena)" was not clicked.
   - Next step: confirm "MSAF Application Status" is RUNNING, wait 60 seconds and click "Query results (Athena)" again; clicking "Generate Data" once more advances the watermark and closes the windows left open by the previous batch.
@@ -372,7 +377,7 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 
 1. **Flink streaming job**: "Stream Compute" → "Stop" in the row → wait for "Stopped" → "Delete" → confirm. The "Deleting" status disappears on its own.
 2. **Kinesis data source** (the practice stream you created yourself): "Data Sources" → "Delete" in the row. It is rejected while a streaming job still references it (409 `DATASOURCE_IN_USE`, with a dialog listing every referencing streaming job); delete the jobs first. The Kinesis stream itself bills per shard-hour, so delete it once you are sure it is no longer needed.
-3. **DMS real-time sync task**: "Data Sync" → "Stop" → wait for "Stopped" → "Delete". The platform deletes the DMS replication task along with it.
+3. **DMS real-time sync task**: "Data Sync" → "Delete" in the row → confirm (no need to stop first; one click, and the platform deletes the replication task along with it once it has settled).
 4. **Zero-ETL task**: "Stop" deletes the integration and drops the `zeroetl_<task-suffix>` database; then "Delete" the task row.
 5. **Replication instance**: once the region's last DMS task is deleted, the platform reclaims the replication instance `bgp-dms` after a 10-minute idle grace ("System Settings → Background cleanup jobs" shows progress and outcome); tasks that are only stopped, not deleted, keep the instance alive and billing.
 6. **S3 Tables result table**: `realtime.flink_region_agg` stays in that region's platform table bucket and keeps using storage; if you do not want it, have the administrator delete it in S3 Tables (the platform pages offer no drop-table entry).

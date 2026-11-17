@@ -18,11 +18,13 @@ describe("DMS 复制实例等待预算", () => {
     expect(REPLICATION_INSTANCE_WAIT.intervalMs).toBeGreaterThanOrEqual(10_000);
   });
 
-  it("② getReplicationInstanceArn 的轮询循环用的是这份常量,不是字面量", () => {
+  it("② getReplicationInstanceArn 的轮询循环用的是这份常量,不是字面量(等旧实例删完另有一份,两段分开计;行为判据在 dms-instance-lifecycle.test.ts)", () => {
     const src = read("lib/realtime/dms-service.ts");
-    expect(src).toMatch(/for \(let i = 0; i < REPLICATION_INSTANCE_WAIT\.maxAttempts && cur && cur\.status !== "available"; i\+\+\)/);
-    expect(src).toMatch(/await sleep\(REPLICATION_INSTANCE_WAIT\.intervalMs\)/);
-    expect(src, "不许再长出 8 分钟那种写死的循环上限").not.toMatch(/i < 48 &&/);
+    const fn = src.slice(src.indexOf("export async function getReplicationInstanceArn"), src.indexOf("export interface RealtimeTaskInput"));
+    expect(fn).toMatch(/const budget = deleting \? REPLICATION_INSTANCE_DELETE_WAIT : REPLICATION_INSTANCE_WAIT;/);
+    expect(fn).toMatch(/if \(waited >= budget\.maxAttempts\)/);
+    expect(fn).toMatch(/await sleep\(budget\.intervalMs\)/);
+    expect(fn, "循环上限与间隔不许写成数字").not.toMatch(/[<>]=? ?\d{2,}|sleep\(\d/);
   });
 
   it("③ 启动路由给用户看的文案与预算同源:说「约 10–15 分钟」,不再说「3–5 分钟」", () => {

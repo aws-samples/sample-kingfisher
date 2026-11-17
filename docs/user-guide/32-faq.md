@@ -118,13 +118,13 @@ Each entry follows the format **symptom** → cause → next step. The next step
 
 ### 4.4 A real-time (DMS) task stays in "Starting" for a long time on its first "Start"; clicking again reports "This task is already starting…"
 
-- Cause: the first start creates a replication instance, which takes about 10–15 minutes; the platform does not issue a second start.
+- Cause: the first start creates a replication instance, which takes about 10–15 minutes; the platform does not issue a second start. After the last DMS task of a region is deleted the instance is reclaimed automatically, and the first start after that has to recreate it as well; if you click "Start" before the reclaim has finished, the old instance must be deleted first (about 15–25 minutes in total).
 - Next step: wait; to abort, click "Stop"; if it stays in "Starting" for a very long time, "Stop" first and then "Start".
 
-### 4.5 "Stop" or "Delete" returns 409 and the message says it is "still on its way to stopping"
+### 4.5 "Stop" or "Delete" returns 409 after a few minutes and the message says it is "still on its way to stopping"
 
-- Cause: the replication channel is stopping and has not reached a final state yet; the platform does not change the record, to avoid leaving an orphan channel that can never be stopped and keeps incurring charges.
-- Next step: click the same button again after a few tens of seconds.
+- Cause: one click on "Stop" / "Delete" is enough — the platform waits until the replication channel has really reached a final state (after 45 seconds the bottom right shows "Running in background"); this message only appears when the channel has still not settled after about 240 seconds. The platform does not change the record, to avoid leaving an orphan channel that can never be stopped and keeps incurring charges.
+- Next step: click the same button again later.
 
 ### 4.6 Starting a task in an execution region with the Zero-ETL / DMS channel reports "Not yet pushed down per region (currently offered in the home region only)"
 

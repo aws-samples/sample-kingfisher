@@ -29,6 +29,13 @@ import type { SyncTask } from "@/types/sync-task";
  *  `SYNC_TEARDOWN_WAIT_MS` 可调(判据里调小,免得一条测试等 20s)。 */
 const IN_REQUEST_WAIT_MS = Math.max(1, Number(process.env.SYNC_TEARDOWN_WAIT_MS || 20_000));
 
+/**
+ * 「停止 / 删除」同步任务走长操作时,下线通道最多等这么久(DMS 复制任务要先等它启动完、再停、再等停稳,是分钟级的事)。
+ * 取 240 秒:比长操作的全局上限(300 秒)短一截 ⇒ 真等不到时由执行体**如实回可重试的拒因**,而不是被上限掐成「超时」。
+ * 后台启动编排让路时的收尾(停回 / 撤掉自己建的复制任务)用同一个预算。
+ */
+export const TEARDOWN_LONG_OP_WAIT_MS = 240_000;
+
 /** Glue run 的**非终态**(这些才需要去停;终态的停了会被服务拒)。 */
 const GLUE_RUNNING = ["STARTING", "RUNNING", "STOPPING", "WAITING"];
 

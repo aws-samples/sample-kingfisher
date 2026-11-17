@@ -1,4 +1,7 @@
 export const dynamic = "force-dynamic";
+import { resourceBusyResponse, assertResourcesFree } from "@/lib/long-ops/guard";
+import { resourceKey } from "@/lib/long-ops/kinds";
+import { CEILING_MS, LongOpHttpError } from "@/lib/long-ops/store";
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
@@ -27,7 +30,7 @@ import {
   waitTaskStartable,
 } from "@/lib/realtime/dms-service";
 // 停 / 删 / 「启动被接管后停回去」共用**同一个**下线作者
-import { teardownSyncChannel } from "@/lib/sync/teardown";
+import { teardownSyncChannel, TEARDOWN_LONG_OP_WAIT_MS } from "@/lib/sync/teardown";
 // 编排失败时复制实例可能刚建出来却没有任务引用 ⇒ 登记回收作业(作业按「零复制任务」事实决定,实例在用就收口为「在用」)
 import { enqueueDmsInstanceReclaim } from "@/lib/realtime/dms-instance-reclaim-job";
 import { getTarget } from "@/lib/exec-env/registry";
@@ -61,6 +64,9 @@ const USER_ID = "default-user";
 const STALE_PROVISIONING_MS = 30 * 60 * 1000;
 /** 「这条任务仍是本次启动在管」:status 还是 provisioning,且 startRunId 是本次写进去的。 */
 const OWNED_BY_THIS_START = "#s = :prov AND realtimeConfig.startRunId = :rid";
+/** 「停止 / 删除」受理后最久占着这条任务多久(长操作全局上限 + 终态写入的余量);过了它不再等,只按任务行判归属。 */
+const TEARDOWN_IN_FLIGHT_WAIT_MS = CEILING_MS + 30_000;
+const TEARDOWN_IN_FLIGHT_POLL_MS = 2_000;
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -73,6 +79,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!task) return apiError("同步任务不存在", 404, { code: "NOT_FOUND", correlationId: cid });
   const ctx = await guardResourceAccess(req, task, "editor");
   if (ctx instanceof NextResponse) return ctx;
+  // 这条任务正被「停止 / 删除」长操作占着(它们要等后台通道真正到终态,可能是分钟级)⇒ 409,等它结束再操作
+  const busy = await resourceBusyResponse([resourceKey("sync-task", params.id)]);
+  if (busy) return busy;
 
   // + DMS 扩展:DMS 通道支持 full(普通全量 full-load)/ incremental・realtime(full-load-and-cdc)。
   // 迁移类型由同步模式派生。realtime 任务后端已强制 channel=dms;full/incremental 经前端选 DMS 通道路由至此。
@@ -117,6 +126,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     });
   }
   const instanceCold = instanceStatus !== "available";
+  // 旧实例正在删除(空闲回收刚发起,或有人手工删):照常受理 —— 后台编排先等它删完再重建,比单纯冷建更久,话要说在前头。
+  const instanceRecycling = instanceStatus === "deleting";
 
   // 源库凭证/库名/主机:任务自身字段优先;否则从关联数据源(datasourceId)解析。
   // 创建流程(SyncTaskModal)只存 datasourceId,不冗余存 secret/database/host,故此处必须能回退解析,
@@ -162,8 +173,36 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   // 🔴 这是**后台 fire-and-forget** 的写回:从这里发起到真正写回之间,用户完全可能已经把任务删了
   //   ⇒ 盲 Update 会把它凭空造回来(一条没名字、删不掉的残行)。
   // 🔴 每一笔都带「仍是本次启动在管」的条件 —— 用户中途「停止」/「删除」/ 另一次启动接管后,
-  //   本条编排的回写一律落空(返回 superseded),绝不盖掉别人的状态。
-  const writeOwned = async (status: string, extra: Record<string, unknown> = {}): Promise<"owned" | "superseded"> => {
+  //   本条编排的回写一律落空,绝不盖掉别人的状态。落空分两种:行还在(superseded:被停止 / 被接管)与行已删(gone)——
+  //   后者意味着再没有任何记录指向这条通道,编排要把自己建出来的复制任务撤掉(见下面的 yieldTo)。
+  // 🔴 用户的「停止 / 删除」一经受理(长操作占住这条任务)就该赢,而任务行要等通道真正撤完才变。这中间编排若照常往前推,
+  //   就与下线抢同一条复制任务 —— 2026-11-16 真环境「启动后 9 秒点删除」:删除刚把复制任务删掉,编排同一秒去启动它被 DMS 拒
+  //   (cannot be started, invalid state)⇒ 把用户自己删掉的这次运行记成了「失败」(监控页多一条失败,盯全部任务的失败告警规则跟着误报)。
+  //   ⇒ 每个关口(含失败分支)先等占着这条任务的停止 / 删除结束,再按任务行判归属:行没了 / 被停止 ⇒ 让路;
+  //   它没做成(记录没动)⇒ 编排照原样继续,真失败照实记。
+  const waitOutTeardown = async (): Promise<void> => {
+    const key = [resourceKey("sync-task", params.id)];
+    const deadline = Date.now() + TEARDOWN_IN_FLIGHT_WAIT_MS;
+    for (;;) {
+      try {
+        await assertResourcesFree(key);
+        return;
+      } catch (e) {
+        if (!(e instanceof LongOpHttpError)) {
+          // 读不到租约(凭证 / 限流)≠ 有人占:不在这里卡住编排,交给下面按任务行判
+          logger.error("realtime.start.lease-read.failed", e, { correlationId: cid, taskId: params.id });
+          return;
+        }
+      }
+      if (Date.now() >= deadline) {
+        logger.warn("realtime.start.teardown-wait.expired", { correlationId: cid, taskId: params.id, waitedMs: TEARDOWN_IN_FLIGHT_WAIT_MS });
+        return;
+      }
+      await new Promise((r) => setTimeout(r, TEARDOWN_IN_FLIGHT_POLL_MS));
+    }
+  };
+  const writeOwned = async (status: string, extra: Record<string, unknown> = {}): Promise<"owned" | "superseded" | "gone"> => {
+    await waitOutTeardown();
     try {
       const r = await updateSyncTaskIfExists({
         taskId: params.id,
@@ -178,7 +217,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         },
         onlyIf: OWNED_BY_THIS_START,
       });
-      return r.ok ? "owned" : "superseded";
+      if (r.ok) return "owned";
+      return r.miss === "gone" ? "gone" : "superseded";
     } catch (e) {
       // 凭证 / 限流之类:不知道归属,按原来的语义继续(只记日志),不把基建抖动当成「被接管」。
       logger.error("realtime.task.update.failed", e, { correlationId: cid, taskId: params.id });
@@ -223,7 +263,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   try {
     await settleRunningRuns({ taskId: params.id, status: "stopped", set: { finishedAt: startedAt }, stamp: resolveRunStamp(task) });
   } catch { /* best-effort */ }
-  const firstStep = instanceCold
+  const firstStep = instanceRecycling
+    ? "[编排] DMS 同步启动已受理;复制实例正在回收,回收完成后自动重建(约 15–25 分钟),就绪后再建复制通道(endpoints/复制任务)..."
+    : instanceCold
     ? "[编排] DMS 同步启动已受理;复制实例首次创建中(约 10–15 分钟),就绪后再建复制通道(endpoints/复制任务)..."
     : "[编排] DMS 同步启动已受理,准备复制通道(endpoints/复制任务)...";
   await writeRun("running", { logs: [firstStep] });
@@ -231,16 +273,30 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   void (async () => {
     const steps: string[] = [firstStep];
     const log = (m: string) => { steps.push(`[${new Date().toISOString().slice(11, 19)}] ${m}`); };
-    const bail = (step: string) => {
-      // 用户已「停止」/「删除」,或另一次启动接管了 ⇒ 本条编排让路:不写状态、不写运行记录(停止路由已把 run 收口)。
-      logger.info("realtime.start.superseded", { correlationId: cid, taskId: params.id, step });
-    };
     let started = false;
+    /** 复制任务已由本次编排建出 / 接手(从这一刻起,让路时要看它还留在 DMS 里会不会成孤儿)。 */
+    let replicationTaskReady = false;
+    // 用户已「停止」/「删除」,或另一次启动接管了 ⇒ 本条编排让路:不写状态、不写运行记录(停止 / 删除已把 run 收口)。
+    // (停止 / 删除还在进行时,归属检查会先等它结束 —— 见 waitOutTeardown;所以走到这里时任务行已经是它们写完之后的样子。)
+    // 让路前先把自己留在 DMS 里的东西收干净:
+    //   · 行已删(gone):删除那一刻复制任务还没建出来(或正被本编排启动),删除带不走它 ⇒ 这里撤掉 ——
+    //     否则留下一条没有任何记录指向的复制任务(启动了的还在搬数据),复制实例也因为「上面还有任务」永远回收不了;
+    //   · 行还在(用户停止 / 被接管)而本编排已把复制任务启动:把它停回去(用户的停止必须赢),不许留「行说已停、DMS 在跑」。
+    //   等待预算与「停止 / 删除」同值:刚启动的复制任务要先等它跑起来才能停,不是二十秒的事。
+    const yieldTo = async (step: string, why: "superseded" | "gone") => {
+      if (replicationTaskReady && (why === "gone" || started)) {
+        const td = await teardownSyncChannel(task as never, { purge: why === "gone", waitMs: TEARDOWN_LONG_OP_WAIT_MS })
+          .catch((e) => ({ channel: "dms", hardFailures: [{ what: "teardownSyncChannel", error: String((e as Error)?.message ?? e).slice(0, 240) }], softFailures: [] }));
+        logger.warn("realtime.start.yield_cleanup", { correlationId: cid, taskId: params.id, step, why, started, teardown: td });
+      }
+      logger.info("realtime.start.superseded", { correlationId: cid, taskId: params.id, step, why });
+    };
     try {
       logger.info("realtime.start.begin", { correlationId: cid, taskId: params.id, schemaName, tableName, instanceCold });
       // ①:等复制实例就位挪到这里(首次 10–15 分钟,预算 30 分钟);等完先确认任务还归我管。
       await getReplicationInstanceArn(); log("✓ DMS 复制实例就绪");
-      if ((await writeOwned("provisioning")) === "superseded") return bail("instance-ready");
+      const afterInstance = await writeOwned("provisioning");
+      if (afterInstance !== "owned") return yieldTo("instance-ready", afterInstance);
       const targetSecretArn = await ensureRedshiftDmsUser(redshiftHost); log("✓ 目标 Redshift 专用用户/密钥就绪(dms_ingest)"); // 踩坑④
       await ensureTargetSchema(schemaName); log(`✓ 目标 schema 就绪: ${schemaName}`); // 踩坑⑤
       await ensureRoleAssociatedToNamespace(dmsRoleArn); log("✓ DMS COPY 角色已关联 Redshift namespace"); // 踩坑⑥
@@ -248,10 +304,10 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       const sourceArn = await ensureSourceEndpoint(input); log("✓ 源 endpoint 就绪(MySQL)");
       const targetArn = await ensureTargetEndpoint(input, stagingBucket); log("✓ 目标 endpoint 就绪(Redshift)");
       // 要建复制任务了 —— 这是第一件「删任务时得连带撤掉」的真资源,建之前再确认一次归属。
-      if ((await writeOwned("provisioning", { sourceEndpointArn: sourceArn, targetEndpointArn: targetArn })) === "superseded") {
-        return bail("before-task-create");
-      }
+      const beforeCreate = await writeOwned("provisioning", { sourceEndpointArn: sourceArn, targetEndpointArn: targetArn });
+      if (beforeCreate !== "owned") return yieldTo("before-task-create", beforeCreate);
       const taskArn = await ensureReplicationTask(input, sourceArn, targetArn, migrationType, task.dmsSettings); log(`✓ DMS 复制任务就绪(${migrationType})`);
+      replicationTaskReady = true;
 
       // 新建任务返回后仍处 creating,须等其进入 ready/stopped 才能启动(否则 invalid state)。
       const taskState = await waitTaskStartable(taskArn); log(`✓ 复制任务状态: ${taskState}`);
@@ -264,9 +320,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         if (lastConn.source === "successful" && lastConn.target === "successful") {
           // 要让复制任务真跑起来(开始搬数据、开始计费)—— 启动前最后一次确认归属:
           // 用户在这几分钟里点了「停止」,就不许再把它启动起来。
-          if ((await writeOwned("provisioning", { replicationTaskArn: taskArn, sourceEndpointArn: sourceArn, targetEndpointArn: targetArn })) === "superseded") {
-            return bail("before-start");
-          }
+          const beforeStart = await writeOwned("provisioning", { replicationTaskArn: taskArn, sourceEndpointArn: sourceArn, targetEndpointArn: targetArn });
+          if (beforeStart !== "owned") return yieldTo("before-start", beforeStart);
           await startReplication(taskArn);
           started = true;
           break;
@@ -278,16 +333,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         replicationTaskArn: taskArn, sourceEndpointArn: sourceArn, targetEndpointArn: targetArn,
         ...(started ? {} : { error: `endpoint 连通性测试未通过(超时):源=${lastConn.source} 目标=${lastConn.target}` }),
       });
-      if (owned === "superseded") {
-        // 归属检查与 StartReplicationTask 之间那几秒里用户点了「停止」:行已是 stopped,但复制任务被我们
-        // 刚刚启动了 ⇒ 把它停回去(用户的停止必须赢),不许留一条「行说已停、DMS 在跑」的孤儿。
-        if (started) {
-          const td = await teardownSyncChannel(task as never, { purge: false, waitMs: 20_000 })
-            .catch((e) => ({ channel: "dms", hardFailures: [{ what: "teardownSyncChannel", error: String((e as Error)?.message ?? e).slice(0, 240) }], softFailures: [] }));
-          logger.warn("realtime.start.superseded_after_start", { correlationId: cid, taskId: params.id, teardown: td });
-        }
-        return bail("final");
-      }
+      // 归属检查与 StartReplicationTask 之间那几秒里用户点了「停止」/「删除」:复制任务被我们刚刚启动了 ⇒ 让路时停回去 / 撤掉
+      if (owned !== "owned") return yieldTo("final", owned);
       await writeRun(started ? "running" : "failed", {
         replicationTaskArn: taskArn, logs: steps,
         ...(started ? {} : { error: `连通性超时:源=${lastConn.source} 目标=${lastConn.target}` }),
@@ -297,7 +344,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       logger.error("realtime.start.failed", e, { correlationId: cid, taskId: params.id });
       log(`✗ 编排失败: ${String(e?.message || e).slice(0, 200)}`);
       // 同样只在仍归我管时才写 error —— 别把用户已经「停止」的任务又翻成「异常」。
-      if ((await writeOwned("error", { error: String(e?.message || e).slice(0, 300) })) === "superseded") return bail("failed");
+      const onFailure = await writeOwned("error", { error: String(e?.message || e).slice(0, 300) });
+      if (onFailure !== "owned") return yieldTo("failed", onFailure);
       await writeRun("failed", { error: String(e?.message || e).slice(0, 300), logs: steps });
       // 落点取任务绑定的执行区(实例建在那个区),不默认主控区
       const [boundTargetId] = bindingTargets(task as { targets?: unknown; targetId?: unknown });
@@ -314,7 +362,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   }).catch(() => {});
 
   // 202:已受理,后台编排中;前端轮询 /realtime-status。
-  const message = instanceCold
+  const message = instanceRecycling
+    ? `DMS 同步编排已启动(${migrationType}):空闲的复制实例正在回收,回收完成后会自动重建(约 15–25 分钟),期间任务显示「启动中」,可随时「停止」;稍后在详情页/监控查看状态`
+    : instanceCold
     ? `DMS 同步编排已启动(${migrationType}):首次使用需先创建复制实例(约 10–15 分钟),期间任务显示「启动中」,可随时「停止」;稍后在详情页/监控查看状态`
     : `DMS 同步编排已启动(${migrationType}),稍后在详情页/监控查看状态`;
   return apiOk({ taskId: params.id, status: "provisioning", migrationType, instanceCold, message }, 202);

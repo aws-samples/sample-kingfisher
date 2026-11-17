@@ -601,6 +601,15 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 3. **Report visuals gain the data method "Metric"**: only the metric id and the execution target are stored, and every fetch computes from the current definition in "Data Modeling → Metric system" ⇒ changing a metric's definition immediately affects every dashboard that references it;
    before deleting a metric, make sure no dashboard uses it (after a referenced metric is deleted, its card shows a red hint pointing the way and no value). Execution regions need no redeployment.
 
+### 7ter.1m Two things to know when upgrading to the version with "one-click stop / delete of sync tasks + a transitive-dependency security refresh" (ships with 2.2.0)
+
+1. **Run `redeploy-agents.sh` as well** (`--check` first): the lockfiles of the platform and the three agent containers move the transitive dependency `@hono/node-server` to 2.1.8 (the fixed version of two medium-severity advisories);
+   the dependencies of the agent images changed and `redeploy-platform.sh` does not rebuild them — with a platform-only upgrade the three agents still carry the old version. No new table, no new permission; execution regions need no redeployment.
+2. **"Stop" / "Delete" of a sync task now needs only one click**: the platform waits until the replication channel has really reached a terminal state (a DMS "Stop" waits until the replication task has settled) before it changes the status / deletes the record,
+   and a DMS task can be clicked while it is "Starting" (it is first waited through its start-up, which may take a minute or two); after 45 seconds the page shows "Running in background: Stop sync task / Delete sync task" at the bottom right.
+   The old habit of "click again after a few tens of seconds" is no longer needed; only when the channel has not settled after about 240 seconds do you get a 409 asking you to click again later.
+   While a stop / delete is in progress, edits and starts of the same task are rejected (409 "in progress"). From the same version on, alert event messages show the task's current name (the task id before); existing events are not rewritten.
+
 ### 7ter.1 Six things to know when upgrading to the "data-sync capability completion" version (`release-2026-10-13`)
 
 | # | Change | Impact on existing objects | What to do |

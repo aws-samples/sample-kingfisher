@@ -11,12 +11,21 @@ const h = vi.hoisted(() => ({
   existing: {} as Record<string, string>,
   task: {} as Record<string, unknown>,
   ds: { userId: "default-user", datasourceId: "D1", type: "mysql", database: "gamedata", projectId: "p1" } as Record<string, unknown>,
+  /** 这条任务此刻被哪条长操作占着(null = 没人占) */
+  lease: null as null | { taskId: string; resource: string; holder: string; kind: string; acquiredAt: string },
 }));
 
 vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { SYNC_TASKS: "bgp-sync-tasks", DATASOURCES: "bgp-datasources" },
   docClient: {
     send: vi.fn(async (cmd: any) => {
+      // 改配置前路由先核这条任务有没有被「停止 / 删除」长操作占着(读对象租约,被占时再读持有它的那条长操作):缺省没人占;
+      // 这两种读不计入下面对任务行 / 数据源行读次数的断言
+      if (cmd.constructor.name === "GetCommand" && String(cmd.input?.Key?.taskId ?? "").startsWith("lease#")) return { Item: h.lease ?? undefined };
+      if (cmd.constructor.name === "GetCommand" && h.lease && cmd.input?.Key?.taskId === h.lease.holder) {
+        const now = new Date().toISOString();
+        return { Item: { taskId: h.lease.holder, kind: h.lease.kind, status: "running", createdAt: now, startedAt: now, heartbeatAt: now } };
+      }
       h.ddb.push(cmd.constructor.name);
       if (cmd.constructor.name === "GetCommand") return { Item: cmd.input?.Key?.datasourceId ? h.ds : h.task };
       if (cmd.constructor.name === "UpdateCommand") return { Attributes: { ...h.task } };
@@ -76,7 +85,7 @@ const req = async (mod: string, body: Record<string, unknown>, method = "POST", 
 };
 const base = { name: "t", datasourceId: "D1", targetType: "redshift", channel: "glue", syncMode: "full", writeMode: "append", sourceDatabase: "gamedata", sourceTables: ["Orders"], targets: ["tgt_home"] };
 
-beforeEach(() => { h.ddb.length = 0; h.sql.length = 0; h.existing = {}; h.ds = { userId: "default-user", datasourceId: "D1", type: "mysql", database: "gamedata", projectId: "p1" }; vi.resetModules(); });
+beforeEach(() => { h.ddb.length = 0; h.sql.length = 0; h.existing = {}; h.lease = null; h.ds = { userId: "default-user", datasourceId: "D1", type: "mysql", database: "gamedata", projectId: "p1" }; vi.resetModules(); });
 
 describe("建任务入口校验新字段", () => {
   it("过滤条件带未知变量 ⇒ 400,不落库", async () => {
@@ -150,5 +159,20 @@ describe("改任务入口校验新字段", () => {
     const r = await req("@/app/api/sync/[id]/route", { name: "renamed", whereClause: "x > 1" }, "PUT", { id: "T1" });
     expect(r.status).toBe(200);
     expect(h.ddb.filter((n) => n === "GetCommand")).toHaveLength(1);
+  });
+
+  it("🔴 这条任务正被「删除」长操作占着(它在等后台通道真正停稳)⇒ 改配置 409 LONG_OP_IN_PROGRESS 点名那个操作,不写库", async () => {
+    h.task = { ...base, userId: "default-user", taskId: "T1", projectId: "p1" };
+    h.lease = { taskId: "lease#sync-task:T1", resource: "sync-task:T1", holder: "01HOLDERDELETE", kind: "sync-delete", acquiredAt: new Date().toISOString() };
+    const r = await req("@/app/api/sync/[id]/route", { name: "renamed" }, "PUT", { id: "T1" });
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe("LONG_OP_IN_PROGRESS");
+    expect(r.body.error.message).toContain("删除同步任务");
+    expect(h.ddb).not.toContain("UpdateCommand");
+    // 对照:占的是别的任务 ⇒ 不受影响
+    h.lease = null; h.ddb.length = 0;
+    vi.resetModules();
+    const ok = await req("@/app/api/sync/[id]/route", { name: "renamed" }, "PUT", { id: "T1" });
+    expect(ok.status).toBe(200);
   });
 });

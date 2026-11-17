@@ -170,7 +170,7 @@ A few older endpoints return the flat `{ "error": "<text>" }` (noted in the tabl
 | 409 | `JOB_IN_USE` | The job is still referenced by a "Batch Job Node" of a workflow when you delete it; remove the node from the workflow first |
 | 409 | `JOB_RUN_IN_PROGRESS` | The job still has in-flight runs when you delete it; `detail.runs` lists the runIds — wait for a final state or stop them first |
 | 409 | `START_IN_PROGRESS` | A start is already in progress for the same streaming sync task; wait for it, do not click again |
-| 409 | `TEARDOWN_IN_PROGRESS` | The sync channel is still stopping; try again in a few tens of seconds |
+| 409 | `TEARDOWN_IN_PROGRESS` | "Stop / Delete" has waited about 240 seconds and the sync channel has still not reached a terminal state; the record is unchanged, try again later |
 | 409 | `DECISION_REQUIRED` | The platform does not take destructive actions on your behalf; `detail` offers the options — retry with `confirm` after the user confirms |
 | 409 | `SCHEDULER_NOT_INSTALLED` | The target region has no scheduler component installed; `detail.fix` points to where to install it |
 | 409 | `WORKFLOW_SCHEDULER_UNSUPPORTED` | The region runs airflow-serverless, which has no Airflow web console; use the platform's run / node log pages |
@@ -796,7 +796,7 @@ The "Requires" column uses short tags; their meaning is in the tag table of §1.
 | POST | `/api/sync/generate-ddl` | `{ targetId, … }` generates the CREATE TABLE statement and probes the target table (long-running; read-only) | target · project editor · long-running | Data sync wizard "Generate DDL" |
 | POST | `/api/sync/recommend-channel` | `{ sourceType, targetType, syncMode }` recommends a sync channel | signed in | Data sync wizard |
 | POST | `/api/sync/type-mapping` | `{ sourceDb, columns }` source column type → target type mapping | signed in | Data sync wizard |
-| GET / PUT / DELETE | `/api/sync/{id}` | Details / edit (tasks that write S3 Tables need Glue version ≥ 5.1) / delete (also takes the schedule and the job offline) | project viewer / editor · audited | Data Sync / Details |
+| GET / PUT / DELETE | `/api/sync/{id}` | Details / edit (tasks that write S3 Tables need Glue version ≥ 5.1) / delete (a long-running operation: waits for the channel to reach a terminal state before deleting, and also takes the schedule and the job offline; PUT while a stop / delete is in progress ⇒ 409 `LONG_OP_IN_PROGRESS`) | project viewer / editor · audited | Data Sync / Details |
 | GET | `/api/sync/{id}/glue-status` | Run state of the Glue channel (queried in the task's region and written back) | project viewer | Data Sync → Details |
 | GET | `/api/sync/{id}/logs` | Job logs (that region's log group) | project viewer | Data Sync → Details |
 | GET | `/api/sync/{id}/output` | Output listing (that region's bucket) | project viewer | Data Sync → Details |
@@ -804,8 +804,8 @@ The "Requires" column uses short tags; their meaning is in the tag table of §1.
 | GET | `/api/sync/{id}/runs` | Run history (failure wording translated into a readable conclusion) | project viewer | Data Sync → Details |
 | GET | `/api/sync/{id}/runs/{runId}/logs` | The log of one run (fetched from the region that run is in) | project viewer | Data Sync → Details |
 | POST | `/api/sync/{id}/start` | "Start" the Glue channel: create the job → start → write the run row | project editor · audited | Data Sync "Start" |
-| POST | `/api/sync/{id}/start-realtime` | "Start" the streaming channel (DMS / Zero-ETL); the first start waits for the replication instance in the background; clicking again ⇒ 409 `START_IN_PROGRESS` | project editor · audited | Data Sync "Start" |
-| POST | `/api/sync/{id}/stop` | "Stop"; still stopping ⇒ 409 `TEARDOWN_IN_PROGRESS`, click again later | project editor · audited | Data Sync "Stop" |
+| POST | `/api/sync/{id}/start-realtime` | "Start" the streaming channel (DMS / Zero-ETL); the first start (or the first one after the replication instance was reclaimed) waits for the replication instance in the background; clicking again ⇒ 409 `START_IN_PROGRESS` | project editor · audited | Data Sync "Start" |
+| POST | `/api/sync/{id}/stop` | "Stop" (a long-running operation: waits for the channel to reach a terminal state, turns into 202 after 45 seconds); still not terminal after about 240 seconds ⇒ 409 `TEARDOWN_IN_PROGRESS`, click again later | project editor · audited | Data Sync "Stop" |
 | GET | `/api/sync/{id}/zeroetl-status` | Zero-ETL integration state + rows replicated | project viewer | Data Sync → Details |
 
 ### 3.50 system — wiring health check

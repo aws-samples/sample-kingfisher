@@ -1,6 +1,6 @@
 // 闸门 ⑬(55 DESIGN §2.8 对象租约)接线判据(「写了」≠「接上了」):
 //   a) LONG_OP_RESOURCES 源码字面每种 kind 恰一条,键集 === LONG_OP_KINDS;声明里只经 resourceKey / tableResource 生成键,族字面 ⊆ LONG_OP_RESOURCE_FAMILIES;
-//   b) 声明了租约族的实体(codetable / dimension / project / flink / workflow / datasource),其改 / 删路由(闭合清单)每个**直接改写**的方法都有
+//   b) 声明了租约族的实体(codetable / dimension / project / flink / workflow / datasource / engine-job / sync-task),其改 / 删路由(闭合清单)每个**直接改写**的方法都有
 //      resourceBusyResponse([resourceKey("<族>", …)]) **调用点**且在写动作之前;改走长操作的方法(删项目 / 删 Flink 作业 / 删编排)则 submitLongOp 自己的 kind,
 //      该 kind 的资源声明落在同一族(租约由 acquireLeases 占住);并反向:app/api/** 里调服务层改删入口的文件 ⊆ 该清单(没有绕过守卫的第二条路);
 //      族清单闭合:每个 LONG_OP_RESOURCE_FAMILIES 要么登记了改删路由,要么明确列在「无改删路由」(table / approval / governance);
@@ -89,6 +89,22 @@ const FAMILY_MUTATION_ROUTES: Record<string, MutationRoute[]> = {
     file: "app/api/engines/[engine]/[id]/route.ts", guarded: ["PUT", "DELETE"],
     mutation: /\b(?:offlineEmrFanout|destroyResource)\(|new (?:UpdateCommand|DeleteCommand)\(/, serviceCalls: /\.destroyResource\(/,
   }],
+  // 同步任务:停止 / 删除改走长操作(租约 sync-task:<taskId>,执行体等通道真正到终态,可能是分钟级);这期间改配置 / 再启动都要被挡住。
+  //   下线的单一作者 teardownSyncChannel 在 app/api 只剩后台启动编排让路时的收尾一处(启动路由本身有守卫)。
+  "sync-task": [
+    {
+      file: "app/api/sync/[id]/route.ts", guarded: ["PUT"],
+      longOps: { DELETE: { kind: "sync-delete", sample: { taskId: "task-1" } } },
+      mutation: /\b(?:updateSyncTaskIfExists|teardownSyncChannel)\(|new DeleteCommand\(/, serviceCalls: /\bteardownSyncChannel\(/,
+    },
+    {
+      file: "app/api/sync/[id]/stop/route.ts", guarded: [],
+      longOps: { POST: { kind: "sync-stop", sample: { taskId: "task-1" } } },
+      mutation: /\b(?:updateSyncTaskIfExists|teardownSyncChannel|settleRunningRuns)\(/, serviceCalls: /\bteardownSyncChannel\(/,
+    },
+    { file: "app/api/sync/[id]/start/route.ts", guarded: ["POST"], mutation: /\b(?:startGlueSyncRun|updateSyncTaskIfExists)\(/, serviceCalls: /\bteardownSyncChannel\(/ },
+    { file: "app/api/sync/[id]/start-realtime/route.ts", guarded: ["POST"], mutation: /\bupdateSyncTaskIfExists\(/, serviceCalls: /\bteardownSyncChannel\(/ },
+  ],
 };
 /** 没有「改 / 删路由」的族:table(目标表只被长操作本身独占)· approval(审批单只经执行长操作改状态)· governance(schema-sync 单例,只做两次同步互斥)。 */
 const FAMILIES_WITHOUT_MUTATION_ROUTES = ["table", "approval", "governance"] as const;
@@ -129,6 +145,8 @@ describe("闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
       "datasource-s3-external": { datasourceId: "ds-1", projectId: "proj-1" },
       "datasource-create": DS_CREATE_SAMPLE,
       "engine-run": { engine: "emr-serverless", jobId: "job-1", projectId: "proj-1", runTargets: ["tgt_home"] },
+      "sync-stop": { taskId: "task-1" },
+      "sync-delete": { taskId: "task-1" },
     };
     for (const [kind, params] of Object.entries(sample) as Array<[LongOpKind, unknown]>) {
       const keys = (LONG_OP_RESOURCES[kind] as (params: unknown) => string[])(params);
@@ -153,6 +171,9 @@ describe("闸门 ⑬ a:LONG_OP_RESOURCES 声明闭合", () => {
     expect(LONG_OP_RESOURCES["datasource-create"]({ ...DS_CREATE_SAMPLE, projectId: "proj-2" })).toEqual(["datasource:create:proj-2:n1"]);
     // 运行提交段独占这条引擎作业(与改 / 删路由的守卫同键)
     expect(LONG_OP_RESOURCES["engine-run"]({ engine: "emr-serverless", jobId: "job-1", projectId: "proj-1", runTargets: ["tgt_home", "tgt_usw2_a"], runGroupId: "rg1" })).toEqual(["engine-job:job-1"]);
+    // 停止 / 删除独占这条同步任务(同键 ⇒ 互斥;与改配置 / 启动两条路由的守卫同键)
+    expect(LONG_OP_RESOURCES["sync-stop"]({ taskId: "task-1" })).toEqual(["sync-task:task-1"]);
+    expect(LONG_OP_RESOURCES["sync-delete"]({ taskId: "task-1" })).toEqual([resourceKey("sync-task", "task-1")]);
   });
   it("样例键:落地 ↔ 删码表同键;解绑按 entity 选族;改表 dryRun 不占、execute 占表;审批执行占审批单 + 表", () => {
     expect(LONG_OP_RESOURCES["modeling-land"]({ codeTableId: "ct1", force: false, probeOnly: false })).toEqual([resourceKey("codetable", "ct1")]);

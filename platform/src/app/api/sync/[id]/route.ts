@@ -1,18 +1,16 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { snapshotVersion } from "@/lib/versions/version-service";
 import { apiError } from "@/lib/api-response";
 import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OVERWRITE_CONFIRM_KIND, overwriteConfirmMessage, writesS3Tables, clearsWholeTable } from "@/lib/sync/target-table-guard";
-import { recordAudit } from "@/lib/audit";
-// 停/删共用**同一个**下线作者
-import { teardownSyncChannel, teardownFailureMessage, teardownIsRetryable } from "@/lib/sync/teardown";
-// 最后一条 DMS 任务删掉之后,懒创建的复制实例就没人引用了 ⇒ 登记一条持久回收作业(实例上仍有任务时作业自己收口为「在用」)
-import { enqueueDmsInstanceReclaim, type DmsReclaimEnqueueResult } from "@/lib/realtime/dms-instance-reclaim-job";
-import { REPLICATION_INSTANCE_ID } from "@/lib/realtime/dms-service";
-import { getTarget } from "@/lib/exec-env/registry";
+import { getCorrelationId } from "@/lib/observability/logger";
+// 停止 / 删除走长操作(执行体 lib/sync/long-ops.ts);保存前核同一把租约
+import { submitLongOp, longOpResponse, longOpErrorResponse } from "@/lib/long-ops/driver";
+import { resourceBusyResponse } from "@/lib/long-ops/guard";
+import { resourceKey } from "@/lib/long-ops/kinds";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
 // 新字段的合法形态(唯一作者)
 import { validateSyncCapabilityFields, whereOf, syncTaskUsesRunDate } from "@/lib/sync/run-vars";
@@ -50,6 +48,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const guard = await guardResourceAccess(req, current, "editor");
   if (guard instanceof NextResponse) return guard;
+  // 这条任务正被「停止 / 删除」长操作占着(它们要等后台通道真正到终态,可能是分钟级)⇒ 409,等它结束再操作
+  const busy = await resourceBusyResponse([resourceKey("sync-task", params.id)]);
+  if (busy) return busy;
 
   const body = await req.json();
   // Tenancy attributes are immutable from this endpoint.
@@ -182,6 +183,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   return NextResponse.json(Attributes);
 }
 
+// DELETE:先把后台通道撤掉再删行(撤不下来就不许删记录)。主体在 lib/sync/long-ops.ts(sync-delete):
+//   执行体等通道真正到终态 —— DMS 复制任务要等它启动完、停稳,是分钟级的事 —— 再入队复制实例回收、删行、记审计;
+//   超 45 秒由统一框架转 202,页面自动轮询到终态(用户只点一次)。「还在停的路上」409 / 「撤不下来」502,都不删行。
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   const { Item } = await docClient.send(
@@ -190,43 +194,15 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   if (!Item) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const guard = await guardResourceAccess(req, Item, "editor");
   if (guard instanceof NextResponse) return guard;
-  // 🔴🔴 **先把后台通道撤掉,再删行**。改动前这里**只删 DDB 行**:DMS 复制任务 / Glue 作业 /
-  //   Zero-ETL 集成继续存在 —— 继续搬数据、继续计费,而它们的 identifier/ARN 随行消失
-  //   ⇒ 平台再也定位不到(多法域下 = 停不下来的跨境数据流动)。与同一条不变量
-  //   **撤不下来就不许删记录**(留着行,用户还能再点一次)。
-  const td = await teardownSyncChannel(Item as never, { purge: true });
-  if (td.hardFailures.length) {
-    // 🔴 「还在停的路上」⇒ **409 可重试**;「撤不下来」⇒ 502。两者都**不删行**。
-    const retryable = teardownIsRetryable(td);
-    return apiError(
-      teardownFailureMessage(td, retryable
-        ? "任务**未删除** —— 通道**正在停的路上**,过几十秒再点一次「删除」即可(先删行会留下无法再下线的孤儿)。"
-        : "任务**未删除** —— 先删行会让那条通道变成再也无法从平台停掉的孤儿(它仍在搬数据并计费)。请重试。"),
-      retryable ? 409 : 502,
-      retryable
-        ? { code: "TEARDOWN_IN_PROGRESS", detail: { teardown: td, retryable: true } }
-        : { code: "UPSTREAM_ERROR", detail: { teardown: td } }
+  try {
+    const result = await submitLongOp(
+      { kind: "sync-delete", params: { taskId: params.id }, correlationId: getCorrelationId(req) },
+      { req, identity: guard.identity },
     );
+    return longOpResponse(req, result);
+  } catch (e) {
+    const lo = longOpErrorResponse(e);
+    if (lo) return lo;
+    return apiError(String((e as Error)?.message ?? e), 500);
   }
-  // DMS 通道:复制任务已撤 ⇒ 复制实例可能再无任务引用 ⇒ 入队回收作业;落点取任务自己绑定的执行区(实例就建在那个区),不默认主控区。
-  // 入队失败不挡删除(实例仍被成本页 R1 建议盯着),但要如实进响应与审计,不许静默。
-  let reclaim: DmsReclaimEnqueueResult | { enqueued: false; error: string } | undefined;
-  if ((Item as { channel?: string }).channel === "dms") {
-    try {
-      const [boundTargetId] = bindingTargets(Item as { targets?: unknown; targetId?: unknown });
-      const target = boundTargetId ? await getTarget(boundTargetId) : null;
-      if (!target) throw new Error("任务没有绑定可解析的执行区 ⇒ 不知道复制实例在哪个区");
-      reclaim = await enqueueDmsInstanceReclaim({
-        targetId: target.targetId, region: target.region, instanceId: REPLICATION_INSTANCE_ID,
-        reason: "task-deleted", createdBy: `user:${guard.identity.username}`,
-      });
-    } catch (e) {
-      reclaim = { enqueued: false, error: String((e as Error)?.message ?? e).slice(0, 200) };
-    }
-  }
-  await docClient.send(
-    new DeleteCommand({ TableName: TABLES.SYNC_TASKS, Key: { userId: USER_ID, taskId: params.id } })
-  );
-  recordAudit(req, "sync.delete", { resourceType: "sync", resourceId: params.id, detail: { name: (Item as { name?: string }).name, teardown: td, ...(reclaim ? { instanceReclaim: reclaim } : {}) } }).catch(() => {});
-  return NextResponse.json({ success: true, teardown: td, ...(reclaim ? { instanceReclaim: reclaim } : {}) });
 }

@@ -87,6 +87,8 @@ export const EN: Record<string, string> = {
   "删除项目空间": "Delete project space",
   "按预览建目标表": "Create target table from preview",
   "生成建表语句并探测目标表": "Generate DDL and probe target table",
+  "停止同步任务": "Stop sync task",
+  "删除同步任务": "Delete sync task",
   "启动实时作业": "Start streaming job",
   "停止实时作业": "Stop streaming job",
   "删除实时作业": "Delete streaming job",

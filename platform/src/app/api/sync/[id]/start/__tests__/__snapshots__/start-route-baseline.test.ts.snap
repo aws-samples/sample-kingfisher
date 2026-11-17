@@ -35,6 +35,16 @@ exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面�
     "cmd": "GetCommand",
     "input": {
       "Key": {
+        "taskId": "lease#sync-task:01TASKSYNC00000000000FX001",
+      },
+      "TableName": "bgp-long-ops",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
         "datasourceId": "ds_mysql",
         "userId": "default-user",
       },
@@ -366,6 +376,7 @@ exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面�
 [
   "ddb:GetCommand",
   "ddb:GetCommand",
+  "ddb:GetCommand",
   "binding:resolveGlueBinding",
   "binding:resolveRedshiftBinding",
   "factory:glue",
@@ -503,6 +514,7 @@ exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面�
 [
   "ddb:GetCommand",
   "ddb:GetCommand",
+  "ddb:GetCommand",
   "binding:resolveGlueBinding",
   "binding:resolveRedshiftBinding",
   "factory:glue",
@@ -520,6 +532,16 @@ exports[`搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面�
         "userId": "default-user",
       },
       "TableName": "bgp-sync-tasks",
+    },
+    "svc": "ddb",
+  },
+  {
+    "cmd": "GetCommand",
+    "input": {
+      "Key": {
+        "taskId": "lease#sync-task:01TASKSYNC00000000000FX001",
+      },
+      "TableName": "bgp-long-ops",
     },
     "svc": "ddb",
   },

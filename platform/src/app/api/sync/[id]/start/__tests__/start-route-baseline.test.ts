@@ -34,6 +34,8 @@ const S = vi.hoisted(() => ({
   downstream: [] as unknown[],
   audits: [] as unknown[],
   jobState: "SUCCEEDED",
+  /** 这条任务此刻被哪条长操作占着(null = 没人占;启动前路由先核对象租约) */
+  lease: null as null | { taskId: string; resource: string; holder: string; kind: string; acquiredAt: string },
 }));
 
 function digest(v: unknown): string {
@@ -59,6 +61,12 @@ vi.mock("@/lib/aws/dynamodb", async (importOriginal) => {
         if (cmd.constructor.name === "GetCommand") {
           if (input.TableName === actual.TABLES.SYNC_TASKS) return { Item: S.task ? structuredClone(S.task) : undefined };
           if (input.TableName === actual.TABLES.DATASOURCES) return { Item: S.ds ? structuredClone(S.ds) : undefined };
+          if (input.TableName === actual.TABLES.LONG_OPS && S.lease) {
+            const key = String((input.Key as { taskId?: string })?.taskId);
+            if (key === S.lease.taskId) return { Item: { ...S.lease } };
+            // 持有租约的那条长操作:还在跑
+            if (key === S.lease.holder) { const now = new Date().toISOString(); return { Item: { taskId: key, kind: S.lease.kind, status: "running", createdAt: now, startedAt: now, heartbeatAt: now } }; }
+          }
           return {};
         }
         return {};
@@ -195,6 +203,7 @@ beforeEach(() => {
   S.ulidSeq = 0;
   S.om = []; S.omBackfill = []; S.downstream = []; S.audits = [];
   S.jobState = "SUCCEEDED";
+  S.lease = null;
   for (const s of ["glue", "s3", "s3tables", "logs"]) clients[s] = fakeClient(s);
   process.env.AWS_ACCOUNT_ID = "123456789012";
   vi.useFakeTimers({ now: new Date("2026-10-12T03:04:05.000Z"), toFake: ["setTimeout", "Date"] });
@@ -269,6 +278,16 @@ describe("搬移前钉现状:glue 通道启动(空请求体 = 现在所有页面
     expect((await res.json()).error.message).toContain("执行角色 ARN 格式非法");
     expect(seq().some((s) => s.startsWith("glue:") || s.startsWith("s3:"))).toBe(false);
     expect(seq()).toMatchSnapshot("bad-role-seq");
+  });
+
+  it("🔴 这条任务正被「停止」长操作占着(它在等后台通道真正停稳)⇒ 启动 409 LONG_OP_IN_PROGRESS 点名那个操作,零作业副作用", async () => {
+    S.lease = { taskId: `lease#sync-task:${baseTask.taskId}`, resource: `sync-task:${baseTask.taskId}`, holder: "01HOLDERSTOP", kind: "sync-stop", acquiredAt: new Date().toISOString() };
+    const res = await POST(post(), { params: { id: baseTask.taskId } });
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error.code).toBe("LONG_OP_IN_PROGRESS");
+    expect(body.error.message).toContain("停止同步任务");
+    expect(seq().filter((s) => !s.startsWith("ddb:GetCommand")), "被挡住之后不许再有任何写 / 作业调用").toEqual([]);
   });
 
   it("没有执行角色 ⇒ 400", async () => {

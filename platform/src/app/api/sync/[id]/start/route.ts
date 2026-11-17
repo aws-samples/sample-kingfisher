@@ -1,4 +1,6 @@
 export const dynamic = "force-dynamic";
+import { resourceBusyResponse } from "@/lib/long-ops/guard";
+import { resourceKey } from "@/lib/long-ops/kinds";
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
@@ -76,6 +78,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     const guard = await guardResourceAccess(req, task, "editor");
     if (guard instanceof NextResponse) return guard;
+    // 这条任务正被「停止 / 删除」长操作占着(它们要等后台通道真正到终态,可能是分钟级)⇒ 409,等它结束再操作
+    const busy = await resourceBusyResponse([resourceKey("sync-task", params.id)]);
+    if (busy) return busy;
     // 章 = 唯一执行落点(建任务时由
     // bindingForNewSyncTask 从数据源的 ownerTargetId 派生,单一作者)。执行链整体按它下推:
     // 章在哪个区,Glue 作业/脚本/staging/数仓写入/日志/run 台账/审计就全在那个区。

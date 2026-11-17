@@ -29,6 +29,9 @@ vi.mock("@/lib/aws/dynamodb", () => ({
   TABLES: { SYNC_TASKS: "bgp-sync-tasks", DATASOURCES: "bgp-datasources", TASK_RUNS: "bgp-task-runs", WORKFLOWS: "bgp-workflows" },
   docClient: {
     send: vi.fn(async (cmd: any) => {
+      // 改配置 / 启动前路由先核这条任务有没有被「停止 / 删除」长操作占着(读一次对象租约):这里没人占;
+      // 这次读不计入下面对任务行 / 数据源行读写次数的断言(被占着 ⇒ 409 的判据另有专条)
+      if (cmd.constructor.name === "GetCommand" && String(cmd.input?.Key?.taskId ?? "").startsWith("lease#")) return {};
       const input = { ...((cmd.input || {}) as Record<string, unknown>) };
       h.calls.push({ svc: "ddb", cmd: cmd.constructor.name, input });
       const n = cmd.constructor.name;

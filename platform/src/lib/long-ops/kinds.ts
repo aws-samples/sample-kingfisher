@@ -54,6 +54,10 @@ export const LONG_OP_KINDS = [
   "datasource-create",
   // ── 第三批第二条(55 DESIGN §6 第 12 行;2026-10-29):Spark 引擎作业「运行」的提交段(等 EMR 应用 STARTED 最多 60s ⇒ 504 而运行照样提交) ──
   "engine-run",
+  // ── 第三批第三、四条(2026-11-16):同步任务「停止 / 删除」。DMS 复制任务要先等它启动完、再停、再等停稳,是分钟级的事;
+  //    原来在一次请求里只等 20 秒、对启动中的任务发 Stop 又被 DMS 拒 ⇒ 用户要点 3–4 次才删得掉,中间还夹一次 502。 ──
+  "sync-stop",
+  "sync-delete",
 ] as const;
 export type LongOpKind = (typeof LONG_OP_KINDS)[number];
 
@@ -159,6 +163,12 @@ export interface LongOpParamsByKind {
     runGroupId?: string;
     definitionVersion?: number;
   };
+  /**
+   * 停止 / 删除同步任务(任务行由执行体按 taskId 重读):把后台通道真正撤到终态 —— DMS 复制任务等它启动完、停稳 —— 再改状态 / 删行。
+   * 鉴权与 404 留在路由。
+   */
+  "sync-stop": { taskId: string };
+  "sync-delete": { taskId: string };
 }
 
 /** 全局提示「正在后台执行:<label>」的中文源串(浏览器侧经 t() 翻;英文词典 lib/i18n/messages/en.ts 必含每一条)。 */
@@ -194,6 +204,8 @@ export const LONG_OP_LABELS: Record<LongOpKind, string> = {
   "metric-compute": "计算指标",
   "datasource-create": "新建数据源",
   "engine-run": "运行引擎作业",
+  "sync-stop": "停止同步任务",
+  "sync-delete": "删除同步任务",
 };
 
 // ── 对象租约(55 DESIGN §2.8;2026-10-22 …7237 页面驱动 run1 抓到的竞态:落地进行中同一码表被删 ⇒ 目标区留物理表孤儿) ──
@@ -201,7 +213,7 @@ export const LONG_OP_LABELS: Record<LongOpKind, string> = {
 // 这个窗口反而更大。根治不是给「删码表」打补丁,而是让每种 kind 声明它独占的资源键:submitLongOp 执行前占租约、终态释放;
 // 同对象的第二个长操作、以及该对象的改 / 删路由(经 lib/long-ops/guard.ts)一律 409 LONG_OP_IN_PROGRESS。
 // 资源族闭合(纪律 2);键文法 `<族>:<段>[:<段>…]` 只经 resourceKey 生成(单一作者;判据 leases-wiring 钉字面)。
-export const LONG_OP_RESOURCE_FAMILIES = ["codetable", "dimension", "table", "approval", "governance", "project", "flink", "workflow", "datasource", "engine-job"] as const;
+export const LONG_OP_RESOURCE_FAMILIES = ["codetable", "dimension", "table", "approval", "governance", "project", "flink", "workflow", "datasource", "engine-job", "sync-task"] as const;
 export type LongOpResourceFamily = (typeof LONG_OP_RESOURCE_FAMILIES)[number];
 
 export function resourceKey(family: LongOpResourceFamily, ...parts: string[]): string {
@@ -263,4 +275,7 @@ export const LONG_OP_RESOURCES: { [K in LongOpKind]: (params: LongOpParamsByKind
   "datasource-create": (params) => [resourceKey("datasource", "create", params.projectId, params.name)],
   // 提交段独占这条引擎作业 —— 第一次「运行」还在后台提交(等 EMR 应用 STARTED),再点一次 ⇒ 409,而不是提交出第二次运行;改 / 删作业路由同样被挡
   "engine-run": (params) => [resourceKey("engine-job", params.jobId)],
+  // 停止与删除同一条同步任务互斥;启动 / 保存路由动手前核同一把键(进行中 ⇒ 409)
+  "sync-stop": (params) => [resourceKey("sync-task", params.taskId)],
+  "sync-delete": (params) => [resourceKey("sync-task", params.taskId)],
 };
