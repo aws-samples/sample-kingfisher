@@ -1,13 +1,16 @@
 # Customer Production Deployment Manual (Multi-Region Edition)
 
-> Document revision: **v1.34** (2026-11-16: new section 7ter.1k, three things to know when upgrading to the version with "sync-node business date, scoped downstream dependencies and the Glue version of new jobs";
-> new section 7ter.1l, three things to know when upgrading to the version with "metric reuse (modeling metrics in Ask-Your-Data + the "Metric" data method of report visuals)" —
-> run `redeploy-agents.sh` as well · save once more the visuals that were saved in an execution-region view before the upgrade · no new table, execution regions need no redeployment) ·
+> Document revision: **v1.35** (2026-11-17: new section 7ter.1n, two things to know when upgrading to the version with "leader hand-over of background tasks" —
+> on the first upgrade to this version background tasks resume after up to about 8.5 minutes, later upgrades hand over within seconds · platform only;
+> also records section 7ter.1m (one-click stop / delete of sync tasks + a transitive-dependency security refresh), which was written on 2026-11-16 without a revision bump) ·
 >
-> Earlier revisions (40) are in the collapsible list below.
+> Earlier revisions (41) are in the collapsible list below.
 
 <details><summary>Revision history</summary>
 
+- **v1.34** (2026-11-16: new section 7ter.1k, three things to know when upgrading to the version with "sync-node business date, scoped downstream dependencies and the Glue version of new jobs";
+  new section 7ter.1l, three things to know when upgrading to the version with "metric reuse (modeling metrics in Ask-Your-Data + the "Metric" data method of report visuals)" —
+  run `redeploy-agents.sh` as well · save once more the visuals that were saved in an execution-region view before the upgrade · no new table, execution regions need no redeployment) ·
 - **v1.33** (2026-11-09: section 7ter step 2 documents the two new upgrade-script steps 2c‴ (auto-registers external buckets referenced by existing home-region sync tasks as routes) and 2f (refreshes the EMR / Flink stacks);
   new section 7ter.1j, four things to know when upgrading to the version with lake table-bucket routing; section 8 marks the cross-bucket entry as fixed in 2.2.0, the 2.1.2 transition stays) ·
 - **v1.32** (2026-11-03: section 8 adds the production transition for "one batch job reading from and writing to several S3 Tables table buckets"
@@ -609,6 +612,16 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
    and a DMS task can be clicked while it is "Starting" (it is first waited through its start-up, which may take a minute or two); after 45 seconds the page shows "Running in background: Stop sync task / Delete sync task" at the bottom right.
    The old habit of "click again after a few tens of seconds" is no longer needed; only when the channel has not settled after about 240 seconds do you get a 409 asking you to click again later.
    While a stop / delete is in progress, edits and starts of the same task are rejected (409 "in progress"). From the same version on, alert event messages show the task's current name (the task id before); existing events are not rewritten.
+
+### 7ter.1n Two things to know when upgrading to the version with "leader hand-over of background tasks" (ships with 2.2.0)
+
+1. **On the first upgrade to this version, background tasks resume after up to about 8.5 minutes**: the platform has a group of background tasks that run only on the "leader replica" (alert / SLA evaluation, background cleanup jobs, backfill, the periodic probe of execution environments).
+   When the leader replica of the old version is stopped by the upgrade it does not hand over the leader role, so a new replica has to wait for the 8-minute lease it left behind to expire and then for one 30-second election beat before it takes over (measured 485 / 488 seconds in two test environments);
+   during that time alert events arrive late — none are lost — and pages and APIs are not affected. To confirm that the tasks have resumed: the "last HH:MM:SS UTC" in the hint of the "Alert Rules" tab of the Alerting Center starts moving forward every minute.
+2. **From this version on, background tasks hardly pause when the platform is upgraded or a platform replica is replaced**: before it exits normally the leader replica hands over the role, and a standby replica takes over within 30 seconds and at once runs one round of each task;
+   measured in two test environments for the two actions "stop the task that hosts the leader replica" and "rolling redeployment", the longest gap of the background heartbeat on the page was 61–78 seconds (before the fix the same action stalled for about 7 minutes, at most about 12 minutes);
+   on upgrades after this version a new replica takes over 1–2 seconds after the old leader has handed over. When the leader process is killed (and cannot hand over), a standby replica takes over after at most about 3.5 minutes.
+   Platform only: no new table, no new permission, no `redeploy-agents.sh`, execution regions need no redeployment.
 
 ### 7ter.1 Six things to know when upgrading to the "data-sync capability completion" version (`release-2026-10-13`)
 

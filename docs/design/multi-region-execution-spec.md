@@ -1,6 +1,7 @@
 # Multi-Region Execution — Technical Specification: Multi-Region Execution Environments, Dual-Track Data Residency and Platform-Wide Multi-Region Coverage
 
-> - Revision: **3.54** (🆕 2026-10-21 **the long-running-operation framework ⇒ new section 3.18, the unified long-running-operation protocol** (any write route that waits for an external system to reach a terminal state may only go through the `lib/long-ops/submitLongOp` hybrid response: wait
+> - Revision: **3.55** (🆕 2026-11-17 **section 3.5a, leader election changed**: an election beat of 30 seconds separate from the probe tick, the lease from 8 to 3 minutes, on a stop signal the process releases the lease before it exits, and on take-over the probe and the background pumps each run one round early ⇒ the hand-over of a normal exit takes ≤ one election beat, and after a sudden death there is no leader for ≤ about 3.5min (≈12min before))
+>   revision 3.54 (🆕 2026-10-21 **the long-running-operation framework ⇒ new section 3.18, the unified long-running-operation protocol** (any write route that waits for an external system to reach a terminal state may only go through the `lib/long-ops/submitLongOp` hybrid response: wait
 >   in-process for `LONG_OPS_SYNC_WAIT_MS` (45 s); if no terminal state is reached ⇒ 202 carrying the protocol marker `protocol:"long-op/1"`; the client's global fetch interceptor follows the task to its terminal state and reshapes it into a synchronous 200 ⇒ zero changes at call sites; the single
 >   author of the wait-for-terminal primitive is `lib/long-ops/await-terminal.ts`, which throws when no long-running-operation context is present; relation to section 3.9a = the execution channel and the authorization axis are unchanged, only "how long to wait and how to answer" changes; the
 >   implementation-level contract is [the long-running-operations design](./long-running-operations.md), revision 1.0, section 2; the governance "sync columns" timeout, the project-deletion failure on warehouse cold start, the model-call 504s behind the 60-second edge limit and the modeling-landing
@@ -25,7 +26,7 @@
 >   fixture of the corresponding acceptance criterion must spell it out. Whether platform-global knowledge objects should be constrained by the per-project allow-list **requires a decision**; this section only records it. (c) ✅ **good news: the execution channel already exists** —
 >   `execOnTarget({warehouse, sql, secretArn})` is, to the letter, the required shape (client taken by target region + explicit workgroup/database + explicit SecretArn, and it refuses an empty ARN by itself) ⇒ narrow-privilege DML uses it directly; 🔴 **never write a new Redshift client for it** (that
 >   would be "a second author"))
-> - Based on: **[the design document](./multi-region-execution-design.md), revision 3.26** (decisions / invariants / section 19 platform-wide coverage / section 20 foundation-correction record; **the sole authority for the implementation order = the design document, section 17**) + [the interaction
+> - Based on: **[the design document](./multi-region-execution-design.md), revision 3.27** (decisions / invariants / section 19 platform-wide coverage / section 20 foundation-correction record; **the sole authority for the implementation order = the design document, section 17**) + [the interaction
 >   design](./multi-region-execution-interaction.md) (interaction). **This document is the sole implementation-level contract** (tables / APIs / state machines / migration / acceptance); decisions and the "why" are in the design document, interaction in the interaction design, and the interaction
 >   design may not define scope on its own (the frozen contract of the design document, section 20.4).
 > - 🔴 Pure design (including pseudocode); no implementation code is written and nothing is deployed without explicit confirmation.
@@ -977,12 +978,26 @@ A conflict (an operation appears / the phase changes / downgraded to legacy) ⇒
 `observed.templateVersion` through the same telemetry channel (reviving the dead field of section 1.1; the taskRole already has that permission today, and the probe route is already calling it).
 
 **Leader lease (leader election)**: the platform service has desiredCount 2~6 ⇒ a leader must be elected, otherwise N replicas probe redundantly. A dedicated lock row
-(`pk="lock"`, `sk="reconciler"`) with a DDB conditional-write lease (reusing the acquire / renew / release semantics of `run-lock.ts`, **short lease**), renewed every tick.
+(`pk="lock"`, `sk="reconciler"`) with a DDB conditional-write lease (reusing the acquire / renew / release semantics of `run-lock.ts`, **short lease**).
+🆕 Revision 3.55: **election and probing run on separate beats** — the election beat `ELECTION_BEAT_MS` = 30 seconds (the leader renews, a standby replica tries to take over), the probe tick stays at 4 minutes;
+both beats go only through the same author `runElectionBeat` (single-flight inside the process: at any moment only one election write is in flight). Up to revision 3.54 election happened only inside the probe tick (renewed every tick).
 
 🔴 **Correctness does not depend on leader election**: `reconcileAfterProbe` is idempotent + fenced; two replicas occasionally running concurrently merely probe twice (waste, no corruption) ⇒ leader election is an **efficiency** optimization.
 
-🔴 **Hard constraint on lease + tick period**: the "nobody probing" gap after a leader dies suddenly = lease TTL + one tick, and it **must be < the 15min stale threshold**
-(with tick≈4min and lease≈8min ⇒ gap ≈12min < 15min; the renewal interval < TTL).
+🔴 **Hard constraint on lease + periods (changed in revision 3.55)**: the "nobody probing" gap after a leader dies suddenly (the process is killed and has no chance to release) = the time since its last probe (≤ one probe tick)
++ the remaining lease (≤ TTL; it can only be taken once it has expired) + one election beat of a standby replica (which probes at once on take-over), and it **must be < the 15min stale threshold**
+(with lease = 3min (`RECONCILER_LEASE_MS`), election beat = 30s and probe tick = 4min ⇒ probe gap ≤ 7.5min, no leader for ≤ about 3.5min).
+A replica regards itself as the leader only until "the moment of its last renewal + lease − 1 minute" (the background pumps stop only after three beats missed in a row; once another replica has taken over ⇒ it knows on the next beat).
+Up to revision 3.54 the values were tick≈4min and lease≈8min ⇒ gap ≈12min, and **a normal exit did not release either**, so every rolling upgrade / replacement of the leader replica had to wait for the lease to expire.
+
+🆕 **Release first on a normal exit (revision 3.55)**: the process receives SIGTERM / SIGINT ⇒ sets the exiting flag (the background pumps stop at once; no acquire / renew after that) → waits for the in-flight election write to land → conditionally deletes the lock row
+(deleted only when `leaseToken` is its own); and it delays the process exit until this release has finished (limit `SHUTDOWN_RELEASE_BUDGET_MS` = 3 seconds, after which it exits as usual).
+⇒ A standby replica takes over on its own next election beat (≤ 30 seconds). A release that fails / times out does not block the exit; it falls back to "wait for the lease to expire".
+
+🆕 **Work on take-over (revision 3.55)**: the one time a replica changes from "not the leader" to "the leader", the election author notifies once (a renewal does not count; an exiting replica is not notified):
+the probe and the three background pumps that hang on the leader lease (data-plane jobs / backfill / alert · SLA evaluation) each bring their waiting round forward to now.
+The single author of the periodic timer is `lib/exec-env/periodic-loop.ts`: the next round is scheduled only after the current one has finished; the round brought forward replaces the one that was scheduled (it is not an extra round), and it does not cut in while a round is running.
+⇒ In a normal hand-over the gap in background work = from the old leader's last round to its exit (≤ one pump period) + one election beat (≤ 30 seconds) + the round itself after take-over.
 
 **Periodic adoption of existing items**: the reconciler also runs legacy items lacking `spec` / `observed` through `reconcileOneTarget` ⇒ the acceptance rule "adopt on this fresh green probe"
 changes from "a person clicks the button" to **periodic and automatic** (still via `adoptLegacyAfterFreshProbe` + `LegacyCompletionFence`; ready is not inferred from a stored probe; item 12 of the rejection list in section 20.23-R is not relaxed).

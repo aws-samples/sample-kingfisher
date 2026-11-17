@@ -7,7 +7,8 @@ const listMock = vi.fn();
 const reconcileMock = vi.fn();
 vi.mock("@/lib/exec-env/leader-lease", () => ({
   acquireOrRenewLeaderLease: (...a: unknown[]) => acquireMock(...a),
-  RECONCILER_LEASE_MS: 8 * 60 * 1000,
+  releaseLeaderLease: async () => false,
+  RECONCILER_LEASE_MS: 3 * 60 * 1000,
 }));
 vi.mock("@/lib/exec-env/registry", () => ({ listTargetsRaw: (...a: unknown[]) => listMock(...a) }));
 vi.mock("@/lib/exec-env/reconcile", () => ({ reconcileOneTarget: (...a: unknown[]) => reconcileMock(...a) }));

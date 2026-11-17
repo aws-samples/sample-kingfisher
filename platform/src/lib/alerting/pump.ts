@@ -24,6 +24,7 @@ import {
   INTERNAL_SOURCE_HEADER,
 } from "@/lib/scheduler/internal-source";
 import { ALERTING_PUMP_INTERVAL_MS } from "@/lib/alerting/types";
+import { startPeriodicLoop, type PeriodicLoopHandle } from "@/lib/exec-env/periodic-loop";
 
 export { ALERTING_PUMP_INTERVAL_MS };
 /** 回环 HTTP 超时:一次 tick = 扫运行台账 + 逐规则匹配 + 逐 SLA 预测 + 可能的通道投递,给足 55s。 */
@@ -121,22 +122,21 @@ export async function runAlertingPumpTick(deps: AlertingPumpDeps): Promise<Alert
   return { ran: true, projects: ids.length, posted, failed };
 }
 
-/** 起泵(reconciler-loop 在 `startReconcilerLoop` 里调;递归 setTimeout + unref ⇒ 一轮跑完才排下一轮,不重叠)。 */
-export function startAlertingPump(deps: AlertingPumpDeps): void {
-  const schedule = (delay: number) => {
-    const timer = setTimeout(runOnce, delay);
-    if (typeof timer.unref === "function") timer.unref();
-  };
-  const runOnce = async () => {
-    try {
-      const s = await runAlertingPumpTick(deps);
-      if (s.ran && s.failed > 0) console.log("[alerting-pump] tick:", JSON.stringify(s));
-    } catch (e) {
-      console.error("[alerting-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
-    } finally {
-      schedule(ALERTING_PUMP_INTERVAL_MS);
-    }
-  };
+/**
+ * 起泵(reconciler-loop 在 `startReconcilerLoop` 里调;计时器代码与另两台泵、探活节拍同一份:一轮跑完才排下一轮,不重叠)。
+ * 返回的句柄给「本副本刚接手主副本」用:把等着的那一轮提到现在,不让规则再空等一个周期。
+ */
+export function startAlertingPump(deps: AlertingPumpDeps): PeriodicLoopHandle {
   console.log("[alerting-pump] 已启动(interval=%dms)", ALERTING_PUMP_INTERVAL_MS);
-  schedule(ALERTING_PUMP_INTERVAL_MS);
+  return startPeriodicLoop({
+    intervalMs: ALERTING_PUMP_INTERVAL_MS,
+    runOnce: async () => {
+      try {
+        const s = await runAlertingPumpTick(deps);
+        if (s.ran && s.failed > 0) console.log("[alerting-pump] tick:", JSON.stringify(s));
+      } catch (e) {
+        console.error("[alerting-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
+      }
+    },
+  });
 }

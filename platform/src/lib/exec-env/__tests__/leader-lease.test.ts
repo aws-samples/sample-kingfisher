@@ -62,22 +62,23 @@ describe("leader-lease 选主", () => {
     await expect(acquireOrRenewLeaderLease(null, 1)).rejects.toThrow("AccessDenied");
   });
 
-  it("租约时长满足硬约束:TTL + tick(4min)< 15min stale 阈值", () => {
-    expect(RECONCILER_LEASE_MS + 4 * 60 * 1000).toBeLessThan(15 * 60 * 1000);
-  });
+  // 租约时长的硬约束(猝死后的无探活缺口 < 探活过期阈值)用真实的节拍常量算,判据在 leader-handover-assembly.test.ts。
 
-  it("release:条件 token 匹配删锁行;被他人抢走(CCF)静默不抛", async () => {
+  it("release:条件 token 匹配删锁行 ⇒ true;被他人抢走(CCF)/ 写不出去 ⇒ false,都不抛", async () => {
     deleteMock.mockResolvedValue({});
-    await releaseLeaderLease({ token: "t1" });
+    expect(await releaseLeaderLease({ token: "t1" })).toBe(true);
     const cmd = deleteMock.mock.calls[0][0].input;
+    expect(cmd.Key).toEqual({ pk: "lock", sk: "reconciler" });
     expect(cmd.ConditionExpression).toContain("#tok = :tok");
     expect((cmd.ExpressionAttributeValues as Record<string, unknown>)[":tok"]).toBe("t1");
     deleteMock.mockRejectedValue(ccf());
-    await expect(releaseLeaderLease({ token: "t2" })).resolves.toBeUndefined();
+    expect(await releaseLeaderLease({ token: "t2" })).toBe(false);
+    deleteMock.mockRejectedValue(new Error("socket hang up"));
+    expect(await releaseLeaderLease({ token: "t3" })).toBe(false);
   });
 
-  it("release(null)= no-op", async () => {
-    await releaseLeaderLease(null);
+  it("release(null)= no-op,返回 false(没有可释放的)", async () => {
+    expect(await releaseLeaderLease(null)).toBe(false);
     expect(deleteMock).not.toHaveBeenCalled();
   });
 });

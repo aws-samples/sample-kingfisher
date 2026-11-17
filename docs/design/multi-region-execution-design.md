@@ -1,6 +1,7 @@
 # Multi-Region Execution — Design: Multi-Region Execution Environments (Single Control Plane × Multiple Execution Planes)
 
-> - Revision: **3.26** (🆕 2026-10-22 08:3xZ **section 12.1 acceptance row amended for the upgrade-script failure of 2026-10-22**: the probe region of the IAM simulation gate now follows "regions the account has not opted into first, the fixed fallback list second, and if none can be picked ⇒ `none`
+> - Revision: **3.27** (🆕 2026-11-17 **section 20.30, leader hand-over: release on exit + election beat + work on take-over**: the "stall of up to 12 min after a deployment" of section 20.28b is design margin for probing, but a defect for the background pumps that were later hung on the same lease ⇒ changed; the 8 min / 12 min in sections 20.24 / 20.28b are marked as historical values. Contract: the specification, revision 3.55, section 3.5a)
+>   revision 3.26 (🆕 2026-10-22 08:3xZ **section 12.1 acceptance row amended for the upgrade-script failure of 2026-10-22**: the probe region of the IAM simulation gate now follows "regions the account has not opted into first, the fixed fallback list second, and if none can be picked ⇒ `none`
 >   without dying"; `test_lib.sh` grows from 35 to 42 checks; cause = during an `all-enabled` upgrade all 7 fixed fallback regions were already on the authorization list ⇒ step 4 died and reported failure although the platform had already finished deploying (tracked as a defect; fixed on 2026-10-22)
 >   ) revision 3.25 (2026-10-19 14:4xZ **section 20.29 adds the real-environment rehearsal conclusion of candidate-region pre-authorization plus the probe-contract defect found during it**: candidate region us-west-1 went from "New" to active in a test account from the web UI with zero
 >   authorization commands; the rehearsal caught that the new probe item `lake:s3tablescatalog` had not been registered in the "probe item → component" contract ⇒ "exact green coverage" was permanently false for every environment (the new region stuck in provisioning, existing regions dropped to
@@ -1057,6 +1058,39 @@ Decision 2, "no phase two, finish everything in phase one" — **this section wi
 >   specification](./multi-region-execution-spec.md) is authoritative and the text has already been aligned word for word** (`landedByTarget`, `targets[]`, `audit#<targetId>#<day>`, the OpenMetadata service `bgp-redshift-<targetId>`, and so on; the summary table of section 10, the two blocking
 >   items of section 14bis.3, section 7.2 and section 2.1 were each corrected in revision 3.0). **The exemption covers prose only, never contract identifiers** — otherwise the "machine-comparable" gate of section 20.4 would fail forever.
 
+### 20.30 🔴 Revision 3.27 **Leader hand-over: release on exit + election beat + work on take-over** (construction batch, 2026-11-17)
+
+**Trigger (real environment, 2026-11-16)**: a page-driven acceptance segment was started 15 seconds after the platform upgrade of a test environment had finished, and the one item that depends on the background pumps went red — the rolling deployment stopped the old replica that held the leader lease, the old replica did not release it
+(section 20.28b, "a live lease is deliberately not stolen"), and the new replica waited for the lease to expire (8 minutes) and then for its own next probe tick (4 minutes) before it took over; during that time the
+alert / SLA evaluation pump, the data-plane job pump, the backfill pump and the periodic probe, all hung on the leader lease, did not run (events arrived late, none were lost). The conclusion of section 20.28b at the time, "this is not a defect, it is design margin", holds for **probing** (the 15-minute stale budget);
+it does not hold for the **minute-level background pumps** that were later hung on the same lease: users see alerts some ten minutes late, and there is such a stretch on every upgrade and every replacement of a replica.
+
+**What changed (contract: the specification, revision 3.55, section 3.5a)**:
+
+- **Election and probing on separate beats**: an election beat of 30 seconds (renew / try to take over), the probe tick stays at 4 minutes; both go only through the single election author `runElectionBeat` (single-flight inside the process). The lease goes from 8 to 3 minutes.
+- **Release first on a normal exit**: on a stop signal the process first conditionally deletes its own lock row, and it delays the process exit until that write has finished (3-second limit) —
+  the framework's own stop handling is "close the server → exit the process at once"; without the wait the write would never go out.
+- **Work on take-over**: the one time a replica becomes the leader, the probe and the three background pumps each bring their waiting round forward to now;
+  the periodic timer is folded into one, `lib/exec-env/periodic-loop.ts` (before, the probe tick, the election beat and the three pumps each had a copy of their own).
+- **Unchanged**: correctness still does not depend on leader election; a live lease still must not be stolen — after a sudden death the only way is to wait for expiry, now with no leader for ≤ about 3.5 minutes and a probe gap ≤ 7.5 minutes < the 15-minute stale threshold.
+
+**Measured in real environments** (two test environments, two regions each; the instrument = the "last HH:MM:SS UTC" in the hint of the "Alert Rules" tab of the Alerting Center, the page heartbeat that the background evaluation pump advances on every round; the values are those of the two environments):
+
+| Action | Before the fix | After the fix |
+|---|---|---|
+| Stop the task that hosts the leader replica | The page heartbeat stalls after the process has exited; a new leader takes over only after 427 seconds | Longest heartbeat gap 64 / 61 seconds; release → take-over 2.8 / 15.3 seconds; take-over → next heartbeat 2.0 / 1.5 seconds |
+| Rolling redeployment (both replicas replaced) | As above (by arithmetic at most about 12 minutes) | Longest heartbeat gap 78 / 63 seconds; last release → take-over by a new task 19.3 / 2.9 seconds; take-over → next heartbeat 0.6 / under 1 seconds |
+| First upgrade to this version (the old leader runs the old code and does not release) | — | A new replica takes over 488 / 485 seconds after the old leader's last renewal (the old 8-minute lease + one election beat) |
+| Upgrade from this version to later bytes | — | A new replica takes over 1–2 seconds after the old leader has released |
+
+With only "election beat + release on exit" (the first change), take-over needs just 0.4–9 seconds, but the pumps of the new leader still wait for their own next period (measured: another 59 / 58 / 30 seconds after take-over),
+and when two hand-overs follow each other in a rolling deployment the waits add up (the stop signals of the two old replicas were measured 38–50 seconds apart) ⇒ "work on take-over" was added.
+
+**Two lessons about the instruments**: when the ECS service reports "rollout complete" it only says that the new replicas are ready; at that moment the old replicas have only just begun to be taken out of the load balancer, and they receive their stop signal some 5–6 minutes later
+⇒ only "every old task that was running when the deployment was started has stopped" counts as settled; the failure class of an alert rule matches only runs whose finish time is later than the watermark of that rule's last evaluation ⇒ a failure fixture for a rule that the background has already evaluated must have a finish time of "just now".
+
+📌 The "tick ≈ 4 min / lease ≈ 8 min ⇒ gap ≈ 12 min" in deliverable ② of section 20.24 and in section 20.28b are the values up to revision 3.26, kept as history; the current values are those of this section and of section 3.5a of the specification.
+
 ### 20.29 🔴 Revision 3.24 **Candidate-region pre-authorization for execution regions (zero manual authorization steps) + root fix of the control-plane guard that broke execution-environment builds for a non-US home region + the region-condition wiring gap of the agent and EMR stacks** (construction batch, 2026-10-19; driven by the record of adding a Frankfurt execution region in the customer's production environment)
 
 - **Trigger**: the customer hit a wall twice while creating an execution region from the web page — ① **the bootstrap-time guard failure**: the two control-plane guards in `infra/bin/app.ts` ran before the execution-environment fork, so for a home region outside the United States the CodeBuild job was rejected by the "default-model geography guard" as early as `cdk bootstrap` (fixed in the development branch: the guards were moved into `assertControlPlaneGuards()`, which is called only on the control-plane branch; three cases were added to section 1c of the offline synth gate, and swapping the old `app.ts` back in turned them red in a real run); ② after the stacks were built, an operator still had to run `redeploy-platform.sh` on the command line to authorize the region (the original design of section 12.1), so the customer's experience was half web page, half CLI. The customer's words: "Even though the new region was created, the authorization step still has to be done by running code by hand — far too cumbersome. This also has to be automated, and it has to be very rigorous and must not affect live functionality."
@@ -1958,7 +1992,7 @@ is still "a person clicking two admin routes" ⇒ a non-home target nobody click
 
 **Three deliverables**: ① the driver `platform/src/instrumentation.ts` (`register()` starts only when `NEXT_RUNTIME==='nodejs'`) + `reconciler-loop.ts`
 (every tick isolated by try/catch; pure I/O, low CPU) + the hook enabled in `next.config.js`; ② a dedicated leader-lease lock row `pk="lock"/sk="reconciler"` (short lease via DynamoDB conditional write,
-reusing the semantics of run-lock.ts; 🔴 lease TTL + tick < the 15 min stale threshold, tick ≈ 4 min / lease ≈ 8 min ⇒ gap ≈ 12 min); ③ a shared `reconcileOneTarget()` (the probe route body extracted into an
+reusing the semantics of run-lock.ts; 🔴 lease TTL + tick < the 15 min stale threshold, tick ≈ 4 min / lease ≈ 8 min ⇒ gap ≈ 12 min [current values from revision 3.27 on: election beat 30 s / lease 3 min, see section 20.30]); ③ a shared `reconcileOneTarget()` (the probe route body extracted into an
 SSOT; the manual click and the periodic tick run the same code ⇒ automatic finalize of a terminal build comes for free) + a new `reconcileTelemetry` in `lifecycle.ts` (does not bump version, phase unchanged, guarded by `attribute_not_exists(observed.operation)`).
 
 🔴🔴 **The most load-bearing invariant of this batch = the ban on fail-open reversal**: once the reconciler refreshes `probe.at` automatically, `fresh(probe)` is always true ⇒ **refreshing probe.at without writing back health
@@ -2149,6 +2183,9 @@ this time it was measured: probe.at stopped after `09:41:03` and recovered at `0
 (my first version allowed 6.5 min and gave up **2 seconds** before recovery — the classic "product right, script wrong").
 
 📌 Incidentally, the multi-replica item was upgraded from "pinned by arithmetic" to "a takeover window measured in a real environment".
+
+📌 **Correction in revision 3.27 (2026-11-17)**: this "stall" later fell on the background pumps that hang on the same lease (alerts arriving some ten minutes late) ⇒ changed to release on exit and take-over on the next beat, see section 20.30;
+the lease of 8 min and the 12 min in this subsection are the values of that time, kept as history.
 
 #### 20.28c Two lessons from the acceptance scripts (once again the script broke before the product did)
 

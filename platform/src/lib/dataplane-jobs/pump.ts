@@ -18,6 +18,7 @@ import {
   INTERNAL_SOURCE_DATAPLANE_JOB_PUMP,
   INTERNAL_SOURCE_HEADER,
 } from "@/lib/scheduler/internal-source";
+import { startPeriodicLoop, type PeriodicLoopHandle } from "@/lib/exec-env/periodic-loop";
 
 /** 泵周期(④-2:15s)。 */
 export const PUMP_INTERVAL_MS = 15_000;
@@ -135,25 +136,22 @@ export async function runPumpTick(tick: number, deps: PumpDeps): Promise<PumpTic
 }
 
 /**
- * 起泵(由 reconciler-loop 在 `startReconcilerLoop` 里调;递归 setTimeout + unref,一轮跑完才排下一轮 ⇒ 不重叠)。
+ * 起泵(由 reconciler-loop 在 `startReconcilerLoop` 里调;计时器代码与另两台泵、探活节拍同一份:一轮跑完才排下一轮 ⇒ 不重叠)。
+ * 返回的句柄给「本副本刚接手主副本」用:把等着的那一轮提到现在。
  */
-export function startDataplaneJobPump(deps: PumpDeps): void {
+export function startDataplaneJobPump(deps: PumpDeps): PeriodicLoopHandle {
   let tick = 0;
-  const schedule = (delay: number) => {
-    const timer = setTimeout(runOnce, delay);
-    if (typeof timer.unref === "function") timer.unref();
-  };
-  const runOnce = async () => {
-    try {
-      tick += 1;
-      const s = await runPumpTick(tick, deps);
-      if (s.ran && (s.due > 0 || s.failed > 0)) console.log("[dataplane-job-pump] tick:", JSON.stringify(s));
-    } catch (e) {
-      console.error("[dataplane-job-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
-    } finally {
-      schedule(PUMP_INTERVAL_MS);
-    }
-  };
   console.log("[dataplane-job-pump] 已启动(interval=%dms)", PUMP_INTERVAL_MS);
-  schedule(PUMP_INTERVAL_MS);
+  return startPeriodicLoop({
+    intervalMs: PUMP_INTERVAL_MS,
+    runOnce: async () => {
+      try {
+        tick += 1;
+        const s = await runPumpTick(tick, deps);
+        if (s.ran && (s.due > 0 || s.failed > 0)) console.log("[dataplane-job-pump] tick:", JSON.stringify(s));
+      } catch (e) {
+        console.error("[dataplane-job-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
+      }
+    },
+  });
 }

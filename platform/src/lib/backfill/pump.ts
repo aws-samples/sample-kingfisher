@@ -21,6 +21,7 @@ import {
   INTERNAL_SOURCE_BACKFILL_PUMP,
   INTERNAL_SOURCE_HEADER,
 } from "@/lib/scheduler/internal-source";
+import { startPeriodicLoop, type PeriodicLoopHandle } from "@/lib/exec-env/periodic-loop";
 
 /** 泵周期:30s(页面推进是 6s;后台慢一点即可 —— 实例本身是分钟级的引擎作业)。 */
 export const BACKFILL_PUMP_INTERVAL_MS = 30_000;
@@ -92,22 +93,21 @@ export async function runBackfillPumpTick(deps: BackfillPumpDeps): Promise<Backf
   return { ran: true, open: keys.length, posted, failed };
 }
 
-/** 起泵(reconciler-loop 在 `startReconcilerLoop` 里调;递归 setTimeout + unref ⇒ 一轮跑完才排下一轮,不重叠)。 */
-export function startBackfillPump(deps: BackfillPumpDeps): void {
-  const schedule = (delay: number) => {
-    const timer = setTimeout(runOnce, delay);
-    if (typeof timer.unref === "function") timer.unref();
-  };
-  const runOnce = async () => {
-    try {
-      const s = await runBackfillPumpTick(deps);
-      if (s.ran && (s.open > 0 || s.failed > 0)) console.log("[backfill-pump] tick:", JSON.stringify(s));
-    } catch (e) {
-      console.error("[backfill-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
-    } finally {
-      schedule(BACKFILL_PUMP_INTERVAL_MS);
-    }
-  };
+/**
+ * 起泵(reconciler-loop 在 `startReconcilerLoop` 里调;计时器代码与另两台泵、探活节拍同一份:一轮跑完才排下一轮,不重叠)。
+ * 返回的句柄给「本副本刚接手主副本」用:把等着的那一轮提到现在。
+ */
+export function startBackfillPump(deps: BackfillPumpDeps): PeriodicLoopHandle {
   console.log("[backfill-pump] 已启动(interval=%dms)", BACKFILL_PUMP_INTERVAL_MS);
-  schedule(BACKFILL_PUMP_INTERVAL_MS);
+  return startPeriodicLoop({
+    intervalMs: BACKFILL_PUMP_INTERVAL_MS,
+    runOnce: async () => {
+      try {
+        const s = await runBackfillPumpTick(deps);
+        if (s.ran && (s.open > 0 || s.failed > 0)) console.log("[backfill-pump] tick:", JSON.stringify(s));
+      } catch (e) {
+        console.error("[backfill-pump] tick 未捕获异常:", String((e as Error)?.message ?? e));
+      }
+    },
+  });
 }
