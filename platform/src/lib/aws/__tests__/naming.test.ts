@@ -9,7 +9,7 @@
 // ③ **fail-closed**:未登记 kind / 缺变量 / 残留占位符 / 超长 / 非法 targetId,一律抛,不返回猜的名字。
 // ④ **被否决的方案留算术在案**:`region + slug` 双段会溢出 S3 的 63 —— 免得下一个人再提一遍。
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import {
@@ -233,10 +233,39 @@ describe("🔴 home 豁免逐个对上 infra/lib 真源码(对不上 ⇒ seed �
   // homeSource 里的**行号只作人工导航用**,断言只看文件内容 —— 行号漂移不该让门禁变红。
   const cases = RESOURCE_KINDS.filter((k) => (homeSourceOf(k) ?? "").startsWith("infra/"));
 
-  it("绝大多数 kind 都登记了 infra 出处(未登记的必须是 stackName 这类新栈)", () => {
+  /**
+   * 不由任何栈创建、由平台在运行期按需创建的资源:它们的 home 名在 infra 里没有出处,出处是平台里**创建它的那个模块**。
+   * 目前只有 DMS 复制实例(第一条 DMS 任务启动时懒创建、空闲后回收;2026-11 之前平台栈经一个环境变量把名字 `bgp-dms` 递给平台,
+   * 现在名字由落点解析直接从命名单一事实源取)。往这里加一行 = 声明「infra 不建它」,要写清谁建。
+   */
+  const RUNTIME_CREATED: Record<string, string> = { dmsInstanceId: "platform/src/lib/realtime/dms-place.ts" };
+
+  it("绝大多数 kind 都登记了 infra 出处(未登记的只有:平台运行期创建的资源,与 stackName 这类新栈)", () => {
     const unregistered = RESOURCE_KINDS.filter((k) => !(homeSourceOf(k) ?? "").startsWith("infra/"));
-    expect(unregistered).toEqual(["stackName"]);
+    expect(unregistered).toEqual([...Object.keys(RUNTIME_CREATED), "stackName"]);
   });
+
+  for (const [kind, author] of Object.entries(RUNTIME_CREATED)) {
+    it(`${kind}(平台运行期创建):出处是 ${author},它真的从命名单一事实源取这个名字;infra 与它自己都不再硬编码`, () => {
+      expect(homeSourceOf(kind)).toBe(author);
+      const text = readFileSync(resolve(REPO, author), "utf8");
+      expect(text, `${author} 里没有 resourceName("${kind}", …) —— 出处登记错了`).toMatch(new RegExp(`resourceName\\(\\s*["'\`]${kind}["'\`]`));
+      const homeName = resourceName(kind as never, varsFor(kind as never, HOME_TARGET_ID));
+      expect(text.includes(`"${homeName}"`), `${author} 既走 resourceName 派生、又留着硬编码 "${homeName}"`).toBe(false);
+      // infra 里一旦又出现这个名字的字面量(有栈开始建它 / 又经环境变量递名字)⇒ 出处该改回 infra,这条登记作废
+      const infraLib = resolve(REPO, "infra/lib");
+      const hits: string[] = [];
+      const walk = (dir: string) => {
+        for (const e of readdirSync(dir, { withFileTypes: true })) {
+          const full = resolve(dir, e.name);
+          if (e.isDirectory()) walk(full);
+          else if (e.name.endsWith(".ts") && readFileSync(full, "utf8").includes(`"${homeName}"`)) hits.push(full.slice(REPO.length + 1));
+        }
+      };
+      walk(infraLib);
+      expect(hits, `infra/lib 里出现了 "${homeName}" 的字面量`).toEqual([]);
+    });
+  }
 
   for (const kind of cases) {
     it(`${kind}:home 名在 ${homeSourceOf(kind)} 找得到`, () => {

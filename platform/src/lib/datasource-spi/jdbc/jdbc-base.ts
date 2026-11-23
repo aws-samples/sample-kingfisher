@@ -34,7 +34,8 @@ export interface JdbcDialect {
   // 不让整个同步作业因一行 `0000-00-00 00:00:00` 失败;Glue 4 / 5 内置 Connector/J 8.0.x 认这个写法)。
   defaultParams?: Readonly<Record<string, string>>;
   // Node 侧「列出表+列」的实现(用各自驱动直连查系统表)。返回归一后的数据集。
-  // 未装驱动/连不上时应捕获并返回 [](与现有 readSourceSchema 的容错语义一致)。
+  // 未装驱动 / 连不上 / 凭证不对 ⇒ **抛**(连接照常在 finally 里关)。「读不到按空清单处理」的容错只在 base 的 introspect 一处做:
+  //   2026-11-19 真环境:方言各自把失败折成 [] ⇒ 浏览表接口分不清「源里没有表」与「没读到」,「连不上就改经 Glue 连接」永远走不到。
   introspect: (conn: JdbcConnInfo) => Promise<SourceDataset[]>;
   // Node 侧「SELECT 1」探活(各驱动建连方式不同)。返回 reachable/延迟。
   ping: (conn: JdbcConnInfo) => Promise<PingResult>;
@@ -83,6 +84,13 @@ export function makeJdbcProvider(
   dialect: JdbcDialect,
   capabilities: DataSourceCapabilities
 ): DataSourceProvider {
+  // 直连读系统表;读不到就抛(连接信息 / 凭证不完整也算读不到)。
+  const introspectStrict = async (ref: SourceRef): Promise<SourceDataset[]> => {
+    if (!capabilities.canIntrospect) return [];
+    const conn = await resolveJdbcConn(ref, dialect.defaultPort);
+    if (!conn) throw new Error("连接信息或凭证不完整");
+    return dialect.introspect(conn);
+  };
   return {
     type: dialect.type,
     capabilities,
@@ -143,11 +151,16 @@ export function makeJdbcProvider(
       return dialect.ping(conn);
     },
 
+    // 读不到要抛的那一份(浏览表用:直连读不到 ⇒ 改经数据源自己的 Glue 连接)。
+    introspectStrict,
+
+    // 容错的唯一作者:读不到(连不上 / 凭证不对 / 驱动不可用)⇒ [],上层仍可注册 service / database(与原 readSourceSchema 的语义一致)。
     async introspect(ref: SourceRef): Promise<SourceDataset[]> {
-      if (!capabilities.canIntrospect) return [];
-      const conn = await resolveJdbcConn(ref, dialect.defaultPort);
-      if (!conn) return [];
-      return dialect.introspect(conn);
+      try {
+        return await introspectStrict(ref);
+      } catch {
+        return [];
+      }
     },
 
     // JDBC 凭证恒为 {username,password}(收编 datasource-service.ts:28)。

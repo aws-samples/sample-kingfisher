@@ -284,17 +284,17 @@
     },
     {
       "action": "secretsmanager:CreateSecret",
-      "axis": "home",
+      "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/dms/redshift-target-AbCdEf",
-      "why": "IAM 侧:实时链建 Redshift 专用用户 dms_ingest 后写完整字段密钥给 DMS(bgp/dms/redshift-target,主控区);observe 量到 PutSecretValue 被拒;数据面角色写语句同笔补 bgp/dms/*",
-      "source": "platform/src/lib/realtime/redshift-target.ts"
+      "why": "DMS 通道按任务所在执行区建:受控 DDL 通道给该区数仓建 DMS 专用用户后,把完整连接字段写进该区的密钥(bgp/dms/redshift-target,每区一份)给 DMS 用(函数:provisionDmsIngestUser)",
+      "source": "platform/src/lib/exec-env/admin-ddl-executor.ts"
     },
     {
       "action": "secretsmanager:PutSecretValue",
-      "axis": "home",
+      "axis": "execution",
       "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/dms/redshift-target-AbCdEf",
-      "why": "同上:密钥已存在 ⇒ 覆盖值(轮换口令)",
-      "source": "platform/src/lib/realtime/redshift-target.ts"
+      "why": "同上:密钥已存在而口令要重设(目标端连通性测试失败后的有界重供给)⇒ 覆盖值",
+      "source": "platform/src/lib/exec-env/admin-ddl-executor.ts"
     },
     {
       "action": "s3:ListAllMyBuckets",
@@ -368,6 +368,34 @@
       "resource": "*",
       "why": "最后一条 DMS 任务删掉之后回收懒创建的复制实例(实例上零复制任务 + 空闲宽限后才删;此前实例只建不删、常驻按小时计费)(函数:dmsInstanceReclaimJobHandler.step)",
       "source": "platform/src/lib/realtime/dms-instance-reclaim-job.ts"
+    },
+    {
+      "action": "dms:DeleteEndpoint",
+      "axis": "execution",
+      "resource": "*",
+      "why": "删 DMS 同步任务后清掉它留在该区的源 / 目标端点(任务行已删、没有复制任务引用的那些;此前删任务不删端点)(函数:deletePlatformEndpoint,调用方 dmsInstanceReclaimJobHandler.step)",
+      "source": "platform/src/lib/realtime/dms-service.ts"
+    },
+    {
+      "action": "dms:DescribeEndpoints",
+      "axis": "execution",
+      "resource": "*",
+      "why": "列该区平台建的端点(bgp-src-* / bgp-tgt-*)供清扫判断;启动时也按标识查端点是否已存在(函数:listPlatformEndpoints / findEndpointArn)",
+      "source": "platform/src/lib/realtime/dms-service.ts"
+    },
+    {
+      "action": "dms:ModifyEndpoint",
+      "axis": "execution",
+      "resource": "*",
+      "why": "再次启动 DMS 同步任务时,把沿用的源端点对齐到数据源当前的主机 / 端口 / 账号 / 口令(停止后或上一次启动失败后用户改过数据源;此前端点按名复用、从不更新)(函数:alignSourceEndpoint,调用方 start-realtime 路由的后台编排)",
+      "source": "platform/src/lib/realtime/dms-service.ts"
+    },
+    {
+      "action": "secretsmanager:DescribeSecret",
+      "axis": "execution",
+      "resource": "arn:aws:secretsmanager:{region}:{acct}:secret:bgp/dms/redshift-target-AbCdEf",
+      "why": "DMS 启动:按名判该区的目标专用用户密钥在不在(在就复用,不每次启动都重设口令);只 Describe 不取值(函数:provisionDmsIngestUser → describeSecretArnByName)",
+      "source": "platform/src/lib/exec-env/admin-ddl-executor.ts"
     },
     {
       "action": "glue:GetJobRuns",

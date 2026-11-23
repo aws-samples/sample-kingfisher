@@ -189,6 +189,10 @@ export class PlatformStack extends cdk.Stack {
         "dms:StopReplicationTask", "dms:DeleteReplicationTask",
         // 最后一条 DMS 任务删掉后,懒创建的复制实例由后台作业按「零复制任务」事实回收(此前实例只建不删、常驻计费)
         "dms:DeleteReplicationInstance",
+        // 删任务后由同一条后台作业清掉它留下的源 / 目标端点(任务行已删、没有复制任务引用的那些;此前删任务不删端点)
+        "dms:DeleteEndpoint",
+        // 再次启动时把沿用的源端点对齐到数据源的现值(停止后改过数据源的主机 / 口令;此前端点按名复用、从不更新)
+        "dms:ModifyEndpoint",
         "dms:TestConnection", "dms:DescribeConnections",
         "dms:DescribeReplicationInstances", "dms:DescribeReplicationSubnetGroups", "dms:DescribeTableStatistics",
       ],
@@ -673,6 +677,16 @@ export class PlatformStack extends cdk.Stack {
         //   (execution 轴,`bgp/*`)覆盖;读那一半若不补,非 home 落地会「供给得出、按名 Describe 不回 /
         //   Data API 拿 SecretArn 执行时 GetSecretValue 被拒」——与上一条 DataSourceSecretRead 同一个成对不变式。
         //   资源面只到 `bgp/shared-writer/*`(比写语句更窄);region 仍由 requestedRegionCondition 收在已登记执行区内。
+        // DMS 目标数仓专用用户的密钥(每个区各一份 `bgp/dms/redshift-target`):平台只需要知道它**在不在**
+        //   (在就复用,不每次启动都重设口令)—— 取值是 DMS 访问角色的事,平台不读。所以只给 DescribeSecret、资源面只到 `bgp/dms/*`。
+        //   写那一半已由 `ProjectCredentialSecretWrite`(execution 轴,`bgp/*`)覆盖;这里补的是同一条成对不变式的「读」半边。
+        regionalStatement(this, {
+          sid: "DmsTargetSecretDescribe",
+          axis: "execution",
+          reason: "DMS 通道按任务所在执行区建:目标数仓专用用户的密钥建在该区,启动时按名 DescribeSecret 判在不在(在就复用);只给 Describe、资源面只到 bgp/dms/*,不含取值",
+          actions: ["secretsmanager:DescribeSecret"],
+          resources: (r) => [`arn:aws:secretsmanager:${r}:${acct}:secret:bgp/dms/*`],
+        }),
         regionalStatement(this, {
           sid: "SharedWriterSecretRead",
           axis: "execution",
@@ -1395,19 +1409,11 @@ export class PlatformStack extends cdk.Stack {
         DEFAULT_VPC_ID: props.vpc.vpcId,
         DEFAULT_SUBNET_ID: props.vpc.selectSubnets({ subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS }).subnetIds[0],
         DEFAULT_AZ: props.vpc.availabilityZones[0],
-        // 实时 CDC:稳定标识由 account/region 派生(不再靠每次部署传 context)。
-        //  · 复制实例 ARN 不注入:它随 BgpRealtimeStack destroy/recreate 漂移,改由运行时按稳定
-        //    id(bgp-dms)发现(见 lib/realtime/dms-service.ts getReplicationInstanceArn)。实例不
-        //    存在(实时栈未拉起/已止血)时,实时启动 API 运行时返回 503。
-        //  · DMS 角色名 bgp-dms-kinesis-role、Redshift workgroup/host 均为固定命名,可确定性派生。
-        REDSHIFT_NAMESPACE: "bgp-namespace",
-        REDSHIFT_HOST: `bgp-workgroup.${cdk.Stack.of(this).account}.${cdk.Stack.of(this).region}.redshift-serverless.amazonaws.com`,
-        // DMS 经典实例模式(决策回退:常驻复制实例 bgp-dms,task 启动 1-3min)。复制实例由门控
-        // BgpRealtimeStack 提供;服务层运行时按稳定 id 发现实例 ARN(免静态 ARN 漂移)。未拉起时
-        // 实时启动 API 返回 503。
-        DMS_REPLICATION_INSTANCE_ID: "bgp-dms",
+        // 实时 CDC(DMS 通道):「在哪个区、用哪台复制实例、哪个子网组 / 安全组、写哪个数仓、密钥叫什么」全部由平台按
+        //   任务绑定的执行区解析(platform/src/lib/realtime/dms-place.ts:命名单一事实源 + 该区描述符 + 该区工作组事实),
+        //   不再靠环境变量。这里只留主控区的 DMS 访问角色(主控区实时栈的固定名角色,确定性派生);
+        //   主控区实时栈未拉起时,启动接口按「该区安全组不存在」如实回 503。
         DMS_ROLE_ARN: `arn:aws:iam::${cdk.Stack.of(this).account}:role/bgp-dms-kinesis-role`,
-        DMS_TARGET_SECRET_ID: "bgp/dms/redshift-target",
         // (实时计算 Flink) — MSAF 编排所需稳定标识(account/region 确定性派生,免跨栈依赖)。
         //  · 角色/源流/代码 JAR 位置固定命名;BgpFlinkStack 未拉起时,Flink 启动 API 运行时返回 503。
         // Flink 运行时版本(单一事实来源)。升级:`-c flink-runtime=FLINK-1_21` 或改此默认值,零代码改动。

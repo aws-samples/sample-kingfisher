@@ -4,17 +4,14 @@
 // 内含 7 个实测踩坑的解法(见 docs/design/31-realtime-cdc/DESIGN.md §9b)。
 //
 // 设计:
-//  - 纯编排,不创建常驻基建(DMS 复制实例/Kinesis 由门控的 BgpRealtimeStack 提供;本服务假定其已就绪)。
+//  - 纯编排,不创建常驻基建(子网组 / 安全组 / 访问角色由主控区实时栈或该执行区的 DMS 栈提供;复制实例懒创建、空闲回收)。
 //  - 幂等:每步先查后建(endpoint/任务/用户/schema 重复调用安全)。
-//  - 凭证零硬编码:源走数据源 secret;目标建专用 Redshift 用户 dms_ingest,密码随机生成、
-//    存入 Secrets Manager(bgp/dms/redshift-target),绝不落代码/日志(红线②)。
-//  - 控制面只编排;实时基建的常驻计费由调用方按需 enable/destroy(成本红线)。
+//  - 凭证零硬编码:源走数据源 secret;目标用专用数仓用户,口令只在该区 Secrets Manager 里,绝不落代码/日志(红线②)。
+//  - 🔴 **在哪个区做** 由调用方给的落点决定(`lib/realtime/dms-place.ts`,来自任务自己的绑定):本文件没有任何
+//    模块级客户端、也不读「在哪」的环境变量 —— 每个发云调用的函数第一个参数就是落点,漏传是编译错。
+//    (2026-11 之前这里握着模块级的主控区客户端:非主控区数据源的任务能选、能存,启动才被拒。)
 
-import { homeRegion } from "@/lib/place/home-region";
-// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
-import { sdkClient } from "@/lib/aws/clients";
 import {
-  DatabaseMigrationServiceClient,
   CreateEndpointCommand,
   DescribeEndpointsCommand,
   CreateReplicationTaskCommand,
@@ -28,27 +25,18 @@ import {
   DescribeTableStatisticsCommand,
   DescribeReplicationInstancesCommand,
   CreateReplicationInstanceCommand,
+  DeleteEndpointCommand,
+  ModifyEndpointCommand,
 } from "@aws-sdk/client-database-migration-service";
-import { EC2Client, DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
+import { DescribeSecurityGroupsCommand } from "@aws-sdk/client-ec2";
+import { GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import { logger } from "@/lib/observability/logger";
-// 复制任务状态按**任务 ARN 里的区**取客户端(见 dmsClientOfTaskArn)
-import { dmsClientFor } from "@/lib/exec-env/target-clients";
+import { dmsClientFor, ec2ClientFor, secretsClientFor } from "@/lib/exec-env/target-clients";
 import { regionOfArn } from "@/lib/aws/arn";
+import { isHome } from "@/lib/exec-env/target-id";
+import type { DmsPlace, DmsSite } from "@/lib/realtime/dms-place";
 
-const region = homeRegion();
-const dms = sdkClient("data-plane", DatabaseMigrationServiceClient, { region });
-const ec2 = sdkClient("data-plane", EC2Client, { region });
-
-// 复制实例 identifier(由 BgpRealtimeStack 固定为 bgp-dms;稳定不变)。
-// ⚠️ 不再用静态 ARN env:实时栈每次 destroy/recreate,实例 ARN 都会变,
-//    静态注入必然过期(历史坑)。改为运行时按 id 发现真实 ARN,根治漂移。
-export const REPLICATION_INSTANCE_ID = process.env.DMS_REPLICATION_INSTANCE_ID || "bgp-dms";
-// DMS 访问 secret / 写 Kinesis / Redshift COPY 用的角色(同一角色,信任 dms + 区域化 dms + redshift)。
-const DMS_ROLE_ARN = process.env.DMS_ROLE_ARN || "";
-// 懒创建实例的耐久依赖(BgpRealtimeStack 提供,固定名):子网组 + 安全组。
-const DMS_SUBNET_GROUP_ID = process.env.DMS_SUBNET_GROUP_ID || "bgp-dms-subnet-group";
-const DMS_SG_NAME = process.env.DMS_SG_NAME || "bgp-dms-sg";
-// 懒创建规格(与原 BgpRealtimeStack 一致:该 region dms.t3.micro 不可订购,用 small;引擎 3.5.4)。
+// 懒创建规格(该 region dms.t3.micro 不可订购,用 small;引擎 3.5.4)。这两项是「建成什么样」,不是「建在哪」。
 const DMS_INSTANCE_CLASS = process.env.DMS_INSTANCE_CLASS || "dms.t3.small";
 const DMS_ENGINE_VERSION = process.env.DMS_ENGINE_VERSION || "3.5.4";
 
@@ -58,11 +46,12 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 //   2026-11-16 真环境:回收之后同一进程里再点「启动」,拿着已删实例的 ARN 去建复制任务 ⇒
 //   「Replication Instance ARN … does not exist」,平台不重启就一直失败。每次用之前都问 DMS(一次 Describe)。
 
-// 按名查 bgp-dms-sg 的 SG id(懒创建 CreateReplicationInstance 需要 SG id,非名)。
-async function findDmsSgId(): Promise<string | null> {
+// 按名查该区复制实例安全组的 id(懒创建 CreateReplicationInstance 需要 SG id,非名)。
+async function findDmsSgId(place: DmsPlace): Promise<string | null> {
   try {
+    const ec2 = await ec2ClientFor(place.region);
     const r = await ec2.send(
-      new DescribeSecurityGroupsCommand({ Filters: [{ Name: "group-name", Values: [DMS_SG_NAME] }] })
+      new DescribeSecurityGroupsCommand({ Filters: [{ Name: "group-name", Values: [place.securityGroupName] }] })
     );
     return r.SecurityGroups?.[0]?.GroupId || null;
   } catch {
@@ -73,12 +62,13 @@ async function findDmsSgId(): Promise<string | null> {
 // 查复制实例(返回 {arn,status} 或 null)。
 // ⚠️ DMS DescribeReplicationInstances 在按 filter 查不到时会**抛 ResourceNotFoundFault**(不是返回空数组),
 //    必须捕获成 null,否则懒创建分支永远进不去(实测踩坑 2026-07-07)。
-async function describeInstance(): Promise<{ arn: string; status: string } | null> {
+async function describeInstance(site: DmsSite): Promise<{ arn: string; status: string } | null> {
+  const dms = await dmsClientFor(site.region);
   let r;
   try {
     r = await dms.send(
       new DescribeReplicationInstancesCommand({
-        Filters: [{ Name: "replication-instance-id", Values: [REPLICATION_INSTANCE_ID] }],
+        Filters: [{ Name: "replication-instance-id", Values: [site.instanceId] }],
       })
     );
   } catch (e: any) {
@@ -117,30 +107,34 @@ export interface ReplicationInstanceProbe {
  *   `ResourceAlreadyExistsFault`,撞的那条把任务写成 error。
  *   ⇒ 请求路径只许做**不等待**的前置检查(基建缺就 503、状态坏就 503),等待一律进后台编排。
  */
-export async function probeReplicationInstance(): Promise<ReplicationInstanceProbe> {
-  let cur = await describeInstance();
+export async function probeReplicationInstance(place: DmsPlace): Promise<ReplicationInstanceProbe> {
+  let cur = await describeInstance(place);
   let requestedCreate = false;
 
   // 不存在 → 懒创建(只发起,不等)。
   // 正在删除(deleting)的旧实例还占着这个 id,此刻建不了 ⇒ 如实回 deleting,由后台编排等它删完再来看这一眼。
   if (!cur) {
-    const sgId = await findDmsSgId();
+    const sgId = await findDmsSgId(place);
     if (!sgId) {
       throw new Error(
-        `DMS 安全组 ${DMS_SG_NAME} 未就绪(需先部署 BgpRealtimeStack 提供子网组/SG/角色等耐久基建)`
+        `DMS 安全组 ${place.securityGroupName} 未就绪(${place.region}):` +
+          (isHome(place.targetId)
+            ? "需先部署 BgpRealtimeStack 提供子网组/SG/角色等耐久基建"
+            : `请在「执行环境」页对 ${place.targetId} 点「重新部署」后再启动`)
       );
     }
-    logger.info?.("dms.instance.lazy_create", { id: REPLICATION_INSTANCE_ID, class: DMS_INSTANCE_CLASS });
+    logger.info?.("dms.instance.lazy_create", { id: place.instanceId, region: place.region, class: DMS_INSTANCE_CLASS });
+    const dms = await dmsClientFor(place.region);
     try {
       await dms.send(
         new CreateReplicationInstanceCommand({
-          ReplicationInstanceIdentifier: REPLICATION_INSTANCE_ID,
+          ReplicationInstanceIdentifier: place.instanceId,
           ReplicationInstanceClass: DMS_INSTANCE_CLASS,
           AllocatedStorage: 20,
           EngineVersion: DMS_ENGINE_VERSION,
           MultiAZ: false,
           PubliclyAccessible: false,
-          ReplicationSubnetGroupIdentifier: DMS_SUBNET_GROUP_ID,
+          ReplicationSubnetGroupIdentifier: place.subnetGroupId,
           VpcSecurityGroupIds: [sgId],
         })
       );
@@ -149,7 +143,7 @@ export async function probeReplicationInstance(): Promise<ReplicationInstancePro
       // 另一条启动(或另一个副本)刚好先一步发起了创建 ⇒ 不是失败:实例正在建,读它的现状即可
       if (String((e as { name?: string })?.name ?? "") !== "ResourceAlreadyExistsFault") throw e;
     }
-    cur = await describeInstance();
+    cur = await describeInstance(place);
   }
   return { status: cur?.status || "missing", arn: cur?.arn, requestedCreate };
 }
@@ -171,20 +165,20 @@ export const REPLICATION_INSTANCE_WAIT = { intervalMs: 20_000, maxAttempts: 90 }
 export const REPLICATION_INSTANCE_DELETE_WAIT = { intervalMs: 20_000, maxAttempts: 60 } as const;
 
 // 运行时发现复制实例 ARN(按稳定 id 查);不缓存 —— 实例会被回收再重建,ARN 随之更换(见上文「不在进程里记」的说明)。
-// **懒创建(2026-07-07 成本改造)**:实例不再随 BgpRealtimeStack 常驻。若 bgp-dms 不存在,则用栈提供的
-// 固定名子网组 + SG 现场 CreateReplicationInstance(首次 10–15 分钟,实测 13.3 分钟),之后复用;空闲时由后台回收,
+// **懒创建(2026-07-07 成本改造)**:实例不常驻。该区的实例不存在,就用该区栈提供的子网组 + 安全组现场
+// CreateReplicationInstance(首次 10–15 分钟,实测 13.3 分钟),之后复用;空闲时由后台回收,
 // 基建(子网组/SG/角色)留着零成本复用。实例的五种常态这里都接得住:
 //   不存在 ⇒ 建;创建中 / 修改中 ⇒ 等到 available;删除中(刚被回收)⇒ 等它删完再建;available ⇒ 直接用。
 // 🔴 只许**后台编排**调本函数(要等分钟级);HTTP 请求路径用 probeReplicationInstance()。
-export async function getReplicationInstanceArn(): Promise<string> {
+export async function getReplicationInstanceArn(place: DmsPlace): Promise<string> {
   let waitedDelete = 0;
   let waitedCreate = 0;
   for (;;) {
     // 每一轮都从「看一眼」开始:实例不在(从未建过 / 旧的刚删完)⇒ 这一眼就发起懒创建
-    const cur = await probeReplicationInstance();
+    const cur = await probeReplicationInstance(place);
     if (cur.status === "available" && cur.arn) return cur.arn;
     if (REPLICATION_INSTANCE_BROKEN_STATUSES.includes(cur.status)) {
-      throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 状态异常:${cur.status}`);
+      throw new Error(`DMS 复制实例 ${place.instanceId} 状态异常:${cur.status}`);
     }
     // 两段预算分开计:等旧实例删完(REPLICATION_INSTANCE_DELETE_WAIT)· 等新实例就位(REPLICATION_INSTANCE_WAIT);
     // 超时抛错,由调用方决定重试(下次进来实例可能已 available,直接用)。
@@ -192,10 +186,10 @@ export async function getReplicationInstanceArn(): Promise<string> {
     const budget = deleting ? REPLICATION_INSTANCE_DELETE_WAIT : REPLICATION_INSTANCE_WAIT;
     const waited = deleting ? waitedDelete++ : waitedCreate++;
     if (waited >= budget.maxAttempts) {
-      throw new Error(`DMS 复制实例 ${REPLICATION_INSTANCE_ID} 未就绪(当前状态 ${cur.status || "缺失"},可稍后重试)`);
+      throw new Error(`DMS 复制实例 ${place.instanceId} 未就绪(当前状态 ${cur.status || "缺失"},可稍后重试)`);
     }
     if (waited > 0 && waited % 15 === 0) {
-      logger.info?.("dms.instance.waiting", { id: REPLICATION_INSTANCE_ID, status: cur.status, waitedSec: (waited * budget.intervalMs) / 1000 });
+      logger.info?.("dms.instance.waiting", { id: place.instanceId, region: place.region, status: cur.status, waitedSec: (waited * budget.intervalMs) / 1000 });
     }
     await sleep(budget.intervalMs);
   }
@@ -206,7 +200,7 @@ export interface RealtimeTaskInput {
   sourceSecretArn: string; // 源 MySQL 凭证(数据源 secret;通常只含 username/password)
   sourceHost: string; // 源 MySQL 主机(数据源 secret 一般不含 host/port,故显式传入)
   sourcePort?: number; // 源 MySQL 端口(默认 3306)
-  targetSecretArn: string; // 目标 Redshift 的 DMS 专用 secret(含 dms_ingest 完整字段)
+  targetSecretArn: string; // 目标数仓专用用户的 secret(名字或 ARN;该区 Secrets Manager 里,含完整连接字段)
   schemaName: string; // 源 schema(也是 Redshift 目标 schema,须预建)
   tableName: string; // 同步的表(或 "%" 整库)
 }
@@ -222,8 +216,9 @@ function names(taskId: string) {
 }
 
 // 幂等:按 identifier 查 endpoint ARN,无则返回空。
-async function findEndpointArn(endpointId: string): Promise<string | null> {
+async function findEndpointArn(site: DmsSite, endpointId: string): Promise<string | null> {
   try {
+    const dms = await dmsClientFor(site.region);
     const r = await dms.send(
       new DescribeEndpointsCommand({ Filters: [{ Name: "endpoint-id", Values: [endpointId] }] })
     );
@@ -233,45 +228,79 @@ async function findEndpointArn(endpointId: string): Promise<string | null> {
   }
 }
 
-// 建源 endpoint(MySQL,显式连接参数)。
-// 踩坑(新账号实测):数据源 secret 通常只含 {username,password},缺 host/port —— DMS Secrets 模式
-//   要求 secret 含完整字段,否则连通性测试报 "The 'port' parameter in the secret string is missing"。
-//   故源端改用【显式参数】:从数据源 secret 取账密 + 用传入的 host/port 直连,绕开 secret 字段不全问题。
-export async function ensureSourceEndpoint(input: RealtimeTaskInput): Promise<string> {
-  const { srcId } = names(input.taskId);
-  const existing = await findEndpointArn(srcId);
-  if (existing) return existing;
-  // 从数据源 secret 取账密(只读用一次,不落日志)。
-  const { SecretsManagerClient, GetSecretValueCommand } = await import("@aws-sdk/client-secrets-manager");
-  const sm = sdkClient("data-plane", SecretsManagerClient, { region });
+/** 源端点的连接配置(主机 / 端口 / 账号 / 口令):建端点与对齐端点两处用同一份(单一作者),值全部来自数据源的现状。 */
+async function sourceConnectionOf(place: DmsPlace, input: RealtimeTaskInput): Promise<{ ServerName: string; Port: number; Username: string; Password: string }> {
+  // 从数据源 secret 取账密(只读用一次,不落日志)。数据源的密钥在它所属的区 —— 任务跟着源走,所以就是落点这个区。
+  const sm = await secretsClientFor(place.region);
   const sec = await sm.send(new GetSecretValueCommand({ SecretId: input.sourceSecretArn }));
   const creds = JSON.parse(sec.SecretString || "{}");
   if (!creds.username || !creds.password) {
     throw new Error("源数据源凭证缺少 username/password,无法建 DMS 源 endpoint");
   }
+  return { ServerName: input.sourceHost, Port: input.sourcePort || 3306, Username: creds.username, Password: creds.password };
+}
+
+/** 源端点:`reused` = 这次沿用的是已有端点(它的连接配置可能早于数据源最近一次改动,启动前要对齐,见 `alignSourceEndpoint`)。 */
+export interface SourceEndpointRef {
+  arn: string;
+  reused: boolean;
+}
+
+// 建源 endpoint(MySQL,显式连接参数)。
+// 踩坑(新账号实测):数据源 secret 通常只含 {username,password},缺 host/port —— DMS Secrets 模式
+//   要求 secret 含完整字段,否则连通性测试报 "The 'port' parameter in the secret string is missing"。
+//   故源端改用【显式参数】:从数据源 secret 取账密 + 用传入的 host/port 直连,绕开 secret 字段不全问题。
+export async function ensureSourceEndpoint(place: DmsPlace, input: RealtimeTaskInput): Promise<SourceEndpointRef> {
+  const { srcId } = names(input.taskId);
+  const existing = await findEndpointArn(place, srcId);
+  if (existing) return { arn: existing, reused: true };
+  const conn = await sourceConnectionOf(place, input);
+  const dms = await dmsClientFor(place.region);
   const r = await dms.send(
     new CreateEndpointCommand({
       EndpointIdentifier: srcId,
       EndpointType: "source",
       EngineName: "mysql",
-      ServerName: input.sourceHost,
-      Port: input.sourcePort || 3306,
-      Username: creds.username,
-      Password: creds.password,
+      ...conn,
     })
   );
   logger.info("realtime.endpoint.source.created", { taskId: input.taskId, endpointId: srcId }); // 不记凭证
-  return r.Endpoint!.EndpointArn!;
+  return { arn: r.Endpoint!.EndpointArn!, reused: false };
+}
+
+/**
+ * 把**沿用的**源端点对齐到数据源的现值(主机 / 端口 / 账号 / 口令),并让连通性测试重新做一遍。
+ *
+ * 【为什么】端点按名复用。任务停止之后(或上一次启动因为连不上而失败之后)用户改了数据源 —— 换主机、改口令、
+ *   纠正填错的地址 —— 再点「启动」,端点里还是旧配置:连通性测试照旧失败,怎么点都一样,只能删任务重建;
+ *   更糟的是旧主机还连得上时,任务会悄悄接着读旧库。口令读不回来、无从比对 ⇒ 每次沿用都按现值写一次(幂等)。
+ * 【为什么要重测】端点上一次的「成功」是旧配置测出来的,不能拿它放行新配置;重测失败时 DMS 给的原文照常带进任务错误。
+ * 【调用时机】复制任务到可启动的稳态之后:端点被运行中 / 正在停止的复制任务占着时 DMS 不让改。
+ */
+export async function alignSourceEndpoint(place: DmsPlace, input: RealtimeTaskInput, sourceArn: string): Promise<void> {
+  const conn = await sourceConnectionOf(place, input);
+  const dms = await dmsClientFor(place.region);
+  await dms.send(new ModifyEndpointCommand({ EndpointArn: sourceArn, ...conn }));
+  logger.info("realtime.endpoint.source.aligned", { taskId: input.taskId, endpointArn: sourceArn }); // 不记凭证
+  const instanceArn = await getReplicationInstanceArn(place);
+  try {
+    await dms.send(new TestConnectionCommand({ ReplicationInstanceArn: instanceArn, EndpointArn: sourceArn }));
+  } catch (e) {
+    // 已经有一次测试在进行(或被限流):随后的连通性轮询会读到真实状态,这里不让它挡住启动
+    logger.warn("realtime.endpoint.source.retest_skipped", { taskId: input.taskId, error: String((e as Error)?.message ?? e).slice(0, 200) });
+  }
 }
 
 // 建目标 endpoint(Redshift,经 Secrets)。
 // 踩坑④:目标 secret 必须含完整字段(host/port/database/username/password)且密码无 DMS 禁用字符 {},;
-//        —— 由 ensureRedshiftDmsUser() 保证(建专用 dms_ingest 用户 + 写完整 secret)。
+//        —— 由目标侧准备保证(lib/realtime/redshift-target.ts:专用用户 + 完整 secret)。
 // 踩坑⑥:Redshift COPY 的 ServiceAccessRoleArn 必须已关联到 Redshift namespace(见 ensureRoleAssociatedToNamespace)。
-export async function ensureTargetEndpoint(input: RealtimeTaskInput, stagingBucket: string): Promise<string> {
+// 访问角色、暂存桶、库名全部取落点:写的是**该区**的数仓,暂存也落**该区**的桶。
+export async function ensureTargetEndpoint(place: DmsPlace, input: RealtimeTaskInput): Promise<string> {
   const { tgtId } = names(input.taskId);
-  const existing = await findEndpointArn(tgtId);
+  const existing = await findEndpointArn(place, tgtId);
   if (existing) return existing;
+  const dms = await dmsClientFor(place.region);
   const r = await dms.send(
     new CreateEndpointCommand({
       EndpointIdentifier: tgtId,
@@ -279,10 +308,10 @@ export async function ensureTargetEndpoint(input: RealtimeTaskInput, stagingBuck
       EngineName: "redshift",
       RedshiftSettings: {
         SecretsManagerSecretId: input.targetSecretArn,
-        SecretsManagerAccessRoleArn: DMS_ROLE_ARN,
-        ServiceAccessRoleArn: DMS_ROLE_ARN,
-        DatabaseName: "dev",
-        BucketName: stagingBucket,
+        SecretsManagerAccessRoleArn: place.roleArn,
+        ServiceAccessRoleArn: place.roleArn,
+        DatabaseName: place.warehouse.database,
+        BucketName: place.stagingBucket,
         BucketFolder: "dms-redshift-staging",
       },
     })
@@ -349,6 +378,7 @@ export function buildReplicationTaskSettings(s?: DmsTaskSettings): string {
 
 // 建复制任务(迁移类型可选:普通全量 / CDC / 全量+CDC),幂等。
 export async function ensureReplicationTask(
+  place: DmsPlace,
   input: RealtimeTaskInput,
   sourceArn: string,
   targetArn: string,
@@ -356,6 +386,7 @@ export async function ensureReplicationTask(
   taskSettings?: DmsTaskSettings
 ): Promise<string> {
   const { taskIdent } = names(input.taskId);
+  const dms = await dmsClientFor(place.region);
   try {
     const r = await dms.send(
       new DescribeReplicationTasksCommand({
@@ -380,7 +411,7 @@ export async function ensureReplicationTask(
   } catch {
     /* not found → create */
   }
-  const replicationInstanceArn = await getReplicationInstanceArn();
+  const replicationInstanceArn = await getReplicationInstanceArn(place);
   const r = await dms.send(
     new CreateReplicationTaskCommand({
       ReplicationTaskIdentifier: taskIdent,
@@ -423,6 +454,30 @@ function isTaskNotFound(e: unknown): boolean {
  */
 export const STOP_SETTLE_FALLBACK_MS = 60_000;
 
+/** DMS 给的时刻(SDK 回 Date)⇒ 毫秒;没有 / 读不出 ⇒ null。 */
+function dmsDateMs(d: unknown): number | null {
+  return d instanceof Date && !Number.isNaN(d.getTime()) ? d.getTime() : null;
+}
+
+/**
+ * DMS 说的「已停止」作不作数(停稳)。唯一作者:列表读时对账、详情状态路由与「停止」共用。
+ * 2026-11-23 真环境每秒只读轮询量到的状态机:
+ *   · 刚跑起来就被停:stopping → stopped(**没有停止原因**,持续 33 秒)→ running(弹回)→ stopping → stopped → 带上停止原因;
+ *   · 跑稳后被停:stopped 先不带停止原因约 23 秒,随后同一刻带上停止原因、停止时刻也更新;
+ *   · 再启动:进 starting 那一刻停止原因清空、最近一次启动时刻更新;
+ *   · 弹回那种翻转在 DMS 自己的事件流里没有记录。同一天另一个账号:再启动 40 秒后读到一次「已停止」,而任务实际在跑。
+ * ⇒ 停稳 = 状态 stopped + 带停止原因 +(两个时刻都读得到时)停止时刻不早于最近一次启动时刻。
+ * 出错停下(停止原因含 ERROR)只看前两条:失败要尽快如实报出来,不拿时刻去拦它。
+ */
+export function isSettledStop(st: { status: string; stopReason?: string; startedAt: number | null; stoppedAt: number | null }): boolean {
+  if (String(st.status || "").toLowerCase() !== "stopped") return false;
+  const reason = String(st.stopReason || "");
+  if (!reason) return false;
+  if (/ERROR/i.test(reason)) return true;
+  if (st.startedAt != null && st.stoppedAt != null && st.stoppedAt < st.startedAt) return false;
+  return true;
+}
+
 /** 停 + 等终态 + (可选)删掉这个同步任务的 DMS 复制任务。
  *
  * 🔴🔴 **为什么必须有它**(2026-09-16 全仓核实):`StopReplicationTaskCommand` 在改动前
@@ -430,16 +485,19 @@ export const STOP_SETTLE_FALLBACK_MS = 60_000;
  *   页面点「停止」只把 DDB 的 `status` 改成 `stopped`,而复制任务**继续把源库数据搬到目标区**、
  *   复制实例继续计费;删任务更狠 —— DDB 行一删,连它的 identifier 都没人记得了。
  *   在多法域下这就是**停不下来的跨境数据流动**(核心承诺被这一处击穿)。
- * 🔴 客户端与命名都用**创建时那一套**(本文件顶部的 home 客户端 + `names()`):
- *   下线必须打在创建它的地方 —— 「换一个更正确的解析器」会去停一个根本不存在的任务。
+ * 🔴 落点与命名都用**创建时那一套**:区由调用方按任务绑定解析(与启动同一个解析器,绑定在任务创建后不变),
+ *   标识由 `names()` 派生。下线必须打在创建它的地方 —— 打到别的区只会查到「没有这个任务」,而真的那条还在搬数据。
  */
 export async function teardownReplicationTask(
+  site: DmsSite,
   taskId: string,
   opts: { purge: boolean; waitMs?: number } = { purge: false }
 ): Promise<DmsTeardownResult> {
   const { taskIdent } = names(taskId);
+  const dms = await dmsClientFor(site.region);
   const NON_TERMINAL = ["running", "starting", "stopping", "modifying", "testing", "creating", "deleting"];
-  let cur: { ReplicationTaskArn?: string; Status?: string; StopReason?: string } | undefined;
+  let cur: { ReplicationTaskArn?: string; Status?: string; StopReason?: string;
+             ReplicationTaskStartDate?: Date; ReplicationTaskStats?: { StopDate?: Date } } | undefined;
   try {
     const r = await dms.send(new DescribeReplicationTasksCommand({
       Filters: [{ Name: "replication-task-id", Values: [taskIdent] }],
@@ -453,6 +511,8 @@ export async function teardownReplicationTask(
   const arn = cur.ReplicationTaskArn;
   let status = String(cur.Status || "");
   let stopReason = String(cur.StopReason || "");
+  let startedAt = dmsDateMs(cur.ReplicationTaskStartDate);
+  let stoppedAt = dmsDateMs(cur.ReplicationTaskStats?.StopDate);
   /** 有一次 Stop 发出去了、还没见分晓(这期间不重复发) */
   let stopSent = false;
   /** 本次下线发过 Stop(只有我们亲手停的任务才需要确认「停稳」) */
@@ -463,14 +523,15 @@ export async function teardownReplicationTask(
   let stoppedSince = 0;
   let polls = 0;
   /** 重读一次:任务没了 ⇒ gone;读失败(限流之类)⇒ 状态未知,调用处沿用上一次的。 */
-  const reread = async (): Promise<{ gone: boolean; status?: string; stopReason?: string }> => {
+  const reread = async (): Promise<{ gone: boolean; status?: string; stopReason?: string; startedAt?: number | null; stoppedAt?: number | null }> => {
     let gone = false;
     const r = await dms.send(new DescribeReplicationTasksCommand({
       Filters: [{ Name: "replication-task-id", Values: [taskIdent] }],
     })).catch((e) => { gone = isTaskNotFound(e); return undefined; });
     if (gone || (r && !r.ReplicationTasks?.length)) return { gone: true };
     const t = r?.ReplicationTasks?.[0];
-    return { gone: false, status: t?.Status ? String(t.Status) : undefined, stopReason: t ? String(t.StopReason || "") : undefined };
+    return { gone: false, status: t?.Status ? String(t.Status) : undefined, stopReason: t ? String(t.StopReason || "") : undefined,
+             startedAt: t ? dmsDateMs(t.ReplicationTaskStartDate) : undefined, stoppedAt: t ? dmsDateMs(t.ReplicationTaskStats?.StopDate) : undefined };
   };
   // 等终态(DMS 的启动 / 停止都是异步的;不等就去删会被服务拒 —— 与 serverless workflow 那条同款教训)
   // 🔴 默认只等 **20s**:不带 waitMs 的调用方跑在一次 HTTP 请求里,而入口(CloudFront/ALB)是 **60s 边缘超时**。
@@ -508,8 +569,10 @@ export async function teardownReplicationTask(
     if (!NON_TERMINAL.includes(status)) {
       // 到终态了:「停止」到此为止(我们亲手停的要先确认停稳);「删除」接着撤掉复制任务(撤不撤得掉由 DMS 说了算,被拒就回循环)
       if (!opts.purge) {
-        // 停稳 = 「已停止」带着停止原因(引擎确认停下);万一服务始终不给停止原因,连续 STOP_SETTLE_FALLBACK_MS 都是「已停止」也算。
-        const unsettled = stopEver && status === "stopped" && !stopReason;
+        // 停稳的记号见 isSettledStop;万一服务始终不给,连续 STOP_SETTLE_FALLBACK_MS 都是「已停止」也算。
+        // 🔴 不论这次发没发过 Stop 都要停稳才算:2026-11-23 真环境,任务再启动 40 秒后读到一次不作数的「已停止」(引擎在跑)——
+        //   只对「我们亲手停的」要求停稳的话,这时点「停止」会一个 Stop 都不发就回「已停止」,通道照跑。
+        const unsettled = status === "stopped" && !isSettledStop({ status, stopReason, startedAt, stoppedAt });
         if (unsettled) {
           sawStopped = true;
           if (!stoppedSince) stoppedSince = Date.now();
@@ -533,6 +596,8 @@ export async function teardownReplicationTask(
           }
           status = now.status;
           stopReason = now.stopReason ?? "";
+          if (now.startedAt !== undefined) startedAt = now.startedAt;
+          if (now.stoppedAt !== undefined) stoppedAt = now.stoppedAt;
           stopSent = false;
           continue;
         }
@@ -547,13 +612,16 @@ export async function teardownReplicationTask(
     if (now.gone) return { found: true, stopped: true, deleted: true, finalStatus: "deleted" };
     status = now.status ?? status;
     stopReason = now.stopReason ?? stopReason;
+    if (now.startedAt !== undefined) startedAt = now.startedAt;
+    if (now.stoppedAt !== undefined) stoppedAt = now.stoppedAt;
   }
   // 预算用完仍在非终态(启动中 / 停止中 / 删除中 …)或「已停止」还没停稳 ⇒ 如实回「没到终态」(调用方按可重试处理),绝不当成已下线
   return { found: true, stopped: false, deleted: false, finalStatus: status,
            error: `复制任务没到终态(status=${status}${NON_TERMINAL.includes(status) ? "" : ",还没停稳"})⇒ 拒绝当成已下线` };
 }
 
-export async function getTaskStatus(taskArn: string): Promise<string> {
+export async function getTaskStatus(site: DmsSite, taskArn: string): Promise<string> {
+  const dms = await dmsClientFor(site.region);
   const r = await dms.send(
     new DescribeReplicationTasksCommand({ Filters: [{ Name: "replication-task-arn", Values: [taskArn] }] })
   );
@@ -563,10 +631,10 @@ export async function getTaskStatus(taskArn: string): Promise<string> {
 // 等复制任务进入可启动状态(ready/stopped/failed)。
 // 踩坑:CreateReplicationTask 返回后任务仍处于 creating,立刻 StartReplicationTask 会报
 //      "Replication Task cannot be started, invalid state"。须先轮询等任务就绪。
-export async function waitTaskStartable(taskArn: string, maxTries = 30, intervalMs = 5000): Promise<string> {
+export async function waitTaskStartable(site: DmsSite, taskArn: string, maxTries = 30, intervalMs = 5000): Promise<string> {
   let status = "unknown";
   for (let i = 0; i < maxTries; i++) {
-    status = await getTaskStatus(taskArn);
+    status = await getTaskStatus(site, taskArn);
     if (["ready", "stopped", "failed"].includes(status)) return status;
     if (status === "running") return status; // 已在跑,无需再启动
     await new Promise((r) => setTimeout(r, intervalMs));
@@ -577,14 +645,15 @@ export async function waitTaskStartable(taskArn: string, maxTries = 30, interval
 // 启动复制任务(DMS 要求任务处于 ready/stopped 且两端 test-connection 成功才能启动)。
 // 幂等:已 running/starting 时跳过,避免 invalid state。首跑用 start-replication,
 // 之前跑过(stopped)用 resume-processing 续传。
-export async function startReplication(taskArn: string): Promise<void> {
-  const status = await getTaskStatus(taskArn);
+export async function startReplication(site: DmsSite, taskArn: string): Promise<void> {
+  const status = await getTaskStatus(site, taskArn);
   if (status === "running" || status === "starting") return; // 已在跑,幂等跳过
   // DMS 状态机(实测):start-replication 仅对【从未跑过】的任务(ready)合法;
   // stopped → resume-processing 续跑;failed 等其余历史态 → reload-target 重做全量
   // (对 failed 发 start-replication 会被拒:"valid only for tasks running for the first time")。
   const startType = status === "ready" ? "start-replication"
     : status === "stopped" ? "resume-processing" : "reload-target";
+  const dms = await dmsClientFor(site.region);
   await dms.send(
     new StartReplicationTaskCommand({
       ReplicationTaskArn: taskArn,
@@ -600,15 +669,44 @@ export async function startReplication(taskArn: string): Promise<void> {
 //    successful → 任务停在 ready(历史坑)。
 //    正确做法:先读现状,**只对"既非 successful 也非 testing"的端点触发测试**(failed/未测/unknown),
 //    已成功的不动,正在测的等它出结果。这样状态单调收敛到双 successful。
-export async function testEndpoints(sourceArn: string, targetArn: string): Promise<{ source: string; target: string }> {
-  const instanceArn = await getReplicationInstanceArn();
+/** 两端连通性测试的现状;失败时带上 DMS 给的失败原文(「连不上」的原因只有它知道:网络不通 / 口令不对 / 库不存在 …)。 */
+export interface EndpointConnectionSnapshot {
+  source: string;
+  target: string;
+  sourceFailure?: string;
+  targetFailure?: string;
+}
+
+/** 把连通性快照写成一句给人看的话(任务错误与运行日志共用;失败原文截到 200 字)。 */
+export function describeEndpointConnections(c: EndpointConnectionSnapshot): string {
+  const one = (label: string, status: string, failure?: string) =>
+    `${label}=${status}${failure ? `(${failure.slice(0, 200)})` : ""}`;
+  return `${one("源", c.source, c.sourceFailure)} ${one("目标", c.target, c.targetFailure)}`;
+}
+
+export async function testEndpoints(place: DmsPlace, sourceArn: string, targetArn: string): Promise<EndpointConnectionSnapshot> {
+  const instanceArn = await getReplicationInstanceArn(place);
+  const dms = await dmsClientFor(place.region);
   // 1) 先读当前连接状态快照。
-  const snapshot = async () => {
+  const snapshot = async (): Promise<EndpointConnectionSnapshot> => {
     const r = await dms.send(
       new DescribeConnectionsCommand({ Filters: [{ Name: "replication-instance-arn", Values: [instanceArn] }] })
     );
-    const byArn = new Map((r.Connections || []).map((c) => [c.EndpointArn, c.Status || "unknown"]));
-    return { source: byArn.get(sourceArn) || "unknown", target: byArn.get(targetArn) || "unknown" };
+    const byArn = new Map((r.Connections || []).map((c) => [c.EndpointArn, c]));
+    const of = (arn: string) => {
+      const c = byArn.get(arn);
+      const status = c?.Status || "unknown";
+      const failure = status === "failed" ? String(c?.LastFailureMessage || "").trim() : "";
+      return { status, failure };
+    };
+    const src = of(sourceArn);
+    const tgt = of(targetArn);
+    return {
+      source: src.status,
+      target: tgt.status,
+      ...(src.failure ? { sourceFailure: src.failure } : {}),
+      ...(tgt.failure ? { targetFailure: tgt.failure } : {}),
+    };
   };
   const before = await snapshot();
   // 2) 只对需要测试的端点触发(已 successful 或正在 testing 的不动)。
@@ -624,8 +722,40 @@ export async function testEndpoints(sourceArn: string, targetArn: string): Promi
       /* 并发已在测/速率限制等,忽略,下一轮快照会反映真实状态 */
     }
   }
-  // 3) 返回触发后的最新快照。
-  return await snapshot();
+  // 3) 返回触发后的最新快照 —— 但这一轮读到的「失败」不能丢:那是一次**已经出了结果**的测试,上面的重测只是把状态刷回 testing。
+  //    只回触发后的快照的话,调用方永远看不到 failed(刚触发重测就是 testing):失败原文到不了任务错误,
+  //    目标端认证失败后的「重设口令再测」也永远等不到它的触发条件。
+  const after = await snapshot();
+  const side = (was: string, wasFailure: string | undefined, now: string, nowFailure: string | undefined) =>
+    was === "failed" ? { status: "failed", failure: wasFailure } : { status: now, failure: nowFailure };
+  const src = side(before.source, before.sourceFailure, after.source, after.sourceFailure);
+  const tgt = side(before.target, before.targetFailure, after.target, after.targetFailure);
+  return {
+    source: src.status,
+    target: tgt.status,
+    ...(src.failure ? { sourceFailure: src.failure } : {}),
+    ...(tgt.failure ? { targetFailure: tgt.failure } : {}),
+  };
+}
+
+/**
+ * 把这一轮的快照并进「每一端最近一次**出了结果**的结论」:正在测 / 还没测不覆盖已有的结论,成功会清掉之前的失败原文。
+ * 启动编排等到超时的时候用它写任务错误 —— 最后一轮多半正好停在「测试中」,只看最后一轮就把「为什么连不上」丢了。
+ */
+export function latestConnectionVerdict(prev: EndpointConnectionSnapshot, cur: EndpointConnectionSnapshot): EndpointConnectionSnapshot {
+  const settled = (status: string) => status === "successful" || status === "failed";
+  const side = (prevStatus: string, prevFailure: string | undefined, curStatus: string, curFailure: string | undefined) =>
+    settled(curStatus) || !settled(prevStatus)
+      ? { status: curStatus, failure: curStatus === "failed" ? curFailure : undefined }
+      : { status: prevStatus, failure: prevFailure };
+  const src = side(prev.source, prev.sourceFailure, cur.source, cur.sourceFailure);
+  const tgt = side(prev.target, prev.targetFailure, cur.target, cur.targetFailure);
+  return {
+    source: src.status,
+    target: tgt.status,
+    ...(src.failure ? { sourceFailure: src.failure } : {}),
+    ...(tgt.failure ? { targetFailure: tgt.failure } : {}),
+  };
 }
 
 export interface RealtimeStatus {
@@ -640,23 +770,26 @@ export interface RealtimeStatus {
    *   「上次失败过、这次已重跑成功」的任务判死(lastFailure 会跨启动残留)。
    */
   stopReason?: string;
+  /** 最近一次启动的时刻(DMS `ReplicationTaskStartDate`,毫秒;没启动过 / 读不出 ⇒ null)。「已停止」作不作数要拿它与停止时刻比(见 isSettledStop)。 */
+  startedAt: number | null;
+  /** 最近一次真停下的时刻(DMS `ReplicationTaskStats.StopDate`,毫秒;没停过 / 读不出 ⇒ null)。 */
+  stoppedAt: number | null;
 }
 
 /** 复制任务的**轻量**状态(只 Describe 任务本体,不拉逐表统计)—— 列表读时对账用:每行每次刷新一次,不该拖逐表统计。 */
-export type ReplicationTaskState = Pick<RealtimeStatus, "status" | "fullLoadProgress" | "lastFailure" | "stopReason">;
+export type ReplicationTaskState = Pick<RealtimeStatus, "status" | "fullLoadProgress" | "lastFailure" | "stopReason" | "startedAt" | "stoppedAt">;
 
-// 🔴 客户端按**复制任务 ARN 里的区**取,不再用模块级的主控区客户端:DMS 通道今天按合同只在主控区
-//   (start-realtime 对非 home 章 409 CHANNEL_NOT_PUSHED_DOWN)⇒ ARN 的区 == 主控区,行为不变;但「去哪个区问」的真值
-//   本来就写在 ARN 里 —— 等 DMS 逐区下推那天这里不需要再改。ARN 读不出区 ⇒ 如实回 null(详情页 unknown),不猜主控区。
-async function dmsClientOfTaskArn(taskArn: string) {
+// 🔴 去任务绑定的那个区问(落点由调用方按任务绑定解析)。复制任务 ARN 里也写着它所在的区:两者必须一致 ——
+//   ARN 读不出区、或与落点不是同一个区 ⇒ 如实回 null(详情页 unknown),既不猜主控区,也不拿着这个 ARN 去别的区问。
+async function dmsClientOfTaskArn(site: DmsSite, taskArn: string) {
   const region = regionOfArn(taskArn, "dms");
-  return region ? dmsClientFor(region) : null;
+  return region && region === site.region ? dmsClientFor(region) : null;
 }
 
 /** 复制任务本体的状态(status / 全量进度 / 最近失败 / 停止原因);任务不存在或查不动 ⇒ null(调用方不猜)。 */
-export async function describeReplicationTaskState(taskArn: string): Promise<ReplicationTaskState | null> {
+export async function describeReplicationTaskState(site: DmsSite, taskArn: string): Promise<ReplicationTaskState | null> {
   try {
-    const client = await dmsClientOfTaskArn(taskArn);
+    const client = await dmsClientOfTaskArn(site, taskArn);
     if (!client) return null;
     const r = await client.send(new DescribeReplicationTasksCommand({ Filters: [{ Name: "replication-task-arn", Values: [taskArn] }] }));
     const t = r.ReplicationTasks?.[0];
@@ -666,6 +799,8 @@ export async function describeReplicationTaskState(taskArn: string): Promise<Rep
       fullLoadProgress: t.ReplicationTaskStats?.FullLoadProgressPercent ?? 0,
       lastFailure: t.LastFailureMessage || undefined,
       stopReason: t.StopReason || undefined,
+      startedAt: dmsDateMs(t.ReplicationTaskStartDate),
+      stoppedAt: dmsDateMs(t.ReplicationTaskStats?.StopDate),
     };
   } catch {
     return null;
@@ -673,12 +808,12 @@ export async function describeReplicationTaskState(taskArn: string): Promise<Rep
 }
 
 // 回填实时任务运行态(CDC 延迟/行数/状态),供监控展示。task 不存在/未启动时返回 null。
-export async function getReplicationStatus(taskArn: string): Promise<RealtimeStatus | null> {
-  const state = await describeReplicationTaskState(taskArn);
+export async function getReplicationStatus(site: DmsSite, taskArn: string): Promise<RealtimeStatus | null> {
+  const state = await describeReplicationTaskState(site, taskArn);
   if (!state) return null;
   let tables: RealtimeStatus["tables"] = [];
   try {
-    const client = await dmsClientOfTaskArn(taskArn);
+    const client = await dmsClientOfTaskArn(site, taskArn);
     if (client) {
       const ts = await client.send(new DescribeTableStatisticsCommand({ ReplicationTaskArn: taskArn }));
       tables = (ts.TableStatistics || []).map((s) => ({
@@ -701,6 +836,65 @@ export async function getReplicationStatus(taskArn: string): Promise<RealtimeSta
     cdcLatencySec: null,
     tables,
   };
+}
+
+/** 平台建的端点的标识形态:`bgp-src-` / `bgp-tgt-` + 任务 id 末 12 位(小写、只留字母数字);与 `names()` 同一份规则。 */
+const PLATFORM_ENDPOINT_ID = /^bgp-(src|tgt)-([a-z0-9]{1,12})$/;
+
+/** 平台端点标识里的任务短名(不是平台端点 ⇒ null)。 */
+export function platformEndpointTaskShort(endpointId: string): string | null {
+  return PLATFORM_ENDPOINT_ID.exec(String(endpointId || ""))?.[2] ?? null;
+}
+
+/** 任务 id ⇒ 它的 DMS 对象标识里用的短名(与 `names()` 同一份规则)。 */
+export function dmsTaskShortOf(taskId: string): string {
+  return names(taskId).srcId.slice("bgp-src-".length);
+}
+
+export interface PlatformEndpoint {
+  arn: string;
+  id: string;
+  /** 标识里的任务短名 */
+  taskShort: string;
+}
+
+/**
+ * 列出该区里**平台建的**端点(按标识形态认;客户自己建的端点不在其列)。
+ * 🔴 读不全就抛(翻页没翻完 / 读失败):清扫按「列全了」下结论,列不全时宁可这一轮不清。
+ */
+export async function listPlatformEndpoints(site: DmsSite): Promise<PlatformEndpoint[]> {
+  const dms = await dmsClientFor(site.region);
+  const out: PlatformEndpoint[] = [];
+  let marker: string | undefined;
+  for (let page = 0; ; page++) {
+    if (page >= 50) throw new Error(`DMS 端点清单超过 50 页仍未列完(${site.region})⇒ 拒绝按不完整的清单下结论`);
+    const r = await dms.send(new DescribeEndpointsCommand({ Marker: marker, MaxRecords: 100 }));
+    for (const e of r.Endpoints ?? []) {
+      const id = String(e.EndpointIdentifier ?? "");
+      const taskShort = platformEndpointTaskShort(id);
+      if (taskShort && e.EndpointArn) out.push({ arn: e.EndpointArn, id, taskShort });
+    }
+    marker = r.Marker;
+    if (!marker) break;
+  }
+  return out;
+}
+
+/**
+ * 删一个端点。回 `deleted`(本次删掉 / 已在删)· `absent`(确认本来就没有)· `in-use`(还被复制任务引用,DMS 拒删)。
+ * 其它错误(权限 / 限流)照抛 —— 「删不动」不许被当成「删掉了」。
+ */
+export async function deletePlatformEndpoint(site: DmsSite, endpointArn: string): Promise<"deleted" | "absent" | "in-use"> {
+  const dms = await dmsClientFor(site.region);
+  try {
+    await dms.send(new DeleteEndpointCommand({ EndpointArn: endpointArn }));
+    return "deleted";
+  } catch (e) {
+    const name = String((e as { name?: string })?.name ?? "");
+    if (name === "ResourceNotFoundFault") return "absent";
+    if (name === "InvalidResourceStateFault") return "in-use";
+    throw e;
+  }
 }
 
 export { names as dmsResourceNames, tableMappings };

@@ -90,7 +90,7 @@ const lintSpy = vi.fn(guards.lintGeneratedStatement);
 vi.mock("@/lib/exec-env/admin-ddl-guards", () => ({ ...guards, lintGeneratedStatement: lintSpy }));
 
 const executorMod = await import("@/lib/exec-env/admin-ddl-executor");
-const { executeAdminDdl, provisionProjectLogin, provisionSharedWriter, actorFromIdentity, systemActor, AdminDdlDenied, redactSql, ADMIN_DDL_PLACE_VIA } =
+const { executeAdminDdl, provisionProjectLogin, provisionSharedWriter, provisionDmsIngestUser, actorFromIdentity, systemActor, AdminDdlDenied, redactSql, ADMIN_DDL_PLACE_VIA } =
   executorMod;
 // 落点决策账本(真模块;请求存储由测试注入)
 const placeCtx = await import("@/lib/place/context");
@@ -232,9 +232,8 @@ describe("🔴 第 2 步交叉验证 + 第 3 步隔离状态", () => {
 
 describe("🔴 第 4 步 RBAC / 审批", () => {
   it("非平台管理员 ⇒ 全部 operation 都拒", async () => {
-    for (const op of ["create-shared-schema", "dms-ingest-bootstrap"] as const) {
-      await expect(executeAdminDdl(DEV, { operation: op, targetId: "tgt_home" })).rejects.toThrow(/平台管理员/);
-    }
+    await expect(executeAdminDdl(DEV, { operation: "create-shared-schema", targetId: "tgt_home" })).rejects.toThrow(/平台管理员/);
+    await expect(executeAdminDdl(DEV, { operation: "dms-ingest-bootstrap", targetId: "tgt_home", schema: "ecommerce" })).rejects.toThrow(/平台管理员/);
     await expect(
       executeAdminDdl(DEV, { operation: "create-role", targetId: "tgt_home", projectId: PROJ_A })
     ).rejects.toThrow(/平台管理员/);
@@ -444,6 +443,8 @@ describe("🔴 返回面封闭:本模块不导出任何拿得到 admin 凭证的
       "AdminDdlDenied",
       "actorFromIdentity",
       "executeAdminDdl",
+      // DMS 摄入用户按区供给;返回值只有密钥名 / 结果 / 审计号,没有 ARN / 口令
+      "provisionDmsIngestUser",
       "provisionProjectLogin",
       // 第三个公开入口(SPEC §3.9d.4);返回值里同样没有 ARN / 口令
       "provisionSharedWriter",
@@ -611,6 +612,129 @@ describe("🔴🔴 grant-shared-writer:逐表授权、零 schema 级写权", () 
       executeAdminDdl(DEV, { operation: "grant-shared-writer", targetId: "tgt_home", codeTableId: "region_cn" })
     ).rejects.toThrow(/平台管理员/);
     expect(execCalls).toHaveLength(0);
+  });
+});
+
+describe("🔴🔴 provisionDmsIngestUser:DMS 摄入用户按区供给 —— 密钥在就复用、口令不出函数", () => {
+  const USW2_TARGET = {
+    targetId: "tgt_usw2_a",
+    region: "us-west-2",
+    credentialIsolationState: "provisioning",
+    provisioningDeadlineAt: "2099-01-01T00:00:00Z",
+    credentialEpoch: 0,
+    resources: { redshiftSecretArn: "arn:aws:secretsmanager:us-west-2:1:secret:redshift!usw2-admin-x" },
+  };
+  const describeMock = async () => {
+    const tc = await import("@/lib/exec-env/target-clients");
+    return tc.describeSecretArnByName as unknown as {
+      mockResolvedValueOnce: (v: string | undefined) => void; mockRejectedValueOnce: (e: Error) => void; mock: { calls: unknown[][] }; mockClear: () => void;
+    };
+  };
+  beforeEach(async () => { (await describeMock()).mockClear(); });
+
+  it("该区还没有密钥 ⇒ 用该区的管理员凭证建用户(带 CREATEDB)、把完整连接字段写进**该区**的密钥;口令不进审计 / 返回值,也不含 DMS 禁用字符", async () => {
+    currentTarget = { ...USW2_TARGET };
+    const r = await provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a" });
+    expect((await describeMock()).mock.calls).toEqual([["us-west-2", "bgp/dms/redshift-target"]]);
+    expect(execCalls.map((c) => ({ secretArn: c.secretArn, region: c.region, workgroup: c.workgroup }))).toEqual([
+      { secretArn: "arn:aws:secretsmanager:us-west-2:1:secret:redshift!usw2-admin-x", region: "us-west-2", workgroup: "bgp-workgroup-usw2a" },
+    ]);
+    expect(execCalls[0].sql).toMatch(/^CREATE USER "dms_ingest" PASSWORD '[^']+' CREATEDB$/);
+    expect(secretWrites).toHaveLength(1);
+    expect(secretWrites[0].region).toBe("us-west-2");
+    expect(secretWrites[0].name).toBe("bgp/dms/redshift-target");
+    const v = secretWrites[0].value;
+    expect(Object.keys(v).sort(), "DMS 要的是含 host / port / database 的完整密钥").toEqual(["database", "host", "password", "port", "username"]);
+    expect(v).toMatchObject({ username: "dms_ingest", host: "wg.123.us-east-1.redshift-serverless.amazonaws.com", port: 5439, database: "dev" });
+    const pw = String(v.password);
+    expect(pw.length).toBeGreaterThanOrEqual(16);
+    expect(pw, "DMS 的密钥里口令不许含 { } , ;").not.toMatch(/[{},;']/);
+    expect(JSON.stringify(audits), "口令进了审计").not.toContain(pw);
+    expect(JSON.stringify(audits)).not.toContain("CREATE USER");
+    expect(JSON.stringify(r)).not.toContain(pw);
+    expect(r).toMatchObject({ secretName: "bgp/dms/redshift-target", outcome: "provisioned" });
+    expect(Object.keys(r).sort()).toEqual(["auditId", "outcome", "secretName"]);
+    expect(audits.map((a) => a.action)).toEqual([
+      "exec-env.admin-ddl.provision-dms-ingest-user.intent",
+      "exec-env.admin-ddl.provision-dms-ingest-user.done",
+    ]);
+  });
+
+  it("🔴 密钥已在 ⇒ 原样复用:不执行任何语句、不写密钥、不写审计(改动前每次启动都重设口令并覆盖密钥)", async () => {
+    currentTarget = { ...USW2_TARGET };
+    (await describeMock()).mockResolvedValueOnce("arn:aws:secretsmanager:us-west-2:1:secret:bgp/dms/redshift-target-AbCdEf");
+    const r = await provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a" });
+    expect(r).toEqual({ secretName: "bgp/dms/redshift-target", outcome: "reused" });
+    expect(execCalls).toHaveLength(0);
+    expect(secretWrites).toHaveLength(0);
+    expect(audits).toHaveLength(0);
+  });
+
+  it("rotate:不看密钥在不在,直接重设口令并覆盖密钥;用户已存在 ⇒ ALTER USER(轮换分支不改用户属性)", async () => {
+    currentTarget = { ...USW2_TARGET };
+    const tc = await import("@/lib/exec-env/target-clients");
+    (tc.execOnTarget as unknown as { mockImplementationOnce: (f: unknown) => void }).mockImplementationOnce(async () => {
+      throw new Error('user "dms_ingest" already exists');
+    });
+    const r = await provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a", rotate: true });
+    expect((await describeMock()).mock.calls, "轮换不该先去问密钥在不在").toHaveLength(0);
+    expect(r.outcome).toBe("provisioned");
+    expect(execCalls).toHaveLength(1);
+    expect(execCalls[0].sql).toMatch(/^ALTER USER "dms_ingest" PASSWORD '[^']+'$/);
+    expect(secretWrites).toHaveLength(1);
+    expect((audits[0].detail as { rotate: boolean }).rotate).toBe(true);
+  });
+
+  it("🔴 读密钥失败(限流 / 无权)不等于「没有」:照抛,不去重建用户", async () => {
+    currentTarget = { ...USW2_TARGET };
+    (await describeMock()).mockRejectedValueOnce(Object.assign(new Error("Rate exceeded"), { name: "ThrottlingException" }));
+    await expect(provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a" })).rejects.toThrow(/Rate exceeded/);
+    expect(execCalls).toHaveLength(0);
+    expect(secretWrites).toHaveLength(0);
+  });
+
+  it("非管理员拒;意图审计写不进去拒(fail-closed);都不碰数仓与密钥", async () => {
+    currentTarget = { ...USW2_TARGET };
+    await expect(provisionDmsIngestUser(DEV, { targetId: "tgt_usw2_a" })).rejects.toThrow(/平台管理员/);
+    auditThrowsOn = "intent";
+    await expect(provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a" })).rejects.toThrow(/fail-closed-on-audit/);
+    expect(execCalls).toHaveLength(0);
+    expect(secretWrites).toHaveLength(0);
+  });
+
+  it("执行失败 ⇒ 抛出去的文本与失败审计里都没有口令", async () => {
+    currentTarget = { ...USW2_TARGET };
+    const tc = await import("@/lib/exec-env/target-clients");
+    (tc.execOnTarget as unknown as { mockImplementation: (f: unknown) => void }).mockImplementation(async (a: { sql: string }) => {
+      throw new Error(`syntax error near ${a.sql}`);
+    });
+    const err = await provisionDmsIngestUser(ADMIN, { targetId: "tgt_usw2_a" }).catch((e) => e);
+    expect(err).toBeInstanceOf(AdminDdlDenied);
+    expect(String(err.message)).toContain("create-dms-ingest-user:dms_ingest@tgt_usw2_a");
+    expect(String(err.message)).not.toMatch(/PASSWORD 'Kf/);
+    expect(JSON.stringify(audits)).not.toMatch(/PASSWORD 'Kf/);
+    expect(audits.map((a) => a.action)).toContain("exec-env.admin-ddl.provision-dms-ingest-user.failed");
+  });
+
+  it("主控区同一条路:落点与管理员凭证都来自主控区的描述符", async () => {
+    await provisionDmsIngestUser(ADMIN, { targetId: "tgt_home" });
+    expect(execCalls[0]).toMatchObject({ region: "us-east-1", workgroup: "bgp-workgroup", secretArn: "arn:aws:secretsmanager:us-east-1:1:secret:redshift!admin-x" });
+    expect(secretWrites[0]).toMatchObject({ region: "us-east-1", name: "bgp/dms/redshift-target" });
+  });
+});
+
+describe("dms-ingest-bootstrap:给 DMS 预建目标 schema(属主 = 摄入用户)", () => {
+  it("语句 = CREATE SCHEMA IF NOT EXISTS \"<源库名>\" AUTHORIZATION \"dms_ingest\",在该 target 的数仓上用它的管理员凭证执行", async () => {
+    await executeAdminDdl(ADMIN, { operation: "dms-ingest-bootstrap", targetId: "tgt_home", schema: "ecommerce" });
+    expect(execCalls.map((c) => c.sql)).toEqual(['CREATE SCHEMA IF NOT EXISTS "ecommerce" AUTHORIZATION "dms_ingest"']);
+    expect(execCalls[0].secretArn).toBe("arn:aws:secretsmanager:us-east-1:1:secret:redshift!admin-x");
+  });
+  it("🔴 源库名与平台自己的 schema 重名 / 不是普通标识符 ⇒ 请求解析时就拒,一条语句都不发、也没有意图审计", async () => {
+    for (const schema of ["proj_default", "PROJ_abc", "shared", "bgp_canary_deny", "pg_catalog", "information_schema", "my-db", 'x"; DROP SCHEMA public', "", undefined]) {
+      await expect(executeAdminDdl(ADMIN, { operation: "dms-ingest-bootstrap", targetId: "tgt_home", schema })).rejects.toThrow(/schema|源库名/);
+    }
+    expect(execCalls).toHaveLength(0);
+    expect(audits).toHaveLength(0);
   });
 });
 

@@ -227,9 +227,9 @@ export type HomeOnlyReason =
   /** 删项目时的资源盘点:盘的是主控区那套控制面资源;跨区盘点归 52 的删项目跨区残留项。 */
   | "project-inventory"
   /** zero-ETL 集成是**主控区里的独立 namespace**,有自己的密钥缓存(`getZeroEtlSecretArn` 对非 home 直接抛)。 */
-  | "zeroetl-home-namespace"
-  /** DMS 目标侧 bootstrap(建 dms_ingest 用户 / schema / 关联 COPY 角色):正确归宿是 §3.9a 闭合执行器的 `dms-ingest-bootstrap`,的 DMS 组件批次。 */
-  | "dms-bootstrap-home";
+  | "zeroetl-home-namespace";
+// 2026-11 —— 原末项 `dms-bootstrap-home`(DMS 目标侧准备只打主控区数仓)已**退役**:
+// 摄入用户 / 目标 schema 改经闭合执行器按任务落点的区做(`provisionDmsIngestUser` + 模板 `dms-ingest-bootstrap`),主控区与执行区同一条路。
 // 原末项「建模落地 DDL 缺写入通道」已**退役**:非 home 建模落地改走
 // §3.9a 闭合执行器(建表/授权)+ 窄权 shared_writer(灌数),home 走逐 target 绑定;那个模块级 home 客户端零生产调用方,已删。
 

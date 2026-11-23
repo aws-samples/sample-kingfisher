@@ -1,102 +1,63 @@
-// DMS→Redshift 目标侧准备(固化踩坑 ④⑤⑥ 的解法)。
+// DMS→Redshift 目标侧准备(固化踩坑 ④⑤⑥ 的解法),**按任务落点的那个区**做。
 //
-// DMS 直连 Redshift 做 COPY 有三个隐蔽前置,本模块用 Redshift Data API(admin 身份)+
-// redshift-serverless SDK 幂等完成:
-//  ④ 建专用用户 dms_ingest(密码自控、无 DMS 禁用字符 {},;),写完整字段的专用 secret;
-//     (Redshift 托管 admin secret 缺 host/port 且密码含禁用字符,不能直接喂 DMS)
-//  ⑤ 预建目标 schema(DMS 默认用源 schema 名作目标 schema,但不自动建);
-//  ⑥ 把 DMS COPY 角色关联到 Redshift namespace(否则 COPY 报 role not associated to cluster)。
+// DMS 直连 Redshift 做 COPY 有三个隐蔽前置:
+//  ④ 专用数仓用户(口令自控、无 DMS 禁用字符 {},;)+ 含完整连接字段的专用密钥;
+//     (Redshift 托管 admin secret 缺 host/port 且口令含禁用字符,不能直接喂 DMS)
+//  ⑤ 预建目标 schema(DMS 默认用源库名作目标 schema,但不自动建);
+//  ⑥ 把 DMS COPY 角色关联到该区数仓的命名空间(否则 COPY 报 role not associated to cluster)。
+//
+// 🔴 ④⑤ 是管理员身份的 DDL ⇒ 只经**受控 DDL 执行器**(`lib/exec-env/admin-ddl-executor.ts`)做:准入、意图审计、
+//    管理员凭证都在那里,本文件不碰管理员凭证、也不拼 SQL。主控区与执行区同一条路 ——
+//    2026-11 之前这里握着主控区的数仓客户端自己拼 `CREATE USER … PASSWORD`,只能给主控区准备。
+// 🔴 落点是带品牌的 `DmsPlace`(`lib/realtime/dms-place.ts`),每个导出函数第一个参数就是它:漏传是编译错。
 
-import { homeRegion } from "@/lib/place/home-region";
-// 散建客户端收口到唯一工厂(L3;行为保持:构造参数原样,见 lib/aws/clients.ts#sdkClient)
-import { sdkClient } from "@/lib/aws/clients";
-import { randomBytes } from "crypto";
+import { GetNamespaceCommand, GetWorkgroupCommand, UpdateNamespaceCommand } from "@aws-sdk/client-redshift-serverless";
 import { logger } from "@/lib/observability/logger";
-// 数仓落点唯一出口(收编兜底字面量)。
-import { homeWorkgroup } from "@/lib/redshift/warehouse-location";
+import { executeAdminDdl, provisionDmsIngestUser, systemActor } from "@/lib/exec-env/admin-ddl-executor";
+import { redshiftServerlessClientFor } from "@/lib/exec-env/target-clients";
+import type { DmsPlace } from "@/lib/realtime/dms-place";
 
-const region = homeRegion();
-const WORKGROUP = homeWorkgroup();
-const NAMESPACE = process.env.REDSHIFT_NAMESPACE || "bgp-namespace";
-const DATABASE = process.env.REDSHIFT_DATABASE || "dev";
-const DMS_TARGET_SECRET_ID = process.env.DMS_TARGET_SECRET_ID || "bgp/dms/redshift-target";
-const DMS_INGEST_USER = "dms_ingest";
+/** 系统主体的用途名(审计里一眼认出是哪条后台流程)。 */
+const ACTOR_REASON = "dms-ingest-bootstrap";
 
-// 生成无 DMS 禁用字符({},;)、足够强的密码。base64url 不含这些字符。
-function genDmsSafePassword(): string {
-  return "Dms" + randomBytes(18).toString("base64url") + "9";
+/** 同一个区的「建用户 + 写密钥」在本进程内排队:两条任务同时首次启动时,后到的那条等前一条写完、直接复用密钥。 */
+const provisioning = new Map<string, Promise<unknown>>();
+
+export interface DmsIngestUserReady {
+  /** 目标端点引用的密钥名(该区 Secrets Manager) */
+  secretId: string;
+  /** 本次是否新供给(建用户 / 重设口令);false = 密钥已在、原样复用 */
+  provisioned: boolean;
 }
 
-// 用 Redshift Data API 以 admin 身份执行 SQL,等待 FINISHED(轮询)。
-async function execAdminSql(sql: string): Promise<void> {
-  const { ExecuteStatementCommand, DescribeStatementCommand } = await import(
-    "@aws-sdk/client-redshift-data"
-  );
-  const { redshiftClientForHomeOnly } = await import("@/lib/exec-env/target-clients");
-  const { getRedshiftSecretArn } = await import("@/lib/redshift/admin-secret");
-  // 合同 home-only(正确归宿是闭合执行器的 dms-ingest-bootstrap,DMS 批次)
-  const client = redshiftClientForHomeOnly("dms-bootstrap-home");
-  // 静态归类:**admin-DDL / bootstrap**(建 dms_ingest 用户与 schema)。
-  // 🔴 **不传 project**:它建的是 target 级的固定摄入身份,不属任何项目。
-  // 🔴 **正确归宿是 `executeAdminDdl({operation:"dms-ingest-bootstrap"})`** —— 那条 operation 已经
-  //    落地(模板 + 执行器都在),但把 realtime 整条链切过去要连 `ensureRedshiftDmsUser` 的口令路径
-  //    一起改(它自己也在 `CREATE USER … PASSWORD` 里拼字面量),的 DMS 组件批次。
-  //    在此之前这里维持现状,**不假装已收口**。
-  const SecretArn = await getRedshiftSecretArn();
-  const { Id } = await client.send(
-    new ExecuteStatementCommand({ Sql: sql, WorkgroupName: WORKGROUP, Database: DATABASE, ...(SecretArn ? { SecretArn } : {}) })
-  );
-  for (let i = 0; i < 30; i++) {
-    await new Promise((r) => setTimeout(r, 1000));
-    const d = await client.send(new DescribeStatementCommand({ Id }));
-    if (d.Status === "FINISHED") return;
-    if (d.Status === "FAILED" || d.Status === "ABORTED") throw new Error(`Redshift SQL 失败: ${d.Error || d.Status}`);
-  }
-  throw new Error("Redshift SQL 超时");
-}
-
-// 踩坑④:确保 dms_ingest 用户存在并重设已知密码,写完整字段 secret(密码不落日志)。
-// 返回 DMS 目标 secret 的 id。
-export async function ensureRedshiftDmsUser(redshiftHost: string): Promise<string> {
-  const pwd = genDmsSafePassword();
-  // CREATE 若已存在会报错→先尝试 ALTER 重设;用 IF 逻辑:先 CREATE(忽略已存在),再 ALTER 统一密码。
+/**
+ * 踩坑④:该区数仓里的 DMS 摄入用户与连接密钥就位。
+ * 缺省「有则复用」;`rotate` = 重设口令并覆盖密钥(目标端连通性测试失败后由启动编排有界地调一次)。
+ */
+export async function ensureRedshiftDmsUser(place: DmsPlace, opts: { rotate?: boolean } = {}): Promise<DmsIngestUserReady> {
+  const key = place.targetId;
+  const prior = provisioning.get(key) ?? Promise.resolve();
+  const run = prior
+    .catch(() => undefined)
+    .then(() => provisionDmsIngestUser(systemActor(ACTOR_REASON), { targetId: place.targetId, rotate: opts.rotate === true }));
+  provisioning.set(key, run);
   try {
-    await execAdminSql(`CREATE USER ${DMS_INGEST_USER} PASSWORD '${pwd}' CREATEDB;`);
-  } catch {
-    await execAdminSql(`ALTER USER ${DMS_INGEST_USER} PASSWORD '${pwd}';`);
+    const r = await run;
+    logger.info("realtime.redshift.dmsuser.ready", { targetId: place.targetId, outcome: r.outcome }); // 不记口令
+    return { secretId: r.secretName, provisioned: r.outcome === "provisioned" };
+  } finally {
+    if (provisioning.get(key) === run) provisioning.delete(key);
   }
-  // 写完整字段 secret(DMS 需要 host/port/database)。密码仅写入 Secrets Manager,不进日志。
-  const { SecretsManagerClient, CreateSecretCommand, PutSecretValueCommand } = await import(
-    "@aws-sdk/client-secrets-manager"
-  );
-  const sm = sdkClient("data-plane", SecretsManagerClient, { region });
-  const secretString = JSON.stringify({
-    username: DMS_INGEST_USER,
-    password: pwd,
-    host: redshiftHost,
-    port: 5439,
-    database: DATABASE,
-  });
-  try {
-    await sm.send(new CreateSecretCommand({ Name: DMS_TARGET_SECRET_ID, SecretString: secretString }));
-  } catch {
-    await sm.send(new PutSecretValueCommand({ SecretId: DMS_TARGET_SECRET_ID, SecretString: secretString }));
-  }
-  logger.info("realtime.redshift.dmsuser.ready", { user: DMS_INGEST_USER }); // 不记密码
-  return DMS_TARGET_SECRET_ID;
 }
 
-// 踩坑⑤:预建目标 schema(owner=dms_ingest)。
-export async function ensureTargetSchema(schemaName: string): Promise<void> {
-  // 🔴 并发安全:`IF NOT EXISTS` 挡不住两个实时任务同时建同一个 schema(见 lib/redshift/concurrent-schema.ts)。
-  const sql = `CREATE SCHEMA IF NOT EXISTS ${schemaName} AUTHORIZATION ${DMS_INGEST_USER};`;
-  const { withSchemaCreateRetry } = await import("@/lib/redshift/concurrent-schema");
-  await withSchemaCreateRetry(sql, () => execAdminSql(sql));
-  logger.info("realtime.redshift.schema.ready", { schema: schemaName });
+/** 踩坑⑤:预建目标 schema(属主 = 摄入用户;幂等,并发建同名 schema 的撞车由执行器内的重试吸收)。 */
+export async function ensureTargetSchema(place: DmsPlace, schemaName: string): Promise<void> {
+  await executeAdminDdl(systemActor(ACTOR_REASON), { operation: "dms-ingest-bootstrap", targetId: place.targetId, schema: schemaName });
+  logger.info("realtime.redshift.schema.ready", { targetId: place.targetId, schema: schemaName });
 }
 
 // 根因治理(坑5):Redshift Serverless 命名空间【一次只允许一个变更操作】。刚在库里建完
-// dms_ingest 用户 + schema(DDL 会短暂锁 namespace),紧接着 UpdateNamespace 关联 COPY 角色
+// 摄入用户 + schema(DDL 会短暂锁 namespace),紧接着 UpdateNamespace 关联 COPY 角色
 // 常撞 `ConflictException: There is an operation running on the namespace`。此前需人工等锁释放
 // 再重试。改为带指数退避的自动重试,启动流程一次成功,后续用户零踩坑。
 async function withNamespaceRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
@@ -113,21 +74,24 @@ async function withNamespaceRetry<T>(fn: () => Promise<T>, label: string): Promi
   }
 }
 
-// 踩坑⑥:把 DMS COPY 角色关联到 Redshift namespace(幂等:已含则不重复)。
-export async function ensureRoleAssociatedToNamespace(dmsRoleArn: string): Promise<void> {
-  const { RedshiftServerlessClient, GetNamespaceCommand, UpdateNamespaceCommand } = await import(
-    "@aws-sdk/client-redshift-serverless"
-  );
-  const rs = sdkClient("data-plane", RedshiftServerlessClient, { region });
+/**
+ * 踩坑⑥:把 DMS COPY 角色关联到该区数仓的命名空间(幂等:已含则不重复)。
+ * 命名空间名从该区工作组的事实里取(`GetWorkgroup`),不读环境变量、不猜名字。
+ */
+export async function ensureRoleAssociatedToNamespace(place: DmsPlace): Promise<void> {
+  const rs = await redshiftServerlessClientFor(place.warehouse.region);
+  const { workgroup } = await rs.send(new GetWorkgroupCommand({ workgroupName: place.warehouse.workgroup }));
+  const namespaceName = workgroup?.namespaceName;
+  if (!namespaceName) {
+    throw new Error(`查不到工作组 ${place.warehouse.workgroup}(${place.warehouse.region})所属的命名空间 ⇒ 无法关联 DMS COPY 角色`);
+  }
   await withNamespaceRetry(async () => {
-    const { namespace } = await rs.send(new GetNamespaceCommand({ namespaceName: NAMESPACE }));
+    const { namespace } = await rs.send(new GetNamespaceCommand({ namespaceName }));
     const current = (namespace?.iamRoles || [])
       .map((r) => (r.match(/arn:aws:iam::[^,)"\s]+/) || [r])[0])
       .filter(Boolean) as string[];
-    if (current.includes(dmsRoleArn)) return; // 已关联
-    await rs.send(new UpdateNamespaceCommand({ namespaceName: NAMESPACE, iamRoles: [...current, dmsRoleArn] }));
-    logger.info("realtime.redshift.role.associated", { role: dmsRoleArn });
+    if (current.includes(place.roleArn)) return; // 已关联
+    await rs.send(new UpdateNamespaceCommand({ namespaceName, iamRoles: [...current, place.roleArn] }));
+    logger.info("realtime.redshift.role.associated", { targetId: place.targetId, role: place.roleArn });
   }, "associate-copy-role");
 }
-
-export { genDmsSafePassword, DMS_INGEST_USER };

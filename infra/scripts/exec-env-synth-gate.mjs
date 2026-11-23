@@ -40,7 +40,7 @@ const problems = [];
 const fail = (m) => problems.push(m);
 
 // §11f 的有状态 aws 替身(源码以字符串内嵌:门禁自带夹具,不依赖仓外文件)
-const DESTROY_AWS_STUB = "\n// §11f 的**有状态** aws 替身(只答销毁脚本会问的问题;没见过的调用一律 exit 99)。\n// 状态在 STUB_STATE(JSON 文件)里,每次调用读 → 改 → 写回;每次调用原样记进 STUB_LOG(断言的就是这份调用序列)。\nconst fs = require(\"fs\");\nconst [svc, op, ...rest] = process.argv.slice(2);\nfs.appendFileSync(process.env.STUB_LOG, [svc, op, ...rest].join(\" \") + \"\\n\");\nconst st = JSON.parse(fs.readFileSync(process.env.STUB_STATE, \"utf8\"));\nconst opt = {};\nfor (let i = 0; i < rest.length; i++) {\n  if (!rest[i].startsWith(\"--\")) continue;\n  const k = rest[i].slice(2);\n  const v = rest[i + 1] !== undefined && !rest[i + 1].startsWith(\"--\") ? rest[++i] : true;\n  opt[k] = v;\n}\nconst q = String(opt.query || \"\");\nconst save = () => fs.writeFileSync(process.env.STUB_STATE, JSON.stringify(st));\nconst out = (v) => { process.stdout.write(v === undefined || v === null || v === \"\" ? \"\" : String(v) + \"\\n\"); save(); process.exit(0); };\nconst nf = (what) => { save(); process.stderr.write(`An error occurred (ResourceNotFoundException): ${what} not found\\n`); process.exit(254); };\nconst k = `${svc} ${op}`;\nswitch (k) {\n  case \"ec2 describe-vpcs\": {\n    if (q.startsWith(\"Vpcs[0]\")) out(st.vpc || \"None\");\n    out(st.vpc || \"\");\n  }\n  case \"ec2 describe-subnets\": out(st.vpc ? st.subnets.join(\"\\t\") : \"\");\n  case \"kinesisanalyticsv2 list-applications\": out(Object.keys(st.flink).join(\"\\t\"));\n  case \"kinesisanalyticsv2 describe-application\": {\n    const a = st.flink[opt[\"application-name\"]];\n    if (!a) nf(\"application\");\n    if (q.endsWith(\"ApplicationStatus\")) out(a.status);\n    out(`${a.role}\\t${a.status}\\t2026-10-01T00:00:00+00:00`);\n  }\n  case \"kinesisanalyticsv2 stop-application\": { st.flink[opt[\"application-name\"]].status = \"READY\"; out(\"\"); }\n  case \"kinesisanalyticsv2 delete-application\": { delete st.flink[opt[\"application-name\"]]; out(\"\"); }\n  case \"mwaa-serverless list-workflows\": out(Object.keys(st.workflows).join(\"\\t\"));\n  case \"mwaa-serverless get-workflow\": {\n    const r = st.workflows[opt[\"workflow-arn\"]];\n    if (!r) nf(\"workflow\");\n    out(q === \"RoleArn\" ? r : opt[\"workflow-arn\"]);\n  }\n  case \"mwaa-serverless delete-workflow\": { delete st.workflows[opt[\"workflow-arn\"]]; out(\"\"); }\n  case \"glue get-jobs\": out(Object.entries(st.glueJobs).map(([n, r]) => `${n}\\t${r}`).join(\"\\n\"));\n  case \"glue delete-job\": { delete st.glueJobs[opt[\"job-name\"]]; out(\"\"); }\n  case \"glue get-connections\": out(Object.entries(st.glueConns).map(([n, s]) => `${n}\\t${s}`).join(\"\\n\"));\n  case \"glue delete-connection\": { delete st.glueConns[opt[\"connection-name\"]]; out(\"\"); }\n  case \"emr-serverless list-applications\": out(Object.entries(st.emr).filter(([, a]) => a.state !== \"TERMINATED\").map(([id]) => id).join(\"\\t\"));\n  case \"emr-serverless get-application\": {\n    const a = st.emr[opt[\"application-id\"]];\n    if (!a) nf(\"application\");\n    out(q.endsWith(\"subnetIds\") ? a.subnets.join(\"\\t\") : a.state);\n  }\n  case \"emr-serverless stop-application\": { st.emr[opt[\"application-id\"]].state = \"STOPPED\"; out(\"\"); }\n  case \"emr-serverless delete-application\": { st.emr[opt[\"application-id\"]].state = \"TERMINATED\"; out(\"\"); }\n  case \"dms describe-replication-instances\": {\n    if (opt.filters) {\n      const arn = String(opt.filters).split(\"Values=\")[1];\n      if (!st.dms[arn]) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Replication Instance found\\n\"); process.exit(254); }\n      out(arn);\n    }\n    const m = q.match(/ReplicationSubnetGroupIdentifier=='([^']+)'/);\n    out(Object.entries(st.dms).filter(([, x]) => x.subnetGroup === (m && m[1])).map(([a]) => a).join(\"\\t\"));\n  }\n  case \"dms describe-replication-tasks\": {\n    const f = String(opt.filters || \"\");\n    const v = f.split(\"Values=\")[1];\n    if (f.startsWith(\"Name=replication-instance-arn\")) {\n      const inst = st.dms[v];\n      const rows = inst ? Object.entries(inst.tasks).map(([a, s]) => `${a}\\t${s}`) : [];\n      if (!rows.length) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254); }\n      out(rows.join(\"\\n\"));\n    }\n    for (const inst of Object.values(st.dms)) if (inst.tasks[v] !== undefined) out(q.endsWith(\"Status\") ? inst.tasks[v] : v);\n    save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254);\n  }\n  case \"dms stop-replication-task\": { for (const inst of Object.values(st.dms)) if (inst.tasks[opt[\"replication-task-arn\"]]) inst.tasks[opt[\"replication-task-arn\"]] = \"stopped\"; out(\"\"); }\n  case \"dms delete-replication-task\": { for (const inst of Object.values(st.dms)) delete inst.tasks[opt[\"replication-task-arn\"]]; out(\"\"); }\n  case \"dms delete-replication-instance\": { delete st.dms[opt[\"replication-instance-arn\"]]; out(\"\"); }\n  case \"mwaa get-environment\": { const s = st.mwaa[opt.name]; if (!s) nf(\"environment\"); out(s); }\n  case \"mwaa delete-environment\": { delete st.mwaa[opt.name]; out(\"\"); }\n  case \"redshift-serverless get-workgroup\": { const s = st.workgroups[opt[\"workgroup-name\"]]; if (!s) nf(\"workgroup\"); out(s); }\n  case \"redshift-serverless delete-workgroup\": { delete st.workgroups[opt[\"workgroup-name\"]]; out(\"\"); }\n  case \"redshift-serverless get-namespace\": { const s = st.namespaces[opt[\"namespace-name\"]]; if (!s) nf(\"namespace\"); out(s); }\n  case \"redshift-serverless delete-namespace\": {\n    if (Object.keys(st.workgroups).length) { save(); process.stderr.write(\"An error occurred (ConflictException): namespace has a workgroup\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && st.snapshots[opt[\"final-snapshot-name\"]]) { save(); process.stderr.write(\"An error occurred (ConflictException): snapshot already exists\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && !st.noFinalSnapshot) st.snapshots[opt[\"final-snapshot-name\"]] = \"AVAILABLE\";\n    delete st.namespaces[opt[\"namespace-name\"]];\n    out(\"\");\n  }\n  case \"redshift-serverless get-snapshot\": { const s = st.snapshots[opt[\"snapshot-name\"]]; if (!s) nf(\"snapshot\"); out(s); }\n  case \"cloudformation describe-stacks\": {\n    const s = st.stacks[opt[\"stack-name\"]];\n    if (!s) { save(); process.stderr.write(`An error occurred (ValidationError): Stack with id ${opt[\"stack-name\"]} does not exist\\n`); process.exit(254); }\n    out(s);\n  }\n  case \"cloudformation delete-stack\": {\n    const n = opt[\"stack-name\"];\n    if (st.stackFail[n]) st.stacks[n] = \"DELETE_FAILED\";\n    else { delete st.stacks[n]; if (n.endsWith(\"-base\")) st.vpc = \"\"; }\n    out(\"\");\n  }\n  case \"cloudformation describe-stack-events\": out(st.stackFail[opt[\"stack-name\"]] || \"\");\n  case \"s3api head-bucket\": { if (st.buckets.includes(opt.bucket)) out(\"\"); save(); process.stderr.write(\"An error occurred (404) when calling the HeadBucket operation: Not Found\\n\"); process.exit(254); }\n  case \"s3tables list-table-buckets\": { const m = q.match(/name=='([^']+)'/); out((m && st.tableBuckets[m[1]]) || \"None\"); }\n  case \"dynamodb describe-table\": { if (st.tables.includes(opt[\"table-name\"])) out(\"{}\"); nf(\"table\"); }\n  case \"kms list-aliases\": { const m = q.match(/AliasName=='([^']+)'/); out((m && st.aliases[m[1]]) || \"None\"); }\n  default:\n    save();\n    process.stderr.write(`stub: 未预期的 aws 调用: ${k}\\n`);\n    process.exit(99);\n}\n";
+const DESTROY_AWS_STUB = "\n// §11f 的**有状态** aws 替身(只答销毁脚本会问的问题;没见过的调用一律 exit 99)。\n// 状态在 STUB_STATE(JSON 文件)里,每次调用读 → 改 → 写回;每次调用原样记进 STUB_LOG(断言的就是这份调用序列)。\nconst fs = require(\"fs\");\nconst [svc, op, ...rest] = process.argv.slice(2);\nfs.appendFileSync(process.env.STUB_LOG, [svc, op, ...rest].join(\" \") + \"\\n\");\nconst st = JSON.parse(fs.readFileSync(process.env.STUB_STATE, \"utf8\"));\nconst opt = {};\nfor (let i = 0; i < rest.length; i++) {\n  if (!rest[i].startsWith(\"--\")) continue;\n  const k = rest[i].slice(2);\n  const v = rest[i + 1] !== undefined && !rest[i + 1].startsWith(\"--\") ? rest[++i] : true;\n  opt[k] = v;\n}\nconst q = String(opt.query || \"\");\nconst save = () => fs.writeFileSync(process.env.STUB_STATE, JSON.stringify(st));\nconst out = (v) => { process.stdout.write(v === undefined || v === null || v === \"\" ? \"\" : String(v) + \"\\n\"); save(); process.exit(0); };\nconst nf = (what) => { save(); process.stderr.write(`An error occurred (ResourceNotFoundException): ${what} not found\\n`); process.exit(254); };\nconst k = `${svc} ${op}`;\nswitch (k) {\n  case \"ec2 describe-vpcs\": {\n    if (q.startsWith(\"Vpcs[0]\")) out(st.vpc || \"None\");\n    out(st.vpc || \"\");\n  }\n  case \"ec2 describe-subnets\": out(st.vpc ? st.subnets.join(\"\\t\") : \"\");\n  case \"kinesisanalyticsv2 list-applications\": out(Object.keys(st.flink).join(\"\\t\"));\n  case \"kinesisanalyticsv2 describe-application\": {\n    const a = st.flink[opt[\"application-name\"]];\n    if (!a) nf(\"application\");\n    if (q.endsWith(\"ApplicationStatus\")) out(a.status);\n    out(`${a.role}\\t${a.status}\\t2026-10-01T00:00:00+00:00`);\n  }\n  case \"kinesisanalyticsv2 stop-application\": { st.flink[opt[\"application-name\"]].status = \"READY\"; out(\"\"); }\n  case \"kinesisanalyticsv2 delete-application\": { delete st.flink[opt[\"application-name\"]]; out(\"\"); }\n  case \"mwaa-serverless list-workflows\": out(Object.keys(st.workflows).join(\"\\t\"));\n  case \"mwaa-serverless get-workflow\": {\n    const r = st.workflows[opt[\"workflow-arn\"]];\n    if (!r) nf(\"workflow\");\n    out(q === \"RoleArn\" ? r : opt[\"workflow-arn\"]);\n  }\n  case \"mwaa-serverless delete-workflow\": { delete st.workflows[opt[\"workflow-arn\"]]; out(\"\"); }\n  case \"glue get-jobs\": out(Object.entries(st.glueJobs).map(([n, r]) => `${n}\\t${r}`).join(\"\\n\"));\n  case \"glue delete-job\": { delete st.glueJobs[opt[\"job-name\"]]; out(\"\"); }\n  case \"glue get-connections\": out(Object.entries(st.glueConns).map(([n, s]) => `${n}\\t${s}`).join(\"\\n\"));\n  case \"glue delete-connection\": { delete st.glueConns[opt[\"connection-name\"]]; out(\"\"); }\n  case \"emr-serverless list-applications\": out(Object.entries(st.emr).filter(([, a]) => a.state !== \"TERMINATED\").map(([id]) => id).join(\"\\t\"));\n  case \"emr-serverless get-application\": {\n    const a = st.emr[opt[\"application-id\"]];\n    if (!a) nf(\"application\");\n    out(q.endsWith(\"subnetIds\") ? a.subnets.join(\"\\t\") : a.state);\n  }\n  case \"emr-serverless stop-application\": { st.emr[opt[\"application-id\"]].state = \"STOPPED\"; out(\"\"); }\n  case \"emr-serverless delete-application\": { st.emr[opt[\"application-id\"]].state = \"TERMINATED\"; out(\"\"); }\n  case \"dms describe-replication-instances\": {\n    if (opt.filters) {\n      const arn = String(opt.filters).split(\"Values=\")[1];\n      if (!st.dms[arn]) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Replication Instance found\\n\"); process.exit(254); }\n      out(arn);\n    }\n    const m = q.match(/ReplicationSubnetGroupIdentifier=='([^']+)'/);\n    out(Object.entries(st.dms).filter(([, x]) => x.subnetGroup === (m && m[1])).map(([a]) => a).join(\"\\t\"));\n  }\n  case \"dms describe-replication-tasks\": {\n    const f = String(opt.filters || \"\");\n    const v = f.split(\"Values=\")[1];\n    if (f.startsWith(\"Name=replication-instance-arn\")) {\n      const inst = st.dms[v];\n      const rows = inst ? Object.entries(inst.tasks).map(([a, s]) => `${a}\\t${s}`) : [];\n      if (!rows.length) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254); }\n      out(rows.join(\"\\n\"));\n    }\n    for (const inst of Object.values(st.dms)) if (inst.tasks[v] !== undefined) out(q.endsWith(\"Status\") ? inst.tasks[v] : v);\n    save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): No Tasks found\\n\"); process.exit(254);\n  }\n  case \"dms stop-replication-task\": { for (const inst of Object.values(st.dms)) if (inst.tasks[opt[\"replication-task-arn\"]]) inst.tasks[opt[\"replication-task-arn\"]] = \"stopped\"; out(\"\"); }\n  case \"dms delete-replication-task\": { for (const inst of Object.values(st.dms)) delete inst.tasks[opt[\"replication-task-arn\"]]; out(\"\"); }\n  case \"dms delete-replication-instance\": { delete st.dms[opt[\"replication-instance-arn\"]]; out(\"\"); }\n  case \"dms describe-endpoints\": {\n    // 照 JMESPath 的 starts_with(EndpointIdentifier,'…') 过滤:脚本的 --query 里写了哪些前缀就只回哪些;一个前缀都没写 ⇒ 全回(脚本漏了过滤,断言会抓到它动了别人的端点)\n    const prefixes = [...q.matchAll(/starts_with\\(EndpointIdentifier,\\s*'([^']+)'\\)/g)].map((x) => x[1]);\n    const rows = Object.entries(st.endpoints || {}).filter(([, e]) => !prefixes.length || prefixes.some((p) => e.id.startsWith(p))).map(([a]) => a);\n    out(rows.join(\"\\t\"));\n  }\n  case \"dms delete-endpoint\": {\n    const arn = opt[\"endpoint-arn\"];\n    const e = (st.endpoints || {})[arn];\n    if (!e) { save(); process.stderr.write(\"An error occurred (ResourceNotFoundFault): Endpoint not found\\n\"); process.exit(254); }\n    // 与真服务同形:还被某条复制任务引用的端点删不掉\n    const live = new Set(Object.values(st.dms).flatMap((inst) => Object.keys(inst.tasks)));\n    const usedBy = (e.tasks || []).filter((t) => live.has(t));\n    if (usedBy.length) { save(); process.stderr.write(`An error occurred (InvalidResourceStateFault): Endpoint ${arn} is part of one or more ReplicationTasks.\\n`); process.exit(254); }\n    delete st.endpoints[arn];\n    out(\"\");\n  }\n  case \"mwaa get-environment\": { const s = st.mwaa[opt.name]; if (!s) nf(\"environment\"); out(s); }\n  case \"mwaa delete-environment\": { delete st.mwaa[opt.name]; out(\"\"); }\n  case \"redshift-serverless get-workgroup\": { const s = st.workgroups[opt[\"workgroup-name\"]]; if (!s) nf(\"workgroup\"); out(s); }\n  case \"redshift-serverless delete-workgroup\": { delete st.workgroups[opt[\"workgroup-name\"]]; out(\"\"); }\n  case \"redshift-serverless get-namespace\": { const s = st.namespaces[opt[\"namespace-name\"]]; if (!s) nf(\"namespace\"); out(s); }\n  case \"redshift-serverless delete-namespace\": {\n    if (Object.keys(st.workgroups).length) { save(); process.stderr.write(\"An error occurred (ConflictException): namespace has a workgroup\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && st.snapshots[opt[\"final-snapshot-name\"]]) { save(); process.stderr.write(\"An error occurred (ConflictException): snapshot already exists\\n\"); process.exit(254); }\n    if (opt[\"final-snapshot-name\"] && !st.noFinalSnapshot) st.snapshots[opt[\"final-snapshot-name\"]] = \"AVAILABLE\";\n    delete st.namespaces[opt[\"namespace-name\"]];\n    out(\"\");\n  }\n  case \"redshift-serverless get-snapshot\": { const s = st.snapshots[opt[\"snapshot-name\"]]; if (!s) nf(\"snapshot\"); out(s); }\n  case \"cloudformation describe-stacks\": {\n    const s = st.stacks[opt[\"stack-name\"]];\n    if (!s) { save(); process.stderr.write(`An error occurred (ValidationError): Stack with id ${opt[\"stack-name\"]} does not exist\\n`); process.exit(254); }\n    out(s);\n  }\n  case \"cloudformation delete-stack\": {\n    const n = opt[\"stack-name\"];\n    if (st.stackFail[n]) st.stacks[n] = \"DELETE_FAILED\";\n    else { delete st.stacks[n]; if (n.endsWith(\"-base\")) st.vpc = \"\"; }\n    out(\"\");\n  }\n  case \"cloudformation describe-stack-events\": out(st.stackFail[opt[\"stack-name\"]] || \"\");\n  case \"s3api head-bucket\": { if (st.buckets.includes(opt.bucket)) out(\"\"); save(); process.stderr.write(\"An error occurred (404) when calling the HeadBucket operation: Not Found\\n\"); process.exit(254); }\n  case \"s3tables list-table-buckets\": { const m = q.match(/name=='([^']+)'/); out((m && st.tableBuckets[m[1]]) || \"None\"); }\n  case \"dynamodb describe-table\": { if (st.tables.includes(opt[\"table-name\"])) out(\"{}\"); nf(\"table\"); }\n  case \"kms list-aliases\": { const m = q.match(/AliasName=='([^']+)'/); out((m && st.aliases[m[1]]) || \"None\"); }\n  default:\n    save();\n    process.stderr.write(`stub: 未预期的 aws 调用: ${k}\\n`);\n    process.exit(99);\n}\n";
 
 /** 零凭证环境:任何 context 查找都会失败 ⇒ 门禁立刻红。 */
 const NO_CRED_ENV = {
@@ -1276,6 +1276,25 @@ if (!FAST) {
       if (!Array.isArray(subnets) || subnets.length < 2) {
         fail(`DMS 子网组只给了 ${JSON.stringify(subnets)} —— DMS 要求覆盖 ≥2 个 AZ 的子网`);
       }
+    }
+    // ②a:复制实例的安全组 —— 平台启动该区第一条 DMS 任务时**按名**查它的 id 再建实例(名字来自命名单一事实源);
+    //   栈里没有它 ⇒ 该区的 DMS 通道永远停在「安全组未就绪」。只出站、零入站;文案只许 ASCII(EC2 真部署才校验)。
+    const dmsSgs = Object.values(dmsTpl.Resources).filter((x) => x.Type === "AWS::EC2::SecurityGroup");
+    const dmsSg = dmsSgs.find((x) => x.Properties?.GroupName === expectName("dmsSecurityGroup"));
+    if (!dmsSg) {
+      fail(`dms 栈里没有名为 ${expectName("dmsSecurityGroup")} 的 AWS::EC2::SecurityGroup(实际:${JSON.stringify(dmsSgs.map((x) => x.Properties?.GroupName))})—— 该区 DMS 通道建不出复制实例`);
+    } else {
+      const sp = dmsSg.Properties ?? {};
+      const homeSgName = naming.kinds.dmsSecurityGroup.home;
+      if (expectName("dmsSecurityGroup") === homeSgName) fail(`执行区 DMS 安全组的名字与主控区的 ${homeSgName} 相同 —— 命名没有按区分开`);
+      if (!/^[\x20-\x7e]+$/.test(String(sp.GroupDescription ?? ""))) fail(`DMS 安全组的 GroupDescription 含非 ASCII 字符:${JSON.stringify(sp.GroupDescription)}(EC2 真部署会 400)`);
+      if (Array.isArray(sp.SecurityGroupIngress) && sp.SecurityGroupIngress.length) fail(`DMS 安全组带了入站规则:${JSON.stringify(sp.SecurityGroupIngress)}(复制实例只出站)`);
+      const egress = sp.SecurityGroupEgress ?? [];
+      if (!egress.some((r) => r.CidrIp === "0.0.0.0/0" && String(r.IpProtocol) === "-1")) fail(`DMS 安全组没有放行出站:${JSON.stringify(egress)}(到不了源库 / 数仓 / 接口端点)`);
+      // 安全组必须建在本 target 的 VPC 里(与子网组同一个底座):VpcId 是对底座栈的引用,不是写死的 id、也不缺省(缺省 = 落进该区默认 VPC)
+      if (!sp.VpcId || typeof sp.VpcId !== "object") fail(`DMS 安全组的 VpcId 不是对本 target 底座 VPC 的引用:${JSON.stringify(sp.VpcId ?? null)}`);
+      const ingressElsewhere = Object.values(dmsTpl.Resources).filter((x) => x.Type === "AWS::EC2::SecurityGroupIngress");
+      if (ingressElsewhere.length) fail(`dms 栈里有独立的入站规则资源 ${ingressElsewhere.length} 条(复制实例只出站)`);
     }
 
     // ②b:per-target DMS 角色(信任含区域化 dms.<region>;消费方接线)
@@ -3234,7 +3253,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
       }
     }
 
-    // (2) 销毁脚本本体:有状态 aws 替身 × 五个场景
+    // (2) 销毁脚本本体:有状态 aws 替身 × 六个场景
     const ddir = mkdtempSync(resolve(tmpdir(), "exec-env-destroy-"));
     mkdirSync(resolve(ddir, "bin"));
     mkdirSync(resolve(ddir, "platform"), { recursive: true });
@@ -3247,6 +3266,9 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
     const STK = (sfx) => `BgpExecEnv-${SLUGX}-${sfx}`;
     const SNAPX = "bgp-final-tgt-usw2-a-20261011-0000";
     const mineRole = (k) => `arn:aws:iam::123456789012:role/BgpExecEnv-${SLUGX}-${k}`;
+    const EP = (x) => `arn:aws:dms:us-west-2:123456789012:endpoint:${x}`;
+    const TASK_MINE = "arn:aws:dms:us-west-2:123456789012:task:T1";
+    const TASK_FOREIGN = "arn:aws:dms:us-west-2:123456789012:task:FOREIGN";
     const fullState = () => ({
       vpc: "vpc-mine", subnets: ["subnet-a", "subnet-b"],
       flink: { "app-mine": { role: mineRole("flink-role"), status: "RUNNING" }, "app-other": { role: "arn:aws:iam::123456789012:role/someone-else", status: "RUNNING" } },
@@ -3254,7 +3276,13 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
       glueJobs: { "job-mine": mineRole("glue-role"), "job-other": "arn:aws:iam::123456789012:role/other" },
       glueConns: { "conn-mine": "subnet-a", "conn-other": "subnet-zzz" },
       emr: { "00mine": { subnets: ["subnet-b"], state: "STARTED" }, "00other": { subnets: ["subnet-zzz"], state: "STARTED" } },
-      dms: { "arn:aws:dms:us-west-2:123456789012:rep:MINE": { subnetGroup: `bgp-dms-subnet-group-${SLUGX}`, tasks: { "arn:aws:dms:us-west-2:123456789012:task:T1": "running" } }, "arn:aws:dms:us-west-2:123456789012:rep:OTHER": { subnetGroup: "someone-else", tasks: {} } },
+      dms: { "arn:aws:dms:us-west-2:123456789012:rep:MINE": { subnetGroup: `bgp-dms-subnet-group-${SLUGX}`, tasks: { [TASK_MINE]: "running" } }, "arn:aws:dms:us-west-2:123456789012:rep:OTHER": { subnetGroup: "someone-else", tasks: {} } },
+      // 平台在本区建的源 / 目标端点(被本 target 复制实例上的那条复制任务引用着)+ 一个不属于平台的端点
+      endpoints: {
+        [EP("SRCMINE")]: { id: "bgp-src-a1b2c3d4e5f6", tasks: [TASK_MINE] },
+        [EP("TGTMINE")]: { id: "bgp-tgt-a1b2c3d4e5f6", tasks: [TASK_MINE] },
+        [EP("CUSTOMER")]: { id: "customer-orders-src", tasks: [] },
+      },
       mwaa: { [`bgp-mwaa-${SLUGX}`]: "AVAILABLE" },
       workgroups: { [`bgp-workgroup-${SLUGX}`]: "AVAILABLE" },
       namespaces: { [`bgp-namespace-${SLUGX}`]: "AVAILABLE" },
@@ -3315,6 +3343,8 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
           [/^emr-serverless delete-application .*00mine/, "EMR Serverless 应用"],
           [/^dms delete-replication-task /, "DMS 复制任务"],
           [/^dms delete-replication-instance .*rep:MINE/, "DMS 复制实例"],
+          [/^dms delete-endpoint .*endpoint:SRCMINE/, "DMS 源端点"],
+          [/^dms delete-endpoint .*endpoint:TGTMINE/, "DMS 目标端点"],
           [/^mwaa delete-environment /, "经典 MWAA 环境"],
           [/^redshift-serverless delete-workgroup /, "Redshift 工作组"],
           [/^redshift-serverless delete-namespace /, "Redshift 命名空间"],
@@ -3329,7 +3359,7 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
         const nsDel = r.calls.find((c) => /^redshift-serverless delete-namespace/.test(c)) || "";
         if (!nsDel.includes(`--final-snapshot-name ${SNAPX}`)) fail(`§11f 场景 A:删命名空间没带最终快照(实际:${nsDel})—— 数仓数据会丢`);
         // 认对象:别人的同区资源一个都不碰
-        for (const re of [/app-other/, /workflow\/other-/, /job-other/, /conn-other/, /00other/, /rep:OTHER/]) {
+        for (const re of [/app-other/, /workflow\/other-/, /job-other/, /conn-other/, /00other/, /rep:OTHER/, /endpoint:CUSTOMER/]) {
           const hit = r.calls.find((c) => /\b(delete|stop)-/.test(c) && re.test(c));
           if (hit) fail(`§11f 场景 A:动了别人的资源:${hit}`);
         }
@@ -3346,6 +3376,16 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
           if (!retained.includes(want)) fail(`§11f 场景 A 的报告没把 ${want} 列为「已保留」(实际:${retained.join(", ")})`);
         }
         if (!existsSync(resolve(ddir, "exec-env-outputs.json"))) fail("§11f 场景 A 没落 exec-env-outputs.json(post_build 打印它)");
+        // 端点:复制任务删完之后才删(还被引用时 DMS 不让删);收尾只剩不属于平台的那个;报告逐个记账
+        const taskDelAt = idxOf(r.calls, /^dms delete-replication-task /);
+        const firstEpDelAt = idxOf(r.calls, /^dms delete-endpoint /);
+        if (firstEpDelAt >= 0 && firstEpDelAt < taskDelAt) fail("§11f 场景 A:端点在复制任务之前删 —— 还被引用的端点删不掉");
+        const epLeft = Object.keys(r.after.endpoints || {});
+        if (JSON.stringify(epLeft) !== JSON.stringify([EP("CUSTOMER")])) fail(`§11f 场景 A 收尾的端点应只剩不属于平台的那个,实际:${epLeft.join(", ") || "(空)"}`);
+        const deleted = (r.report?.steps || []).filter((x) => x.status === "deleted").map((x) => x.resource);
+        for (const want of ["dms-endpoint:SRCMINE", "dms-endpoint:TGTMINE"]) {
+          if (!deleted.includes(want)) fail(`§11f 场景 A 的报告没把 ${want} 记为「已删除」(实际:${deleted.filter((x) => x.startsWith("dms")).join(", ")})`);
+        }
       }
     }
     // 场景 B:重试 —— 最终快照已在 ⇒ 删命名空间不再要求新快照;二次全空跑 ⇒ 一条删除都不发
@@ -3390,6 +3430,22 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
       const r = runDestroy(fullState(), { EXEC_ENV_TARGET: "tgt_home" });
       cases++;
       if (r.ok || r.calls.length) fail(`§11f 场景 E:tgt_home 的销毁没有在第一个 aws 调用之前被拒(调用 ${r.calls.length} 次)`);
+    }
+    // 场景 F:平台前缀的端点还被一条**不在本 target 实例上**的复制任务引用(账号里别人的任务用着它)⇒ DMS 不让删 ⇒ 如实卡住、点名端点与真因,一个栈都不删
+    {
+      const st = fullState();
+      st.dms["arn:aws:dms:us-west-2:123456789012:rep:OTHER"].tasks[TASK_FOREIGN] = "running";
+      st.endpoints[EP("SRCMINE")].tasks.push(TASK_FOREIGN);
+      const r = runDestroy(st);
+      cases++;
+      if (r.ok) fail("§11f 场景 F:端点删不掉竟然整体成功 —— 假装删完");
+      if (r.report?.stuck?.resource !== `dms-endpoint:${EP("SRCMINE")}` || !/InvalidResourceStateFault/.test(r.report?.stuck?.detail || "")) {
+        fail(`§11f 场景 F:报告没点名卡住的端点与真因:${JSON.stringify(r.report?.stuck)}`);
+      }
+      if (idxOf(r.calls, /^cloudformation delete-stack/) >= 0) fail("§11f 场景 F:端点卡住后仍在删栈 —— 必须停在第一个卡住的地方");
+      const touched = r.calls.find((c) => /\b(delete|stop)-/.test(c) && /task:FOREIGN|rep:OTHER/.test(c));
+      if (touched) fail(`§11f 场景 F:为了删端点动了别人的复制任务 / 实例:${touched}`);
+      if (!r.after.endpoints?.[EP("SRCMINE")]) fail("§11f 场景 F:还被引用的端点被删掉了");
     }
     globalThis.__destroyShellCases = cases;
   }
@@ -3659,7 +3715,11 @@ echo "stub: 未预期的 aws 调用: $*" >&2; exit 99
 //   (glue:CreateDatabase / CreateTable / DeleteTable / Get* on catalog · database/bgp_s3_ext · table/bgp_s3_ext/*)从 home 轴改 execution 轴。
 //   显式决定的理由:外部表现在建在**数据源所在区**的 Glue 目录(此前一律落主控区目录,主控区 Athena 跨区读桶);
 //   只放 home ⇒ 第二区的 S3 源「建外部表」必 AccessDenied。资源面一个字没放宽(仍只限 bgp_s3_ext 库),region 由 requestedRegionCondition 收在已登记执行区内。
-const EXEC_AXIS_EXPECTED = 17;
+// ④ 2026-11-18 17 → **18**:`DmsTargetSecretDescribe` —— DMS 通道改为建在任务所在的执行区,目标数仓专用用户的密钥
+//   (`bgp/dms/redshift-target`,每个区各一份)也建在该区;启动时按名 DescribeSecret 判它在不在(在就复用,不每次重设口令)。
+//   显式决定的理由:只放 home ⇒ 执行区的 DMS 任务每次启动都判成「密钥不在」而重设口令,同区正在跑的通道下次重连即认证失败。
+//   资源面只到 `bgp/dms/*`、动作只有 DescribeSecret(不含取值:取值是 DMS 访问角色的事);写那一半早已在 execution 轴(`bgp/*`),这里补的是成对不变式的「读」半边。
+const EXEC_AXIS_EXPECTED = 18;
   if (execAxisSites.length !== EXEC_AXIS_EXPECTED) {
     fail(
       `§12 execution 轴调用点数从 ${EXEC_AXIS_EXPECTED} 变成 ${execAxisSites.length}(${execAxisSites.join(", ")})。` +
@@ -3728,7 +3788,7 @@ console.log(
     (FAST ? "" : `、删栈顺序核对 ${globalThis.__destroyOrder ?? 0} 个栈`)
 );
 // 🔴 「本节没跑」不许当绿(段中断 ≠ 判据过,记忆 gate-must-separate-crash-from-fail)
-if ((globalThis.__destroyShellCases ?? 0) < 6) fail(`§11f 销毁分支 shell 只真跑了 ${globalThis.__destroyShellCases ?? 0} 例(<6)—— 那一节没跑完`);
+if ((globalThis.__destroyShellCases ?? 0) < 7) fail(`§11f 销毁分支 shell 只真跑了 ${globalThis.__destroyShellCases ?? 0} 例(<7)—— 那一节没跑完`);
 if (!FAST && (globalThis.__destroyOrder ?? 0) < 8) fail(`§7d 删栈顺序只核对了 ${globalThis.__destroyOrder ?? 0} 个栈(<8)—— 全组件 synth 那一节没跑到`);
 if (FAST) console.log("⚡ fast 模式:已跳过 §7(负向组件 synth)与 §9(控制面/部署权隔离)—— 提交前必须跑一次全量!");
 if (problems.length > 0) {

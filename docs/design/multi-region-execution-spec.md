@@ -1,6 +1,7 @@
 # Multi-Region Execution — Technical Specification: Multi-Region Execution Environments, Dual-Track Data Residency and Platform-Wide Multi-Region Coverage
 
-> - Revision: **3.55** (🆕 2026-11-17 **section 3.5a, leader election changed**: an election beat of 30 seconds separate from the probe tick, the lease from 8 to 3 minutes, on a stop signal the process releases the lease before it exits, and on take-over the probe and the background pumps each run one round early ⇒ the hand-over of a normal exit takes ≤ one election beat, and after a sudden death there is no leader for ≤ about 3.5min (≈12min before))
+> - Revision: **3.56** (🆕 2026-11-23 **new section 3.19, the place of the real-time channel (DMS) — per-region execution**: every cloud object of the DMS channel is created in the one execution region the task is bound to, and start / stop / delete / status reads / idle reclaim go through the same place resolver; a single source of truth for channel × execution region (Zero-ETL stays home-region only and is refused on save); deleting a task leaves no endpoints behind; a reused source endpoint is aligned with the current values of the data source; the "home-only" reason list of section 3.4.4 loses one more entry; the `dms-ingest-bootstrap` input of section 3.9a gains `schema`)
+>   revision 3.55 (🆕 2026-11-17 **section 3.5a, leader election changed**: an election beat of 30 seconds separate from the probe tick, the lease from 8 to 3 minutes, on a stop signal the process releases the lease before it exits, and on take-over the probe and the background pumps each run one round early ⇒ the hand-over of a normal exit takes ≤ one election beat, and after a sudden death there is no leader for ≤ about 3.5min (≈12min before))
 >   revision 3.54 (🆕 2026-10-21 **the long-running-operation framework ⇒ new section 3.18, the unified long-running-operation protocol** (any write route that waits for an external system to reach a terminal state may only go through the `lib/long-ops/submitLongOp` hybrid response: wait
 >   in-process for `LONG_OPS_SYNC_WAIT_MS` (45 s); if no terminal state is reached ⇒ 202 carrying the protocol marker `protocol:"long-op/1"`; the client's global fetch interceptor follows the task to its terminal state and reshapes it into a synchronous 200 ⇒ zero changes at call sites; the single
 >   author of the wait-for-terminal primitive is `lib/long-ops/await-terminal.ts`, which throws when no long-running-operation context is present; relation to section 3.9a = the execution channel and the authorization axis are unchanged, only "how long to wait and how to answer" changes; the
@@ -26,7 +27,7 @@
 >   fixture of the corresponding acceptance criterion must spell it out. Whether platform-global knowledge objects should be constrained by the per-project allow-list **requires a decision**; this section only records it. (c) ✅ **good news: the execution channel already exists** —
 >   `execOnTarget({warehouse, sql, secretArn})` is, to the letter, the required shape (client taken by target region + explicit workgroup/database + explicit SecretArn, and it refuses an empty ARN by itself) ⇒ narrow-privilege DML uses it directly; 🔴 **never write a new Redshift client for it** (that
 >   would be "a second author"))
-> - Based on: **[the design document](./multi-region-execution-design.md), revision 3.27** (decisions / invariants / section 19 platform-wide coverage / section 20 foundation-correction record; **the sole authority for the implementation order = the design document, section 17**) + [the interaction
+> - Based on: **[the design document](./multi-region-execution-design.md), revision 3.28** (decisions / invariants / section 19 platform-wide coverage / section 20 foundation-correction record; **the sole authority for the implementation order = the design document, section 17**) + [the interaction
 >   design](./multi-region-execution-interaction.md) (interaction). **This document is the sole implementation-level contract** (tables / APIs / state machines / migration / acceptance); decisions and the "why" are in the design document, interaction in the interaction design, and the interaction
 >   design may not define scope on its own (the frozen contract of the design document, section 20.4).
 > - 🔴 Pure design (including pseudocode); no implementation code is written and nothing is deployed without explicit confirmation.
@@ -825,6 +826,11 @@ the next person in a hurry writes one line and quietly reverts a path that shoul
 ⇒ Two gates: `BARE_ALLOWLIST` **is always empty** (the only construction point is the factory) + **the home-only list matches exactly**.
 Each reason must state **when it may be deleted** (the sync push-down work / the ETL orchestration target-dimension work / the DMS data-plane push-down / the narrow-privilege shared-writer work / project deletion in the project-isolation design).
 
+🆕 **Correction in revision 3.56 (2026-11-23)**: group C in the table above is the grouping measured at the time of the direct-query target-awareness work package, and the reason list has only shrunk since —
+`sync-no-target-dim` / `workflow-no-target-dim` / `modeling-ddl-credential-gap` were retired one after another, and this revision retires `dms-bootstrap-home`
+(the target-side preparation of DMS now goes through the closed executor of section 3.9a in the region of the task's place, see section 3.19);
+the only reasons left are `project-inventory` and `zeroetl-home-namespace` (source of truth: `HomeOnlyReason` in `lib/exec-env/target-clients.ts`).
+
 #### 3.4.5 🔴🔴 Ask-Your-Data (GenBI) executes per region — **everything goes through the same AgentCore** (decided on 2026-09-10)
 
 > - **Decision wording (verbatim)**: "Whatever your design, my requirement is: **everything goes through the same AgentCore**, nothing more."
@@ -1431,7 +1437,7 @@ type AdminDdlRequest =
   | { operation: "create-role";            targetId: string; projectId: string }
   | { operation: "grant";                  targetId: string; projectId: string }
   | { operation: "drop-project-schema";    targetId: string; projectId: string; approvalId: string }
-  | { operation: "dms-ingest-bootstrap";   targetId: string }
+  | { operation: "dms-ingest-bootstrap";   targetId: string; schema: string }   // 🆕 revision 3.56, section 3.19: schema = the source database name (a plain identifier, never a name reserved by the platform)
   | { operation: "land-code-table";        targetId: string; projectId: string; codeTableId: string }
   | { operation: "grant-shared-writer";   targetId: string; codeTableId: string }   // 🆕 revision 3.48, section 3.9d (the shared-writer work package)
   | { operation: "land-model-table";      targetId: string; modelTableId: string } // 🆕 revision 3.49, section 3.9d.6 (the model-table half: pure DDL, no narrow-privilege writer needed)
@@ -2309,6 +2315,50 @@ slotIso = "the most recent cron fire point ≤ the moment of this trigger", norm
 | Table | `bgp-long-ops` (replaces `bgp-ai-tasks`; the earlier AI task table was never released, so zero migration; pk `taskId` ULID, TTL 7 days, `hardened`); `TABLES.LONG_OPS`; the table totals 72 / 63 are unchanged |
 | Environment variables | `LONG_OPS_SYNC_WAIT_MS` (**one new key in the container env**, CDK context `-c long-ops-sync-wait-ms`; not given in production = 45000; test accounts use 500 to force 202 for acceptance) · `LONG_OPS_MAX_MS` 300000 · `LONG_OPS_STALE_MS` 30000 · `LONG_OPS_HEARTBEAT_MS` 8000 · `LONG_OPS_ASYNC` on by default (`0` falls back to purely synchronous); the earlier AI protocol's `AI_SYNC_WAIT_MS` / `AI_ASYNC_MAX_MS` / `AI_ASYNC_STALE_MS` / `AI_ASYNC_HEARTBEAT_MS` / `AI_ASYNC` are deleted |
 | Acceptance checks | The headless acceptance segment for long-running operations (ten checks; the seventh is the closing check for the modeling-landing timeout defect) + the twelve offline gates ①–⑫ in [the long-running-operations design](./long-running-operations.md), section 2.7 |
+
+### 3.19 🆕 Revision 3.56 The place of the real-time channel (DMS) — per-region execution
+
+> Decisions and the "why" are in [the design document](./multi-region-execution-design.md), section 20.31; this section only fixes the contract. Source: decided on 2026-11-10 ("a root fix at the product level"); the treatment of Zero-ETL was confirmed on 2026-11-17 ("push down DMS only").
+
+- **Single resolver of the place** `lib/realtime/dms-place.ts`: every cloud object of the DMS channel (replication instance, source / target endpoints, replication task, the dedicated user on the target side and its secret, staging)
+  **must** be created in the region of the one execution environment the task is bound to. The binding is read through the existing single author `bindingTargets` (old task rows without a binding belong to the home region);
+  a binding to more than one execution environment ⇒ 409 `TARGET_PUSHDOWN_UNAVAILABLE`. No path **may** use the home region as a default.
+- **Two levels of place**:
+  - `DmsSite` (which region, which replication instance): used by stop / delete / status reads / idle reclaim, **without an admission check** — a channel in an execution environment that is draining **must** still be stoppable;
+    a region that cannot be resolved is reported as a failure (stop / delete 502, the record unchanged) and **must not** be treated as "nothing to stop".
+  - `DmsPlace` (every fact a start needs: replication subnet group · security-group name · access role · staging bucket · warehouse · target-secret name): requires the execution environment to be ready with the `dms` component installed;
+    anything missing ⇒ 503, and the message names what is missing and where to get it (for an execution region: "press "Redeploy" for it on the "Execution Environments" page and start again").
+  - Both types are branded, and in product code only the resolver can construct them; the first parameter of every exported function of `lib/realtime/dms-service.ts` and `redshift-target.ts` that makes a cloud call **must** be one of them, with no default.
+- **Names**: the names of the replication instance / security group come from the naming single source of truth — `bgp-dms` / `bgp-dms-sg` in the home region, unchanged letter for letter, and `bgp-dms-<slug>` / `bgp-dms-sg-<slug>` in an execution region;
+  the replication subnet group and the access role of an execution region are taken from the execution-environment descriptor (`dmsSubnetGroup` / `dmsKinesisRoleArn`), the access role of the home region from the platform container's `DMS_ROLE_ARN` (read at this one point only);
+  the target-secret name is fixed, `bgp/dms/redshift-target` (one per region).
+- **Order of the checks on start** (`POST /api/sync/[id]/start-realtime`): place → region of the data source (a source outside the region the task is bound to ⇒ 409 `CROSS_REGION_SOURCE`,
+  the same verdict as for the batch-sync start, `lib/sync/cross-region-source.ts`) → source-database information (missing ⇒ 400) → source-database name (see "Source-database name" below; not satisfied ⇒ 400) → and only **last** the replication instance (created lazily when absent).
+  A refused request **must not** leave a billed replication instance behind.
+- **Place decision**: start / stop / delete / list reconciliation / detail status / idle reclaim — every path records its place decision before its first cloud call.
+- **Target side per region**: the dedicated user `dms_ingest` and its secret are provisioned per region by the provisioning entry of the controlled DDL channel, `provisionDmsIngestUser(actor, { targetId, rotate? })` —
+  the password is generated inside the function, goes into the statement and into the secret, and **must not** appear in the return value / audit / logs; a secret that already exists ⇒ reused, not rotated;
+  when the target-endpoint connectivity test fails and the secret was a reused one or DMS says plainly that authentication failed ⇒ the password is reset once and the test repeated (at most once per start; an old failure left from before this start does not trigger it).
+  The target schema goes through the section 3.9a template `dms-ingest-bootstrap` (input `schema` = the source database name).
+- **Source-database name**: the `schema` of `dms-ingest-bootstrap` **must** be a plain identifier (starting with a letter or an underscore, containing only letters, digits and underscores, at most 127 characters)
+  and **must not** be a name reserved by the platform (`proj_*` / `shared` / `bgp_canary*` / `pg_*` / `information_schema`, compared after case folding) — this template runs `CREATE SCHEMA IF NOT EXISTS … AUTHORIZATION <dedicated user>` as the administrator,
+  and without the check it could be used to take ownership of the platform's own schemas. Not satisfied ⇒ "Start" is refused on the spot (400, no cloud resource is created) and the message points to the Glue channel (confirmed on 2026-11-18: keep the rule, and refuse on the spot in the request path).
+- **Channel × execution region** (single source of truth `lib/sync/channel-place.ts`, keyed by the closed channel list; a new channel without a rule is a compile error): at present Glue and DMS are offered in every execution region, Zero-ETL in the home region only.
+  - The channel-recommendation endpoint (`POST /api/sync/recommend-channel`, optional `datasourceId`; the server reads the data-source row to find its region) **must** mark a channel that is not offered in that region `supported:false` and give the reason;
+  - create (`POST /api/sync`) / **changing** the channel to it (`PUT /api/sync/[id]`) / saving a Copilot draft ⇒ 400 `CHANNEL_NOT_AVAILABLE_IN_REGION`; an edit that does not touch the channel **must not** fail because of it;
+  - the refusal at start stays as defense in depth (Zero-ETL is still 409 `CHANNEL_NOT_PUSHED_DOWN`).
+- **A delete leaves no endpoints behind**: endpoints are deleted by the replication-instance reclaim job after the replication task that references them is gone; the delete request does not wait for it. At every step the job first sweeps the endpoints of its region — endpoints are listed first, the task table is read second;
+  an identifier of the platform's form (`bgp-src-*` / `bgp-tgt-*`), no matching task row in the task table and no replication task referencing it ⇒ delete and write the audit entry `realtime.endpoints.swept`;
+  referenced by a replication task that is being deleted ⇒ looked at again on the next step; referenced by a replication task that is not being deleted ⇒ reported only, not deleted; the task table cannot be read completely ⇒ nothing is deleted. The endpoints of a stopped task **must** be kept.
+  A sweep error does not block the reclaim of the instance; the result goes into the job evidence (the note under "Settings → Background cleanup jobs").
+- **Reclaim per region**: "tasks that are starting" are attributed by the task's binding and only those of the job's own region count; a place resolved by the job that differs from the one recorded when it was queued ⇒ failure, no instance is touched.
+- **A start that reuses an existing source endpoint**: **must** first align the host / port / user / password of the source endpoint with the current values of the data source (the password cannot be read back ⇒ it is written on every reuse) and then test connectivity again;
+  it **must not** let the test verdict of the old settings pass the new ones. The settings of the target endpoint do not come from the data source and are left alone.
+- **Connectivity failure**: the task error and the run log **must** carry the failure text DMS gave; when the wait times out, the latest verdict that produced a result is taken for each side.
+- **Infrastructure**: the `-dms` stack of every region **must** deliver a security group (egress only, named from the naming single source of truth); the DMS actions of the task role include delete endpoint / modify endpoint;
+  the task role and every region's data-plane role have a narrow read on `bgp/dms/*` that contains only `DescribeSecret` (whether it exists must be known, the value is not given); the IAM call manifest is updated in the same change;
+  the script that retires an execution region deletes the platform endpoints after the replication tasks are gone, and when an endpoint is still referenced by somebody else's replication task it stops and says so, deleting no stack.
+- **Acceptance**: the page-driven headless acceptance segment for the per-region DMS channel (13 checks); offline = assembly checks bucketed by region (objects of the same name in two regions are invisible to each other) + the place-type ratchet + the offline synth gate (the DMS stack of every region has the security group).
 
 ## 4. List of change points (implementation level)
 

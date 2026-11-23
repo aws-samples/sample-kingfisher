@@ -88,11 +88,41 @@ describe("start 路由下推接线", () => {
   });
 });
 
-describe("start-realtime(dms)通道卡", () => {
-  it("非 home 章任务走 DMS ⇒ 409 CHANNEL_NOT_PUSHED_DOWN(fail-closed,不替它在主控区跑)", () => {
+describe("start-realtime(dms):通道建在任务绑定的那个区", () => {
+  it("落点来自任务绑定(resolveDmsPlace(task));「只许主控区」的守卫与 409 CHANNEL_NOT_PUSHED_DOWN 已不在这条路由里", () => {
     const code = codeOnly(realtimeSrc);
-    expect(code).toContain("boundToHomeOnly(task)");
-    expect(code).toContain('"CHANNEL_NOT_PUSHED_DOWN"');
+    expect(code).toMatch(/place = await resolveDmsPlace\(task\b/);
+    expect(code).not.toContain("boundToHomeOnly");
+    expect(code).not.toContain("CHANNEL_NOT_PUSHED_DOWN");
+    // 路由自己不读「在哪」的环境变量(落点解析器是唯一作者)
+    expect(code).not.toMatch(/process\.env\.(DMS_|REDSHIFT_|GENBI_MEMORY_BUCKET|AWS_ACCOUNT_ID)/);
+  });
+  it("禁止跨区取数:与批同步启动同一个判法(crossRegionSource)、同一个错误码,且在懒创建复制实例之前判", () => {
+    const code = codeOnly(realtimeSrc);
+    const iCross = code.indexOf("crossRegionSource(task");
+    const iProbe = code.indexOf("probeReplicationInstance(place)");
+    expect(iCross).toBeGreaterThan(0);
+    expect(iProbe).toBeGreaterThan(iCross);
+    expect(code).toContain('"CROSS_REGION_SOURCE"');
+    expect(codeOnly(startSrc)).toContain("crossRegionSource(task");
+  });
+  it("服务层每个发云调用的调用点都带着落点(第一个参数)", () => {
+    const code = codeOnly(realtimeSrc);
+    for (const call of [
+      "getReplicationInstanceArn(place)", "ensureRedshiftDmsUser(place", "ensureTargetSchema(place,", "ensureRoleAssociatedToNamespace(place)",
+      "ensureSourceEndpoint(place,", "ensureTargetEndpoint(place,", "ensureReplicationTask(place,", "waitTaskStartable(place,",
+      "alignSourceEndpoint(place,", "testEndpoints(place,", "startReplication(place,",
+    ]) expect(code, `启动编排里缺 ${call}`).toContain(call);
+  });
+  it("沿用的源端点先对齐到数据源现值再测:对齐排在「复制任务可启动」之后、连通性轮询之前,且只在沿用时做", () => {
+    const code = codeOnly(realtimeSrc);
+    const iStartable = code.indexOf("waitTaskStartable(place,");
+    const iAlign = code.indexOf("alignSourceEndpoint(place,");
+    const iTest = code.indexOf("testEndpoints(place,");
+    expect(iStartable).toBeGreaterThan(0);
+    expect(iAlign).toBeGreaterThan(iStartable);
+    expect(iTest).toBeGreaterThan(iAlign);
+    expect(code).toMatch(/if \(source\.reused\) \{\s*await alignSourceEndpoint\(place,/);
   });
 });
 
@@ -121,8 +151,9 @@ describe("对账/下线/读路由按章取区", () => {
     });
   }
 
-  it("reconcile / glue-status 的收口盖章都显式传章(裸 resolveRunStamp(task) 绝迹)", () => {
-    for (const rel of ["lib/sync/reconcile.ts", "app/api/sync/[id]/glue-status/route.ts"]) {
+  it("reconcile / glue-status / 实时启动路由 / 停止与删除执行体的盖章都显式传章(裸 resolveRunStamp(task) 绝迹)", () => {
+    // 2026-11-20 页面实测:执行区的 DMS 运行在任务监控里记成了主控区 —— 实时启动路由建运行行时没传落点。
+    for (const rel of ["lib/sync/reconcile.ts", "app/api/sync/[id]/glue-status/route.ts", "app/api/sync/[id]/start-realtime/route.ts", "lib/sync/long-ops.ts"]) {
       const code = codeOnly(readFileSync(join(srcRoot, rel), "utf8"));
       expect(code, `${rel} 有裸盖章`).not.toMatch(/resolveRunStamp\(task\)/);
     }

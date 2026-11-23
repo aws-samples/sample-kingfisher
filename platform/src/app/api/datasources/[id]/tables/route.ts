@@ -61,7 +61,9 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   let directError: string | null = null;
   if (!(dsCanUseGlueReach(row) && dsProbeVia(row) === "glue-connection")) {
     try {
-      const datasets = await getProvider(ds.type).introspect(ref);
+      // 直连读不到(连不上 / 凭证不对)必须能看见:用 provider 读不到就抛的那一份,否则失败被折成空清单、下面改经 Glue 连接的那条路永远走不到
+      const provider = getProvider(ds.type);
+      const datasets = provider.introspectStrict ? await provider.introspectStrict(ref) : await provider.introspect(ref);
       // SPI SourceDataset[] → 本端点契约(name + database + columns),前端 Metadata browser 消费。
       const out = datasets.map((d) => ({
         name: d.name,

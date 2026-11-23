@@ -220,6 +220,9 @@ export class ExecEnvDeployStack extends cdk.Stack {
           "dms:StopReplicationTask",
           "dms:DeleteReplicationTask",
           "dms:DeleteReplicationInstance",
+          // 平台在本区建的 DMS 端点(bgp-src-* / bgp-tgt-*):实例与任务删掉之后连带删
+          "dms:DescribeEndpoints",
+          "dms:DeleteEndpoint",
           // 经典 MWAA 环境(CLI 名 mwaa,IAM 前缀 airflow;存量双装目标才有)
           "airflow:GetEnvironment",
           "airflow:DeleteEnvironment",

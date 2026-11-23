@@ -1,7 +1,7 @@
 // Oracle provider(JDBC 范式)。
 //
 // 【驱动】oracledb@6(实证:6.x thin 模式默认,免 Oracle Instant Client native lib,alpine 可用)。
-// 按需 dynamic import——oracledb 未装进 platform 依赖前,introspect/ping 优雅降级(返回 [] / reachable:false)。
+// 按需 dynamic import——oracledb 未装进 platform 依赖前,ping 回 reachable:false、introspect 抛(由 jdbc-base 的 introspect 统一按空清单处理)。
 // 验证阶段再决定是否加依赖真跑;未装时该源仍可建、可走 Glue 同步(driver 走 Glue 内置 jar)。
 // 【方言差异】统一用 Service Name 语义(根治):Node 侧 oracledb EZConnect connectString=
 //   "host:port/service",Glue/JDBC thin URL=jdbc:oracle:thin:@//host:port/service —— 两侧把
@@ -58,8 +58,6 @@ async function introspect(conn: JdbcConnInfo): Promise<SourceDataset[]> {
       map[tname].push({ name: cname, type: dtype, nullable: nullable === "Y" });
     }
     return toDatasets(map);
-  } catch {
-    return [];
   } finally {
     try { await c?.close(); } catch {}
   }

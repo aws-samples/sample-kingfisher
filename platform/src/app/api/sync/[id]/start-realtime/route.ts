@@ -8,9 +8,11 @@ import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
-// (原则 3)—— DMS 通道尚未逐区,非 home 章 fail-closed
-import { boundToHomeOnly } from "@/lib/exec-env/definition-binding";
+// 落点 = 任务绑定的那个执行区(唯一作者);该区不具备条件时的拒因也由它给
+import { resolveDmsPlace, DmsPlaceUnavailable, type DmsPlace } from "@/lib/realtime/dms-place";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
+// 「禁止跨区取数」与批同步启动同一个判法
+import { crossRegionSource } from "@/lib/sync/cross-region-source";
 // task-runs 唯一写通道(50 SPEC §6 S10)。
 import { putRunRecord, settleRunningRuns, resolveRunStamp } from "@/lib/monitor/run-records";
 import { recordAudit } from "@/lib/audit";
@@ -19,26 +21,30 @@ import { getCorrelationId, logger } from "@/lib/observability/logger";
 import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
 import {
   ensureSourceEndpoint,
+  alignSourceEndpoint,
   ensureTargetEndpoint,
   ensureReplicationTask,
   startReplication,
   testEndpoints,
+  latestConnectionVerdict,
   getReplicationInstanceArn,
   probeReplicationInstance,
-  REPLICATION_INSTANCE_ID,
   REPLICATION_INSTANCE_BROKEN_STATUSES,
   waitTaskStartable,
+  describeEndpointConnections,
+  type EndpointConnectionSnapshot,
 } from "@/lib/realtime/dms-service";
 // 停 / 删 / 「启动被接管后停回去」共用**同一个**下线作者
 import { teardownSyncChannel, TEARDOWN_LONG_OP_WAIT_MS } from "@/lib/sync/teardown";
 // 编排失败时复制实例可能刚建出来却没有任务引用 ⇒ 登记回收作业(作业按「零复制任务」事实决定,实例在用就收口为「在用」)
 import { enqueueDmsInstanceReclaim } from "@/lib/realtime/dms-instance-reclaim-job";
-import { getTarget } from "@/lib/exec-env/registry";
 import {
   ensureRedshiftDmsUser,
   ensureTargetSchema,
   ensureRoleAssociatedToNamespace,
 } from "@/lib/realtime/redshift-target";
+// 目标 schema 名(= 源库名)的校验唯一作者:受控 DDL 通道在后台编排里还会再判一次,这里只是把同一个结论提前到请求里
+import { assertDmsIngestSchema } from "@/lib/exec-env/admin-ddl-request";
 
 // 实时同步启动入口(syncMode=realtime / channel=dms)。
 //
@@ -46,7 +52,9 @@ import {
 // 编排顺序固化了 R3/R4 实测的 7 个踩坑解法(目标准备 → endpoints → 任务 → 启动)。
 //
 // 生产级:editor+ RBAC、审计、幂等(全程 ensure*)、结构化日志带 correlationId、错误不吞。
-// 不创建常驻基建(DMS 实例/Kinesis 由门控 BgpRealtimeStack 提供;经环境变量判断是否就绪)。
+// 不创建常驻基建(子网组 / 安全组 / 访问角色由主控区实时栈或该执行区的 DMS 栈提供;复制实例懒创建)。
+// 🔴 在哪个区做 = 任务绑定的执行区(`resolveDmsPlace`):复制实例、端点、复制任务、目标数仓、暂存桶、密钥全在该区,
+//   主控区与执行区同一条路。该区还不具备条件 ⇒ 如实拒并指路,绝不替它在别的区跑。
 //
 // 【(2026-10-24 全新账号页面驱动段 wp24 抓到)】两件事一起坏
 //   ① 返 202 之前同步 `await getReplicationInstanceArn()`:全新账号第一次「启动」要现场创建复制实例
@@ -88,31 +96,80 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (task.channel !== "dms") {
     return apiError("该任务非 DMS 通道,请用对应入口启动", 400, { code: "VALIDATION_FAILED", correlationId: cid });
   }
-  // 🔴 原则 3:DMS 是主控区里的托管通道(HomeOnlyReason:
-  // dms-bootstrap-home;复制实例/角色只有 home 那套 env),尚未逐区。非 home 章任务在这里跑 =
-  // 拿主控区的 DMS 去拉别区的源、写主控区数仓 —— 数据当场出境。如实拒,DMS target 化归后续包。
-  if (!boundToHomeOnly(task)) {
-    return apiError(
-      `该任务绑定在执行环境 ${bindingTargets(task as { targets?: unknown; targetId?: unknown }).join(" / ")},` +
-        `而 DMS 实时通道尚未逐区下推(目前只在主控区提供)—— 已拒绝启动,不会替它在主控区跑`,
-      409,
-      { code: "CHANNEL_NOT_PUSHED_DOWN", correlationId: cid }
-    );
-  }
   const migrationType: "full-load" | "full-load-and-cdc" = task.syncMode === "full" ? "full-load" : "full-load-and-cdc";
-  // 实时基建未部署时明确报错(门控栈未拉起)。
-  // 复制实例 ARN 不再靠静态 env——改为运行时按稳定 id(bgp-dms)发现,根治 destroy/recreate 后的
-  // ARN 漂移;发现失败即说明实时栈未拉起/已止血销毁,快速返回 503。
-  if (!process.env.DMS_ROLE_ARN) {
-    return apiError("实时基建未就绪:请先部署 BgpRealtimeStack(-c enable-realtime=1)", 503, {
+  // 落点:任务绑定的那个执行区。该区的实时基建没就位(主控区没部署实时栈 / 执行区没装组件、升级后还没重新部署、当前不可用)
+  // ⇒ 503 并点名缺什么、去哪补;任务绑了多个区(坏数据行)⇒ 409。🔴 没有「解析不出来就用主控区」这条路。
+  let place: DmsPlace;
+  try {
+    place = await resolveDmsPlace(task as { targets?: unknown; targetId?: unknown });
+  } catch (e) {
+    if (e instanceof DmsPlaceUnavailable) {
+      const multi = e.reason === "multi-binding";
+      return apiError(e.message, e.httpStatus, {
+        code: multi ? "TARGET_PUSHDOWN_UNAVAILABLE" : "UPSTREAM_ERROR",
+        correlationId: cid,
+        ...(multi ? { detail: { bound: bindingTargets(task as { targets?: unknown; targetId?: unknown }) } } : {}),
+      });
+    }
+    return apiError(`实时基建未就绪:${String((e as Error)?.message || e).slice(0, 300)}`, 503, {
       code: "UPSTREAM_ERROR",
       correlationId: cid,
     });
   }
+
+  // 源库凭证/库名/主机:任务自身字段优先;否则从关联数据源(datasourceId)解析。
+  // 创建流程(SyncTaskModal)只存 datasourceId,不冗余存 secret/database/host,故此处必须能回退解析,
+  // 否则任何经 UI 正常创建的实时任务都拿不到源库连接信息而启动失败。
+  let sourceSecretArn = task.sourceSecretArn || task.secretArn;
+  let schemaName = task.sourceDatabase || task.schemaName || "";
+  let sourceHost = task.sourceHost || "";
+  let sourcePort = task.sourcePort || 3306;
+  if (task.datasourceId) {
+    const { Item: ds } = await docClient.send(
+      new GetCommand({ TableName: TABLES.DATASOURCES, Key: { userId: USER_ID, datasourceId: task.datasourceId } })
+    );
+    if (ds) {
+      // 🔴 禁止跨区取数(与批同步启动同一个判法、同一个错误码):通道建在任务绑定的区,源也必须在那个区 ——
+      //   源在别的区 = 拿这个区的复制实例去拉另一个区的库。这不是过渡态,设计如此、永久拒;零副作用(还没写任何状态)。
+      const cross = crossRegionSource(task as { targets?: unknown; targetId?: unknown }, ds as Record<string, unknown>);
+      if (cross) {
+        return apiError(
+          `禁止跨区取数:数据源在执行环境 ${cross.datasourceOwner},而任务绑定在 ${cross.bound.join(" / ")} —— 同步 = 读源写仓,` +
+            `源与任务必须在同一执行环境(数据不离开它所在的区),这是设计规则、永久拒绝(请在源所在的区建同步任务)`,
+          409,
+          { code: "CROSS_REGION_SOURCE", correlationId: cid, detail: cross }
+        );
+      }
+      // 连接信息:任务自身字段优先,缺的才从数据源行补(三项齐全的任务连端口也用自己的,与改动前一致)
+      if (!sourceSecretArn || !schemaName || !sourceHost) sourcePort = ds.port || sourcePort;
+      sourceSecretArn = sourceSecretArn || ds.secretArn;
+      schemaName = schemaName || ds.database || "";
+      sourceHost = sourceHost || ds.host || "";
+    }
+  }
+  const tableName = (task.sourceTables && task.sourceTables[0]) || task.tableName || "%";
+
+  // 源库连接信息缺失则明确报错(而非进后台编排后才失败)。
+  if (!sourceSecretArn || !schemaName || !sourceHost) {
+    return apiError("任务缺少源库信息(secret/database/host),请确认已正确选择数据源", 400, {
+      code: "VALIDATION_FAILED",
+      correlationId: cid,
+    });
+  }
+
+  // DMS 把源库名当作目标数仓里的 schema 名。平台保留的名字 / 不是普通标识符的库名,受控 DDL 通道不收 ⇒ 现在就拒:
+  //   这是纯校验,不该等复制实例建好(10–15 分钟、按小时计费)之后才在后台编排的「建目标 schema」一步失败。
+  try {
+    assertDmsIngestSchema(schemaName);
+  } catch (e) {
+    return apiError(String((e as Error)?.message ?? e).slice(0, 400), 400, { code: "VALIDATION_FAILED", correlationId: cid });
+  }
+
   // 🔴 ①:这里只**看一眼**(实例缺就发起懒创建、立刻回当前状态),不在请求里等它 available。
+  //   放在全部「会拒」的检查之后:懒创建是真副作用(一台按小时计费的实例),被拒的请求不该留下它。
   let instanceStatus = "";
   try {
-    instanceStatus = (await probeReplicationInstance()).status;
+    instanceStatus = (await probeReplicationInstance(place)).status;
   } catch (e: any) {
     return apiError(`实时基建未就绪:${String(e?.message || e)}`, 503, {
       code: "UPSTREAM_ERROR",
@@ -128,37 +185,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const instanceCold = instanceStatus !== "available";
   // 旧实例正在删除(空闲回收刚发起,或有人手工删):照常受理 —— 后台编排先等它删完再重建,比单纯冷建更久,话要说在前头。
   const instanceRecycling = instanceStatus === "deleting";
-
-  // 源库凭证/库名/主机:任务自身字段优先;否则从关联数据源(datasourceId)解析。
-  // 创建流程(SyncTaskModal)只存 datasourceId,不冗余存 secret/database/host,故此处必须能回退解析,
-  // 否则任何经 UI 正常创建的实时任务都拿不到源库连接信息而启动失败。
-  let sourceSecretArn = task.sourceSecretArn || task.secretArn;
-  let schemaName = task.sourceDatabase || task.schemaName || "";
-  let sourceHost = task.sourceHost || "";
-  let sourcePort = task.sourcePort || 3306;
-  if ((!sourceSecretArn || !schemaName || !sourceHost) && task.datasourceId) {
-    const { Item: ds } = await docClient.send(
-      new GetCommand({ TableName: TABLES.DATASOURCES, Key: { userId: USER_ID, datasourceId: task.datasourceId } })
-    );
-    if (ds) {
-      sourceSecretArn = sourceSecretArn || ds.secretArn;
-      schemaName = schemaName || ds.database || "";
-      sourceHost = sourceHost || ds.host || "";
-      sourcePort = ds.port || sourcePort;
-    }
-  }
-  const tableName = (task.sourceTables && task.sourceTables[0]) || task.tableName || "%";
-  const stagingBucket = process.env.GENBI_MEMORY_BUCKET || `bgp-datalake-${process.env.AWS_ACCOUNT_ID || ""}`;
-  const redshiftHost = process.env.REDSHIFT_HOST || "";
-  const dmsRoleArn = process.env.DMS_ROLE_ARN!;
-
-  // 源库连接信息缺失则明确报错(而非进后台编排后才失败)。
-  if (!sourceSecretArn || !schemaName || !sourceHost) {
-    return apiError("任务缺少源库信息(secret/database/host),请确认已正确选择数据源", 400, {
-      code: "VALIDATION_FAILED",
-      correlationId: cid,
-    });
-  }
 
   // 写一条运行记录到 bgp-task-runs(让详情页"运行历史"Tab + 顶部统计对实时任务也有数据;
   // 实时是常驻通道,这条记录代表"启动编排"这一次运行,含编排步骤日志与复制任务 ARN)。
@@ -254,14 +280,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   const writeRun = (status: string, extra: Record<string, unknown> = {}) =>
     putRunRecord({
       taskId: params.id, runId, taskType: "sync", status, startedAt, triggeredBy: "manual",
-      stamp: resolveRunStamp(task),
+      // 章按任务真正跑的那个区显式盖:同步任务的区在 targets[] 里,不传第二个参数会盖成主控区
+      //(2026-11-20 页面实测:执行区的 DMS 运行在任务监控里记成了主控区)。
+      stamp: resolveRunStamp(task, place.targetId),
       extra: { channel: "dms", metrics: { rowsRead: 0, rowsWritten: 0 }, ...extra },
     }).catch((e) => logger.error("realtime.run.write.failed", e, { correlationId: cid, taskId: params.id }));
 
   // 落一条 running 运行记录(立即可在"运行历史"看到本次启动)。
   // 关闭本任务此前残留的 running 运行记录(常驻通道重启/后台轮询中断会累积多条 running,与 zero-etl 同处理)。
   try {
-    await settleRunningRuns({ taskId: params.id, status: "stopped", set: { finishedAt: startedAt }, stamp: resolveRunStamp(task) });
+    await settleRunningRuns({ taskId: params.id, status: "stopped", set: { finishedAt: startedAt }, stamp: resolveRunStamp(task, place.targetId) });
   } catch { /* best-effort */ }
   const firstStep = instanceRecycling
     ? "[编排] DMS 同步启动已受理;复制实例正在回收,回收完成后自动重建(约 15–25 分钟),就绪后再建复制通道(endpoints/复制任务)..."
@@ -289,57 +317,88 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
           .catch((e) => ({ channel: "dms", hardFailures: [{ what: "teardownSyncChannel", error: String((e as Error)?.message ?? e).slice(0, 240) }], softFailures: [] }));
         logger.warn("realtime.start.yield_cleanup", { correlationId: cid, taskId: params.id, step, why, started, teardown: td });
       }
+      // 行已删:本编排在这之前可能已经建了端点(甚至复制任务)。删除那一刻登记的回收作业也许已经收口 ⇒ 再登记一次
+      //   (同一台实例已有在途作业时原样返回),由它按事实清掉这条任务留在该区的端点、并在实例空闲后回收实例。
+      if (why === "gone") {
+        await enqueueDmsInstanceReclaim({ targetId: place.targetId, region: place.region, instanceId: place.instanceId, reason: "task-deleted", createdBy: "system:realtime-start" })
+          .catch((e2) => logger.error("realtime.instance-reclaim.enqueue-failed", e2, { correlationId: cid, taskId: params.id, step }));
+      }
       logger.info("realtime.start.superseded", { correlationId: cid, taskId: params.id, step, why });
     };
     try {
-      logger.info("realtime.start.begin", { correlationId: cid, taskId: params.id, schemaName, tableName, instanceCold });
+      logger.info("realtime.start.begin", { correlationId: cid, taskId: params.id, targetId: place.targetId, region: place.region, schemaName, tableName, instanceCold });
       // ①:等复制实例就位挪到这里(首次 10–15 分钟,预算 30 分钟);等完先确认任务还归我管。
-      await getReplicationInstanceArn(); log("✓ DMS 复制实例就绪");
+      await getReplicationInstanceArn(place); log(`✓ DMS 复制实例就绪(${place.instanceId} · ${place.region})`);
       const afterInstance = await writeOwned("provisioning");
       if (afterInstance !== "owned") return yieldTo("instance-ready", afterInstance);
-      const targetSecretArn = await ensureRedshiftDmsUser(redshiftHost); log("✓ 目标 Redshift 专用用户/密钥就绪(dms_ingest)"); // 踩坑④
-      await ensureTargetSchema(schemaName); log(`✓ 目标 schema 就绪: ${schemaName}`); // 踩坑⑤
-      await ensureRoleAssociatedToNamespace(dmsRoleArn); log("✓ DMS COPY 角色已关联 Redshift namespace"); // 踩坑⑥
-      const input = { taskId: params.id, sourceSecretArn, sourceHost, sourcePort, targetSecretArn, schemaName, tableName };
-      const sourceArn = await ensureSourceEndpoint(input); log("✓ 源 endpoint 就绪(MySQL)");
-      const targetArn = await ensureTargetEndpoint(input, stagingBucket); log("✓ 目标 endpoint 就绪(Redshift)");
+      let ingest = await ensureRedshiftDmsUser(place); log(`✓ 目标 Redshift 专用用户/密钥就绪(dms_ingest${ingest.provisioned ? "" : ",沿用已有密钥"})`); // 踩坑④
+      await ensureTargetSchema(place, schemaName); log(`✓ 目标 schema 就绪: ${schemaName}`); // 踩坑⑤
+      await ensureRoleAssociatedToNamespace(place); log("✓ DMS COPY 角色已关联 Redshift namespace"); // 踩坑⑥
+      const input = { taskId: params.id, sourceSecretArn, sourceHost, sourcePort, targetSecretArn: ingest.secretId, schemaName, tableName };
+      const source = await ensureSourceEndpoint(place, input); log("✓ 源 endpoint 就绪(MySQL)");
+      const sourceArn = source.arn;
+      const targetArn = await ensureTargetEndpoint(place, input); log("✓ 目标 endpoint 就绪(Redshift)");
       // 要建复制任务了 —— 这是第一件「删任务时得连带撤掉」的真资源,建之前再确认一次归属。
       const beforeCreate = await writeOwned("provisioning", { sourceEndpointArn: sourceArn, targetEndpointArn: targetArn });
       if (beforeCreate !== "owned") return yieldTo("before-task-create", beforeCreate);
-      const taskArn = await ensureReplicationTask(input, sourceArn, targetArn, migrationType, task.dmsSettings); log(`✓ DMS 复制任务就绪(${migrationType})`);
+      const taskArn = await ensureReplicationTask(place, input, sourceArn, targetArn, migrationType, task.dmsSettings); log(`✓ DMS 复制任务就绪(${migrationType})`);
       replicationTaskReady = true;
 
       // 新建任务返回后仍处 creating,须等其进入 ready/stopped 才能启动(否则 invalid state)。
-      const taskState = await waitTaskStartable(taskArn); log(`✓ 复制任务状态: ${taskState}`);
+      const taskState = await waitTaskStartable(place, taskArn); log(`✓ 复制任务状态: ${taskState}`);
+
+      // 沿用的源端点(停止后再启动 / 上一次启动失败后重试):按数据源的现值对齐一次再测 ——
+      //   这期间用户改过数据源的主机 / 口令的话,不能还拿旧配置去连(改动前只能删任务重建)。
+      if (source.reused) {
+        await alignSourceEndpoint(place, input, sourceArn);
+        log("✓ 源 endpoint 已按数据源当前的连接配置更新,重新测试连通性");
+      }
 
       // 连通性测试是异步的,轮询等两端 successful 再启动。Redshift 首次连接(冷启动)较慢,
       // 窗口放宽到 ~5min(30×10s);testEndpoints 内部只对未成功端点触发测试,状态单调收敛。
-      let lastConn = { source: "unknown", target: "unknown" };
+      let lastConn: EndpointConnectionSnapshot = { source: "unknown", target: "unknown" };
+      /** 每一端最近一次出了结果的测试结论(超时的时候用它说清「为什么连不上」;最后一轮多半正停在测试中) */
+      let verdict: EndpointConnectionSnapshot = lastConn;
+      /** 目标端测试失败后的「重设摄入用户口令」本次启动只做一次(有界) */
+      let reprovisioned = false;
       for (let i = 0; i < 30; i++) {
-        lastConn = await testEndpoints(sourceArn, targetArn);
+        lastConn = await testEndpoints(place, sourceArn, targetArn);
+        verdict = latestConnectionVerdict(verdict, lastConn);
+        // 目标端连不上、而密钥是沿用的(数仓重建过 / 用户被删 / 口令与密钥对不上)或 DMS 明说是认证失败 ⇒ 重设口令并覆盖密钥,下一轮重测。
+        //   别的原因(网络不通之类)换口令没用,不折腾:同区其它正在跑的通道下次重连也要读这份密钥。
+        //   第一轮读到的「失败」是这次启动之前留下的旧结论(这次还没测过),不据此动口令;本轮已经触发重测,下一轮起的失败才算数。
+        if (i > 0 && lastConn.target === "failed" && !reprovisioned
+          && (!ingest.provisioned || /authenticat|password/i.test(lastConn.targetFailure ?? ""))) {
+          reprovisioned = true;
+          ingest = await ensureRedshiftDmsUser(place, { rotate: true });
+          log("↻ 目标端连通性测试失败:已重设目标专用用户的口令并更新密钥,重新测试");
+          continue;
+        }
         if (lastConn.source === "successful" && lastConn.target === "successful") {
           // 要让复制任务真跑起来(开始搬数据、开始计费)—— 启动前最后一次确认归属:
           // 用户在这几分钟里点了「停止」,就不许再把它启动起来。
           const beforeStart = await writeOwned("provisioning", { replicationTaskArn: taskArn, sourceEndpointArn: sourceArn, targetEndpointArn: targetArn });
           if (beforeStart !== "owned") return yieldTo("before-start", beforeStart);
-          await startReplication(taskArn);
+          await startReplication(place, taskArn);
           started = true;
           break;
         }
         await new Promise((r) => setTimeout(r, 10000));
       }
-      log(started ? "✓ 两端连通性通过,DMS 复制任务已启动(running)" : `✗ 连通性超时:源=${lastConn.source} 目标=${lastConn.target}`);
+      // 连不上时把 DMS 给的失败原文带出来(只有它知道是网络不通、口令不对还是库不存在)
+      const connText = describeEndpointConnections(started ? lastConn : verdict);
+      log(started ? "✓ 两端连通性通过,DMS 复制任务已启动(running)" : `✗ 连通性超时:${connText}`);
       const owned = await writeOwned(started ? "running" : "error", {
         replicationTaskArn: taskArn, sourceEndpointArn: sourceArn, targetEndpointArn: targetArn,
-        ...(started ? {} : { error: `endpoint 连通性测试未通过(超时):源=${lastConn.source} 目标=${lastConn.target}` }),
+        ...(started ? {} : { error: `endpoint 连通性测试未通过(超时):${connText}`.slice(0, 600) }),
       });
       // 归属检查与 StartReplicationTask 之间那几秒里用户点了「停止」/「删除」:复制任务被我们刚刚启动了 ⇒ 让路时停回去 / 撤掉
       if (owned !== "owned") return yieldTo("final", owned);
       await writeRun(started ? "running" : "failed", {
         replicationTaskArn: taskArn, logs: steps,
-        ...(started ? {} : { error: `连通性超时:源=${lastConn.source} 目标=${lastConn.target}` }),
+        ...(started ? {} : { error: `连通性超时:${connText}`.slice(0, 600) }),
       });
-      logger.info("realtime.start.done", { correlationId: cid, taskId: params.id, started, conn: lastConn });
+      logger.info("realtime.start.done", { correlationId: cid, taskId: params.id, started, conn: { source: lastConn.source, target: lastConn.target } });
     } catch (e: any) {
       logger.error("realtime.start.failed", e, { correlationId: cid, taskId: params.id });
       log(`✗ 编排失败: ${String(e?.message || e).slice(0, 200)}`);
@@ -347,18 +406,14 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       const onFailure = await writeOwned("error", { error: String(e?.message || e).slice(0, 300) });
       if (onFailure !== "owned") return yieldTo("failed", onFailure);
       await writeRun("failed", { error: String(e?.message || e).slice(0, 300), logs: steps });
-      // 落点取任务绑定的执行区(实例建在那个区),不默认主控区
-      const [boundTargetId] = bindingTargets(task as { targets?: unknown; targetId?: unknown });
-      await (async () => {
-        const target = boundTargetId ? await getTarget(boundTargetId) : null;
-        if (!target) throw new Error("任务没有绑定可解析的执行区");
-        await enqueueDmsInstanceReclaim({ targetId: target.targetId, region: target.region, instanceId: REPLICATION_INSTANCE_ID, reason: "start-failed", createdBy: "system:realtime-start" });
-      })().catch((e2) => logger.error("realtime.instance-reclaim.enqueue-failed", e2, { correlationId: cid, taskId: params.id }));
+      // 落点就是这次启动用的那一个(实例建在那个区)
+      await enqueueDmsInstanceReclaim({ targetId: place.targetId, region: place.region, instanceId: place.instanceId, reason: "start-failed", createdBy: "system:realtime-start" })
+        .catch((e2) => logger.error("realtime.instance-reclaim.enqueue-failed", e2, { correlationId: cid, taskId: params.id }));
     }
   })();
 
   recordAudit(req, "sync.start-realtime", {
-    resourceType: "sync", resourceId: params.id, detail: { name: task.name, schemaName, tableName, instanceCold },
+    resourceType: "sync", resourceId: params.id, detail: { name: task.name, schemaName, tableName, instanceCold, targetId: place.targetId, region: place.region },
   }).catch(() => {});
 
   // 202:已受理,后台编排中;前端轮询 /realtime-status。

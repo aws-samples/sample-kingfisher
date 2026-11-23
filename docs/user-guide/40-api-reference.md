@@ -175,7 +175,8 @@ A few older endpoints return the flat `{ "error": "<text>" }` (noted in the tabl
 | 409 | `SCHEDULER_NOT_INSTALLED` | The target region has no scheduler component installed; `detail.fix` points to where to install it |
 | 409 | `WORKFLOW_SCHEDULER_UNSUPPORTED` | The region runs airflow-serverless, which has no Airflow web console; use the platform's run / node log pages |
 | 409 | `SCHEDULER_ARTIFACT_MISSING` | Neither the platform nor the scheduler can find this workflow's scheduling artifact; "Publish" again |
-| 409 | `TARGET_PUSHDOWN_UNAVAILABLE` · `CROSS_REGION_SOURCE` · `CHANNEL_NOT_PUSHED_DOWN` | The region the definition is bound to does not match the execution channel / source and execution region differ (data leaving the region, always refused) / the channel is not yet per-region; change the binding or the channel |
+| 409 | `TARGET_PUSHDOWN_UNAVAILABLE` · `CROSS_REGION_SOURCE` · `CHANNEL_NOT_PUSHED_DOWN` | The region the definition is bound to does not match the execution channel / source and execution region differ (data leaving the region, always refused) / the channel is not offered in that execution region (at present only Zero-ETL); change the binding or the channel |
+| 400 | `CHANNEL_NOT_AVAILABLE_IN_REGION` | The channel selected when saving a sync task is not offered in the execution region of the data source (at present: Zero-ETL is home-region only); switch to a channel that region offers |
 | 409 | `GENBI_CARD_QUOTA_EXCEEDED` · `GENBI_CARD_TOO_LARGE` | Card quota is full / a single card exceeds the limit; the message gives used / limit |
 | 409 | `PREVIEW_DRIFT` · `NOT_DRAINED` · `IMPACT_NOT_ZERO` · `USE_DISCARD` etc. | Refusal reasons of the individual steps of deleting an execution environment; each states the next step |
 | 410 | `GONE` | The capability is retired (Data Service / two legacy execution-environment endpoints) |

@@ -173,12 +173,20 @@ export function buildPlatformDataRole(scope: Construct, id: string, p: PlatformD
   //   · `bgp/datasource/*` —— 建源 / 改口令 / 删源的 CreateSecret / UpdateSecret / DeleteSecret 一直走该区的数据面客户端
   //     (`lib/datasource-spi/secrets.ts`),而本角色此前只给了读 ⇒ 「能读不能建」是上一轮「能建不能读」的镜像,同样是非对称授权;
   //   · `bgp/dms/*` —— 实时链给 DMS 建 Redshift 专用用户后写完整字段密钥(`lib/realtime/redshift-target.ts`,CreateSecret / PutSecretValue)。
-  //   平台不读 `bgp/dms/*`(DMS 用自己的访问角色读),所以只进写语句,不进上面的读语句。
+  //   平台不读 `bgp/dms/*` 的**值**(DMS 用自己的访问角色读),所以只进写语句,不进上面的读语句;
+  //   「在不在」要知道(在就复用,不每次启动都重设口令;写完也要按名确认可见)⇒ 另给一条只有 DescribeSecret 的窄语句。
   role.addToPolicy(
     new iam.PolicyStatement({
       sid: "OwnRegionCredentialSecretsWrite",
       actions: ["secretsmanager:CreateSecret", "secretsmanager:UpdateSecret", "secretsmanager:PutSecretValue", "secretsmanager:DeleteSecret", "secretsmanager:TagResource"],
       resources: [sec(`bgp/project/${slug}/*`), sec("bgp/shared-writer/*"), sec("bgp/datasource/*"), sec("bgp/dms/*")],
+    })
+  );
+  role.addToPolicy(
+    new iam.PolicyStatement({
+      sid: "OwnRegionDmsSecretDescribe",
+      actions: ["secretsmanager:DescribeSecret"],
+      resources: [sec("bgp/dms/*")],
     })
   );
 

@@ -10,6 +10,8 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { bindingTargets, TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
 import { homeRegion } from "@/lib/exec-env/target-clients";
 import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
+// 「禁止跨区取数」的判法(三处共用)
+import { crossRegionSource } from "@/lib/sync/cross-region-source";
 import { apiOk, apiError } from "@/lib/api-response";
 import { ulid } from "ulid";
 import type { DataSource } from "@/types/datasource";
@@ -101,16 +103,18 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     // 存量源无章 = home(补维前所有源都在主控区可达,历史事实,与 bindingTargets 三级回落同一条理由)。
     // 读法收成一个(`datasourceOwnerTarget`,按 DATASOURCE_OWNER_TARGET_ATTR 读),
     //   OM 回填重放(源表 service)用的是同一个。
-    const dsOwner = datasourceOwnerTarget(ds as Record<string, unknown>);
-    if (!bound.includes(dsOwner)) {
+    const cross = crossRegionSource(task as { targets?: unknown; targetId?: unknown }, ds as Record<string, unknown>);
+    if (cross) {
       // 🔴 文案不做法务定性(「数据出境」等词只许 disclaimer.ts 一处定义),只说事实与规则。
       return apiError(
-        `禁止跨区取数:数据源在执行环境 ${dsOwner},而任务绑定在 ${bound.join(" / ")} —— 同步 = 读源写仓,` +
+        `禁止跨区取数:数据源在执行环境 ${cross.datasourceOwner},而任务绑定在 ${cross.bound.join(" / ")} —— 同步 = 读源写仓,` +
           `源与任务必须在同一执行环境(数据不离开它所在的区),这是设计规则、永久拒绝(请在源所在的区建同步任务)`,
         409,
-        { code: "CROSS_REGION_SOURCE", detail: { datasourceOwner: dsOwner, bound } }
+        { code: "CROSS_REGION_SOURCE", detail: cross }
       );
     }
+    // 过了上面那道卡,数据源就在任务绑定的区里;启动核心要它(记进运行行)
+    const dsOwner = datasourceOwnerTarget(ds as Record<string, unknown>);
 
     // 🔴 启动前再判一次「有没有活可干」:存量任务可能就是空的(建任务那道门是后加的),
     //   而空表清单的同步会**什么都不做却报 succeeded**(真环境实测:Glue 日志 `SYNC RESULTS: {}`、

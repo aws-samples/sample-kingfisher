@@ -1,13 +1,17 @@
 # Customer Production Deployment Manual (Multi-Region Edition)
 
-> Document revision: **v1.35** (2026-11-17: new section 7ter.1n, two things to know when upgrading to the version with "leader hand-over of background tasks" —
-> on the first upgrade to this version background tasks resume after up to about 8.5 minutes, later upgrades hand over within seconds · platform only;
-> also records section 7ter.1m (one-click stop / delete of sync tasks + a transitive-dependency security refresh), which was written on 2026-11-16 without a revision bump) ·
+> Document revision: **v1.36** (2026-11-23: new section 7ter.1o, four things to know when upgrading to the version with the "per-region DMS real-time channel" —
+> press "Redeploy" once on the page for every execution region · the DMS channel runs in the region of the data source · Zero-ETL stays in the home region only ·
+> deleting a task leaves no endpoints behind, and a start after the data source was changed uses the new settings; section 8 gains the boundaries of the per-region DMS channel (reachability of the source database and others);
+> Appendix A.1 drops the four container variables the platform no longer injects) ·
 >
-> Earlier revisions (41) are in the collapsible list below.
+> Earlier revisions (42) are in the collapsible list below.
 
 <details><summary>Revision history</summary>
 
+- **v1.35** (2026-11-17: new section 7ter.1n, two things to know when upgrading to the version with "leader hand-over of background tasks" —
+  on the first upgrade to this version background tasks resume after up to about 8.5 minutes, later upgrades hand over within seconds · platform only;
+  also records section 7ter.1m (one-click stop / delete of sync tasks + a transitive-dependency security refresh), which was written on 2026-11-16 without a revision bump) ·
 - **v1.34** (2026-11-16: new section 7ter.1k, three things to know when upgrading to the version with "sync-node business date, scoped downstream dependencies and the Glue version of new jobs";
   new section 7ter.1l, three things to know when upgrading to the version with "metric reuse (modeling metrics in Ask-Your-Data + the "Metric" data method of report visuals)" —
   run `redeploy-agents.sh` as well · save once more the visuals that were saved in an execution-region view before the upgrade · no new table, execution regions need no redeployment) ·
@@ -623,6 +627,23 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
    on upgrades after this version a new replica takes over 1–2 seconds after the old leader has handed over. When the leader process is killed (and cannot hand over), a standby replica takes over after at most about 3.5 minutes.
    Platform only: no new table, no new permission, no `redeploy-agents.sh`, execution regions need no redeployment.
 
+### 7ter.1o Four things to know when upgrading to the version with the "per-region DMS real-time channel" (ships with 2.2.0)
+
+1. **Press "Redeploy" once on the page for every execution region**: this version adds a security group (used by the replication instance) to the DMS stack of every execution region and extends the permissions of that region's data-plane role.
+   After the platform has been upgraded and while a region has not been redeployed yet, "Start" of a DMS task in that region answers with directions: "Real-time infrastructure not ready: DMS security group … not ready …
+   press "Redeploy" for … on the "Execution Environments" page and start again"; no cloud resource is created and the task is not moved to the home region; after the redeployment press "Start" once more. DMS tasks of the home region are not affected.
+2. **The DMS channel runs in the execution region of the data source**: the replication instance (`bgp-dms-<slug>`, created on the first start, about 10–15 minutes), the source / target endpoints, the replication task and
+   the target warehouse are all in the region of the data source; the data does not pass through the home region. Before, a data source of an execution region could select the DMS channel and save it, and was refused only on "Start"; after the upgrade and the redeployment these tasks can be started as they are, without being recreated.
+   The object names of the home region (`bgp-dms` and so on) are unchanged, letter for letter.
+3. **The Zero-ETL channel is still offered in the home region only**: for a data source of an execution region the wizard shows Zero-ETL greyed out and says to use the DMS or the Glue channel instead; a save is refused as well.
+   Tasks of this kind that were saved before the upgrade still cannot be started (the start says so plainly); editing their other fields is not affected.
+4. **Deleting a task no longer leaves endpoints behind; a start after the data source was changed uses the new settings**: after a DMS task is deleted, its source / target endpoints are removed by the background cleanup job once the replication task is gone
+   ("Settings → Background cleanup jobs" shows "N leftover endpoint(s) removed"; orphan endpoints left by earlier versions are removed on the region's next cleanup).
+   When the host / port / user / password of the data source was changed after a DMS task was stopped, or the first start failed because of a wrong address or password that has since been corrected, pressing "Start" once more connects with the new settings — no need to delete and recreate the task.
+
+Platform only plus "Redeploy" on the page for every execution region; no new table, no `redeploy-agents.sh`. The platform container has four environment variables fewer (this only matters to those who set up a local development environment from `platform/.env.example`).
+Measured in two test environments: first start in an execution region until the replication task appears 527 / 544 seconds; endpoints removed 81 / 82 seconds after the delete; back to "Running" after a password change and a restart 79 / 115 seconds.
+
 ### 7ter.1 Six things to know when upgrading to the "data-sync capability completion" version (`release-2026-10-13`)
 
 | # | Change | Impact on existing objects | What to do |
@@ -907,6 +928,23 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
   - the platform Glue role is already allowed on any table bucket of its own region;
   - the Athena Query page can query any bucket of the same region with `"s3tablescatalog/<bucket>"."<namespace>"."<table>"` (that page is read-only).
   - Full steps and screenshots are in the "Cross-table-bucket read/write handbook (2.1.2)" delivered to the customer.
+- **The DMS channel of an execution region requires the source database to be reachable from that region's platform VPC (from 2.2.0 the DMS channel is available in every execution region)**: the replication instance of an execution region sits in the private subnets of that region's platform VPC, and this VPC has no route to the public internet.
+  - The source database is either inside this VPC, or you connect the route to it through VPC peering / Transit Gateway and allow that region's DMS security group in the security group of the source database
+    (`bgp-dms-sg-<slug>`, for example `bgp-dms-sg-tgt-usw2`); a source database that only has a public address cannot be reached from an execution region (the home region has a NAT exit, so there it can).
+  - When it cannot be reached, the task error carries the failure text DMS gave; after the network or the data source has been corrected, press "Start" once more.
+- **The Zero-ETL channel is offered in the home region only** (use the DMS or the Glue channel for a data source of an execution region; the wizard greys it out and says so).
+- **A source database whose name equals a schema name reserved by the platform cannot use the DMS channel** (`proj_*` / `shared` / `bgp_canary*` / `pg_*` / `information_schema`, or a database name that is not a plain identifier — starting with a letter or an underscore and containing only letters, digits and underscores):
+  "Start" is refused on the spot (400, no cloud resource is created) and points to the Glue channel (the Glue channel lets you choose a different target schema).
+- **Endpoints stay in DMS after a DMS task is deleted (2.1.2 and all earlier versions; fixed in 2.2.0)**: in the production version every deleted DMS task leaves its source / target endpoints behind (`bgp-src-*` / `bgp-tgt-*`; they are not billed,
+  but they keep the connection settings of the source database); they can be deleted by hand in the DMS console. From 2.2.0 the background cleanup job deletes them automatically, and those left from before the upgrade are removed on the region's next cleanup.
+- **A DMS task that is started again after its data source was changed still uses the old connection settings (2.1.2 and all earlier versions; fixed in 2.2.0)**: in the production version the only way is to delete the task and recreate it; from 2.2.0 pressing "Start" once more connects with the current values of the data source.
+- **For a data source in its own network whose "Probe & browse method" is left on "Auto", step 2 of the sync wizard and "Browse tables" show no tables (2.1.2 and all earlier versions; fixed in 2.2.0)**:
+  in the production version set the "Probe & browse method" of such data sources to "Glue connection only (source in its own network)"; from 2.2.0 "Auto" switches to the Glue connection by itself when the direct connection fails (about 1–3 minutes the first time, the cache afterwards).
+- **After a DMS task is stopped and started again, the list occasionally shows it as "Stopped" and records that run as "Success" although the channel is in fact running (2.1.1 and 2.1.2; fixed in 2.2.0)**:
+  in the first tens of seconds after a replication task has started, DMS briefly reports a "stopped" that does not count, and the platform believed it when it refreshed the list. The data did not stop; in the production version wait a minute and press "Start" once more —
+  the platform finds the replication task already running and only changes the status back to "Running" (the full load is not repeated). From 2.2.0 the platform accepts only a settled "stopped" (one that carries a stop reason and whose stop time is after the latest start).
+- **"Start" of a DMS task occasionally fails with a reason saying the endpoint "already exists" or "DMS security group … not ready" although the security group exists (all versions)**: when an AWS API call fails transiently (throttling and the like),
+  the platform takes "could not read" for "does not exist"; pressing "Start" once more usually works; if it keeps happening, contact the platform administrator.
 - Deferred items (least-privilege narrowing, secret rotation, OpenSearch sizing and snapshots, alerting and so on) are recorded as deferred in the engineering defect records.
 
 ## Appendix A. Configuration reference
@@ -967,11 +1005,7 @@ The platform container receives these variables from the CDK platform stack. "Se
 | `DEFAULT_VPC_ID` | Home VPC | VPC stack |
 | `DEFAULT_SUBNET_ID` | First private subnet | VPC stack |
 | `DEFAULT_AZ` | First availability zone | VPC stack |
-| `REDSHIFT_NAMESPACE` | Home warehouse namespace | CDK constant |
-| `REDSHIFT_HOST` | Home warehouse endpoint | Derived from account and region |
-| `DMS_REPLICATION_INSTANCE_ID` | Replication instance id `bgp-dms` | CDK constant |
-| `DMS_ROLE_ARN` | DMS role | Derived from account |
-| `DMS_TARGET_SECRET_ID` | Warehouse target secret for DMS | CDK constant |
+| `DMS_ROLE_ARN` | DMS access role of the home region | Derived from account |
 | `FLINK_RUNTIME_ENVIRONMENT` | Managed Flink runtime | Context `flink-runtime`, default pinned in CDK |
 | `FLINK_RUNTIME_ROLE_ARN` | Flink application role | Derived from account |
 | `FLINK_SOURCE_STREAM` | Sample source stream name | CDK constant |

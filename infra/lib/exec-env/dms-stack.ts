@@ -1,10 +1,11 @@
 // 执行环境 **dms 组件**栈(50 SPEC §1.1 的 `dms` 资源袋:`dmsSubnetGroup`)。
 //
 // 【本栈为什么这么薄 —— 不是没做完,是 DMS 的形态如此】
-//   复制实例(`AWS::DMS::ReplicationInstance`)是**按小时计费的常驻资源**,而平台的既有做法是
-//   「同步任务需要时按需 provision 实例、用完销毁」(home 侧 `realtime-stack.ts` 同样只建子网组)。
-//   ⇒ 组件栈只交付**实例的耐久前置**:子网组(告诉 DMS 能把 ENI 放进哪些私有子网)。
-//   §3.1a 对 `dms` 组件要求的实名资源也正好只有 `dmsSubnetGroup` 一项(不发明合同)。
+//   复制实例(`AWS::DMS::ReplicationInstance`)是**按小时计费的常驻资源**,而平台的做法是
+//   「第一条 DMS 同步任务启动时懒创建实例、空闲后回收」(主控区 `realtime-stack.ts` 同样不建实例)。
+//   ⇒ 组件栈只交付**实例的耐久前置**(都不计费):子网组(DMS 能把 ENI 放进哪些私有子网)、
+//   安全组(平台按名查 id 再建实例)、访问角色(读密钥 / 写暂存桶 / 数仓 COPY)。
+//   §3.1a 对 `dms` 组件要求的实名资源只有 `dmsSubnetGroup` 一项;安全组的名字来自命名单一事实源,不进描述符。
 //
 // 🔴 资源文案字段一律英文(本模块被"中文描述"整栈 ROLLBACK 过一次:EC2 SG 的 GroupDescription
 //    只收 ASCII、IAM description 只收 Latin-1,synth 不校验、真部署才 400)。
@@ -37,8 +38,8 @@ export class ExecEnvDmsStack extends ExecEnvStack {
     // ──:per-target DMS 统一角色(SPEC v3.21 §6.1 段二)──────────────────
     // 照抄 home `realtime-stack.ts` 的 `bgp-dms-kinesis-role`:信任 dms + **区域化** dms.<region> + redshift(COPY 时
     // assume 本角色读 S3 暂存);动作集相同,资源面改指本 target 的数据湖桶 / 本 region secret。
-    // 🔴 **消费方接线不在本包**:DMS 实时同步尚未 target 化(`dms-service.ts` 仍读 home 的 `DMS_ROLE_ARN`),
-    //    ;这里先把角色与探活备好,免得届时又回头改栈(再改一次 = usw2 再重新部署一次)。
+    // 消费方:平台的 DMS 落点解析(`platform/src/lib/realtime/dms-place.ts`)—— 绑定在本执行区的同步任务,
+    //    复制实例 / 端点 / 复制任务都建在本区,用的就是这个角色。
     const dmsRole = perTargetExecRole(this, "DmsKinesisRole", {
       ctx,
       kind: "dmsKinesisRole",
@@ -79,9 +80,20 @@ export class ExecEnvDmsStack extends ExecEnvStack {
       })
     );
 
+    // 复制实例的安全组:固定名(命名单一事实源),平台启动第一条 DMS 任务时按名查 id 再建实例。
+    // 只有出站(本 VPC 内的源库、本区数仓 5439、Secrets Manager / KMS 接口端点 443、S3 网关端点);没有入站规则。
+    // 源库在别的 VPC 时,由客户把路由接到本 VPC,并在源库的安全组里放行这个安全组(或本 VPC 网段)。
+    new ec2.SecurityGroup(this, "DmsSecurityGroup", {
+      vpc,
+      securityGroupName: nameOf("dmsSecurityGroup"),
+      description: `BGP exec-env ${ctx.targetId} DMS replication instance (egress only)`,
+      allowAllOutbound: true,
+    });
+
     const subnetGroupId = resourceName("dmsSubnetGroup", { targetId: ctx.targetId, account: ctx.account });
-    // 🔴 子网必须是**跨 AZ 的私有子网**:DMS 要求子网组覆盖 ≥2 个 AZ(底座固定给 2 个 AZ),
-    //    且复制实例要能出网访问源库 ⇒ PRIVATE_WITH_EGRESS(经 NAT),不放公有子网。
+    // 🔴 子网必须是**跨 AZ 的私有子网**:DMS 要求子网组覆盖 ≥2 个 AZ(底座固定给 2 个 AZ)。
+    //    执行区的私有子网**零出网**(没有 NAT):复制实例只到得了本 VPC 内、或经客户自己的路由可达的源库;
+    //    只有公网地址的源库在执行区连不上(手册「已知边界」写明)。
     new dms.CfnReplicationSubnetGroup(this, "SubnetGroup", {
       replicationSubnetGroupIdentifier: subnetGroupId,
       replicationSubnetGroupDescription: `BGP exec-env ${ctx.targetId} DMS replication subnet group`,

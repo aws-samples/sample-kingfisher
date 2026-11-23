@@ -24,7 +24,13 @@
 // DMS 夹具与真服务同形:只有运行中的任务能停(对启动中的发 Stop 回「is currently not running」)、非终态的任务删不掉、
 //   启动后要读过几次状态才变成运行中。
 // 🔴 只 mock 真外部:DDB(内存表 + **真的求值路由发来的 ConditionExpression**)、DMS / EC2 / Secrets SDK、
-//    Redshift 目标准备(Data API)、项目守卫、审计、运行记录;路由与 lib/realtime/dms-service 真跑。
+//    Redshift 目标准备(Data API)、项目守卫、审计、运行记录;路由、落点解析(lib/realtime/dms-place)与 lib/realtime/dms-service 真跑。
+//    (目标准备不 mock 的全链装配在 lib/realtime/__tests__/dms-pushdown-assembly.test.ts。)
+// 【落点(2026-11 起 DMS 通道按任务绑定的执行区跑)】
+//   ⑰ 主控区任务:复制实例 / 安全组 / 子网组的名字与此前的字面缺省逐字相同,每个客户端都建在主控区;
+//   ⑱ 绑了多个执行区 ⇒ 409;⑲ 绑定的执行环境不可用 ⇒ 503 点名它,绝不退回主控区去建;
+//   ⑳ 数据源不在任务绑定的区 ⇒ 409;㉑ 缺源库信息 ⇒ 400 —— 都在看复制实例**之前**拒(被拒的请求不许留下一台懒创建的实例);
+//   ㉒ ㉓ 目标端连通性测试失败 ⇒ 重设目标专用用户口令**至多一次**再测;仍失败 ⇒ 任务错误与运行日志带 DMS 给的失败原文。
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const h = vi.hoisted(() => ({
@@ -48,7 +54,7 @@ const h = vi.hoisted(() => ({
   dmsCalls: [] as string[],
   endpoints: new Map<string, string>(),
   /** after = 之后每次 Describe 依次读到的状态(结尾带「!」= 这次的「已停止」带着停止原因) */
-  replTask: null as null | { status: string; stopReason?: string; after?: string[] },
+  replTask: null as null | { status: string; stopReason?: string; after?: string[]; startedAt?: Date; stoppedAt?: Date },
   /** 每次 Stop 被受理之后 Describe 依次读到的状态(一次 Stop 用掉一份;用完按真环境量到的缺省:停止中 → 已停止(无停止原因)→ 已停止(带停止原因)) */
   stopScripts: [] as string[][],
   createTaskCount: 0,
@@ -68,6 +74,23 @@ const h = vi.hoisted(() => ({
   createTaskThrows: null as null | Error,
   redshiftPrepCalls: 0,
   runs: [] as Array<Record<string, any>>,
+  /** 每个云调用打在哪个区(客户端按落点的区建;判「一个都没打到别的区」) */
+  dmsRegions: [] as string[],
+  ec2Calls: [] as Array<{ region: string; input: Record<string, any> }>,
+  /** 建复制实例 / 建端点时带的入参 */
+  createInputs: [] as Array<{ n: string; input: Record<string, any> }>,
+  /** 目标端点的连通性状态(null = 与 conn 相同)与失败原文 */
+  connTarget: null as null | string,
+  connFailure: "",
+  /** 目标准备每次被调用时拿到的落点与选项 */
+  prep: [] as Array<{ targetId: string; region: string; rotate: boolean }>,
+  /** 密钥是这次新供给的(true)还是沿用已有的(false) */
+  ingestProvisioned: false,
+  onRotate: null as null | (() => void),
+  /** 「数据库里」的数据源行(按 datasourceId) */
+  datasources: new Map<string, Record<string, any>>(),
+  /** 写进别的表的行(回收作业入队等) */
+  puts: [] as Array<Record<string, any>>,
 }));
 
 // ───────── DynamoDB:内存表 + 条件表达式求值(只支持路由实际发出的那几种形态) ─────────
@@ -137,6 +160,10 @@ vi.mock("@/lib/aws/dynamodb", () => ({
           const now = new Date().toISOString();
           return { Item: { taskId: h.lease.holder, kind: h.lease.kind, status: "running", createdAt: now, startedAt: now, heartbeatAt: now } };
         }
+        if (input.TableName === "bgp-datasources") {
+          const ds = h.datasources.get(input.Key.datasourceId);
+          return ds ? { Item: JSON.parse(JSON.stringify(ds)) } : {};
+        }
         if (input.TableName !== "bgp-sync-tasks") return {};
         const row = h.rows.get(input.Key.taskId);
         return row ? { Item: JSON.parse(JSON.stringify(row)) } : {};
@@ -156,6 +183,7 @@ vi.mock("@/lib/aws/dynamodb", () => ({
         applySet(row, input.UpdateExpression, names, values);
         return { Attributes: JSON.parse(JSON.stringify(row)) };
       }
+      if (n === "PutCommand") { h.puts.push(input.Item); return {}; }
       return {};
     }),
   },
@@ -166,10 +194,14 @@ vi.mock("@aws-sdk/client-database-migration-service", () => {
   const mk = (n: string) => { const C = class { constructor(public input: any) {} }; Object.defineProperty(C, "name", { value: n }); return C; };
   const notFound = () => { const e: any = new Error("not found"); e.name = "ResourceNotFoundFault"; return e; };
   class DatabaseMigrationServiceClient {
+    region: string;
+    constructor(cfg: { region?: string } = {}) { this.region = String(cfg.region ?? ""); }
     async send(cmd: any) {
       const n = cmd.constructor.name as string;
       h.dmsCalls.push(n);
+      h.dmsRegions.push(this.region);
       const input = cmd.input as Record<string, any>;
+      if (n === "CreateReplicationInstanceCommand" || n === "CreateEndpointCommand") h.createInputs.push({ n, input });
       switch (n) {
         case "DescribeReplicationInstancesCommand": {
           h.describeInstanceCalls++;
@@ -199,13 +231,19 @@ vi.mock("@aws-sdk/client-database-migration-service", () => {
           if (!h.replTask) throw notFound();
           if (h.replTask.after?.length) {
             const t = h.replTask.after.shift()!;
-            h.replTask.status = t.replace("!", "");
-            h.replTask.stopReason = t.endsWith("!") ? "Stop Reason NORMAL" : undefined;
+            // 脚本记号(照 2026-11-23 真环境每秒轮询量到的状态机):「!」= 停稳(带停止原因,停止时刻同一刻更新);
+            //   「^」= 带着上一轮的停止原因、停止时刻早于最近一次启动(不作数);不带记号的 stopped = 没有停止原因(不作数)
+            h.replTask.status = t.replace(/[!^]/g, "");
+            h.replTask.stopReason = /[!^]$/.test(t) ? "Stop Reason NORMAL" : undefined;
+            if (t.endsWith("!")) h.replTask.stoppedAt = new Date();
+            if (t.endsWith("^")) h.replTask.stoppedAt = new Date((h.replTask.startedAt?.getTime() ?? Date.now()) - 120_000);
           } else if (h.replTask.status === "starting") {
             if (h.startingReadsLeft > 0) h.startingReadsLeft--;
             else h.replTask.status = "running";
           }
-          return { ReplicationTasks: [{ ReplicationTaskArn: "arn:dms:task", Status: h.replTask.status, ...(h.replTask.stopReason ? { StopReason: h.replTask.stopReason } : {}) }] };
+          return { ReplicationTasks: [{ ReplicationTaskArn: "arn:dms:task", Status: h.replTask.status, ...(h.replTask.stopReason ? { StopReason: h.replTask.stopReason } : {}),
+            ...(h.replTask.startedAt ? { ReplicationTaskStartDate: h.replTask.startedAt } : {}),
+            ...(h.replTask.stoppedAt ? { ReplicationTaskStats: { StopDate: h.replTask.stoppedAt } } : {}) }] };
         }
         case "CreateReplicationTaskCommand": {
           await h.hooks.beforeTaskCreate?.();
@@ -219,14 +257,17 @@ vi.mock("@aws-sdk/client-database-migration-service", () => {
         case "ModifyReplicationTaskCommand": return {};
         case "DescribeConnectionsCommand": {
           await h.hooks.beforeConnSnapshot?.();
-          return { Connections: [...h.endpoints.values()].map((arn) => ({ EndpointArn: arn, Status: h.conn })) };
+          return { Connections: [...h.endpoints.values()].map((arn) => {
+            const status = h.connTarget && arn.includes(":bgp-tgt-") ? h.connTarget : h.conn;
+            return { EndpointArn: arn, Status: status, ...(status === "failed" && h.connFailure ? { LastFailureMessage: h.connFailure } : {}) };
+          }) };
         }
         case "TestConnectionCommand": return {};
         case "StartReplicationTaskCommand": {
           h.startCalls++;
           await h.hooks.beforeStart?.();
           if (h.startThrows) throw h.startThrows;
-          if (h.replTask) { h.replTask.status = "starting"; h.replTask.stopReason = undefined; h.replTask.after = []; h.startingReadsLeft = h.startingReads; }
+          if (h.replTask) { h.replTask.status = "starting"; h.replTask.stopReason = undefined; h.replTask.startedAt = new Date(); h.replTask.after = []; h.startingReadsLeft = h.startingReads; }
           await h.hooks.afterStart?.();
           return {};
         }
@@ -260,7 +301,11 @@ vi.mock("@aws-sdk/client-database-migration-service", () => {
   return { DatabaseMigrationServiceClient, ...Object.fromEntries(names.map((n) => [n, mk(n)])) };
 });
 vi.mock("@aws-sdk/client-ec2", () => {
-  class EC2Client { async send() { return { SecurityGroups: [{ GroupId: "sg-dms" }] }; } }
+  class EC2Client {
+    region: string;
+    constructor(cfg: { region?: string } = {}) { this.region = String(cfg.region ?? ""); }
+    async send(cmd: any) { h.ec2Calls.push({ region: this.region, input: cmd.input }); return { SecurityGroups: [{ GroupId: "sg-dms" }] }; }
+  }
   class DescribeSecurityGroupsCommand { constructor(public input: any) {} }
   return { EC2Client, DescribeSecurityGroupsCommand };
 });
@@ -270,7 +315,13 @@ vi.mock("@aws-sdk/client-secrets-manager", () => {
   return { SecretsManagerClient, GetSecretValueCommand };
 });
 vi.mock("@/lib/realtime/redshift-target", () => ({
-  ensureRedshiftDmsUser: vi.fn(async () => { h.redshiftPrepCalls++; return "arn:secret:dms-target"; }),
+  ensureRedshiftDmsUser: vi.fn(async (place: { targetId: string; region: string; targetSecretName: string }, opts: { rotate?: boolean } = {}) => {
+    h.redshiftPrepCalls++;
+    const rotate = opts.rotate === true;
+    h.prep.push({ targetId: place.targetId, region: place.region, rotate });
+    if (rotate) h.onRotate?.();
+    return { secretId: place.targetSecretName, provisioned: rotate || h.ingestProvisioned };
+  }),
   ensureTargetSchema: vi.fn(async () => {}),
   ensureRoleAssociatedToNamespace: vi.fn(async () => {}),
 }));
@@ -326,8 +377,10 @@ const until = async (cond: () => boolean, what: string, ms = 4000) => {
   }
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   h.rows.clear(); h.updates.length = 0; h.dmsCalls.length = 0; h.endpoints.clear(); h.runs.length = 0;
+  h.dmsRegions.length = 0; h.ec2Calls.length = 0; h.createInputs.length = 0; h.connTarget = null; h.connFailure = "";
+  h.prep.length = 0; h.ingestProvisioned = false; h.onRotate = null; h.datasources.clear(); h.puts.length = 0;
   h.instance = "missing"; h.instanceAvailableAfterDescribes = 0; h.describeInstanceCalls = 0;
   h.instanceArn = "arn:dms:instance"; h.instanceGen = 0; h.deletingReadsLeft = 0; h.creatingReads = 0; h.creatingReadsLeft = 0;
   h.createInstanceSeenAt = []; h.taskInstanceArns = []; h.stopScripts = [];
@@ -335,10 +388,23 @@ beforeEach(() => {
   h.deleteCalls = 0; h.stopSeenAt = []; h.startingReads = 1; h.startingReadsLeft = 0; h.startThrows = null; h.lease = null;
   h.hooks = {}; h.createTaskThrows = null; h.redshiftPrepCalls = 0;
   process.env.DMS_ROLE_ARN = "arn:iam:role:dms";
-  process.env.REDSHIFT_HOST = "rs.internal";
   process.env.AWS_REGION = process.env.AWS_REGION || "us-east-1";
   vi.resetModules();
+  await warmClients();
 });
+/**
+ * 主控区的三个客户端先各建一次(经产品自己的按区工厂,进它的缓存)。
+ * 产品按区**懒加载** SDK(第一次用到某个服务时才 `import()`);vitest 对同一个被 mock 的模块的**并发** `import()`,
+ * 第二个回的是真模块(实测:并发两次取客户端,一个是假的、一个是真的)⇒ 两条并发请求同时第一次取客户端时,
+ * 其中一条会拿着真客户端去发假命令。这是判据环境的假象,与产品无关 ⇒ 判据先串行建好,并发的请求都从缓存取。
+ */
+async function warmClients() {
+  const tc = await import("@/lib/exec-env/target-clients");
+  const region = process.env.AWS_REGION as string;
+  await tc.dmsClientFor(region);
+  await tc.ec2ClientFor(region);
+  await tc.secretsClientFor(region);
+}
 afterEach(() => { vi.useRealTimers(); });
 
 describe("DMS 通道启动:立刻受理 + 单飞", () => {
@@ -398,6 +464,7 @@ describe("DMS 通道启动:立刻受理 + 单飞", () => {
     expect(row().realtimeConfig.startRunId, "409 不许改行").toBe("OLD");
 
     vi.resetModules();
+    await warmClients();
     h.rows.set(TASK_ID, task({ status: "provisioning", updatedAt: new Date(Date.now() - 31 * 60_000).toISOString(), realtimeConfig: { target: "redshift", startRunId: "OLD" } }));
     const stale = await post();
     expect(stale.status, JSON.stringify(stale.body)).toBe(202);
@@ -450,6 +517,20 @@ describe("DMS 通道启动:立刻受理 + 单飞", () => {
     expect(row().status).toBe("stopped");
   });
 
+  it("⑤c 🔴 要停的任务读出来已经是「已停止」,但那是不作数的(没有停止原因 / 带着上一轮的停止原因)、随后弹回运行中 ⇒ 不许一个 Stop 都不发就算停好:等它回到运行中再停,停稳才算", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instance = "available";
+    // 用户在启动的那一瞬点了「停止」;同一刻起 DMS 连着几次报「已停止」(2026-11-23 真环境:任务再启动约 40 秒后读到,通道实际在跑),之后才是运行中
+    h.hooks.afterStart = () => { row().status = "stopped"; h.replTask!.after = ["stopped", "stopped^", "stopped", "running"]; };
+    const r = await postOnFakeClock();
+    expect(r.status).toBe(202);
+    await drive(() => h.replTask?.status === "stopped" && !!h.replTask?.stopReason && h.stopCalls > 0, "编排等复制任务弹回运行中、停掉它并等到停稳");
+    expect(h.stopSeenAt, "Stop 只在读到运行中之后发,而且真的发了").toEqual(["running"]);
+    expect(h.replTask?.stoppedAt && h.replTask?.startedAt && h.replTask.stoppedAt >= h.replTask.startedAt, "停止时刻晚于这次启动").toBe(true);
+    expect(h.deleteCalls).toBe(0);
+    expect(row().status).toBe("stopped");
+  });
+
   it("⑥ 编排失败只在仍归自己管时写 error;用户已「停止」的任务不许被翻成「异常」", async () => {
     h.rows.set(TASK_ID, task());
     h.instance = "available";
@@ -466,6 +547,7 @@ describe("DMS 通道启动:立刻受理 + 单飞", () => {
 
     // 对照:没人动过 ⇒ 失败如实写 error(原有语义不变)
     vi.resetModules();
+    await warmClients();
     h.hooks = {}; h.dmsCalls.length = 0; h.runs.length = 0; h.endpoints.clear(); h.replTask = null;
     h.rows.set(TASK_ID, task());
     const r2 = await post();
@@ -665,5 +747,158 @@ describe("DMS 通道启动:复制实例被空闲回收之后", () => {
     expect(JSON.stringify(r.body)).toMatch(/状态异常:failed/);
     expect(h.updates).toHaveLength(0);
     expect(h.redshiftPrepCalls).toBe(0);
+  });
+});
+
+describe("DMS 通道启动:落点来自任务绑定的执行区", () => {
+  const ROTATE_NEVER_AGAIN = "目标端一直连不上,重设口令却不止一次";
+
+  it("⑰ 主控区任务 ⇒ 名字与此前的字面缺省逐字相同(bgp-dms / bgp-dms-sg / bgp-dms-subnet-group),每个客户端都建在主控区,目标准备拿到的是主控区落点", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instanceAvailableAfterDescribes = 3;
+    const r = await post();
+    expect(r.status, JSON.stringify(r.body)).toBe(202);
+    await until(() => row().status === "running", "主控区任务走到 running");
+    const createInstance = h.createInputs.find((c) => c.n === "CreateReplicationInstanceCommand")!.input;
+    expect(createInstance).toMatchObject({ ReplicationInstanceIdentifier: "bgp-dms", ReplicationSubnetGroupIdentifier: "bgp-dms-subnet-group", VpcSecurityGroupIds: ["sg-dms"] });
+    expect(h.ec2Calls.length).toBeGreaterThan(0);
+    expect(JSON.stringify(h.ec2Calls[0].input)).toContain("bgp-dms-sg");
+    expect(new Set(h.ec2Calls.map((c) => c.region))).toEqual(new Set(["us-east-1"]));
+    expect(new Set(h.dmsRegions)).toEqual(new Set(["us-east-1"]));
+    expect(h.prep).toEqual([{ targetId: "tgt_home", region: "us-east-1", rotate: false }]);
+    // 目标端点:访问角色取平台容器注入的那一个,密钥是该区的固定名(不是每次启动现造的 ARN)
+    const target = h.createInputs.find((c) => c.n === "CreateEndpointCommand" && String(c.input.EndpointIdentifier).startsWith("bgp-tgt-"))!.input;
+    expect(JSON.stringify(target)).toContain("arn:iam:role:dms");
+    expect(JSON.stringify(target)).toContain("bgp/dms/redshift-target");
+  });
+
+  it("⑱ 任务绑了两个执行区 ⇒ 409 TARGET_PUSHDOWN_UNAVAILABLE 并列出绑定;不写任务行、零云调用", async () => {
+    h.rows.set(TASK_ID, task({ targets: ["tgt_home", "tgt_usw2"] }));
+    const r = await post();
+    expect(r.status).toBe(409);
+    expect(r.body.error.code).toBe("TARGET_PUSHDOWN_UNAVAILABLE");
+    expect(r.body.error.message).toContain("tgt_home / tgt_usw2");
+    expect(r.body.error.detail).toEqual({ bound: ["tgt_home", "tgt_usw2"] });
+    expect(h.updates).toEqual([]);
+    expect(h.dmsCalls).toEqual([]);
+    expect(h.ec2Calls).toEqual([]);
+  });
+
+  it("⑲ 🔴 任务绑定的执行环境不可用(注册表里读不到)⇒ 503 点名这个执行环境;绝不退回主控区去建:零云调用、不写任务行", async () => {
+    h.rows.set(TASK_ID, task({ targets: ["tgt_usw2"] }));
+    const r = await post();
+    expect(r.status, JSON.stringify(r.body)).toBe(503);
+    expect(r.body.error.code).toBe("UPSTREAM_ERROR");
+    expect(r.body.error.message).toContain("执行环境 tgt_usw2 当前不可用");
+    expect(h.updates).toEqual([]);
+    expect(h.dmsCalls).toEqual([]);
+    expect(h.ec2Calls).toEqual([]);
+    expect(h.redshiftPrepCalls).toBe(0);
+  });
+
+  it("⑳ 🔴 数据源在别的执行区 ⇒ 409 CROSS_REGION_SOURCE 说清两边;在看复制实例之前拒(没有懒创建的实例留下)", async () => {
+    h.datasources.set("ds_west", { userId: "default-user", datasourceId: "ds_west", ownerTargetId: "tgt_usw2", host: "db.west.internal", port: 3306, database: "gamedata", secretArn: "arn:secret:west" });
+    h.rows.set(TASK_ID, task({ datasourceId: "ds_west" }));
+    const r = await post();
+    expect(r.status, JSON.stringify(r.body)).toBe(409);
+    expect(r.body.error.code).toBe("CROSS_REGION_SOURCE");
+    expect(r.body.error.detail).toEqual({ datasourceOwner: "tgt_usw2", bound: ["tgt_home"] });
+    expect(h.dmsCalls, "被拒的请求留下了云调用(懒创建的实例按小时计费)").toEqual([]);
+    expect(h.ec2Calls).toEqual([]);
+    expect(h.updates).toEqual([]);
+    // 对照:同一个区的数据源(存量行没有归属章 = 主控区)⇒ 照常受理,连接信息缺的从数据源行补
+    h.datasources.set("ds_home", { userId: "default-user", datasourceId: "ds_home", host: "db.home.internal", port: 3307, database: "gamedata", secretArn: "arn:secret:home" });
+    h.rows.set(TASK_ID, task({ datasourceId: "ds_home", sourceSecretArn: undefined, sourceDatabase: undefined, sourceHost: undefined }));
+    h.instance = "available";
+    const ok = await post();
+    expect(ok.status, JSON.stringify(ok.body)).toBe(202);
+    await until(() => row().status === "running", "同区数据源的任务走到 running");
+    const source = h.createInputs.find((c) => c.n === "CreateEndpointCommand" && String(c.input.EndpointIdentifier).startsWith("bgp-src-"))!.input;
+    expect(source).toMatchObject({ ServerName: "db.home.internal", Port: 3307 });
+  });
+
+  it("㉑ 缺源库信息 ⇒ 400;同样在看复制实例之前拒", async () => {
+    h.rows.set(TASK_ID, task({ sourceHost: undefined }));
+    const r = await post();
+    expect(r.status).toBe(400);
+    expect(r.body.error.code).toBe("VALIDATION_FAILED");
+    expect(h.dmsCalls).toEqual([]);
+    expect(h.updates).toEqual([]);
+  });
+
+  it("㉑b 🔴 源库名是平台保留的 schema 名 / 不是普通标识符 ⇒ 当场 400 并指路 Glue 通道;在看复制实例之前拒(不等实例建好才在后台失败)", async () => {
+    for (const db of ["shared", "proj_demo", "PG_catalog", "game-data"]) {
+      h.rows.set(TASK_ID, task({ sourceDatabase: db }));
+      const r = await post();
+      expect(r.status, `${db}: ${JSON.stringify(r.body)}`).toBe(400);
+      expect(r.body.error.code).toBe("VALIDATION_FAILED");
+      expect(r.body.error.message, db).toContain("Glue 通道");
+      expect(r.body.error.message, db).toContain(JSON.stringify(db));
+    }
+    expect(h.dmsCalls, "被拒的请求留下了云调用(懒创建的实例按小时计费)").toEqual([]);
+    expect(h.ec2Calls).toEqual([]);
+    expect(h.updates, "被拒的请求改了任务行").toEqual([]);
+    // 对照:普通库名照常受理
+    h.rows.set(TASK_ID, task({ sourceDatabase: "gamedata" }));
+    h.instance = "available";
+    expect((await post()).status).toBe(202);
+  });
+
+  it("㉒ 目标端连通性测试失败、密钥是沿用的 ⇒ 重设目标专用用户口令一次后重测;通过 ⇒ running", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instance = "available";
+    h.connTarget = "failed"; h.connFailure = "password authentication failed for user dms_ingest";
+    h.onRotate = () => { h.connTarget = null; };
+    const r = await postOnFakeClock();
+    expect(r.status).toBe(202);
+    await drive(() => row().status === "running", "重设口令后连通性通过、走到 running");
+    expect(h.prep).toEqual([
+      { targetId: "tgt_home", region: "us-east-1", rotate: false },
+      { targetId: "tgt_home", region: "us-east-1", rotate: true },
+    ]);
+    expect(h.startCalls).toBe(1);
+    expect(JSON.stringify(h.runs[h.runs.length - 1].extra.logs)).toContain("已重设目标专用用户的口令");
+  });
+
+  it("㉓ 目标端一直连不上 ⇒ 口令只重设一次;终态 error,任务错误与运行日志带 DMS 给的失败原文(改动前只有「目标=failed」)", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instance = "available";
+    h.connTarget = "failed"; h.connFailure = "Timed out connecting to server bgp-workgroup.example.us-east-1.redshift-serverless.amazonaws.com";
+    const r = await postOnFakeClock();
+    expect(r.status).toBe(202);
+    await tick(330);
+    expect(row().status).toBe("error");
+    expect(h.prep.filter((x) => x.rotate), ROTATE_NEVER_AGAIN).toHaveLength(1);
+    expect(h.startCalls).toBe(0);
+    expect(row().realtimeConfig.error).toContain("源=successful");
+    expect(row().realtimeConfig.error).toContain("目标=failed(Timed out connecting to server");
+    const last = h.runs[h.runs.length - 1];
+    expect(last.status).toBe("failed");
+    expect(String(last.extra.error)).toContain("Timed out connecting to server");
+    expect(JSON.stringify(last.extra.logs)).toContain("Timed out connecting to server");
+  });
+
+  it("㉓b 密钥是这次新供给的、失败原文也不是认证问题(网络不通)⇒ 不重设口令(换口令没用,还会打扰同区其它通道)", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instance = "available";
+    h.ingestProvisioned = true;
+    h.connTarget = "failed"; h.connFailure = "Timed out connecting to server";
+    const r = await postOnFakeClock();
+    expect(r.status).toBe(202);
+    await tick(330);
+    expect(row().status).toBe("error");
+    expect(h.prep).toEqual([{ targetId: "tgt_home", region: "us-east-1", rotate: false }]);
+  });
+
+  it("㉔ 编排抛错(建复制任务失败)⇒ 登记一条回收作业,落点就是这次启动用的那一个(执行区 / 区 / 实例名)", async () => {
+    h.rows.set(TASK_ID, task());
+    h.instance = "available";
+    h.createTaskThrows = Object.assign(new Error("quota exceeded"), { name: "ResourceQuotaExceededFault" });
+    const r = await post();
+    expect(r.status).toBe(202);
+    await until(() => row().status === "error", "失败如实写 error");
+    await until(() => h.puts.some((p) => p.kind === "dms-instance-reclaim"), "登记回收作业");
+    const reclaim = h.puts.find((p) => p.kind === "dms-instance-reclaim")!;
+    expect(reclaim).toMatchObject({ targetId: "tgt_home", state: { region: "us-east-1", instanceId: "bgp-dms", reason: "start-failed" } });
   });
 });

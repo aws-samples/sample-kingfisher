@@ -126,10 +126,11 @@ Each entry follows the format **symptom** → cause → next step. The next step
 - Cause: one click on "Stop" / "Delete" is enough — the platform waits until the replication channel has really reached a final state (after 45 seconds the bottom right shows "Running in background"); this message only appears when the channel has still not settled after about 240 seconds. The platform does not change the record, to avoid leaving an orphan channel that can never be stopped and keeps incurring charges.
 - Next step: click the same button again later.
 
-### 4.6 Starting a task in an execution region with the Zero-ETL / DMS channel reports "Not yet pushed down per region (currently offered in the home region only)"
+### 4.6 A data source of an execution region cannot select the Zero-ETL channel (greyed out); a Zero-ETL task saved earlier reports "Not yet pushed down per region (the managed integration is currently provided only in the home-region warehouse)" on start
 
-- Cause: the Zero-ETL and DMS real-time channels are currently offered in the home region only.
-- Next step: create the task in the home region, or use the Glue channel instead.
+- Cause: the Zero-ETL channel is offered in the home region only; the DMS and Glue channels work in every execution region (the replication instance, the endpoints, the replication task and the target warehouse of DMS are all in the region of the data source).
+- Next step: use the DMS or the Glue channel for a data source of an execution region. When "Start" of a DMS task in an execution region says "press "Redeploy" for … on the "Execution Environments" page and start again",
+  that region has not been redeployed since the platform was upgraded: ask the platform administrator to redeploy the region, then press "Start" once more.
 
 ### 4.7 The run history says "The previous run is still finishing (one Glue job can only run one instance at a time); start again later"
 

@@ -36,7 +36,7 @@ export default function ExecEnvsPage() {
   // 深链 `/exec-envs?target=<id>&highlight=<component>`(调度页「去执行环境补装 MWAA」落点):
   //   列表加载后自动打开该 target 的抽屉,并把要补的组件行高亮。只读一次(用户手动关抽屉后不再自动弹回)。
   //   首帧 null(= 服务端),挂载后再读地址栏;初值函数里读 window 会让 React 19 报水合不一致
-  const [deepLink, setDeepLink] = useBrowserInitialState<{ target: string; highlight: string } | null>(null, () => {
+  const [deepLink, setDeepLink, deepLinkResolved] = useBrowserInitialState<{ target: string; highlight: string } | null>(null, () => {
     const q = new URLSearchParams(window.location.search);
     const target = q.get("target");
     return target ? { target, highlight: q.get("highlight") || "" } : null;
@@ -84,9 +84,12 @@ export default function ExecEnvsPage() {
       .finally(() => setLoading(false));
   };
 
+  // 首次拉列表要等地址栏的深链读完(2026-11-20 页面实测:`/exec-envs?target=<id>` 打开后列表加载了、抽屉不自动弹开):
+  //   fetchData 握着的是它被创建那一帧的 deepLink;挂载那一帧它还是服务端缺省(null),那一帧就发请求 ⇒ 列表回来时看不到深链。
+  //   深链值与「已读完」在同一次提交里更新 ⇒ 等到这一帧再发,回调里拿到的就是地址栏的值。
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (deepLinkResolved) fetchData();
+  }, [deepLinkResolved]);
 
   const hasHome = targets.some((x) => x.isHome === true || x.targetId === "tgt_home");
 

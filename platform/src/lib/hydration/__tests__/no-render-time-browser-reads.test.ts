@@ -71,4 +71,71 @@ describe("渲染期不读浏览器状态(水合安全)", () => {
     // 不许再有不等解析就拉的首拉写法
     expect(src).not.toMatch(/useEffect\(\(\) => \{ fetchData\(\); \}, \[scopeParam\]\);/);
   });
+
+  // 🔴 同一类的机械规则(2026-11-20 页面实测:`/exec-envs?target=<id>` 打开后列表加载了、详情抽屉不自动弹开):
+  //   挂载期 effect(deps 为 [])里跑的代码 —— 它自己,或它调用的组件级函数 —— 读 useBrowserInitialState 的值,读到的永远是首帧的服务端缺省
+  //   (挂载那一帧的闭包);要按这个值做事的 effect 必须等第三个元素 resolved 为 true 的那一帧。
+  function staleMountReads(src: string): string[] {
+    const names = [...src.matchAll(/const \[([A-Za-z_]\w*)[^\]]*\] = useBrowserInitialState\b/g)].map((m) => m[1]);
+    if (!names.length) return [];
+    const blockAt = (open: number): string => {            // open 指向 `{`,回到与它配对的 `}`
+      let depth = 0;
+      for (let i = open; i < src.length; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}" && --depth === 0) return src.slice(open, i + 1);
+      }
+      return src.slice(open);
+    };
+    const fnBody = (name: string): string => {
+      const m = new RegExp(`(?:const ${name} = (?:async )?\\([^)]*\\)(?::[^=]+)? => \\{|function ${name}\\([^)]*\\)[^{]*\\{)`).exec(src);
+      return m ? blockAt(m.index + m[0].length - 1) : "";
+    };
+    const hits: string[] = [];
+    const re = /useEffect\(\(\) => \{/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      const open = m.index + m[0].length - 1;
+      const body = blockAt(open);
+      if (!/^,\s*\[\]\s*\)/.test(src.slice(open + body.length, open + body.length + 16))) continue;   // 只看挂载期 effect
+      const reach = [body, ...[...body.matchAll(/\b([A-Za-z_]\w*)\(/g)].map((c) => fnBody(c[1]))].join("\n");
+      for (const n of names) if (new RegExp(`\\b${n}\\b`).test(reach)) hits.push(n);
+    }
+    return hits;
+  }
+
+  it("🔴 ⑥ 挂载期 effect 不许(直接或经组件级函数)读 useBrowserInitialState 的值 —— 读到的是首帧缺省,深链 / 地址栏筛选就此失效", () => {
+    const bad: string[] = [];
+    const scanned: string[] = [];
+    for (const f of [...walk(join(SRC, "app")), ...walk(join(SRC, "components"))]) {
+      const src = readFileSync(f, "utf8");
+      if (!/= useBrowserInitialState\b/.test(src)) continue;
+      scanned.push(relative(SRC, f));
+      for (const n of staleMountReads(src)) bad.push(`${relative(SRC, f)} :: ${n}`);
+    }
+    // 不空转:真的扫到了用这个 hook 的页面(含执行环境页与任务监控页)
+    expect(scanned).toEqual(expect.arrayContaining(["app/exec-envs/page.tsx", "app/monitor/page.tsx"]));
+    expect(bad, "这些组件在挂载期 effect 里读 useBrowserInitialState 的值 ⇒ 改成等 resolved 那一帧再做(deps 带上 resolved)").toEqual([]);
+  });
+
+  it("⑥ 的探测器有判别力:挂载期就拉列表、回调里读深链 ⇒ 抓到;等 resolved 再拉 ⇒ 放行", () => {
+    const head = [
+      "const [deepLink, setDeepLink, deepLinkResolved] = useBrowserInitialState<{ target: string } | null>(null, () => null);",
+      "const fetchData = () => {",
+      "  listTargets().then((rows) => { if (deepLink) { setSelected(rows.find((r) => r.targetId === deepLink.target)); } });",
+      "};",
+    ].join("\n");
+    const mountOnly = `${head}\nuseEffect(() => {\n  fetchData();\n}, []);\n`;
+    const waits = `${head}\nuseEffect(() => {\n  if (deepLinkResolved) fetchData();\n}, [deepLinkResolved]);\n`;
+    const direct = "const [tab] = useBrowserInitialState<string>(\"a\", () => \"b\");\nuseEffect(() => {\n  track(tab);\n}, []);\n";
+    expect(staleMountReads(mountOnly)).toEqual(["deepLink"]);
+    expect(staleMountReads(waits)).toEqual([]);
+    expect(staleMountReads(direct)).toEqual(["tab"]);
+  });
+
+  it("🔴 ⑦ 执行环境页:首次拉列表等地址栏深链读完(deps 带上 resolved),不在挂载那一帧就拉", () => {
+    const src = readFileSync(join(SRC, "app/exec-envs/page.tsx"), "utf8");
+    expect(src).toMatch(/const \[deepLink, setDeepLink, deepLinkResolved\] = useBrowserInitialState</);
+    expect(src).toMatch(/useEffect\(\(\) => \{\s*if \(deepLinkResolved\) fetchData\(\);\s*\}, \[deepLinkResolved\]\);/);
+    expect(src).not.toMatch(/useEffect\(\(\) => \{\s*fetchData\(\);\s*\}, \[\]\);/);
+  });
 });

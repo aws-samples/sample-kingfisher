@@ -258,7 +258,9 @@ describe("🔴 反向覆盖:infra/lib 里每个 bgp-* 名字面量都必须有�
       // infra 侧若已改为**从命名 SSOT 派生**(resourceName("<kind>", …)),则"名字存在"由构造保证,
       // 不该再要求源码里出现字面量(要求字面量反而会逼人把刚收编掉的硬编码写回去)。
       const homeSrc = (namingConfig.kinds as never as Record<string, { homeSource?: string }>)[kind]?.homeSource;
-      const homeText = homeSrc?.startsWith("infra/") ? readFileSync(resolve(REPO, homeSrc.split(":")[0]), "utf8") : "";
+      // 平台运行期创建的资源(如懒创建的 DMS 复制实例)同理:出处登记的是平台里创建它的模块,那个模块从命名 SSOT 取名
+      //   ⇒ "名字存在"同样由构造保证(「出处真的派生、infra 不再硬编码」另由 naming.test.ts 钉住)。
+      const homeText = homeSrc && /^(?:infra|platform)\//.test(homeSrc) ? readFileSync(resolve(REPO, homeSrc.split(":")[0]), "utf8") : "";
       if (new RegExp(`resourceName\\(\\s*["'\`]${kind}["'\`]`).test(homeText)) continue;
       if (name.startsWith("bgp-")) {
         if (!literals.has(name)) ghosts.push(`${kind} → "${name}"`);

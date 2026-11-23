@@ -41,7 +41,6 @@ const AWAIT_TERMINAL_BASELINE = new Set<string>([
   "lib/engines/emr/application.ts",
   "lib/genbi/athena.ts",
   "lib/realtime/zeroetl-service.ts",
-  "lib/realtime/redshift-target.ts",
   "lib/realtime/dms-service.ts",
   "app/api/sync/[id]/start-realtime/route.ts",
   "app/api/sync/[id]/start/route.ts",
@@ -102,7 +101,7 @@ describe("闸门 ②:等待终态的轮询原语只许一个作者", () => {
     expect(fresh, `新出现了自己写 sleep 循环等外部终态的文件(请改经 lib/long-ops/await-terminal.ts,并在该路由接入 submitLongOp):\n${fresh.join("\n")}`).toEqual([]);
     expect(offenders).not.toContain("lib/modeling/landing.ts");
     for (const rel of SECOND_BATCH_AWAIT_TERMINAL_MIGRATED) expect(offenders, `${rel} 第二批已迁出,不许再写本地轮询`).not.toContain(rel);
-    expect(AWAIT_TERMINAL_BASELINE.size).toBe(20); // datasource-service 迁为泵作业 ⇒ 21 → 20
+    expect(AWAIT_TERMINAL_BASELINE.size).toBe(19); // datasource-service 迁为泵作业 ⇒ 21 → 20;DMS 目标侧准备改经受控 DDL 执行器(redshift-target 不再自己轮询语句)⇒ 20 → 19
     // 基线里已经干净的文件要从基线删掉(棘轮只减不增的另一半:不许留着已修好的名额)
     const stale = [...AWAIT_TERMINAL_BASELINE].filter((rel) => !offenders.includes(rel));
     expect(stale, `这些基线文件已不再自己写轮询循环,请从 AWAIT_TERMINAL_BASELINE 删掉:\n${stale.join("\n")}`).toEqual([]);

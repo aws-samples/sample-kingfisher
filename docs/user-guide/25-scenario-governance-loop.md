@@ -37,8 +37,10 @@ Overview route (everything is done on the pages, no code):
 - **Classification and masking only act on query results.** After an admin sets a level and masking policy on a field, the results that unauthorized users get in "Ask-Your-Data", "Redshift Query" and "Report Builder" are replaced by masks on the server side; not a single byte of data in the database is changed.
   Platform admins (role group `bgp-admin`) are not masked; a user who has "requested access" to a table and been approved is not masked on that table.
   If a result column uses an alias (for example `device_id AS device`) or an expression, the platform resolves it back to the physical column it references before deciding, so aliased columns are masked too.
-- **Lineage has two sources.** Every run of a sync task automatically produces table-level and column-level lineage "source database → data lake → warehouse"; Redshift SQL batch jobs parse the SQL text automatically when saved to obtain table-level lineage "which tables were read, which table was written". Both are written into OpenMetadata and shown in the same graph.
-  Glue PySpark / EMR scripts are not text-parsed; their lineage is only the sync-path part.
+- **Lineage is collected automatically, by task type.** Every run of a sync task automatically produces table-level and column-level lineage "source database → data lake → warehouse"; Redshift SQL batch jobs parse the SQL text automatically when saved to obtain table-level lineage "which tables were read, which table was written".
+  EMR Serverless jobs extract table-level lineage when a run is submitted, from the table names written out in the script: only table names qualified with a database or a namespace are recognized, lineage is recorded only when both the read side and the write side are recognized, and table names that are assembled only at run time are not recognized.
+  Flink SQL jobs of Stream Compute extract it from the SQL when they are started. All of these are written into OpenMetadata and shown in the same graph.
+  Glue (PySpark) batch jobs and the inline SQL / Python nodes of an ETL workflow do not collect lineage at present; the tables they read and write appear in the graph only with the sync-path part.
 - **Quality score = weighted pass rate.** Each rule has a weight (default 1) and a severity (error / warn); quality score = sum of weights of passed rules ÷ sum of weights of all executed rules × 100, and one score is also computed for each of the five dimensions completeness / uniqueness / validity / consistency / freshness.
   The "Freshness / SLA" rule is the SLA: when the latest value of the time column is older than the number of hours you entered, it is "Breached".
 - **The governance workbench is a read-only aggregate.** The overall score 0–100 is a weighted sum of four dimensions: security / classification coverage 30%, quality health 30%, SLA compliance 20%, lineage coverage 20%; to-dos fall into four groups: unclassified likely-sensitive tables, SLA breaches, quality below threshold, not yet governed.
@@ -377,7 +379,8 @@ Check each item; when all are ticked, the loop is closed:
 - **Symptom: impact analysis says "OpenMetadata is currently unreachable".**
   Cause: the OpenMetadata service is offline. Next step: check the status in "Governance Center"; meanwhile "Affected jobs / tasks" still gives results from job SQL parsing.
 - **Symptom: lineage shows only synced tables, not tables produced by Glue PySpark jobs.**
-  Cause: the platform only parses the text of Redshift SQL jobs; PySpark scripts get no text lineage. Next step: carry the processing that needs lineage tracking in Redshift SQL jobs, or add lineage edges manually in the OpenMetadata console.
+  Cause: Glue (PySpark) batch jobs do not collect lineage at present (the platform parses the text of Redshift SQL jobs and of Flink SQL; EMR Serverless jobs extract it when a run is submitted, from the table names written out in the script).
+  Next step: carry the processing that needs lineage tracking in Redshift SQL jobs, or add lineage edges manually in the OpenMetadata console.
 - **Symptom: after switching execution region, the governance workbench scores did not change.**
   Cause: the page needs to re-fetch. Next step: click "Refresh".
 

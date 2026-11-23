@@ -235,7 +235,7 @@ describe("IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", () => 
   // IAM 侧(2026-10-21)—— …9435 observe 第四十四轮 `place.creds.denied` 量出的四族缺口,清单里必须有对应条目
   //   (否则模拟门探不到它们,enforce 一开就是静默 500):
   //   ① bgp/datasource/* 的写三动作(建源 / 改口令 / 删源,execution 轴,secret 建在源所属区);
-  //   ② bgp/dms/redshift-target 的 CreateSecret / PutSecretValue(实时链给 DMS 写完整字段密钥,home 轴);
+  //   ② bgp/dms/redshift-target 的 CreateSecret / PutSecretValue / DescribeSecret(给 DMS 写完整字段密钥,execution 轴:密钥建在任务所在的区);
   //   ③ secretsmanager:ListSecrets(RDS 发现按区列托管密钥,execution 轴,动作不支持资源级 ⇒ *);
   //   ④ s3:ListAllMyBuckets(系统设置服务状态数桶,home 轴,控制面调用);⑤ 读账号自有 RDS 主密钥(建源复制账密,home 轴)。
   // ══════════════════════════════════════════════════════════════════════════
@@ -248,11 +248,19 @@ describe("IAM 调用清单三层一致(代码 ⇒ 清单 ⇒ 栈授权)", () => 
         for (const c of rows) expect(c.axis, `${a} on bgp/datasource 的轴应为 execution(secret 建在源所属区)`).toBe("execution");
       }
     });
-    it("② bgp/dms/redshift-target 的 CreateSecret 与 PutSecretValue 在清单里(home 轴)", () => {
-      for (const a of ["secretsmanager:CreateSecret", "secretsmanager:PutSecretValue"]) {
+    it("② bgp/dms/redshift-target 的 CreateSecret / PutSecretValue / DescribeSecret 在清单里,且是 execution 轴(密钥建在任务所在的执行区;平台只 Describe 不取值)", () => {
+      for (const a of ["secretsmanager:CreateSecret", "secretsmanager:PutSecretValue", "secretsmanager:DescribeSecret"]) {
         const rows = find(a, "secret:bgp/dms/redshift-target");
         expect(rows.length, `清单缺 ${a} on bgp/dms/redshift-target`).toBeGreaterThanOrEqual(1);
-        for (const c of rows) expect(c.axis).toBe("home");
+        for (const c of rows) expect(c.axis, `${a} on bgp/dms/redshift-target 的轴应为 execution`).toBe("execution");
+      }
+      expect(find("secretsmanager:GetSecretValue", "secret:bgp/dms/"), "平台不读 DMS 目标密钥的值(那是 DMS 访问角色的事)").toHaveLength(0);
+    });
+    it("②b 删端点 / 列端点在清单里(execution 轴,资源 *):删任务后清端点的后台作业要它", () => {
+      for (const a of ["dms:DeleteEndpoint", "dms:DescribeEndpoints"]) {
+        const rows = manifest.calls.filter((c) => c.action === a);
+        expect(rows.length, `清单缺 ${a}`).toBeGreaterThanOrEqual(1);
+        for (const c of rows) { expect(c.axis).toBe("execution"); expect(c.resource).toBe("*"); }
       }
     });
     it("③ secretsmanager:ListSecrets(资源 *,execution 轴)与 ④ s3:ListAllMyBuckets(资源 *,home 轴)在清单里", () => {

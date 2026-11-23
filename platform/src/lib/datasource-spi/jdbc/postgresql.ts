@@ -1,7 +1,7 @@
 // PostgreSQL provider(JDBC 范式,底座试金石)。
 //
-// 【驱动】pg@8(纯 JS,实证 alpine 可用)。按需 dynamic import——若 pg 未装则 introspect/ping
-// 优雅降级(返回 [] / reachable:false),不让顶层 import 崩(与"驱动可得性分期"一致)。
+// 【驱动】pg@8(纯 JS,实证 alpine 可用)。按需 dynamic import——若 pg 未装,ping 回 reachable:false、
+// introspect 抛(由 jdbc-base 的 introspect 统一按空清单处理),不让顶层 import 崩(与"驱动可得性分期"一致)。
 // 【方言差异】PG 有 schema 概念(默认 public);driver=org.postgresql.Driver;URL=jdbc:postgresql://。
 
 import { makeJdbcProvider, toDatasets, type JdbcConnInfo } from "./jdbc-base";
@@ -22,7 +22,7 @@ const capabilities: DataSourceCapabilities = {
   label: "PostgreSQL",
 };
 
-// 按需加载 pg(纯 JS)。未装时抛错被 introspect/ping 的 try 捕获。
+// 按需加载 pg(纯 JS)。未装时抛错:ping 自己捕获,introspect 交给 jdbc-base。
 async function pgClient(conn: JdbcConnInfo) {
   const { Client } = await import("pg");
   const client = new Client({
@@ -62,8 +62,6 @@ async function introspect(conn: JdbcConnInfo): Promise<SourceDataset[]> {
       });
     }
     return toDatasets(map);
-  } catch {
-    return [];
   } finally {
     try { await client?.end(); } catch {}
   }

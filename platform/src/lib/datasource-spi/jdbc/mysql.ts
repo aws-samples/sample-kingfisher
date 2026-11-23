@@ -24,7 +24,7 @@ const capabilities: DataSourceCapabilities = {
   label: "MySQL",
 };
 
-// introspect:逐字复用 schema-reader.ts 的 INFORMATION_SCHEMA.COLUMNS 查询(容错返 [])。
+// introspect:逐字复用 schema-reader.ts 的 INFORMATION_SCHEMA.COLUMNS 查询;连不上 / 凭证不对就抛(容错在 jdbc-base 一处做)。
 async function introspect(conn: JdbcConnInfo): Promise<SourceDataset[]> {
   let c: mysql.Connection | null = null;
   try {
@@ -53,8 +53,6 @@ async function introspect(conn: JdbcConnInfo): Promise<SourceDataset[]> {
       });
     }
     return toDatasets(map);
-  } catch {
-    return []; // unreachable / bad creds:上层仍注册 service+db(与现有一致)
   } finally {
     try { await c?.end(); } catch {}
   }

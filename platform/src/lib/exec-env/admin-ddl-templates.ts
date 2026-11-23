@@ -34,6 +34,8 @@ import { buildCodeTableCreateStatement, buildCreateTableStatements } from "@/lib
 import { buildAlterTableStatements, isEmptyAlterPlan } from "@/lib/modeling/alter";
 // canary 探针名的唯一作者(与判据侧 permission-canary.ts 同源)
 import { CANARY_DENY_SCHEMA, CANARY_TABLE } from "@/lib/exec-env/canary-names";
+// DMS 摄入用户名的唯一作者
+import { DMS_INGEST_USER } from "@/lib/realtime/dms-ingest-identity";
 
 /**
  * 🔴 **mint 函数(v3.5 从 `admin-ddl-request.ts` 移到这里,且不导出)**。
@@ -69,9 +71,6 @@ function literal(v: string): string {
   return `'${String(v).replace(/'/g, "''")}'`;
 }
 
-/** DMS 增量同步的固定摄入身份(与 realtime/redshift-target 现状同名,便于后续迁移对齐)。 */
-const DMS_INGEST_USER = "dms_ingest";
-const DMS_INGEST_SCHEMA = "dms_ingest";
 
 /**
  * 每个 operation 一个 builder。
@@ -175,14 +174,12 @@ const builders: TemplateBuilders = {
     return [brandStatement(`DROP SCHEMA IF EXISTS ${ident(schema)} CASCADE`)];
   },
 
-  "dms-ingest-bootstrap": () => [
-    // 现状(realtime/redshift-target.ts)是 `CREATE USER dms_ingest PASSWORD '<随机>' CREATEDB`
-    // + `CREATE SCHEMA ... AUTHORIZATION dms_ingest`。
-    // 🔴 口令**不进模板**:模板产物会进审计,口令绝不能落审计/日志。
-    // 定案:用户创建与口令设置由执行器在函数内调 `CREATE USER ... PASSWORD` 的**参数化路径**完成
-    // (交付);本模板只负责**幂等的 schema + 授权**部分,故 DMS bootstrap 功能保留、
-    // 但口令那一段不经模板。
-    brandStatement(`CREATE SCHEMA IF NOT EXISTS ${ident(DMS_INGEST_SCHEMA)} AUTHORIZATION ${ident(DMS_INGEST_USER)}`),
+  "dms-ingest-bootstrap": (req) => [
+    // DMS 按源库名写目标 schema,但不自动建 ⇒ 预建一个同名 schema,属主是该区的摄入用户(幂等:已存在则不动,也不改属主)。
+    // 🔴 口令**不进模板**:模板产物会进审计,口令绝不能落审计/日志。建用户 / 设口令 / 写密钥由执行器的
+    //    `provisionDmsIngestUser` 在函数内完成;本模板只负责 schema。
+    // schema 名的形态与「不许是平台自己的 schema」在请求解析时已校验(`assertDmsIngestSchema`);`ident()` 再编码一次。
+    brandStatement(`CREATE SCHEMA IF NOT EXISTS ${ident(req.schema)} AUTHORIZATION ${ident(DMS_INGEST_USER)}`),
   ],
 
   // 🔴 改造(原来落 `shared.code_<id>`、列 `code/label/sort_order`,零生产调用方):

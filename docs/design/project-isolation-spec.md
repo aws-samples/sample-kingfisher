@@ -11,7 +11,7 @@
 >   ② the section 1 headline claim "all pure append-only attributes, zero table migration" is **narrowed** to "this module's own additions are pure append-only;
 >   the key changes and back-fill of `bgp-task-runs` / `bgp-audit` are owned by the multi-region execution work", and the claim "no new control-plane tables" is withdrawn (there are now 2: this table + `bgp-query-handles`);
 >   ③ the migration pseudo-code of section 3.7 gains the ledger's **table name** (it previously said only "the ledger", with no anchor).
-> - Basis: [the design](./project-isolation.md), **revision 1.11** (decisions / gaps / risks) + **[the multi-region execution design](./multi-region-execution-design.md), revision 3.26 / [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.54** (the `targetId`
+> - Basis: [the design](./project-isolation.md), **revision 1.11** (decisions / gaps / risks) + **[the multi-region execution design](./multi-region-execution-design.md), revision 3.28 / [the multi-region execution specification](./multi-region-execution-spec.md), revision 3.56** (the `targetId`
 >   identity, the four axes of its section 19, the foundation corrections of its section 20, the controlled admin-DDL executor of its section 3.9a). **This document is the single implementation-level contract of the project-isolation module**; decisions are in the design, interaction in [the
 >   interaction design](./project-isolation-interaction.md).
 > - 🔴 Pure design (with pseudo-code); no implementation code is written and nothing is deployed without confirmation.

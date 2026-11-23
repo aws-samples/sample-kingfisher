@@ -1,7 +1,7 @@
 // SQL Server provider(JDBC 范式)。
 //
 // 【驱动】tedious@18(纯 JS,微软官方,mssql 底层;实证 alpine 可用)。
-// 按需 dynamic import——未装进 platform 依赖前,introspect/ping 优雅降级(返回 [] / reachable:false)。
+// 按需 dynamic import——未装进 platform 依赖前,ping 回 reachable:false、introspect 抛(由 jdbc-base 的 introspect 统一按空清单处理)。
 // 【方言差异】URL=jdbc:sqlserver://host:port;databaseName=db;系统表=sys.columns/sys.tables;
 //   driver=com.microsoft.sqlserver.jdbc.SQLServerDriver。
 
@@ -64,28 +64,24 @@ function queryRows(tedious: any, connection: any, sql: string): Promise<any[]> {
 }
 
 async function introspect(conn: JdbcConnInfo): Promise<SourceDataset[]> {
-  try {
-    const tedious: any = await import("tedious");
-    return await withTedious(conn, async (connection) => {
-      const rows = await queryRows(
-        tedious,
-        connection,
-        `SELECT t.name AS table_name, c.name AS column_name, ty.name AS data_type, c.is_nullable
-         FROM sys.tables t
-         JOIN sys.columns c ON c.object_id = t.object_id
-         JOIN sys.types ty ON ty.user_type_id = c.user_type_id
-         ORDER BY t.name, c.column_id`
-      );
-      const map: Record<string, SourceColumn[]> = {};
-      for (const r of rows) {
-        if (!map[r.table_name]) map[r.table_name] = [];
-        map[r.table_name].push({ name: r.column_name, type: r.data_type, nullable: !!r.is_nullable });
-      }
-      return toDatasets(map);
-    });
-  } catch {
-    return [];
-  }
+  const tedious: any = await import("tedious");
+  return await withTedious(conn, async (connection) => {
+    const rows = await queryRows(
+      tedious,
+      connection,
+      `SELECT t.name AS table_name, c.name AS column_name, ty.name AS data_type, c.is_nullable
+       FROM sys.tables t
+       JOIN sys.columns c ON c.object_id = t.object_id
+       JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+       ORDER BY t.name, c.column_id`
+    );
+    const map: Record<string, SourceColumn[]> = {};
+    for (const r of rows) {
+      if (!map[r.table_name]) map[r.table_name] = [];
+      map[r.table_name].push({ name: r.column_name, type: r.data_type, nullable: !!r.is_nullable });
+    }
+    return toDatasets(map);
+  });
 }
 
 async function ping(conn: JdbcConnInfo): Promise<PingResult> {

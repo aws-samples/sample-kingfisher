@@ -150,7 +150,7 @@
       "home": "bgp-dms",
       "target": "bgp-dms-{slug}",
       "maxLength": 60,
-      "homeSource": "infra/lib/platform-stack.ts:821"
+      "homeSource": "platform/src/lib/realtime/dms-place.ts"
     },
     "dmsSubnetGroup": {
       "scope": "account-region",

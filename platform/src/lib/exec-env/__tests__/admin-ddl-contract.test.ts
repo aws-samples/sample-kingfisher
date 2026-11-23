@@ -62,7 +62,7 @@ const SAMPLES: AdminDdlRequest[] = [
   { operation: "create-role", targetId: TID, projectId: PID },
   { operation: "grant", targetId: TID, projectId: PID },
   { operation: "drop-project-schema", targetId: TID, projectId: PID, approvalId: "apr-1" },
-  { operation: "dms-ingest-bootstrap", targetId: TID },
+  { operation: "dms-ingest-bootstrap", targetId: TID, schema: "ecommerce" },
   // land-code-table 改成 target 级(码表没有项目维)
   { operation: "land-code-table", targetId: TID, codeTableId: "country" },
   // 🔴 **追加在末尾**:上面用了 `SAMPLES[0]` / `SAMPLES[6]` 这种下标,

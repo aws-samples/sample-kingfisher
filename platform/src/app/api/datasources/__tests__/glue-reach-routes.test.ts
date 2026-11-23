@@ -63,9 +63,16 @@ vi.mock("@/lib/datasource-spi/registry", () => ({
   isDataSourceType: (t: string) => ["mysql", "postgresql", "oracle", "sqlserver", "dynamodb"].includes(t),
   getProvider: (t: string) => ({
     capabilities: { paradigm: t === "dynamodb" ? "nosql" : "jdbc", needsGlueConnection: t !== "dynamodb" },
-    introspect: vi.fn(async () => {
+    // 与真 provider 同形(2026-11-19 真环境:这里原来让 introspect 在连不上时抛,而真实现把失败折成空清单 ⇒ 判据全绿、真环境「自动」方式下浏览表恒空):
+    //   读不到就抛的是 introspectStrict;introspect 读不到回 []。真 provider 接进路由的装配判据在 tables-direct-read-assembly.test.ts。
+    introspectStrict: vi.fn(async () => {
       h.calls.push({ svc: "node", cmd: "introspect", input: {} });
       if (h.introspectError) throw new Error(h.introspectError);
+      return [{ name: "players", kind: "table", columns: [{ name: "id", type: "int", nullable: false, key: "PRI", comment: "" }] }];
+    }),
+    introspect: vi.fn(async () => {
+      h.calls.push({ svc: "node", cmd: "introspect-tolerant", input: {} });
+      if (h.introspectError) return [];
       return [{ name: "players", kind: "table", columns: [{ name: "id", type: "int", nullable: false, key: "PRI", comment: "" }] }];
     }),
     buildConnection: () => ({ paradigm: "jdbc", jdbcUrl: "jdbc:mysql://db.cust.internal:3306/gamedb", driverClass: "com.mysql.cj.jdbc.Driver" }),

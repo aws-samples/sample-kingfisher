@@ -73,7 +73,7 @@ Note: the "English term" column is the word that appears in the console's Englis
 | Network object missing | A security group / subnet / Glue connection / secret this source depends on was deleted in the account; platform-created ones self-heal, your own must be replaced by you | Red tag in the Data Sources list |
 | Sync task | A task that syncs source tables to the region's data lake (S3 Tables) and / or warehouse (Redshift) | Data Integration → Data Sync |
 | Sync mode | Full load / incremental / real-time (CDC) | Sync wizard · "Sync mode" column of the list |
-| Sync channel | Which channel moves the data: Glue ETL (batch) · DMS (real-time CDC) · Zero-ETL (managed integration); the latter two are home-region only and bill continuously | Sync wizard · "Sync channel" column of the list |
+| Sync channel | Which channel moves the data: Glue ETL (batch) · DMS (real-time CDC) · Zero-ETL (managed integration); the latter two bill continuously; DMS runs in the execution region of the data source, Zero-ETL in the home region only | Sync wizard · "Sync channel" column of the list |
 | Write mode | Append / overwrite / merge; must be chosen explicitly; overwriting an existing table not created by the platform must be confirmed per table | Sync wizard |
 | Confirm overwrite | Per-table confirmation for tables flagged "Table exists (not created by platform; overwrite needs confirmation)"; an unconfirmed task fails outright at run time and deletes not one row | Dialog when submitting the sync wizard |
 | Date variables | Business-date placeholders usable in sync / jobs (such as `${ds}`), replaced by the business date at run time; list in the [Configuration reference](31-reference-config.md) | Sync wizard · job scripts |

@@ -57,8 +57,11 @@ export type ApiErrorCode =
   // 🔴 CROSS_REGION_SOURCE 不是过渡态:源在 A 区、活在 B 区跑 = 数据出境,**设计如此永久拒**
   //   (原则 2;error.detail = { datasourceOwner, bound })。
   | "CROSS_REGION_SOURCE"
-  // zero-etl / DMS 是主控区里的托管通道,尚未逐区 ⇒ 非 home 章任务选它们如实拒(原则 3)。
+  // Zero-ETL 是主控区里的托管通道,尚未逐区 ⇒ 非主控区任务启动它如实拒(原则 3;DMS 通道已逐区下推,不再用这个码)。
   | "CHANNEL_NOT_PUSHED_DOWN"
+  // (400):保存 / 修改同步任务时选的通道在数据源所在的执行区不提供(规则唯一作者 lib/sync/channel-place.ts)。
+  //   🔴 在「保存」就拒,不留到「启动」:能存不能启的任务对用户是个坑。error.detail = { channel, targetId }。
+  | "CHANNEL_NOT_AVAILABLE_IN_REGION"
   // 50-WP17-serverless-workflow
   // 🔴 语义已**收窄**:此后多节点编排在 serverless 上是**支持**的(发布 / 触发 / 状态 / 日志都通),
   // 这个码现在只剩一处真用途 = **Airflow Web 控制台**(serverless 压根没有 Web UI)。

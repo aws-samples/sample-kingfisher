@@ -47,7 +47,13 @@ const BASELINE = {
   // 2026-10-24 259 → 257(-2):probeEnvironment 的决策改记**真实落点**(req.targetId),HOME_TARGET_ID 引用 + import 两处退场
   // 2026-11-04 257 → 258(+1):lib/etl/run-lock.ts `heldJobRunLocks` 从作业行**反解**锁属性名 ⇒ targetId(`runLock` 无 target 段 ⇒ 主控区),
   //   是 `lockAttrFor` 的逆映射(§3.6「home 锁属性与存量逐字节同名」的另一半读法),不是「没给 = 主控区」的回落;删作业前核在途运行用它
-  homeBranches: 258, // 2026-10-23 257 → 259(+2):lib/network-advisor/environment-probe.ts
+  // 2026-11-18 258 → 261(+3):实时通道(DMS)按任务所在执行区建。三处都不是「没给落点就回落主控区」:
+  //   · lib/realtime/dms-place.ts `resolveDmsPlace`:主控区的 DMS 访问角色是主控区实时栈的固定名角色,取自平台容器的 `DMS_ROLE_ARN`
+  //     (执行区取该区描述符);落点本身来自任务绑定,绑定缺 / 多 ⇒ 拒。
+  //   · lib/realtime/dms-service.ts `probeReplicationInstance`:只决定「安全组未就绪」时指路的那句话
+  //     (主控区 = 去部署实时栈;执行区 = 去该执行环境点「重新部署」),不影响调用打到哪个区。
+  //   · lib/sync/channel-place.ts:通道 × 落点规则表里「Zero-ETL 只在主控区提供」这一条规则本身。
+  homeBranches: 261, // 2026-10-23 257 → 259(+2):lib/network-advisor/environment-probe.ts
   //   `probeEnvironment` 开头 `notePlaceDecision({ targetId: HOME_TARGET_ID, … homeReason })` 一处 + 它的 import 一处(量具对 import 也计数,
   //   与 start-run.ts 那条「import 1」同口径)—— 不是分支、不是回落:L1 探测的 EC2 客户端本来就是模块级主控区客户端,这一笔只是把事实
   //   写进账本(观测器归因);非主控区网络事实的缺口登记。
@@ -85,7 +91,10 @@ const BASELINE = {
   //  2026-10-02 278 → 274:六个数据面解析器去掉「缺省 = 主控区」+ 存量章 / 视角落点各收成一个作者(targetOfStamp / landingOfScope)
   /** L2:主控区资源名字面量(由 naming.json 的 home 模板派生,不手抄清单) */
   // 2026-11-03 30 → 29:依赖库上传路由不再手拼主控区脚本桶名,改按作业绑定的每个落点 resolveGlueBinding 取脚本桶
-  homeLiterals: 29, // 2026-10-11 31 → 30(o4-REG):同步推 OM 的两份 `bgp-table-bucket` 缺省收成坐标作者 om-sync-coords 的一处(主控区分支)
+  // 2026-11-18 29 → 24(−5):实时通道(DMS)的名字改由落点解析从命名 SSOT 取 ——
+  //   lib/realtime/dms-service.ts 的复制实例名 / 子网组 / 安全组三个字面缺省(−3)· lib/realtime/redshift-target.ts 的数仓命名空间缺省(−1,
+  //   改从该区工作组事实取)· 启动路由里拼主控区数据湖桶名的那一处(−1,暂存桶取落点)。
+  homeLiterals: 24, // 2026-10-11 31 → 30(o4-REG):同步推 OM 的两份 `bgp-table-bucket` 缺省收成坐标作者 om-sync-coords 的一处(主控区分支)
   /** L1:落点签名里的可选 / undefined(`targetId?: string` / `targetId: string | undefined|null`) */
   // 2026-11-04 66 → 65:lib/backfill/execute.ts 工作流 SQL 节点补数的锁名不再从 `(wf as { targetId?: string }).targetId` 取
   //   (多绑行上没有这个字段 ⇒ 恒为空 ⇒ 两个区的同节点串成一条队),改按实例的区解析出的 `binding.targetId`;那个局部可选签名随之消失

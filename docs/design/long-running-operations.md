@@ -1,11 +1,13 @@
 # Long-Running-Operation Framework (Design Overview · Data Model and Interface Contract · Interaction · Construction Sequence · Headless Acceptance Criteria — five in one)
 
-> Revision: **1.9** (2026-11-16)
+> Revision: **1.10** (2026-11-23)
 >
-> The full note for 1.9 and the earlier revisions (9) are in the collapsible list below.
+> The full note for 1.10 and the earlier revisions (10) are in the collapsible list below.
 
 <details><summary>Revision history</summary>
 
+- **1.10** (2026-11-23, the "settled" item of section 2.6d corrected by the state machine measured in a real environment with a read-only poll every second: a stop reason is not enough, the stop time must also be no earlier than the latest start;
+  this verdict now has a single author, "Stop" waits by it whether or not it sent the Stop itself, and the list reconciliation and the detail status use it too — no verdict while the task has not settled.)
 - **1.9** (2026-11-16, sync task "Stop" / "Delete" connected: `sync-stop` / `sync-delete` ✅ verified and merged back to the development mainline: deleting a DMS task right after its start took three or four clicks (409 → 502 → 409 → success) — the two routes only dared to wait 20 seconds inside one request, while "wait for the start-up → stop → wait until it has settled" takes minutes. The shape is in section 2.6d; lease family `sync-task:<taskId>` (guards added to the edit route and the two start routes, section 2.8); criteria in section 7d; the closed list now holds 33 kinds. Same change: "Stop" only counts once the replication task has settled (the "Settled" item in section 2.6d).)
 - **1.8** (🆕 2026-10-30 00:3xZ **third batch, second kind `engine-run` ✅ verified and merged back to the development mainline** (root fix of the EMR run 504 of 2026-10-29): the install chains of two freshly installed demo accounts hit HTTP 504 (CloudFront HTML) on "Run" of an EMR job in the
   showcase execution region while the job run in us-west-2 was already SUCCESS —
@@ -344,6 +346,11 @@ The second and third batches (section 6) **write the list first, then wire** (en
 - Settled (measured in a real environment on 2026-11-16): for "Stop", reading "stopped" once after a Stop was sent does not count yet — for a task stopped a few seconds after it entered running, DMS first reports a "stopped" without a stop reason,
   and the engine may only then come up (the status bounces back to running for about half a minute and data moves meanwhile); only a "stopped" that carries a stop reason counts as settled (if the service never gives a reason, 60 consecutive seconds of "stopped" count as well);
   a bounce back to running is stopped once more; not settled within the budget ⇒ still 409 and the status is unchanged. Delete does not look at this marker (whether the task can be removed is for DMS to say; a refusal goes back into the loop).
+- Settled, corrected (revision 1.10, measured in a real environment on 2026-11-23 with a read-only poll every second): whether a "stopped" counts has a single verdict (`lib/realtime/dms-service.ts#isSettledStop`) —
+  stopped + a stop reason + a stop time that is not earlier than the latest start (compared only when both times can be read; a stop reason that contains ERROR is not held back by the times — a failure has to be reported quickly).
+  What was measured: a task stopped after it has been running steadily first reports about 23 seconds of "stopped" without a stop reason, then gets the stop reason and an updated stop time at the same moment; on a restart, the moment the task enters "starting" the stop reason is cleared and the latest start time is updated;
+  a "stopped" that does not count (followed by a bounce back to running) never enters the DMS event stream. "Stop" waits by this verdict whether or not it sent a Stop itself this time (the 60-second fallback is unchanged);
+  the list reconciliation and the detail status (`lib/sync/reconcile.ts`) use the same verdict: not settled ⇒ no verdict, decided on the next read — before, a task the user had just restarted was written as "Stopped" and that run recorded as "Success".
 - After a successful delete, the run rows of this task that still show "running" are closed in the same step (the same write as for stop), and the replication-instance reclaim job is queued for the DMS channel as before.
 - Concurrency with the background start orchestration (the `start-realtime` route, which is not a long-running operation): an accepted stop / delete must win, but the task row only changes after the channel is down ⇒ at every checkpoint
   (including the failure branch) the orchestration first waits for the stop / delete that holds this task to finish (it reads the object lease; ceiling = global ceiling + 30 seconds) and then decides ownership from the task row, in three states —
@@ -476,7 +483,7 @@ The second and third batches (section 6) **write the list first, then wire** (en
 | **10** (offline) | Section 2.7 ①–⑬ all green; the `await-terminal-ratchet` baseline is ≥ 1 file smaller than the step 2 inventory (`landing.ts` migrated) | vitest |
 | 🆕 **11** (revision 1.2, leases) | **Immediately** after sending code table "Land in this region", close the panel, click "Delete" on the same row and confirm ⇒ toast "“Land code table to execution target” is in progress (n s elapsed); wait for it to finish before acting" (DELETE 409 `LONG_OP_IN_PROGRESS`) and the row is still there; the landing proceeds to ✓ as usual; afterwards unbind-and-clean-up / delete work as usual; the target region's `pg_tables` has no orphan matching the fixture code-table prefix | DOM + request log + Redshift |
 
-> Basis: section 2 of this document · the [multi-region specification](./multi-region-execution-spec.md), **revision 3.54, section 3.18** · the multi-region acceptance criteria, **section 8, new section (this segment)**.
+> Basis: section 2 of this document · the [multi-region specification](./multi-region-execution-spec.md), **revision 3.56, section 3.18** · the multi-region acceptance criteria, **section 8, new section (this segment)**.
 
 ### 7a. Second-batch criteria (page-driven segment; a test account in demo mode, two regions, observe credential mode, default 45 s; the segment's headless script requires a second execution region to be configured; revision 1.6 backfill: 2026-10-22, three runs each 13 items, 0 failures, 1 recorded item)
 

@@ -23,8 +23,11 @@ import { getProvider, isDataSourceType } from "@/lib/datasource-spi/registry";
 import { ensureGlueSyncJob } from "@/lib/sync/start-run";
 import { adoptExistingTargetsOnce } from "@/lib/sync/foreign-guard-adoption";
 import { bindingTargets } from "@/lib/exec-env/data-plane-target";
+// 通道 × 执行区的唯一规则(与新建同一条)
+import { channelUnavailableReason, CHANNEL_NOT_AVAILABLE_CODE } from "@/lib/sync/channel-place";
 // 换源时读新源的章(与启动路由的跨区判法同一个作者)
-import { datasourceOwnerTarget } from "@/lib/datasource/placement-shared";
+// 「禁止跨区取数」的判法(三处共用;数据源落点的读法在它里面)
+import { crossRegionSource } from "@/lib/sync/cross-region-source";
 import type { DataSource } from "@/types/datasource";
 
 const USER_ID = "default-user";
@@ -78,6 +81,15 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   if (Object.keys(body).length === 0) return NextResponse.json({ error: "无更新字段" }, { status: 400 });
   // 🔴 生产上线批次 A:按「改完之后」的整条任务校验写模式 + 确认清单,并提前告知会被整表清空的非平台表。
   const merged = { ...current, ...body } as Record<string, unknown>;
+  // 这次把通道**改成了**任务所在执行区不提供的那一种 ⇒ 拒(与新建同一条规则)。没动通道的保存不因它失败:
+  //   存量任务里早就存下的那种组合,启动时照旧如实拒,不让一次与它无关的编辑保存不了。
+  if (body.channel !== undefined && body.channel !== current.channel) {
+    const [boundTargetId] = bindingTargets(current as { targets?: unknown; targetId?: unknown });
+    const channelReject = channelUnavailableReason(body.channel, boundTargetId);
+    if (channelReject) {
+      return apiError(`${channelReject};任务未改`, 400, { code: CHANNEL_NOT_AVAILABLE_CODE, detail: { channel: body.channel, targetId: boundTargetId } });
+    }
+  }
   const writeReject = validateSyncWriteFields(merged);
   if (writeReject) return apiError(writeReject, 400, { code: "VALIDATION_FAILED" });
   // 改目标类型 / 改 Glue 版本之后的整条任务,写 S3 Tables 就必须是 Glue 5.1+
@@ -101,14 +113,13 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     dsRow = (await docClient.send(new GetCommand({ TableName: TABLES.DATASOURCES, Key: { userId: USER_ID, datasourceId: String(body.datasourceId) } }))).Item as Record<string, unknown> | undefined;
     if (!dsRow) return apiError(`数据源 ${String(body.datasourceId)} 不存在,任务未改`, 404, { code: "NOT_FOUND" });
     // 与启动路由同一条判法(datasourceOwnerTarget ∈ bindingTargets(任务行))、同一个错误码:源与任务必须在同一执行环境
-    const dsOwner = datasourceOwnerTarget(dsRow);
-    const bound = bindingTargets(current as { targets?: unknown; targetId?: unknown });
-    if (!bound.includes(dsOwner)) {
+    const cross = crossRegionSource(current as { targets?: unknown; targetId?: unknown }, dsRow);
+    if (cross) {
       return apiError(
-        `禁止跨区取数:新数据源在执行环境 ${dsOwner},而本任务绑定在 ${bound.join(" / ")} —— 同步 = 读源写仓,源与任务必须在同一执行环境,` +
+        `禁止跨区取数:新数据源在执行环境 ${cross.datasourceOwner},而本任务绑定在 ${cross.bound.join(" / ")} —— 同步 = 读源写仓,源与任务必须在同一执行环境,` +
           `这是设计规则、永久拒绝(请在新源所在的区新建同步任务);任务未改`,
         409,
-        { code: "CROSS_REGION_SOURCE", detail: { datasourceOwner: dsOwner, bound } }
+        { code: "CROSS_REGION_SOURCE", detail: cross }
       );
     }
     const newDb = typeof dsRow.database === "string" ? dsRow.database.trim() : "";

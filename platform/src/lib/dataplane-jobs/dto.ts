@@ -64,13 +64,25 @@ export interface DmsReclaimEvidence {
   deleting?: number;
   provisioning?: number;
   instanceStatus?: string;
-  waitingFor?: "task-deleting" | "provisioning-task" | "instance-available" | "deleting" | "idle-grace";
+  /**
+   * 在等什么。后两种是端点那一侧:实例已有结论,但该区还有遗留端点没清完 ——
+   * `endpoint-in-use` 端点还被「删除中」的复制任务占着 · `endpoint-sweep-retry` 这一步清扫出错,下一步重试。
+   */
+  waitingFor?: "task-deleting" | "provisioning-task" | "instance-available" | "deleting" | "idle-grace" | "endpoint-in-use" | "endpoint-sweep-retry";
   reclaimAt?: string;
   idleMin?: number;
   outcome?: "deleted" | "gone" | "kept-in-use" | "needs-manual";
+  /** 本作业到目前为止清掉的遗留端点(任务已删、不再被任何复制任务引用的平台端点)的标识。 */
+  endpointsDeleted?: string[];
+  /** 还被「删除中」的复制任务占用、下一步再清的端点。 */
+  endpointsPending?: string[];
+  /** 任务行已经没了、却还被一条没在删除的复制任务引用的端点:只报告,不删。 */
+  endpointsBlocked?: string[];
+  /** 这一步清扫遗留端点时的出错原因(已脱敏)。 */
+  endpointSweepError?: string;
 }
 const DMS_RECLAIM_OUTCOMES = new Set(["deleted", "gone", "kept-in-use", "needs-manual"]);
-const DMS_RECLAIM_WAITING = new Set(["task-deleting", "provisioning-task", "instance-available", "deleting", "idle-grace"]);
+const DMS_RECLAIM_WAITING = new Set(["task-deleting", "provisioning-task", "instance-available", "deleting", "idle-grace", "endpoint-in-use", "endpoint-sweep-retry"]);
 
 interface PublicJobBase {
   jobId: string;
@@ -150,6 +162,12 @@ function sgCleanupEvidenceOf(ev: Record<string, unknown>): SgCleanupEvidence {
 
 function dmsReclaimEvidenceOf(ev: Record<string, unknown>): DmsReclaimEvidence {
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+  // 端点标识清单:只留像端点标识的短字符串;空清单不出键
+  const ids = (v: unknown, max: number): string[] | undefined => {
+    if (!Array.isArray(v)) return undefined;
+    const out = v.filter((x): x is string => typeof x === "string" && /^[A-Za-z0-9-]{1,64}$/.test(x)).slice(0, max);
+    return out.length ? out : undefined;
+  };
   return {
     ...(str(ev.instanceId, 64) ? { instanceId: str(ev.instanceId, 64) } : {}),
     ...(str(ev.region, 32) ? { region: str(ev.region, 32) } : {}),
@@ -162,6 +180,10 @@ function dmsReclaimEvidenceOf(ev: Record<string, unknown>): DmsReclaimEvidence {
     ...(str(ev.reclaimAt, 32) ? { reclaimAt: str(ev.reclaimAt, 32) } : {}),
     ...(num(ev.idleMin) !== undefined ? { idleMin: num(ev.idleMin) } : {}),
     ...(typeof ev.outcome === "string" && DMS_RECLAIM_OUTCOMES.has(ev.outcome) ? { outcome: ev.outcome as DmsReclaimEvidence["outcome"] } : {}),
+    ...(ids(ev.endpointsDeleted, 100) ? { endpointsDeleted: ids(ev.endpointsDeleted, 100) } : {}),
+    ...(ids(ev.endpointsPending, 20) ? { endpointsPending: ids(ev.endpointsPending, 20) } : {}),
+    ...(ids(ev.endpointsBlocked, 20) ? { endpointsBlocked: ids(ev.endpointsBlocked, 20) } : {}),
+    ...(str(ev.endpointSweepError, 240) ? { endpointSweepError: str(ev.endpointSweepError, 240) } : {}),
   };
 }
 

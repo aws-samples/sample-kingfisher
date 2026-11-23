@@ -1074,6 +1074,8 @@ export const EN: Record<string, string> = {
   "请填写需求标题": "Enter a request title",
   "请先在「连接信息」填好子网+安全组（或用网络顾问一键预填）再运行": "Fill in subnet + security group under \"Connection Info\" (or one-click prefill via the Network Advisor) before running",
   "请先在上一步选择数据源": "Select a data source in the previous step first",
+  "正在读取数据源的表清单…(源在自有网络时经它的 Glue 连接发现,约 1–3 分钟)": "Reading the table list of the data source… (for a source in its own network this goes through its Glue connection and takes about 1–3 minutes)",
+  "没有读到这个数据源的表:源库里还没有表,或读取失败(失败原因见页面提示)。可回到上一步重新选择数据源再试": "No tables were read from this data source: the source database has no tables yet, or the read failed (see the page notice for the reason). Go back one step and select the data source again to retry",
   "请选择连接器 JAR 文件": "Select a connector JAR file",
   "请选择目标类型": "Select a target type",
   "请选择数据表": "Select a table",
@@ -4142,5 +4144,9 @@ export const EN: Record<string, string> = {
   "实例处于 {s},等它到稳态": "Instance is {s}; waiting for a stable state",
   "实例上仍有 {n} 条复制任务(含停止态,保留检查点),不回收": "{n} replication task(s) still on the instance (including stopped ones, which keep their checkpoint); not reclaimed",
   "已回收": "Reclaimed",
+  "{n} 个遗留端点还被删除中的复制任务占用,复制任务消失后清理": "{n} leftover endpoint(s) are still held by a replication task that is being deleted; they are removed once it is gone",
+  "清理遗留端点时出错,稍后重试:{err}": "Removing leftover endpoints failed; retrying shortly: {err}",
+  "已清理 {n} 个遗留端点": "{n} leftover endpoint(s) removed",
+  "{n} 个端点仍被残留的复制任务引用,未清理:{list}": "{n} endpoint(s) are still referenced by a leftover replication task and were not removed: {list}",
   "若删后该区再无 DMS 任务,复制实例将在空闲宽限后由后台自动回收(下次启动需重新创建,约 10–15 分钟);停止态任务保留检查点、实例不回收。": "If no DMS task remains in this region after deletion, the replication instance is reclaimed automatically after an idle grace period (the next start recreates it, about 10–15 minutes); stopped tasks keep their checkpoint and the instance is kept.",
 };

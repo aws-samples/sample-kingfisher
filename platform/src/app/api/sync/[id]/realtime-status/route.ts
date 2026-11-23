@@ -5,6 +5,7 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { apiOk, apiError } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { getReplicationStatus } from "@/lib/realtime/dms-service";
+import { resolveDmsSite } from "@/lib/realtime/dms-place";
 // 终态判定 / 回写与列表读时对账**同一份**(lib/sync/reconcile)
 import { applyDmsStatus } from "@/lib/sync/reconcile";
 
@@ -23,7 +24,9 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   const taskArn = task.realtimeConfig?.replicationTaskArn;
   if (!taskArn) return apiOk({ provisioned: false, status: task.status || "draft" });
 
-  const st = await getReplicationStatus(taskArn);
+  // 去任务绑定的那个区问(解析同时记下落点决策);解析不出区 ⇒ 如实 unknown,不猜主控区
+  const site = await resolveDmsSite(task as { targets?: unknown; targetId?: unknown }).catch(() => null);
+  const st = site ? await getReplicationStatus(site, taskArn) : null;
   if (!st) return apiOk({ provisioned: true, status: "unknown" });
 
   // BUG-4(2026-07-04):DMS 侧 failed、或 stopped 带失败 ⇒ 任务与运行记录如实回写 failed;

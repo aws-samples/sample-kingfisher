@@ -14,9 +14,11 @@
 //   下线必须打在创建它的地方 —— 用 home 客户端去停非 home 的 run,GetJobRuns 直接 EntityNotFound,
 //   改动前的行为等于把「Glue 里没有这个作业」当成「已停」(孤儿 run 继续跑继续计费)。
 //   区解析不出来 = 不知道它在哪跑 ⇒ hardFailure(绝不当成「没东西可停」)。
-// zero-etl / DMS 仍是主控区托管通道(原则 3),它们的服务层照旧打 home。
+// DMS 通道同理:复制任务建在任务绑定的那个区(`lib/realtime/dms-place.ts`),下线用同一个解析去同一个区找它。
+// zero-etl 仍是主控区托管通道(原则 3),它的服务层照旧打主控区。
 import { GetJobRunsCommand, BatchStopJobRunCommand, DeleteJobCommand } from "@aws-sdk/client-glue";
 import { teardownReplicationTask } from "@/lib/realtime/dms-service";
+import { resolveDmsSite, type DmsSite } from "@/lib/realtime/dms-place";
 import { deleteZeroEtlIntegration, dropDestinationDatabase } from "@/lib/realtime/zeroetl-service";
 import { bindingTargets, regionOfTarget } from "@/lib/exec-env/data-plane-target";
 import { glueClientFor } from "@/lib/exec-env/target-clients";
@@ -100,7 +102,17 @@ export async function teardownSyncChannel(
   }
 
   if (task.channel === "dms") {
-    const r = await teardownReplicationTask(task.taskId, {
+    // 停/删打在任务绑定的那个区(与启动同一个解析)。解析不出区 = 不知道它在哪跑 ⇒ 硬失败,
+    // 绝不当成「没东西可停」:去错的区只会查到「没有这个复制任务」,而真的那条还在别的区搬数据、计费。
+    // 🔴 这里只解析位置、不做准入:正在停止承接 / 降级的执行区里的通道照样得停得下来。
+    let site: DmsSite;
+    try {
+      site = await resolveDmsSite(task as { targets?: unknown; targetId?: unknown });
+    } catch (e) {
+      out.hardFailures.push({ what: "resolveTargetRegion", error: String((e as Error)?.message ?? e).slice(0, 240) });
+      return out;
+    }
+    const r = await teardownReplicationTask(site, task.taskId, {
       purge: opts.purge, waitMs: opts.waitMs ?? IN_REQUEST_WAIT_MS,
     });
     out.dms = { found: r.found, stopped: r.stopped, deleted: r.deleted, finalStatus: r.finalStatus };

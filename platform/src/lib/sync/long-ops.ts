@@ -12,7 +12,7 @@
 import { ExecuteStatementCommand, DescribeStatementCommand } from "@aws-sdk/client-redshift-data";
 import { recordAudit } from "@/lib/audit";
 import { redshiftDataClientFor } from "@/lib/exec-env/target-clients";
-import { resolveRedshiftBinding, TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
+import { resolveRedshiftBinding, TargetBindingRejected, bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { awaitTerminal, LongOpWaitBudgetExceeded } from "@/lib/long-ops/await-terminal";
 import type { LongOpExecutor, LongOpExecutorRegistry } from "@/lib/long-ops/executor-types";
 import { LongOpHttpError } from "@/lib/long-ops/store";
@@ -27,9 +27,7 @@ import { updateSyncTaskIfExists } from "./task-write";
 import { settleRunningRuns, resolveRunStamp } from "@/lib/monitor/run-records";
 // 最后一条 DMS 任务删掉之后,懒创建的复制实例就没人引用了 ⇒ 登记一条持久回收作业(实例上仍有任务时作业自己收口为「在用」)
 import { enqueueDmsInstanceReclaim, type DmsReclaimEnqueueResult } from "@/lib/realtime/dms-instance-reclaim-job";
-import { REPLICATION_INSTANCE_ID } from "@/lib/realtime/dms-service";
-import { getTarget } from "@/lib/exec-env/registry";
-import { bindingTargets } from "@/lib/exec-env/data-plane-target";
+import { resolveDmsSite } from "@/lib/realtime/dms-place";
 
 /** 建表 / 打标记语句最多等多少轮(× 500ms;原路由 30 轮 = 15 秒,长操作里放到 120 秒覆盖数仓冷启动)。 */
 export const SYNC_DDL_WAIT_POLLS = 240;
@@ -183,7 +181,7 @@ const syncStop: LongOpExecutor<"sync-stop"> = async ({ taskId }, ctx) => {
   });
   // 实时(DMS)运行没有轮询器替它写终态 ⇒ 停止后把还挂着「运行中」的运行行收口,否则监控页的「运行中」计数永远多一条
   try {
-    await settleRunningRuns({ taskId, status: "stopped", set: { finishedAt: now }, stamp: resolveRunStamp(task) });
+    await settleRunningRuns({ taskId, status: "stopped", set: { finishedAt: now }, stamp: resolveRunStamp(task, bindingTargets(task as { targets?: unknown; targetId?: unknown })[0]) });
   } catch { /* 收口失败不改变「已停止」这个事实 */ }
   recordAudit(ctx.req, "sync.stop", { resourceType: "sync", resourceId: taskId, detail: { name: task.name, teardown: td } }).catch(() => {});
   return { data: { stopped: true, teardown: td } };
@@ -206,11 +204,10 @@ const syncDelete: LongOpExecutor<"sync-delete"> = async ({ taskId }, ctx) => {
   let reclaim: DmsReclaimEnqueueResult | { enqueued: false; error: string } | undefined;
   if ((task as { channel?: string }).channel === "dms") {
     try {
-      const [boundTargetId] = bindingTargets(task as { targets?: unknown; targetId?: unknown });
-      const target = boundTargetId ? await getTarget(boundTargetId) : null;
-      if (!target) throw new Error("任务没有绑定可解析的执行区 ⇒ 不知道复制实例在哪个区");
+      // 与通道下线同一个解析(哪个区、哪台实例);同一条作业还负责清掉这条任务留在该区的两个端点
+      const site = await resolveDmsSite(task as { targets?: unknown; targetId?: unknown });
       reclaim = await enqueueDmsInstanceReclaim({
-        targetId: target.targetId, region: target.region, instanceId: REPLICATION_INSTANCE_ID,
+        targetId: site.targetId, region: site.region, instanceId: site.instanceId,
         reason: "task-deleted", createdBy: `user:${ctx.identity.username}`,
       });
     } catch (e) {
@@ -221,7 +218,7 @@ const syncDelete: LongOpExecutor<"sync-delete"> = async ({ taskId }, ctx) => {
   // 任务没了,它名下还挂着「运行中」的运行行也要收口(与停止同一写法):实时(DMS)运行没有轮询器替它写终态,
   // 不收口的话任务监控里永远多一条指向已删任务的「运行中」。
   try {
-    await settleRunningRuns({ taskId, status: "stopped", set: { finishedAt: new Date().toISOString() }, stamp: resolveRunStamp(task) });
+    await settleRunningRuns({ taskId, status: "stopped", set: { finishedAt: new Date().toISOString() }, stamp: resolveRunStamp(task, bindingTargets(task as { targets?: unknown; targetId?: unknown })[0]) });
   } catch { /* 收口失败不改变「已删除」这个事实 */ }
   recordAudit(ctx.req, "sync.delete", { resourceType: "sync", resourceId: taskId, detail: { name: (task as { name?: string }).name, teardown: td, ...(reclaim ? { instanceReclaim: reclaim } : {}) } }).catch(() => {});
   // 响应体保持原来摊平的形状(页面与验收脚本读顶层字段)

@@ -20,7 +20,10 @@ const h = vi.hoisted(() => ({
   ddb: [] as Array<{ ctor: string; input: Record<string, any>; dms?: string }>,
   leases: new Map<string, Record<string, any>>(),
   glueCalls: [] as Array<{ cmd: string; input: Record<string, any> }>,
-  dmsCalls: [] as Array<{ cmd: string; input: Record<string, any> }>,
+  /** region = 这次调用用的客户端建在哪个区(通道下线必须去任务绑定的那个区) */
+  dmsCalls: [] as Array<{ cmd: string; input: Record<string, any>; region: string }>,
+  /** 注册表里的执行环境(按 targetId;只放非主控区的 —— 主控区的区不从注册表读) */
+  registry: {} as Record<string, Record<string, unknown>>,
   jobRuns: [] as Array<{ Id: string; JobRunState: string }>,
   stopErrors: [] as Array<Record<string, any>>,
   dmsStatus: "running",
@@ -64,9 +67,11 @@ vi.mock("@aws-sdk/client-database-migration-service", () => {
   const STOP_AFTERMATH = ["stopping", "stopped", "stopped!"];
   const mk = (n: string) => { const C = class { constructor(public input: any) {} }; Object.defineProperty(C, "name", { value: n }); return C; };
   class DatabaseMigrationServiceClient {
+    region: string;
+    constructor(cfg: { region?: string } = {}) { this.region = String(cfg.region ?? ""); }
     async send(cmd: any) {
       const n = cmd.constructor.name;
-      h.dmsCalls.push({ cmd: n, input: cmd.input });
+      h.dmsCalls.push({ cmd: n, input: cmd.input, region: this.region });
       const invalidState = (msg: string) => { const e: any = new Error(msg); e.name = "InvalidResourceStateFault"; return e; };
       if (n === "DescribeReplicationTasksCommand") {
         if (h.dmsSeq.length) {
@@ -158,7 +163,10 @@ vi.mock("@/lib/projects/guard", () => ({
   guardResourceAccess: vi.fn(async () => ({ identity: { username: "admin" }, projectId: "p1" })),
 }));
 vi.mock("@/lib/audit", () => ({ recordAudit: vi.fn(async () => {}) }));
-vi.mock("@/lib/exec-env/registry", () => ({ getTarget: vi.fn(async (id: string) => ({ targetId: id, region: "us-east-1", status: "active" })) }));
+vi.mock("@/lib/exec-env/registry", () => ({
+  getTarget: vi.fn(async (id: string) => ({ targetId: id, region: "us-east-1", status: "active" })),
+  getTargetRaw: vi.fn(async (id: string) => h.registry[id] ?? null),
+}));
 vi.mock("@/lib/versions/version-service", () => ({ snapshotVersion: vi.fn(async () => {}) }));
 vi.mock("@/lib/monitor/run-records", () => ({
   settleRunningRuns: vi.fn(async (args: Record<string, any>) => { h.settled.push(args); return 0; }),
@@ -206,7 +214,7 @@ const updates = () => h.ddb.filter((x) => x.ctor === "UpdateCommand" && onSyncTa
 const deletes = () => h.ddb.filter((x) => x.ctor === "DeleteCommand" && onSyncTable(x));
 
 beforeEach(() => {
-  h.ddb.length = 0; h.glueCalls.length = 0; h.dmsCalls.length = 0; h.leases.clear();
+  h.ddb.length = 0; h.glueCalls.length = 0; h.dmsCalls.length = 0; h.leases.clear(); h.registry = {};
   h.jobRuns = []; h.stopErrors = []; h.dmsStatus = "running"; h.dmsStopThrows = false;
   h.dmsStaysNonTerminal = false; h.dmsDeleteThrows = false;
   h.dmsSeq = []; h.dmsStopReason = ""; h.stopScripts = []; h.stopSeenAt = []; h.deleteSeenAt = []; h.onStop = null; h.onDelete = null; h.settled = [];
@@ -344,6 +352,70 @@ describe("同步通道的下线", () => {
     const r = await del();
     expect(r.status).toBe(200);
     expect(deletes()).toHaveLength(1);
+  });
+});
+
+describe("DMS 通道下线去任务绑定的那个执行区(与创建同一个落点解析)", () => {
+  const WEST = "tgt_usw2";
+  const westRow = { pk: "env", sk: WEST, targetId: WEST, region: "us-west-2", status: "active" };
+  const westTask = (over: Record<string, unknown> = {}) => dmsTask({ targetId: undefined, targets: [WEST], ...over });
+  const reclaimPut = () => h.ddb.find((x) => x.ctor === "PutCommand" && (x.input as any)?.Item?.kind === "dms-instance-reclaim");
+
+  it("🔴🔴 执行区的 DMS 任务「停止」⇒ 每一个 DMS 调用都打在那个区(改动前:下线握着主控区的客户端 ⇒ 去主控区找不到这条复制任务,当成「没东西可停」)", async () => {
+    h.registry[WEST] = westRow;
+    h.task = westTask();
+    const r = await stop();
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(h.dmsCalls.map((c) => c.cmd)).toContain("StopReplicationTaskCommand");
+    expect(new Set(h.dmsCalls.map((c) => c.region))).toEqual(new Set(["us-west-2"]));
+    expect(updates()).toHaveLength(1);
+  });
+
+  it("🔴🔴 执行区的 DMS 任务「删除」⇒ 撤复制任务在那个区;登记的回收作业也是那个区的(执行环境 / 区 / 该区的实例名)", async () => {
+    h.registry[WEST] = westRow;
+    h.task = westTask();
+    const r = await del();
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(h.dmsCalls.map((c) => c.cmd)).toContain("DeleteReplicationTaskCommand");
+    expect(new Set(h.dmsCalls.map((c) => c.region))).toEqual(new Set(["us-west-2"]));
+    expect((reclaimPut()!.input as any).Item).toMatchObject({
+      phase: "queued", targetId: WEST, createdBy: "user:admin",
+      state: { instanceId: "bgp-dms-tgt-usw2", region: "us-west-2", reason: "task-deleted" },
+    });
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("主控区的任务照旧:调用都在主控区,回收作业是主控区的 bgp-dms(存量行只有顶层 targetId / 新行只有 targets[] 两种形态同结论)", async () => {
+    for (const task of [dmsTask(), dmsTask({ targetId: undefined, targets: ["tgt_home"] })]) {
+      h.ddb.length = 0; h.dmsCalls.length = 0; h.dmsStatus = "running"; h.dmsSeq = []; h.dmsStopReason = ""; h.leases.clear();
+      h.task = task;
+      const r = await del();
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      expect(new Set(h.dmsCalls.map((c) => c.region))).toEqual(new Set(["us-east-1"]));
+      expect((reclaimPut()!.input as any).Item).toMatchObject({ targetId: "tgt_home", state: { instanceId: "bgp-dms", region: "us-east-1" } });
+    }
+  });
+
+  it("🔴 解析不出任务在哪个区(注册表里读不到这个执行环境)⇒ 502 且不改 / 不删记录、零 DMS 调用:不知道通道在哪,绝不当成「没东西可停」,也不去主控区碰运气", async () => {
+    h.task = westTask();
+    const stopped = await stop();
+    expect(stopped.status, JSON.stringify(stopped.body)).toBe(502);
+    expect(JSON.stringify(stopped.body)).toContain("resolveTargetRegion");
+    expect(updates()).toHaveLength(0);
+    const deleted = await del();
+    expect(deleted.status).toBe(502);
+    expect(deletes()).toHaveLength(0);
+    expect(reclaimPut()).toBeUndefined();
+    expect(h.dmsCalls).toEqual([]);
+  });
+
+  it("🔴 任务绑了两个执行区(DMS 通道只能在一个区)⇒ 同样 502、记录不动、零 DMS 调用", async () => {
+    h.registry[WEST] = westRow;
+    h.task = westTask({ targets: ["tgt_home", WEST] });
+    const r = await del();
+    expect(r.status, JSON.stringify(r.body)).toBe(502);
+    expect(deletes()).toHaveLength(0);
+    expect(h.dmsCalls).toEqual([]);
   });
 });
 
@@ -540,12 +612,32 @@ describe("「停止」要等复制任务停稳:带着停止原因的「已停止
     expect(teardownIsRetryable(td)).toBe(true);
   });
 
-  it("不是我们停的(本来就停着 / 自己跑完)⇒ 不用等停止原因,直接收口", async () => {
-    h.task = dmsTask({ status: "running" }); h.dmsStatus = "stopped";
+  it("不是我们停的、那边早就停稳了(带着停止原因:上次正常停下 / 自己跑完)⇒ 一个 Stop 都不发,直接收口", async () => {
+    // 形态照真服务:停稳的复制任务一直带着停止原因(2026-11-23 每秒只读轮询:stopped + Stop Reason NORMAL 一直保持到下一次启动)
+    h.task = dmsTask({ status: "running" }); h.dmsStatus = "stopped"; h.dmsStopReason = "Stop Reason NORMAL";
     const r = await stop();
     expect(r.status).toBe(200);
     expect(h.stopSeenAt).toEqual([]);
     expect(r.virtualMs).toBeLessThan(5_000);
+  });
+
+  it("🔴 不是我们停的、读出来是不带停止原因的「已停止」(不作数),随后弹回运行中 ⇒ 不许一个 Stop 都不发就回「已停止」:等它回到运行中再停,停稳才回", async () => {
+    // 2026-11-23 真环境:任务再启动约 40 秒后读到一次「已停止」,而通道实际在跑。改动前这里直接回 200「已停止」,一个 Stop 都没发。
+    h.task = dmsTask({ status: "running" }); h.dmsStatus = "stopped";
+    h.dmsSeq = ["stopped", "stopped", "running"];
+    const r = await stop();
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(h.stopSeenAt, "Stop 真的发了,而且是在读到运行中之后").toEqual(["running"]);
+    expect(`${h.dmsStatus}|${h.dmsStopReason}`).toBe("stopped|Stop Reason NORMAL");
+  });
+
+  it("不带停止原因的「已停止」一直不变(服务始终不给停止原因)⇒ 连续这么报满兜底时长才算停好,不会永远等下去", async () => {
+    h.task = dmsTask({ status: "running" }); h.dmsStatus = "stopped";
+    const r = await stop();
+    expect(r.status).toBe(200);
+    expect(h.stopSeenAt).toEqual([]);
+    expect(r.virtualMs).toBeGreaterThanOrEqual(60_000);
+    expect(r.virtualMs).toBeLessThan(75_000);
   });
 
   it("🔴 删除刚启动的任务:撤复制任务那一下正赶上它弹回运行中而被拒 ⇒ 不是 502:再停、停下后撤掉、删行", async () => {

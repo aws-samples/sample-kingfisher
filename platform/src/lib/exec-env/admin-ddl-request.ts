@@ -61,7 +61,9 @@ export type AdminDdlRequest =
   //   **纯权限语句**留在这里,产物里**没有任何字面量**,进审计完全安全。
   | { operation: "grant-role-to-login"; targetId: string; projectId: string }
   | { operation: "drop-project-schema"; targetId: string; projectId: string; approvalId: string }
-  | { operation: "dms-ingest-bootstrap"; targetId: string }
+  // 给 DMS 通道预建目标 schema(属主 = 该区的 DMS 摄入用户)。schema 名 = 源库名(DMS 按源库名写目标 schema,但不自动建);
+  // 它是调用方给的**标识符**(不是 SQL):形态在这里校验,平台自己的 schema 一律不许给(见 `parseAdminDdlRequest`)。
+  | { operation: "dms-ingest-bootstrap"; targetId: string; schema: string }
   // 🔴 `land-code-table` 改成 **target 级**(原来带 projectId 且落 `shared.code_<id>`,零生产调用方):
   //    码表是平台全局的、没有项目维;落点由 SSOT `codeTableLandingFqn()` 派生(过渡期 = 现网 `public.dim_code_<code>`),
   //    列定义与 home 落地**同一个作者**(`buildCodeTableCreateStatement`)。只建结构,**不灌数**(§4.6)。
@@ -189,6 +191,36 @@ const MODEL_TABLE_ID_RE = CODE_TABLE_ID_RE;
 /** 审批单号形态(drop-project-schema 必须带)。 */
 const APPROVAL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
 
+/** DMS 目标 schema 名的形态:普通标识符(字母 / 下划线开头,只含字母数字下划线),不超过 Redshift 标识符上限。 */
+const DMS_INGEST_SCHEMA_RE = /^[A-Za-z_][A-Za-z0-9_]{0,126}$/;
+/** 平台自己的 schema(大小写折叠后判):项目私有 `proj_*`、全局知识 `shared`、探针 `bgp_canary*`、系统 `pg_*` / `information_schema`。 */
+const PLATFORM_RESERVED_SCHEMA_RE = /^(proj_.*|shared|bgp_canary.*|pg_.*|information_schema)$/i;
+
+/**
+ * DMS 目标 schema 名的校验(唯一作者)。
+ *
+ * 🔴 为什么要拦平台自己的 schema:这条模板以管理员身份 `CREATE SCHEMA IF NOT EXISTS … AUTHORIZATION <摄入用户>`。
+ *    schema 已存在时它什么都不做;可要是源库恰好叫 `proj_<某项目>` 而那个项目的 schema 还没建,摄入用户就成了它的属主 ——
+ *    等于经这条通道拿到了别人项目空间的所有权。所以平台保留的名字一律拒,并说清怎么办。
+ */
+export function assertDmsIngestSchema(v: unknown): string {
+  if (typeof v !== "string" || !DMS_INGEST_SCHEMA_RE.test(v)) {
+    throw new AdminDdlRequestInvalid(
+      "schema",
+      `dms-ingest-bootstrap 的 schema(= 源库名)必须是普通标识符(字母或下划线开头,只含字母、数字、下划线,不超过 127 个字符);` +
+        `收到 ${JSON.stringify(typeof v === "string" ? v.slice(0, 80) : v)};这类源库请改用 Glue 通道同步(可指定目标 schema)`
+    );
+  }
+  if (PLATFORM_RESERVED_SCHEMA_RE.test(v)) {
+    throw new AdminDdlRequestInvalid(
+      "schema",
+      `源库名 ${JSON.stringify(v)} 与平台自己的 schema 重名(项目空间 proj_* / shared / 系统 schema)⇒ 拒绝用它作 DMS 的目标 schema;` +
+        `这类源库请改用 Glue 通道同步(可指定目标 schema)`
+    );
+  }
+  return v;
+}
+
 /**
  * **运行时** schema 校验(不是 TypeScript 强转)。
  *
@@ -250,6 +282,10 @@ export function parseAdminDdlRequest(input: unknown): AdminDdlRequest {
       );
     }
     return { operation, targetId, projectId: projectId as string, approvalId };
+  }
+
+  if (operation === "dms-ingest-bootstrap") {
+    return { operation, targetId, schema: assertDmsIngestSchema(o.schema) };
   }
 
   if (operation === "land-code-table" || operation === "grant-shared-writer") {

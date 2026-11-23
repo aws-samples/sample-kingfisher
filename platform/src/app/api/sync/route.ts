@@ -6,6 +6,9 @@ import { syncWorkRejection } from "@/lib/sync/task-shape";
 import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OVERWRITE_CONFIRM_KIND, overwriteConfirmMessage, writesS3Tables } from "@/lib/sync/target-table-guard";
 // 自带 Table Bucket 的准入(保存与启动同一份判定)
 import { tableBucketSaveRejection } from "@/lib/sync/table-bucket";
+// 通道 × 执行区的唯一规则(保存即校验:不留「能存不能启」的任务)
+import { channelUnavailableReason, CHANNEL_NOT_AVAILABLE_CODE } from "@/lib/sync/channel-place";
+import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { apiOk, apiError } from "@/lib/api-response";
 import { generateSyncLineage } from "@/lib/governance/lineage-service";
 import { recordAudit } from "@/lib/audit";
@@ -164,6 +167,12 @@ export async function POST(req: NextRequest) {
     createdAt: now,
     updatedAt: now,
   };
+  // 选的通道在任务所在的执行区不提供 ⇒ 保存即拒并说明改用哪个(改动前保存能成、点「启动」才被拒)。
+  const [boundTargetId] = bindingTargets(item as { targets?: unknown; targetId?: unknown });
+  const channelReject = channelUnavailableReason((item as { channel?: unknown }).channel, boundTargetId);
+  if (channelReject) {
+    return apiError(`${channelReject};任务未保存`, 400, { code: CHANNEL_NOT_AVAILABLE_CODE, detail: { channel: (item as { channel?: unknown }).channel, targetId: boundTargetId } });
+  }
   // 自带 Table Bucket 的准入在**保存**时就判(启动守卫同一份判定):非主控区只许平台表桶或「系统设置 → 数据湖外部表桶」
   //   已登记的桶,否则 400 并指路去登记(改动前保存能成、启动才 409,登记了也仍 409)。主控区不变。
   if (writesS3Tables(item as never)) {

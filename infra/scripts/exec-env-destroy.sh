@@ -255,6 +255,19 @@ for iarn in $(clean "$DINST"); do
   wait_gone "dms-instance:$iarn" aws dms describe-replication-instances --region "$R" --filters "Name=replication-instance-arn,Values=$iarn" --query 'ReplicationInstances[0].ReplicationInstanceArn' --output text
   record "$CURRENT_STEP" deleted "dms-instance:${iarn##*:}" ""
 done
+# 平台在本区建的 DMS 端点(标识 bgp-src-* / bgp-tgt-*;一个区只有一套执行环境,所以本区这两种前缀的端点都是它的)。
+# 复制任务已在上面删完 ⇒ 端点不再被引用;仍被引用(账号里有不属于平台的复制任务用着它)⇒ 如实停下,不硬删。
+if ! DEPS="$(aws dms describe-endpoints --region "$R" \
+              --query "Endpoints[?starts_with(EndpointIdentifier,'bgp-src-') || starts_with(EndpointIdentifier,'bgp-tgt-')].EndpointArn" --output text 2>&1)"; then
+  is_not_found "$DEPS" || stuck "dms-endpoints" "列 DMS 端点失败:$(last_line "$DEPS")"
+  DEPS=""
+fi
+for earn in $(clean "$DEPS"); do
+  if ! EOUT="$(aws dms delete-endpoint --region "$R" --endpoint-arn "$earn" 2>&1)"; then
+    is_not_found "$EOUT" || stuck "dms-endpoint:$earn" "删 DMS 端点失败:$(last_line "$EOUT")"
+  fi
+  record "$CURRENT_STEP" deleted "dms-endpoint:${earn##*:}" ""
+done
 
 # ── 6. 经典 MWAA 环境(RETAIN 的有状态托管环境;存量双装目标才有)──
 CURRENT_STEP="6-mwaa"

@@ -29,7 +29,8 @@ import { updateSyncTaskIfExists } from "@/lib/sync/task-write";
 // 终态失败原话分类(与 pollGlueJob 同一作者);网络漂移 ⇒ 源行标 broken,下一次启动前自愈
 import { classifyRunError, isNetworkDrift } from "@/lib/sync/run-error";
 import { noteNetworkDriftFromRunError } from "@/lib/datasource/network-reconcile";
-import { describeReplicationTaskState, type ReplicationTaskState } from "@/lib/realtime/dms-service";
+import { describeReplicationTaskState, isSettledStop, type ReplicationTaskState } from "@/lib/realtime/dms-service";
+import { resolveDmsSite } from "@/lib/realtime/dms-place";
 import { getIntegrationStatus } from "@/lib/realtime/zeroetl-service";
 
 const GLUE_DONE = ["SUCCEEDED", "FAILED", "STOPPED", "ERROR", "TIMEOUT"];
@@ -71,7 +72,7 @@ const DMS_FAILED_STATUSES = ["failed", "failed-move"];
  * · `failed` / `failed-move` ⇒ failed(running 与 provisioning 都认:这是 DMS 自己说的终态);
  * · 🔴 **provisioning 只认上面这一条**:启动编排会复用上一次留下的复制任务(可能带着旧 lastFailure、处于 stopped / ready),
  *   在它 StartReplicationTask 之前这些全是正常中间态,按失败处理就是把一次正常启动判死;
- * · running 且 DMS `stopped`:StopReason 含 ERROR ⇒ failed;含 FINISHED 或(全量 100% 且无 lastFailure)⇒ stopped / 运行成功;
+ * · running 且 DMS `stopped`:先要停稳(带停止原因、停止时刻不早于最近一次启动;没停稳 ⇒ null);StopReason 含 ERROR ⇒ failed;含 FINISHED 或(全量 100% 且无 lastFailure)⇒ stopped / 运行成功;
  *   带 lastFailure ⇒ failed;其余 = 有人在服务侧停了它 ⇒ stopped / 运行 stopped;
  * · running 且 DMS `ready` 带 lastFailure ⇒ failed(任务被服务侧重置且带失败);
  * · running / starting / stopping / modifying / testing / creating / 其它 ⇒ null —— 🔴 **运行中的任务不因残留的 lastFailure 被判死**
@@ -85,6 +86,10 @@ export function judgeDmsReplication(st: ReplicationTaskState, taskStatus: string
   }
   if (taskStatus !== "running") return null;
   if (dmsStatus === "stopped") {
+    // 🔴 「已停止」要停稳才作数(记号见 isSettledStop):DMS 会短暂报不作数的「已停止」(刚启动 / 刚被停的头几十秒,随后弹回运行中)。
+    //   2026-11-23 真环境:用户刚点「启动」的任务,列表读在这个窗口里 ⇒ 行被写成「已停止」、这次运行记成「成功」,而通道在跑。
+    //   没停稳 ⇒ 不下结论,下一次读再判(对账只许带回后端已到终态的事实)。
+    if (!isSettledStop(st)) return null;
     const reason = String(st.stopReason || "");
     if (/ERROR/i.test(reason)) {
       return { status: "failed", runStatus: "failed", error: st.lastFailure || `DMS 复制任务已停止:${reason}` };
@@ -235,11 +240,14 @@ async function reconcileGlue(task: SyncTaskRowLike): Promise<SyncTaskRowLike> {
 async function reconcileDms(task: SyncTaskRowLike): Promise<SyncTaskRowLike> {
   const arn = task.realtimeConfig?.replicationTaskArn;
   if (typeof arn !== "string" || !arn) return task; // 复制任务还没建出来(编排早期)⇒ 没有可对账的后端事实
-  const st = await describeReplicationTaskState(arn);
+  // 去任务绑定的那个区问(解析同时记下落点决策);解析不出区 ⇒ 没有可对账的事实,行原样返回(不猜主控区)
+  const site = await resolveDmsSite(task).catch(() => null);
+  if (!site) return task;
+  const st = await describeReplicationTaskState(site, arn);
   if (!st) return task;
   const verdict = judgeDmsReplication(st, String(task.status ?? ""));
   if (!verdict) return task;
-  const wrote = await settleSyncChannelVerdict(task, verdict, bindingTargets(task)[0]);
+  const wrote = await settleSyncChannelVerdict(task, verdict, site.targetId);
   return wrote ? { ...task, status: verdict.status } : task;
 }
 

@@ -129,6 +129,7 @@ import {
   judgeDmsReplication, judgeZeroEtlIntegration, reconcileSyncTask, settleSyncChannelVerdict, SYNC_IN_FLIGHT_STATUSES,
 } from "../reconcile";
 import { describeReplicationTaskState, getReplicationStatus } from "@/lib/realtime/dms-service";
+import { homeDmsPlace, regionDmsPlace } from "@/lib/realtime/__tests__/fixtures/dms-place";
 
 const DMS_ARN = "arn:aws:dms:us-east-1:123456789012:task:ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const INTEG_ARN = "arn:aws:rds:us-east-1:123456789012:integration:0f1e2d3c-aaaa-bbbb-cccc-ddddeeeeffff";
@@ -143,7 +144,9 @@ const runUpdates = () => h.ddb.filter((x) => x.n === "UpdateCommand" && x.input.
 beforeEach(() => h.reset());
 
 describe("① judgeDmsReplication(纯判定)", () => {
-  const st = (o: Partial<Parameters<typeof judgeDmsReplication>[0]>) => ({ status: "running", fullLoadProgress: 0, ...o });
+  const st = (o: Partial<Parameters<typeof judgeDmsReplication>[0]>) => ({ status: "running", fullLoadProgress: 0, startedAt: null, stoppedAt: null, ...o });
+  /** 某一次启动的时刻(毫秒);停止时刻与它比先后 */
+  const T0 = Date.UTC(2026, 10, 23, 3, 8, 11);
 
   it("DMS failed ⇒ failed,错误 = lastFailure(running 与 provisioning 都认)", () => {
     const v = judgeDmsReplication(st({ status: "failed", lastFailure: "Binary Logging must be enabled" }), "running");
@@ -167,11 +170,28 @@ describe("① judgeDmsReplication(纯判定)", () => {
       .toEqual({ status: "stopped", runStatus: "succeeded" });
   });
 
-  it("stopped 无 StopReason:全量 100% 且无失败 ⇒ 跑完;带 lastFailure ⇒ failed;其余 = 服务侧被人停了 ⇒ stopped / 运行 stopped、无 error", () => {
-    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 100 }), "running")).toEqual({ status: "stopped", runStatus: "succeeded" });
-    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 40, lastFailure: "disk full" }), "running"))
+  it("🔴 stopped 没停稳(没带停止原因 / 停在最近一次启动之前)⇒ 不下结论:DMS 会短暂报不作数的「已停止」,随后弹回运行中", () => {
+    // 2026-11-23 真环境每秒轮询:刚跑起来就被停 ⇒ stopped(无停止原因)33 秒后弹回 running;同一天另一个账号,任务再启动 40 秒后读到一次「已停止」而通道在跑。
+    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 100 }), "running")).toBeNull();
+    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 100, startedAt: T0, stoppedAt: T0 + 95_000 }), "running")).toBeNull();
+    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 40, lastFailure: "disk full" }), "running")).toBeNull();
+    // 带着停止原因,但停止时刻早于最近一次启动 ⇒ 那是上一轮的停止
+    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 100, stopReason: "Stop Reason NORMAL", startedAt: T0 + 180_000, stoppedAt: T0 + 95_000 }), "running")).toBeNull();
+  });
+
+  it("stopped 停稳了(带停止原因、停止时刻不早于最近一次启动)才判:全量 100% 且无失败 ⇒ 跑完;带 lastFailure ⇒ failed;其余 = 被人停了 ⇒ stopped / 运行 stopped、无 error", () => {
+    const settled = { status: "stopped", stopReason: "Stop Reason NORMAL", startedAt: T0, stoppedAt: T0 + 95_000 };
+    expect(judgeDmsReplication(st({ ...settled, fullLoadProgress: 100 }), "running")).toEqual({ status: "stopped", runStatus: "succeeded" });
+    expect(judgeDmsReplication(st({ ...settled, fullLoadProgress: 40, lastFailure: "disk full" }), "running"))
       .toEqual({ status: "failed", runStatus: "failed", error: "disk full" });
-    expect(judgeDmsReplication(st({ status: "stopped", fullLoadProgress: 40 }), "running")).toEqual({ status: "stopped", runStatus: "stopped" });
+    expect(judgeDmsReplication(st({ ...settled, fullLoadProgress: 40 }), "running")).toEqual({ status: "stopped", runStatus: "stopped" });
+    // 同一秒停下也算(时刻只到秒)
+    expect(judgeDmsReplication(st({ ...settled, stoppedAt: T0, fullLoadProgress: 100 }), "running")?.status).toBe("stopped");
+    // 时刻读不出而带停止原因 ⇒ 作数(读不出不等于停在启动之前)
+    expect(judgeDmsReplication(st({ status: "stopped", stopReason: "Stop Reason NORMAL", fullLoadProgress: 100 }), "running")).toEqual({ status: "stopped", runStatus: "succeeded" });
+    // 出错停下不拿时刻去拦:失败要尽快如实报
+    expect(judgeDmsReplication(st({ status: "stopped", stopReason: "Stop Reason FATAL_ERROR", lastFailure: "boom", startedAt: T0 + 180_000, stoppedAt: T0 }), "running"))
+      .toEqual({ status: "failed", runStatus: "failed", error: "boom" });
   });
 
   it("running 且 DMS ready 带 lastFailure ⇒ failed;ready 无失败 ⇒ 不动", () => {
@@ -260,6 +280,24 @@ describe("② reconcileSyncTask:dms 通道真接上后端事实与落库", () =>
     expect(Object.values(runUpdates()[0].input.ExpressionAttributeValues)).toContain("succeeded");
   });
 
+  it("🔴 刚再启动的任务:DMS 短暂报一次不作数的「已停止」⇒ 行不动、零写、运行记录不收口;真停稳了才写", async () => {
+    const task = seedRow({ taskId: "d9", channel: "dms", status: "running", targets: ["tgt_home"], realtimeConfig: { replicationTaskArn: DMS_ARN } });
+    h.runsByTask.set("d9", [{ taskId: "d9", runId: "r2", status: "running" }]);
+    const started = new Date("2026-11-23T02:33:32Z"), prevStop = new Date("2026-11-23T02:31:25Z");
+    // 2026-11-23 真环境读到的形态:stopped、没有停止原因、全量 100%、无失败;停止时刻还是上一轮的。改动前这一读就把行写成 stopped、把运行记成 succeeded。
+    h.replTasks.set(DMS_ARN, { Status: "stopped", ReplicationTaskStartDate: started, ReplicationTaskStats: { FullLoadProgressPercent: 100, StopDate: prevStop } });
+    expect((await reconcileSyncTask(task)).status).toBe("running");
+    // 带着上一轮的停止原因也一样:停止时刻早于这次启动
+    h.replTasks.set(DMS_ARN, { Status: "stopped", StopReason: "Stop Reason NORMAL", ReplicationTaskStartDate: started, ReplicationTaskStats: { FullLoadProgressPercent: 100, StopDate: prevStop } });
+    expect((await reconcileSyncTask(task)).status).toBe("running");
+    expect(syncTaskUpdates()).toHaveLength(0);
+    expect(runUpdates()).toHaveLength(0);
+    // 真停稳:带停止原因、停止时刻晚于这次启动 ⇒ 这才是后端到了终态
+    h.replTasks.set(DMS_ARN, { Status: "stopped", StopReason: "Stop Reason NORMAL", ReplicationTaskStartDate: started, ReplicationTaskStats: { FullLoadProgressPercent: 100, StopDate: new Date("2026-11-23T02:40:00Z") } });
+    expect((await reconcileSyncTask(task)).status).toBe("stopped");
+    expect(Object.values(runUpdates()[0].input.ExpressionAttributeValues)).toContain("succeeded");
+  });
+
   it("🔴 用户同一瞬间已「停止」(行已是 stopped)⇒ 条件写不过 ⇒ 返回原行、**不碰运行记录**(停止路由自己收口)", async () => {
     const stale = { taskId: "d4", channel: "dms", status: "running", targets: ["tgt_home"], realtimeConfig: { replicationTaskArn: DMS_ARN } } as never;
     h.rowsById.set("d4", { taskId: "d4", status: "stopped" });
@@ -307,27 +345,43 @@ describe("② reconcileSyncTask:dms 通道真接上后端事实与落库", () =>
   });
 });
 
-describe("② dms-service:复制任务状态按 ARN 里的区取客户端", () => {
-  it("ARN 在 eu-west-1 ⇒ regionalClient('dms','eu-west-1');不是主控区的模块级客户端", async () => {
+describe("② dms-service:复制任务状态去任务落点的那个区问,且 ARN 写的区必须与落点一致", () => {
+  it("落点与 ARN 都在 eu-west-1 ⇒ regionalClient('dms','eu-west-1');不是主控区的客户端", async () => {
     const arn = "arn:aws:dms:eu-west-1:123456789012:task:ZZZZZZZZZZZZZZZZZZZZZZZZZZ";
-    h.replTasks.set(arn, { Status: "running", ReplicationTaskStats: { FullLoadProgressPercent: 55 }, StopReason: undefined });
-    const st = await describeReplicationTaskState(arn);
-    expect(st).toEqual({ status: "running", fullLoadProgress: 55, lastFailure: undefined, stopReason: undefined });
+    // 形态照真服务:再启动之后在跑的任务 —— 最近一次启动时刻是这一次的,停止时刻还是上一轮的,没有停止原因
+    const started = new Date("2026-11-23T03:08:11Z"), prevStop = new Date("2026-11-23T03:05:06Z");
+    h.replTasks.set(arn, { Status: "running", ReplicationTaskStartDate: started, ReplicationTaskStats: { FullLoadProgressPercent: 55, StopDate: prevStop }, StopReason: undefined });
+    const st = await describeReplicationTaskState(regionDmsPlace({ targetId: "tgt_euw1", region: "eu-west-1" }), arn);
+    expect(st).toEqual({ status: "running", fullLoadProgress: 55, lastFailure: undefined, stopReason: undefined, startedAt: started.getTime(), stoppedAt: prevStop.getTime() });
+    // 从没启动 / 从没停过的任务:两个时刻都读不出 ⇒ null(不是 0)
+    h.replTasks.set(arn, { Status: "ready" });
+    expect(await describeReplicationTaskState(regionDmsPlace({ targetId: "tgt_euw1", region: "eu-west-1" }), arn))
+      .toEqual({ status: "ready", fullLoadProgress: 0, lastFailure: undefined, stopReason: undefined, startedAt: null, stoppedAt: null });
+    h.regionalCalls.length = 1; h.dmsCalls.length = 1;
     expect(h.regionalCalls).toEqual([{ service: "dms", region: "eu-west-1" }]);
     expect(h.dmsCalls[0].region).toBe("eu-west-1");
   });
 
   it("getReplicationStatus = 本体 + 逐表统计,同一个区的客户端;stopReason 透传", async () => {
     h.replTasks.set(DMS_ARN, { Status: "stopped", StopReason: "Stop Reason FULL_LOAD_ONLY_FINISHED", ReplicationTaskStats: { FullLoadProgressPercent: 100 } });
-    const st = await getReplicationStatus(DMS_ARN);
+    const st = await getReplicationStatus(homeDmsPlace(), DMS_ARN);
     expect(st).toMatchObject({ status: "stopped", fullLoadProgress: 100, stopReason: "Stop Reason FULL_LOAD_ONLY_FINISHED", cdcLatencySec: null, tables: [] });
     expect(h.dmsCalls.map((c) => c.n)).toEqual(["DescribeReplicationTasksCommand", "DescribeTableStatisticsCommand"]);
     expect(new Set(h.dmsCalls.map((c) => c.region))).toEqual(new Set(["us-east-1"]));
   });
 
+  it("ARN 写的区与任务落点不是同一个区 ⇒ null,哪个区都不去问(既不拿这个 ARN 去落点的区,也不跟着 ARN 去别的区)", async () => {
+    // 复制任务确实存在于 us-east-1,但任务的落点是 us-west-2
+    h.replTasks.set(DMS_ARN, { Status: "running", ReplicationTaskStats: { FullLoadProgressPercent: 10 } });
+    expect(await describeReplicationTaskState(regionDmsPlace(), DMS_ARN)).toBeNull();
+    expect(await getReplicationStatus(regionDmsPlace(), DMS_ARN)).toBeNull();
+    expect(h.regionalCalls).toHaveLength(0);
+    expect(h.dmsCalls).toHaveLength(0);
+  });
+
   it("ARN 读不出区(畸形 / 不是 dms 服务)⇒ null,**不**退回主控区去问", async () => {
-    expect(await describeReplicationTaskState("not-an-arn")).toBeNull();
-    expect(await describeReplicationTaskState("arn:aws:glue:us-east-1:123456789012:job/x")).toBeNull();
+    expect(await describeReplicationTaskState(homeDmsPlace(), "not-an-arn")).toBeNull();
+    expect(await describeReplicationTaskState(homeDmsPlace(), "arn:aws:glue:us-east-1:123456789012:job/x")).toBeNull();
     expect(h.regionalCalls).toHaveLength(0);
     expect(h.dmsCalls).toHaveLength(0);
   });
@@ -421,14 +475,21 @@ describe("③ 接线:详情页路由与 dms-service 都走同一份判定(调用
     expect(code).toContain('case "glue":');
   });
 
-  it("dms-service:状态查询路径上模块级主控区客户端 `dms.send(` 绝迹,改 dmsClientFor(ARN 的区)", () => {
+  it("dms-service:没有模块级客户端;每个客户端都按落点的区取;状态查询先核「ARN 的区 = 落点的区」", () => {
     const code = codeOnly("lib/realtime/dms-service.ts");
+    // 模块级(行首)不许再有客户端或区的定义 —— 2026-11 之前这里握着主控区的 DMS / EC2 单例
+    expect(code).not.toMatch(/^(?:export )?(?:const|let|var) (?:dms|ec2|sm|region|secrets)\b/m);
+    expect(code).not.toMatch(/new (?:DatabaseMigrationService|EC2|SecretsManager)Client\(/);
+    // 每个按区取客户端的调用,区只许来自落点(place / site)或已与落点核对过的 ARN 的区
+    const args = [...code.matchAll(/\b(?:dmsClientFor|ec2ClientFor|secretsClientFor)\(([^)]*)\)/g)].map((m) => m[1].trim());
+    expect(args.length).toBeGreaterThanOrEqual(10);
+    expect(new Set(args)).toEqual(new Set(["place.region", "site.region", "region"]));
+    expect(args.filter((a) => a === "region")).toHaveLength(1);
     const from = code.indexOf("async function dmsClientOfTaskArn(");
     expect(from).toBeGreaterThan(0);
-    const statusPath = code.slice(from);
-    expect(statusPath).not.toContain("dms.send(");
-    expect(statusPath).toContain("dmsClientFor(region)");
-    expect(statusPath).toContain('regionOfArn(taskArn, "dms")');
+    const guard = code.slice(from, code.indexOf("export async function describeReplicationTaskState("));
+    expect(guard).toContain('regionOfArn(taskArn, "dms")');
+    expect(guard).toMatch(/region && region === site\.region \? dmsClientFor\(region\) : null/);
   });
 
   it("列表路由仍对每行调 reconcileSyncTask(且在 scope 过滤之前)", () => {

@@ -79,6 +79,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const [step, setStep] = useState(0);
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [tables, setTables] = useState<any[]>([]);
+  // 表清单读取中(经数据源的 Glue 连接发现时要 1–3 分钟)⇒ 第 2 步如实说「正在读取」;读完仍为空也如实说,不再一律写「请先选择数据源」
+  const [tablesLoading, setTablesLoading] = useState(false);
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   // 带日期变量的源表名单独存:它们不在源库表清单里,而 antd 的
   // Checkbox.Group 在 onChange 时会把「没有对应复选框」的值滤掉(混在 selectedTables 里一勾选就丢了)。
@@ -165,6 +167,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     const ds = dataSources.find((d) => d.datasourceId === dsId);
     if (!ds) return;
     const seq = ++dsReqSeq.current;
+    // 换源之前向导上是否已经显示着通道推荐(换源后要按新源重取,见下面「用户换源」分支)
+    const hadChannelRec = !!channelRec;
     // 源在哪个区,任务就在那个区跑。workgroup 下拉改拉**该区**清单。
     // 🔴 落点字段(表桶/workgroup/库)在前端**一律不预填**:留空 = 服务端按该章的描述符解析
     // (start 路由 tableBucketName / resolveRedshiftBinding 是唯一作者)。此处刻意不按 home 与否
@@ -187,6 +191,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     }
     // 直连读不到且有 Glue 连接时后端起发现作业(202),唯一作者 fetchSourceTables 负责轮询;源在自有网络的客户向导才建得了任务
     let tableList: any[] = [];
+    setTablesLoading(true);
     try {
       const r = await fetchSourceTables(dsId, ds.database, {
         onWaiting: (info) => message.info(info.note || t("正在经数据源的 Glue 连接发现表(约 1–3 分钟),请稍候…"), 8),
@@ -198,6 +203,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     }
     // 🔴 先发后到的旧源结果不许盖掉新源的表清单 / 映射(用户已经换了源,这次结果作废)
     if (seq !== dsReqSeq.current) return;
+    setTablesLoading(false);
     setTables(tableList);
     if (opts?.userSwitched) {
       // 旧源的建表预览 / 通道推荐 / 能力校验错误都是按旧源算的,一律作废
@@ -212,6 +218,9 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       const samplesNow = templateSamplesRef.current;
       const keptSamples = Object.fromEntries(Object.entries(samplesNow).filter(([, sampleName]) => names.has(sampleName)));
       if (Object.keys(keptSamples).length !== Object.keys(samplesNow).length) { templateSamplesRef.current = keptSamples; setTemplateSamples(keptSamples); }
+      // 通道可不可用取决于数据源所在的执行区(有的通道只在主控区提供):换源前已经显示着通道推荐的,按新源重取并重置所选通道,
+      //   不让新源所在的区不提供的通道留在表单里、到保存才被拒
+      if (hadChannelRec) void fetchChannelRec();
     }
     const mappings: Record<string, any[]> = {};
     for (const tbl of tableList) {
@@ -231,7 +240,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
   const fetchChannelRec = async () => {
     const ds = dataSources.find((d) => d.datasourceId === form.getFieldValue("datasourceId"));
-    const res = await fetch("/api/sync/recommend-channel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceType: ds?.type, targetType: form.getFieldValue("targetType"), syncMode: form.getFieldValue("syncMode") }) });
+    const res = await fetch("/api/sync/recommend-channel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceType: ds?.type, targetType: form.getFieldValue("targetType"), syncMode: form.getFieldValue("syncMode"), ...(ds?.datasourceId ? { datasourceId: ds.datasourceId } : {}) }) });
     const data = await res.json();
     setChannelRec(data.success ? data.data : data);
     if (data.data?.recommended) form.setFieldValue("channel", data.data.recommended);
@@ -407,6 +416,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
           <Form.Item name="datasourceId" label={t("选择数据源")} rules={[{ required: true }]}>
             {/* 数据源下拉按范式渲染标识(JDBC=host/库;DDB=表名;S3=桶/前缀)。仅列可批同步(glue 通道)的源
                 JDBC 四兄弟 + DynamoDB + S3;stream(kinesis/msk)走实时计算页 flink-cdc,不在批同步向导。 */}
+            {/* 换了数据源 ⇒ 已经给出的通道推荐作废重取:通道可不可用取决于源的类型与它所在的执行区(该区不提供的通道要置灰并写明原因) */}
             <Select onChange={(v) => { void onDatasourceChange(String(v), { userSwitched: true }); }} options={dataSources
               .filter((ds) => ds.type !== "kinesis" && ds.type !== "msk")
               .map((ds) => {
@@ -552,7 +562,11 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                 </div>
               </div>
             );
-          })() : <Alert type="info" message={t("请先在上一步选择数据源")} />}
+          })() : tablesLoading ? (
+            <Alert type="info" showIcon data-testid="sync-tables-loading" message={t("正在读取数据源的表清单…(源在自有网络时经它的 Glue 连接发现,约 1–3 分钟)")} />
+          ) : watchDsId ? (
+            <Alert type="warning" showIcon data-testid="sync-tables-empty" message={t("没有读到这个数据源的表:源库里还没有表,或读取失败(失败原因见页面提示)。可回到上一步重新选择数据源再试")} />
+          ) : <Alert type="info" message={t("请先在上一步选择数据源")} />}
           {/* 带日期变量的源表名(加进 sourceTables + 固定目标表名进 targetTableNames) */}
           {/* 样例表候选 = 源库表清单;添加 / 改样例把样例列映射复制给模板 */}
           <TemplateTablesEditor form={form} templateTables={templateTables} setTemplateTables={setTemplateTables}

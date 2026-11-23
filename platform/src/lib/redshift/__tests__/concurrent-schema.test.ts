@@ -116,7 +116,6 @@ describe("🔴 零棘轮:每个发 CREATE SCHEMA IF NOT EXISTS 的地方都必�
     // 发出点(建模 DDL 生成)不变,加固点改到**真正执行它的那条路**:
     //   原映射指向 redshift.ts 自己的 execStatements,而那个函数零生产调用方(已删)⇒ 这条门禁一直在给死代码打勾。
     "lib/modeling/redshift.ts": "lib/modeling/landing.ts",
-    "lib/realtime/redshift-target.ts": "lib/realtime/redshift-target.ts",
     // Glue 生成脚本是**另一个运行时**(Python),它自己那份加固叫 ensure_schema
     "lib/sync/glue-script-generator.ts": "lib/sync/glue-script-generator.ts",
   };

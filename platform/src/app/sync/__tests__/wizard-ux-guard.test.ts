@@ -85,6 +85,10 @@ describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源
   it("userSwitched 只由下拉 onChange 传入;换源后不在新表清单里的已选表被移除并 message.info 点名", () => {
     expect(src).toMatch(/<Select onChange=\{\(v\) => \{ void onDatasourceChange\(String\(v\), \{ userSwitched: true \}\); \}\}/);
     expect((src.match(/userSwitched: true/g) || []).length).toBe(1); // 自动回填 / 草稿恢复不带它
+    // 换源前显示着通道推荐的 ⇒ 旧推荐作废之后按新源重取(通道可不可用取决于数据源所在的执行区);「有没有显示着」在第一个 await 之前取
+    expect(src).toMatch(/const seq = \+\+dsReqSeq\.current;\s*const hadChannelRec = !!channelRec;/);
+    expect(src).toMatch(/setTemplateSamples\(keptSamples\); \}\s*if \(hadChannelRec\) void fetchChannelRec\(\);\s*\}\s*const mappings/);
+    expect((src.match(/hadChannelRec/g) || []).length).toBe(2);
     expect(src).toMatch(/if \(opts\?\.userSwitched\) \{\s*setDdlPreview\(\{\}\); setChannelRec\(null\); setCapabilityError\(null\);\s*const names = new Set\(tableList\.map\(\(x: any\) => String\(x\.name\)\)\);\s*const dropped = selectedTables\.filter\(\(x\) => !names\.has\(x\)\);\s*if \(dropped\.length\) \{\s*setSelectedTables\(selectedTables\.filter\(\(x\) => names\.has\(x\)\)\);\s*message\.info\(/);
   });
 });

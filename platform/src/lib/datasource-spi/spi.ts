@@ -55,6 +55,11 @@ export interface DataSourceProvider {
   // JDBC=INFORMATION_SCHEMA;S3=列 prefix + 采样;DDB=ListTables + scan 采样;MSK=ListTopics。
   introspect(ref: SourceRef): Promise<SourceDataset[]>;
 
+  // 与 introspect 同一份读取,但**读不到要抛**(连不上 / 凭证不对 / 驱动不可用),不折成空清单。
+  // 给必须区分「源里没有表」与「没读到」的调用方用(浏览表:直连读不到 ⇒ 改经数据源自己的 Glue 连接)。
+  // 只有控制面直连读系统表的范式(JDBC)实现;没实现的 provider 调用方按 introspect 处理。
+  introspectStrict?(ref: SourceRef): Promise<SourceDataset[]>;
+
   // 建源时把表单凭证 → secret 字符串(按 credentialKind 决定内容形态)。
   // userpass→JSON({username,password});iam-role/none→provider 不实现(返回 undefined)。
   buildSecretPayload?(input: Record<string, any>): string | undefined;

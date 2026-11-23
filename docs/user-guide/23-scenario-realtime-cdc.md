@@ -48,7 +48,8 @@ Key points:
 
 - **DMS CDC**: the first time you start a DMS task, the platform automatically creates one replication instance (reused from then on; once the region's last DMS task is deleted, the background reclaims it after 10 idle minutes), then creates source / target endpoints and one "full load + continuous CDC" replication task for each task. The target is Redshift; the platform first creates a dedicated user and a schema named after the source database.
 - **Zero-ETL**: the AWS-managed RDS → Redshift integration. The platform creates a dedicated Redshift Serverless workgroup and namespace for it (not mixed with the platform's main warehouse); each task gets one target database `zeroetl_<task-suffix>`, and the schema name inside it = the source database name.
-- **Home region only**: both channels currently land only in the home-region warehouse. Clicking "Start" on a task bound to another execution region is rejected (HTTP 409, verbatim message in section 13); the platform will not quietly run it in the home region instead.
+- **Which region it runs in**: the DMS channel runs in the execution region the data source belongs to — the replication instance, the source / target endpoints, the replication task and the target warehouse are all in that region, and the data does not pass through the home region.
+  The Zero-ETL channel is currently offered in the home region only: for a data source of an execution region the wizard shows it greyed out and a save is refused as well (verbatim message in section 13); the platform will not quietly run it in the home region instead.
 - **Real status**: when the list is read it reconciles with DMS / Zero-ETL; if the replication task failed on the AWS side, the list shows "Failed" directly, with no need to open the detail page first.
 
 ### 1.2 Stream compute is Flink SQL streaming jobs; one job = one managed Flink application
@@ -76,7 +77,10 @@ Key points:
 ### 2.2 Data source (needed for Part A)
 
 - A data source for the source database already exists under "Data Integration → Data Sources", with the status cell showing "Connected". The demo environment uses `Showcase-<region-slug>-GameData-MySQL`.
-- Switch the top-bar "Execution scope" to the home-region view (or "All"): real-time sync tasks can only be started in the home region; the data source dropdown labels each source with its region, and the source you pick decides the region it runs in.
+- Switch the top-bar "Execution scope" to the region of the data source (or "All"): the data source dropdown labels each source with its region, and the source you pick decides the region it runs in —
+  the replication instance, the endpoints, the replication task and the target warehouse of the DMS channel are created in the region of the data source; the Zero-ETL channel is offered in the home region only (for a data source of an execution region the wizard shows it greyed out, with the reason).
+- The source database of an execution region must be reachable from that region's platform VPC (which has no route to the public internet): either the source database is inside this VPC, or the platform administrator connects the route through VPC peering / Transit Gateway
+  and allows that region's DMS security group in the security group of the source database (its name is `bgp-dms-sg-` plus the execution environment id, with underscores written as hyphens). A source database that only has a public address cannot be reached from an execution region; from the home region it can.
 
 ### 2.3 Kinesis data source (needed for Part B)
 
@@ -135,7 +139,7 @@ Page path: "Data Integration → Data Sync".
 Verify that data arrives:
 
 1. Insert a payment row in the source database (in the demo environment, use the seeding script or a manual `INSERT`).
-2. "Data Development → Redshift Query": choose the home region as the execution region and run `SELECT COUNT(*) FROM <source-db>.payments;`; the row count should increase within seconds.
+2. "Data Development → Redshift Query": choose the region of the data source as the execution region (DMS writes the data into that region's warehouse) and run `SELECT COUNT(*) FROM <source-db>.payments;`; the row count should increase within seconds.
 3. Back on the detail page, the "Insert" count in the per-table row of "DMS Sync Monitor" increases accordingly.
 
 ---
@@ -337,9 +341,22 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 - **Clicking "Start" reports "Real-time infrastructure is not ready: deploy BgpRealtimeStack (-c enable-realtime=1) first"** (or, for Flink, "Real-time compute infrastructure is not ready: deploy BgpFlinkStack (-c enable-flink=1) first and upload the runner JAR").
   - Cause: the real-time components are not installed in that region.
   - Next step: ask the platform administrator; this cannot be fixed from the page.
-- **DMS task start rejected with "This task is bound to execution environment … and the DMS real-time channel has not been rolled out per region yet (currently home region only) — start rejected; it will not be run in the home region instead"** (Zero-ETL equivalent: "The Zero-ETL channel has not been rolled out per region yet (the managed integration is currently provided only in the home-region warehouse) — start rejected").
-  - Cause: the task's data source is in another execution region; real-time sync currently lands only in the home region.
-  - Next step: recreate the task with a home-region data source; for real-time needs in other regions, use a Flink job (MySQL CDC source) on the "Stream Compute" page instead.
+- **"Start" of a DMS task in an execution region reports "Real-time infrastructure not ready: DMS security group … not ready … press "Redeploy" for … on the "Execution Environments" page and start again"**.
+  - Cause: this execution region has not been redeployed since the platform was upgraded and lacks the DMS security group every region must have; this start created no cloud resource.
+  - Next step: ask the platform administrator to press "Redeploy" for that region on the "Execution Environments" page, then press "Start" once more.
+- **The Zero-ETL channel is greyed out in the wizard, with the text "The Zero-ETL channel is currently offered in the home region only; for a data source of execution environment … use the DMS channel (incremental / real-time) or the Glue channel"**
+  (for a task of this kind that was saved earlier, "Start" reports "The Zero-ETL channel has not been rolled out per region yet (the managed integration is currently provided only in the home-region warehouse) — start rejected").
+  - Cause: the managed Zero-ETL integration writes only to the home-region warehouse; the DMS and Glue channels work in every execution region.
+  - Next step: choose the DMS or the Glue channel for a data source of an execution region.
+- **Step 2 of the sync wizard says "Reading the table list of the data source…" and takes a minute or two**.
+  - Cause: when the source database is in its own network and the platform cannot reach it directly, the table list is discovered through the data source's own Glue connection; the first time takes about 1–3 minutes, afterwards the cache is used.
+  - Next step: just wait for the list; if it ends with "No tables were read from this data source", look at the failure reason in the page notice (usually the address / user / password of the source database, or the network).
+- **A DMS task in an execution region is "Failed", and the error carries the connectivity failure text DMS gave**.
+  - Cause: usually the source database cannot be reached from that region's platform VPC (see section 2.2), or the address / user / password in the data source is wrong.
+  - Next step: correct the network or the data source and press "Start" once more — the platform reconnects with the current values of the data source; there is no need to delete and recreate the task.
+- **"Start" of a DMS task is refused on the spot with "The source database name … is the same as one of the platform's own schemas … sync this kind of source database through the Glue channel (which lets you choose the target schema)"** (or "the schema (= the source database name) must be a plain identifier …").
+  - Cause: the DMS channel uses the source database name as the schema name in the target warehouse; names starting with `proj_`, the name `shared`, names starting with `pg_` and the like are used by the platform itself, and database names that contain hyphens or other symbols do not work either.
+  - Next step: use the Glue channel for this source database (the target schema can be given another name).
 - **After the first "Start" the task stays in "Starting" for a long time**.
   - Cause: creating the replication instance for the first time takes about 10–15 minutes, longer on slow days; "Run Logs" on the detail page shows which step it is stuck on.
   - Next step: be patient; if it is still "Starting" after 30 minutes, "Stop" and then "Start" again (the verbatim message says the same).
@@ -379,7 +396,7 @@ Page path: "Data Development → Athena Query". The tag to the right of the titl
 2. **Kinesis data source** (the practice stream you created yourself): "Data Sources" → "Delete" in the row. It is rejected while a streaming job still references it (409 `DATASOURCE_IN_USE`, with a dialog listing every referencing streaming job); delete the jobs first. The Kinesis stream itself bills per shard-hour, so delete it once you are sure it is no longer needed.
 3. **DMS real-time sync task**: "Data Sync" → "Delete" in the row → confirm (no need to stop first; one click, and the platform deletes the replication task along with it once it has settled).
 4. **Zero-ETL task**: "Stop" deletes the integration and drops the `zeroetl_<task-suffix>` database; then "Delete" the task row.
-5. **Replication instance**: once the region's last DMS task is deleted, the platform reclaims the replication instance `bgp-dms` after a 10-minute idle grace ("System Settings → Background cleanup jobs" shows progress and outcome); tasks that are only stopped, not deleted, keep the instance alive and billing.
+5. **Replication instance**: once the region's last DMS task is deleted, the platform reclaims that region's replication instance (`bgp-dms` in the home region, `bgp-dms-` plus the execution environment id in an execution region) after a 10-minute idle grace, and the source / target endpoints the tasks left behind are removed along with it ("System Settings → Background cleanup jobs" shows progress and outcome); tasks that are only stopped, not deleted, keep the instance alive and billing.
 6. **S3 Tables result table**: `realtime.flink_region_agg` stays in that region's platform table bucket and keeps using storage; if you do not want it, have the administrator delete it in S3 Tables (the platform pages offer no drop-table entry).
 7. **Do not delete the sample objects**: the `Showcase-*` series is maintained by the administrator for everyone's reference.
 

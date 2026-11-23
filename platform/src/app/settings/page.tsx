@@ -64,13 +64,23 @@ export default function SettingsPage() {
   // DMS 复制实例回收作业的一句话说明(证据 → 用户看得懂的话;终态 outcome 由列表过滤,这里主要是等待态)
   const cleanupNote = (r: any): string => {
     const ev = r.evidence ?? {};
-    if (ev.waitingFor === "idle-grace") return t("实例上已无复制任务,空闲宽限后回收(预计 {time})", { time: String(ev.reclaimAt ?? "").slice(11, 16) + " UTC" });
-    if (ev.waitingFor === "task-deleting") return t("刚删掉的复制任务还在 DMS 里消失中({n} 条),消失后再判空闲", { n: ev.deleting ?? 0 });
-    if (ev.waitingFor === "provisioning-task") return t("仍有 {n} 条任务正在启动中,等它们就位", { n: ev.provisioning ?? 0 });
-    if (ev.waitingFor === "instance-available" || ev.waitingFor === "deleting") return t("实例处于 {s},等它到稳态", { s: ev.instanceStatus ?? "-" });
-    if (ev.outcome === "kept-in-use") return t("实例上仍有 {n} 条复制任务(含停止态,保留检查点),不回收", { n: ev.tasks ?? 0 });
-    if (ev.outcome === "deleted") return t("已回收");
-    return "-";
+    // 实例那一侧在等什么 / 结论是什么
+    const instanceNote = (): string => {
+      if (ev.waitingFor === "idle-grace") return t("实例上已无复制任务,空闲宽限后回收(预计 {time})", { time: String(ev.reclaimAt ?? "").slice(11, 16) + " UTC" });
+      if (ev.waitingFor === "task-deleting") return t("刚删掉的复制任务还在 DMS 里消失中({n} 条),消失后再判空闲", { n: ev.deleting ?? 0 });
+      if (ev.waitingFor === "provisioning-task") return t("仍有 {n} 条任务正在启动中,等它们就位", { n: ev.provisioning ?? 0 });
+      if (ev.waitingFor === "instance-available" || ev.waitingFor === "deleting") return t("实例处于 {s},等它到稳态", { s: ev.instanceStatus ?? "-" });
+      if (ev.waitingFor === "endpoint-in-use") return t("{n} 个遗留端点还被删除中的复制任务占用,复制任务消失后清理", { n: (ev.endpointsPending ?? []).length });
+      if (ev.waitingFor === "endpoint-sweep-retry") return t("清理遗留端点时出错,稍后重试:{err}", { err: ev.endpointSweepError ?? "-" });
+      if (ev.outcome === "kept-in-use") return t("实例上仍有 {n} 条复制任务(含停止态,保留检查点),不回收", { n: ev.tasks ?? 0 });
+      if (ev.outcome === "deleted") return t("已回收");
+      return "";
+    };
+    // 端点那一侧:已清掉几个、还有几个清不了(任务已删却仍被残留的复制任务引用 ⇒ 只报告)
+    const parts = [instanceNote()];
+    if ((ev.endpointsDeleted ?? []).length > 0) parts.push(t("已清理 {n} 个遗留端点", { n: ev.endpointsDeleted.length }));
+    if ((ev.endpointsBlocked ?? []).length > 0) parts.push(t("{n} 个端点仍被残留的复制任务引用,未清理:{list}", { n: ev.endpointsBlocked.length, list: ev.endpointsBlocked.join(" / ") }));
+    return parts.filter(Boolean).join(" · ") || "-";
   };
   const [netCleanupBusy, setNetCleanupBusy] = useState<string>("");
   const loadNetObjects = async () => {

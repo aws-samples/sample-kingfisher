@@ -33,6 +33,9 @@
 // 第三个公开入口 `provisionSharedWriter()`(SPEC §3.9d.4):每个 target 一个
 //   窄权写者 `shared_writer`,与 `provisionProjectLogin` 同形态、同纪律(口令不出函数、不进模板 / 审计 / 返回值)。
 //
+// 第四个公开入口 `provisionDmsIngestUser()`:每个 target 一个 DMS 摄入用户(DMS 写目标数仓用),
+//   与上面两个同形态、同纪律;区别只有两点 —— 密钥已在就复用(不是每次都轮换),建用户时带 CREATEDB。
+//
 // 🔴 **返回面封闭**:本模块任何导出都不返回 secret 明文 / admin secret ARN / 口令。
 //    `provisionProjectLogin` 返回的 `secretArn` 是**该项目自己的** secret 的 ARN(供给层要把它
 //    写进描述符/校验存在性),不是 admin 凭证;口令不在返回值里。有可执行门禁钉住这条。
@@ -47,6 +50,8 @@ import {
 // 窄权写者身份名的唯一作者
 import { sharedWriterSecretName, sharedWriterUserName } from "@/lib/modeling/landing-fqn";
 import { buildAdminDdlStatements } from "@/lib/exec-env/admin-ddl-templates";
+// DMS 摄入用户 / 密钥名的唯一作者
+import { DMS_INGEST_USER, DMS_TARGET_SECRET_NAME } from "@/lib/realtime/dms-ingest-identity";
 import { lintGeneratedStatement, sqlSkeleton } from "@/lib/exec-env/admin-ddl-guards";
 import { withSchemaCreateRetry } from "@/lib/redshift/concurrent-schema";
 import { requireCredentialIsolationState } from "@/lib/exec-env/privileged-cred";
@@ -67,6 +72,7 @@ import {
   assertProjectId,
 } from "@/lib/exec-env/project-schema";
 import {
+  describeSecretArnByName,
   execOnTarget,
   putSecretJson,
   resolveTargetEndpoint,
@@ -668,6 +674,109 @@ export async function provisionSharedWriter(
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// 公开入口 ⑥:provisionDmsIngestUser —— DMS 摄入用户 + 口令 + 连接密钥(按区)
+// ──────────────────────────────────────────────────────────────────────────────
+
+export interface DmsIngestUserResult {
+  /** 连接密钥的名字(每个区各一份、同名;DMS 目标端点按名引用) */
+  secretName: string;
+  /** `reused` = 密钥已在,数仓与密钥都没动;`provisioned` = 本次建用户(或重设口令)并写了密钥 */
+  outcome: "reused" | "provisioned";
+  /** 只有 `provisioned` 才有(复用不执行任何特权语句,也就没有意图审计) */
+  auditId?: string;
+}
+
+/**
+ * 为某个 target 的数仓准备 **DMS 摄入用户**:建用户(或重设口令)→ 写该区的连接密钥。
+ *
+ * 🔴 与 `provisionSharedWriter` **同一条纪律**:口令生命周期完全在本函数内(生成 → 进 SQL → 进 Secrets Manager → 出栈),
+ *    不进返回值 / 审计 / 日志 / 模板;审计只写固定脱敏描述符;错误文本先脱敏再抛。
+ * 🔴 **密钥已在就复用**(`rotate` 不为真时):2026-11 之前每次「启动」都重设一次口令并覆盖密钥 —— 两条任务同时启动时,
+ *    数仓里的口令与密钥里的口令可能对不上,而且正在跑的通道下一次重连会撞上换到一半的口令。
+ *    「密钥在、口令却不对」(数仓重建过 / 用户被人删了)由调用方在目标端连通性测试失败后带 `rotate` 再来一次。
+ * 🔴 主控区与执行区同一条路:落点、管理员凭证都从该 target 的描述符来,没有「主控区专用」分支。
+ */
+export async function provisionDmsIngestUser(
+  actor: AuthenticatedActor,
+  args: { targetId: string; rotate?: boolean }
+): Promise<DmsIngestUserResult> {
+  assertActor(actor);
+  // 3) 强一致读 target + 准入 + 隔离状态
+  const target = await requireReadyTarget(args.targetId);
+  notePlaceDecision({ targetId: target.targetId, via: ADMIN_DDL_PLACE_VIA });
+  const iso = requireCredentialIsolationState(target);
+  // 4) RBAC:建登录身份是特权动作,一律要求平台管理员
+  if (!actor.isPlatformAdmin) {
+    throw new AdminDdlDenied("4-rbac", `建 DMS 摄入用户需要平台管理员;actor=${actor.actor} 不是 ⇒ 拒绝`);
+  }
+
+  const warehouse = resolveTargetWarehouse(target);
+  const secretName = DMS_TARGET_SECRET_NAME;
+  // 密钥已在 ⇒ 复用(🔴 只有 ResourceNotFound 才等于「没有」,读失败照抛 —— 不把一次限流当成「该重建了」)
+  if (!args.rotate && (await describeSecretArnByName(warehouse.region, secretName))) {
+    return { secretName, outcome: "reused" };
+  }
+
+  const descriptor = `create-dms-ingest-user:${DMS_INGEST_USER}@${target.targetId}`;
+  const auditBase = { resourceType: "exec-env-admin-ddl", resourceId: `${target.targetId}#provision-dms-ingest-user` };
+  const intentDetail = {
+    operation: "provision-dms-ingest-user",
+    auditKind: "credential" as const,
+    targetId: target.targetId,
+    credentialIsolationState: iso.state,
+    credentialEpoch: iso.epoch,
+    descriptor,
+    secretName,
+    rotate: args.rotate === true,
+  };
+  // 6) 意图审计 fail-closed
+  let auditId: string;
+  try {
+    auditId = await writeAuditRecord(actor, "exec-env.admin-ddl.provision-dms-ingest-user.intent", {
+      ...auditBase,
+      detail: intentDetail,
+    });
+  } catch (e) {
+    throw new AdminDdlDenied(
+      "6-audit",
+      `执行意图审计写入失败 ⇒ 拒绝建 DMS 摄入用户(fail-closed-on-audit):${(e as Error)?.message ?? String(e)}`
+    );
+  }
+
+  // 7) admin 凭证(函数内部)
+  const secretArn = adminSecretArnOf(target);
+  // 端点先解析:DMS 要的是含 host / port 的完整密钥,半份密钥通得过「存在性」检查却连不上。
+  const endpoint = await resolveTargetEndpoint(warehouse);
+
+  // 8) 执行 —— 🔴 语句含口令字面量,**全程包在脱敏 try 里**
+  //    口令字符集是 base64url(A-Za-z0-9-_):不含 DMS 密钥里禁用的 { } , ; 也不含单引号 / 反斜杠。
+  const password = generateRedshiftPassword();
+  try {
+    await execLoginStatements(warehouse, secretArn, DMS_INGEST_USER, password, { createDb: true });
+    const put = await putSecretJson(warehouse.region, secretName, {
+      username: DMS_INGEST_USER,
+      password,
+      host: endpoint.host,
+      port: endpoint.port,
+      database: warehouse.database,
+    });
+    // 9) 结果审计
+    await writeAuditRecord(actor, "exec-env.admin-ddl.provision-dms-ingest-user.done", {
+      ...auditBase,
+      detail: { ...intentDetail, intentAuditId: auditId, secretCreated: put.created },
+    }).catch(() => {});
+    return { secretName, outcome: "provisioned", auditId };
+  } catch (e) {
+    const safe = redactSql(String((e as Error)?.message ?? e));
+    await writeAuditRecord(actor, "exec-env.admin-ddl.provision-dms-ingest-user.failed", {
+      ...auditBase,
+      detail: { ...intentDetail, intentAuditId: auditId, error: safe },
+    }).catch(() => {});
+    throw new AdminDdlDenied("8-execute", `建 DMS 摄入用户失败(${descriptor}):${safe}`);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // 私有件
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -801,12 +910,14 @@ async function execLoginStatements(
   warehouse: TargetWarehouse,
   secretArn: string,
   userName: string,
-  password: string
+  password: string,
+  /** 建用户时的固定选项(闭合:只有 DMS 摄入用户要 CREATEDB;轮换口令的分支不改用户属性) */
+  opts: { createDb?: boolean } = {}
 ): Promise<void> {
   const u = identForLogin(userName);
   const pw = `'${password.replace(/'/g, "''")}'`;
   try {
-    await execOnTarget({ warehouse, sql: `CREATE USER ${u} PASSWORD ${pw}`, secretArn });
+    await execOnTarget({ warehouse, sql: `CREATE USER ${u} PASSWORD ${pw}${opts.createDb ? " CREATEDB" : ""}`, secretArn });
   } catch {
     // 已存在 ⇒ 轮换口令。🔴 catch 里**不看也不记**原错误:它可能带语句片段。
     await execOnTarget({ warehouse, sql: `ALTER USER ${u} PASSWORD ${pw}`, secretArn });

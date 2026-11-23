@@ -9,6 +9,9 @@ import { mergeKeysOf, usesGlueWriteMode, validateSyncCapabilityFields } from "@/
 import { PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 // 落点章的唯一作者(不在这里另写一份判定)
 import { bindingForNewSyncTask } from "@/lib/exec-env/definition-binding";
+// 通道 × 执行区的唯一规则(与页面新建同一条)
+import { channelUnavailableReason } from "@/lib/sync/channel-place";
+import { bindingTargets } from "@/lib/exec-env/data-plane-target";
 import { HOME_TARGET_ID } from "@/lib/exec-env/target-id";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { ulid } from "ulid";
@@ -91,6 +94,9 @@ export async function createSyncDraft(args: any, caller: CopilotCaller): Promise
   const binding = dsRow
     ? bindingForNewSyncTask(dsRow)
     : { targets: [caller.targetId || HOME_TARGET_ID] };
+  // 选的通道在任务所在的执行区不提供 ⇒ 不落草稿(与页面新建同一条规则;草稿存下来也启动不了)
+  const channelReject = channelUnavailableReason(channel, bindingTargets(binding)[0]);
+  if (channelReject) throw new Error(channelReject);
   const item: any = {
     userId: USER_ID,
     taskId: ulid(),
