@@ -19,6 +19,8 @@ import { fetchSourceTables } from "@/lib/datasource/tables-client";
 import { clearSyncDraft, describeDraftAge, loadSyncDraft, saveSyncDraft, type SyncWizardDraft } from "@/lib/sync/wizard-draft";
 // UX ②:第一步三个选择题的缺省值(唯一作者)
 import { SYNC_WIZARD_DEFAULTS } from "@/lib/sync/wizard-defaults";
+// 通道推荐的取数闸(唯一作者):只认最后一次请求、且数据源没换;换数据源时要不要重取也问它
+import { createChannelRecGate } from "@/lib/sync/channel-rec-gate";
 import { WhereClauseHelp, BusinessTimezoneField, TemplateTablesEditor, WriteOptionsSection } from "./SyncCapabilityControls";
 // 模板实例识别(守卫 1 黄标)与样例列映射复制(纯函数,单测在 __tests__/template-sample-table.test.ts)
 import { templateInstanceOf, cloneColumnMapping } from "./sync-capability-helpers";
@@ -103,6 +105,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const [onlySelected, setOnlySelected] = useState(false);
   const [targetType, setTargetType] = useState("");
   const [channelRec, setChannelRec] = useState<any>(null);
+  // 通道推荐的应答落进页面之前都过这把闸(一个向导一把;useState 的惰性初值保证只建一次)
+  const [channelRecGate] = useState(createChannelRecGate);
   // 🔴 生产上线批次 A:exists 三态(true / false / null = 探测不到);platformCreated 区分「平台建的」与「客户已有的」。
   const [ddlPreview, setDdlPreview] = useState<Record<string, { ddl: string; table?: string; exists: boolean | null; platformCreated?: boolean | null }>>({});
   // IAM 侧(2026-10-21):原来这里还有一个 `s3Buckets` 状态 + 打开向导就 fetch("/api/s3/buckets"),但**没有任何 JSX 消费它**
@@ -167,8 +171,13 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     const ds = dataSources.find((d) => d.datasourceId === dsId);
     if (!ds) return;
     const seq = ++dsReqSeq.current;
-    // 换源之前向导上是否已经显示着通道推荐(换源后要按新源重取,见下面「用户换源」分支)
-    const hadChannelRec = !!channelRec;
+    // 用户换了源:按旧源算出来的建表预览 / 通道推荐 / 能力校验错误当下就作废,通道推荐当下就按新源重取 ——
+    //   不等新源的表清单(经 Glue 连接读表要 1–3 分钟;通道可不可用取决于数据源所在的执行区,有的通道只在主控区提供,
+    //   这段时间里页面上不许还摆着旧源的通道单选)。「要不要重取」问闸:这个向导显示过或正在取通道推荐才取。
+    if (opts?.userSwitched) {
+      setDdlPreview({}); setChannelRec(null); setCapabilityError(null);
+      if (channelRecGate.wanted) void fetchChannelRec(dsId);
+    }
     // 源在哪个区,任务就在那个区跑。workgroup 下拉改拉**该区**清单。
     // 🔴 落点字段(表桶/workgroup/库)在前端**一律不预填**:留空 = 服务端按该章的描述符解析
     // (start 路由 tableBucketName / resolveRedshiftBinding 是唯一作者)。此处刻意不按 home 与否
@@ -206,8 +215,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     setTablesLoading(false);
     setTables(tableList);
     if (opts?.userSwitched) {
-      // 旧源的建表预览 / 通道推荐 / 能力校验错误都是按旧源算的,一律作废
-      setDdlPreview({}); setChannelRec(null); setCapabilityError(null);
+      // 等表清单的这段时间里按旧源的列映射生成的建表预览,到这里再作废一次(通道推荐与能力校验错误在换源当下已处理)
+      setDdlPreview({});
       const names = new Set(tableList.map((x: any) => String(x.name)));
       const dropped = selectedTables.filter((x) => !names.has(x));
       if (dropped.length) {
@@ -218,9 +227,6 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       const samplesNow = templateSamplesRef.current;
       const keptSamples = Object.fromEntries(Object.entries(samplesNow).filter(([, sampleName]) => names.has(sampleName)));
       if (Object.keys(keptSamples).length !== Object.keys(samplesNow).length) { templateSamplesRef.current = keptSamples; setTemplateSamples(keptSamples); }
-      // 通道可不可用取决于数据源所在的执行区(有的通道只在主控区提供):换源前已经显示着通道推荐的,按新源重取并重置所选通道,
-      //   不让新源所在的区不提供的通道留在表单里、到保存才被拒
-      if (hadChannelRec) void fetchChannelRec();
     }
     const mappings: Record<string, any[]> = {};
     for (const tbl of tableList) {
@@ -238,10 +244,16 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     setFieldMappings(mappings);
   };
 
-  const fetchChannelRec = async () => {
-    const ds = dataSources.find((d) => d.datasourceId === form.getFieldValue("datasourceId"));
+  // 数据源可以显式传入(换源当下调用):不依赖「表单值此刻是否已经写进去」的时序。重取会把所选通道重置成新推荐的那个,
+  //   不让新源所在的区不提供的通道留在表单里、到保存才被拒。
+  const fetchChannelRec = async (dsIdOverride?: string) => {
+    const dsId: string | undefined = dsIdOverride ?? form.getFieldValue("datasourceId");
+    const ds = dataSources.find((d) => d.datasourceId === dsId);
+    const ticket = channelRecGate.begin(dsId);
     const res = await fetch("/api/sync/recommend-channel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sourceType: ds?.type, targetType: form.getFieldValue("targetType"), syncMode: form.getFieldValue("syncMode"), ...(ds?.datasourceId ? { datasourceId: ds.datasourceId } : {}) }) });
     const data = await res.json();
+    // 晚到的旧应答(之后又发过一次,或用户已经换了数据源)不许盖掉新的结论
+    if (!channelRecGate.accepts(ticket, form.getFieldValue("datasourceId"))) return;
     setChannelRec(data.success ? data.data : data);
     if (data.data?.recommended) form.setFieldValue("channel", data.data.recommended);
   };
@@ -281,6 +293,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   useEffect(() => { saveDraftNow(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, step, selectedTables, templateTables, fieldMappings]);
   const applyDraft = async (d: SyncWizardDraft) => {
     setPendingDraft(null);
+    // 草稿会换掉数据源 / 模式 / 目标:页面上按恢复前的选择取的通道推荐作废(所选通道以草稿为准,不重取)
+    setChannelRec(null); channelRecGate.reset();
     form.setFieldsValue(d.formValues);
     setTargetType(String((d.formValues as any)?.targetType || ""));
     setSelectedTables(d.selectedTables);
@@ -390,7 +404,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     <Modal title={isEdit ? t("编辑同步任务") : t("新建同步任务")} open={open} width={900} onCancel={onClose} onOk={handleSubmit} confirmLoading={saving} okText={t("完成")}
       // UX ②:第一步只留「下一步」(用户 10-20 拍板);第 2 步起「完成」才出现(后面几步都有缺省,可直接完成)
       okButtonProps={{ "data-testid": "sync-wizard-finish", style: step === 0 ? { display: "none" } : undefined } as any}
-      afterOpenChange={(o) => { if (o) { form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS); setStep(0); setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType); setChannelRec(null); setDdlPreview({}); setCapabilityError(null); setPendingDraft(loadSyncDraft(editing?.taskId)); setTableFilter(""); setOnlySelected(false);
+      afterOpenChange={(o) => { if (o) { form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS); setStep(0); setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType); setChannelRec(null); channelRecGate.reset(); setDdlPreview({}); setCapabilityError(null); setPendingDraft(loadSyncDraft(editing?.taskId)); setTableFilter(""); setOnlySelected(false);
         // 带日期变量的表名与普通表分开回填(见 templateTables 的注释)
         const editTables = editing?.sourceTables || [];
         setSelectedTables(editTables.filter((x) => !x.includes("$" + "{"))); setTemplateTables(editTables.filter((x) => x.includes("$" + "{")));

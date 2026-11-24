@@ -26,9 +26,19 @@ describe("通道 × 执行区:规则表", () => {
   });
 
   it("不认识的通道 / 空值 ⇒ null(通道合不合法由各自的校验管,这里只管落点);继承来的键名不算通道", () => {
-    for (const v of ["flink-cdc", "", undefined, null, 7, "constructor", "toString"]) {
+    for (const v of ["flink-cdc", "", undefined, null, 7, "constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"]) {
       expect(channelUnavailableReason(v, WEST)).toBeNull();
+      expect(channelUnavailableReason(v, HOME)).toBeNull();
     }
+  });
+
+  it("按通道名取规则:不拿名字做对象下标,查出来的值调用前先核是函数(名字来自请求体;静态扫描把「按请求里的名字取出来就调用」判为未校验的动态调用)", () => {
+    const src = readFileSync(resolve(__dirname, "../channel-place.ts"), "utf8");
+    expect(src).not.toMatch(/CHANNEL_PLACE_RULES\s*\[/);
+    expect(src).toMatch(/new Map\(Object\.entries\(CHANNEL_PLACE_RULES\)\)/);
+    // 调用点只有一处,且紧跟在「不是函数就返回」之后(真值判断不算校验:扫描器只认 typeof … "function")。
+    expect(src).toMatch(/if \(typeof rule !== "function"\) return null;\n\s*return rule\(targetId\);/);
+    expect(src.match(/\brule\(/g)).toHaveLength(1);
   });
 
   it("错误码是登记在案的那一个", () => {

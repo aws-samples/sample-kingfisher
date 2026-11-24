@@ -74,7 +74,7 @@ describe("② 多页签右键菜单:三项都接到 closeMany,规则在纯模块
 });
 
 // 编辑任务换数据源(用户 2026-10-15 反馈 ②;…7698 探针坐实:旧源已选表残留、先发后到的旧源表清单盖掉新源)
-describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源里的已选表", () => {
+describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源里的已选表 + 通道推荐当下按新源重取", () => {
   const src = strip(read("SyncTaskModal.tsx"));
   it("dsReqSeq 序号:每次选源自增;拉表 / 映射 / workgroup 三处结果落地前都比对序号;过期结果直接 return", () => {
     expect(src).toMatch(/const dsReqSeq = useRef\(0\);/);
@@ -85,11 +85,35 @@ describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源
   it("userSwitched 只由下拉 onChange 传入;换源后不在新表清单里的已选表被移除并 message.info 点名", () => {
     expect(src).toMatch(/<Select onChange=\{\(v\) => \{ void onDatasourceChange\(String\(v\), \{ userSwitched: true \}\); \}\}/);
     expect((src.match(/userSwitched: true/g) || []).length).toBe(1); // 自动回填 / 草稿恢复不带它
-    // 换源前显示着通道推荐的 ⇒ 旧推荐作废之后按新源重取(通道可不可用取决于数据源所在的执行区);「有没有显示着」在第一个 await 之前取
-    expect(src).toMatch(/const seq = \+\+dsReqSeq\.current;\s*const hadChannelRec = !!channelRec;/);
-    expect(src).toMatch(/setTemplateSamples\(keptSamples\); \}\s*if \(hadChannelRec\) void fetchChannelRec\(\);\s*\}\s*const mappings/);
-    expect((src.match(/hadChannelRec/g) || []).length).toBe(2);
-    expect(src).toMatch(/if \(opts\?\.userSwitched\) \{\s*setDdlPreview\(\{\}\); setChannelRec\(null\); setCapabilityError\(null\);\s*const names = new Set\(tableList\.map\(\(x: any\) => String\(x\.name\)\)\);\s*const dropped = selectedTables\.filter\(\(x\) => !names\.has\(x\)\);\s*if \(dropped\.length\) \{\s*setSelectedTables\(selectedTables\.filter\(\(x\) => names\.has\(x\)\)\);\s*message\.info\(/);
+    // 表清单回来之后那段只做依赖新表清单的收尾:按旧列映射生成的建表预览再作废一次、移除不在新源里的已选表与样例
+    expect(src).toMatch(/if \(opts\?\.userSwitched\) \{\s*setDdlPreview\(\{\}\);\s*const names = new Set\(tableList\.map\(\(x: any\) => String\(x\.name\)\)\);\s*const dropped = selectedTables\.filter\(\(x\) => !names\.has\(x\)\);\s*if \(dropped\.length\) \{\s*setSelectedTables\(selectedTables\.filter\(\(x\) => names\.has\(x\)\)\);\s*message\.info\(/);
+  });
+  it("用户换源当下(等新源的表清单之前)就作废旧源的通道推荐并按新源重取:通道可不可用取决于数据源所在的执行区,读表要 1–3 分钟,这期间页面上不许还摆着旧源的通道单选", () => {
+    const body = src.slice(src.indexOf("const onDatasourceChange = async"), src.indexOf("const fetchChannelRec = async"));
+    // 作废 + 重取紧跟在取序号之后,在第一个 await 之前;要不要重取问闸(显示过或正在取才取),数据源显式传入
+    expect(body).toMatch(/const seq = \+\+dsReqSeq\.current;\s*if \(opts\?\.userSwitched\) \{\s*setDdlPreview\(\{\}\); setChannelRec\(null\); setCapabilityError\(null\);\s*if \(channelRecGate\.wanted\) void fetchChannelRec\(dsId\);\s*\}/);
+    const firstAwait = body.indexOf("await ");
+    expect(firstAwait).toBeGreaterThan(0);
+    expect(body.indexOf("void fetchChannelRec(dsId)")).toBeGreaterThan(0);
+    expect(body.indexOf("void fetchChannelRec(dsId)")).toBeLessThan(firstAwait);
+    // 等到表清单之后不再碰通道推荐(旧写法:表清单回来才作废、才重取)
+    const afterTables = body.slice(body.indexOf("await fetchSourceTables("));
+    expect(afterTables).not.toMatch(/fetchChannelRec|setChannelRec/);
+    expect(src).not.toMatch(/hadChannelRec/);
+  });
+  it("通道推荐的应答落进页面之前过闸(只认最后一次、且数据源没换);闸一个向导一把,打开向导与恢复草稿时重置", () => {
+    expect(src).toMatch(/import \{ createChannelRecGate \} from "@\/lib\/sync\/channel-rec-gate";/);
+    expect(src).toMatch(/const \[channelRecGate\] = useState\(createChannelRecGate\);/);
+    const fn = src.slice(src.indexOf("const fetchChannelRec = async"), src.indexOf("const fetchDDL = async"));
+    expect(fn).toMatch(/const fetchChannelRec = async \(dsIdOverride\?: string\) => \{\s*const dsId: string \| undefined = dsIdOverride \?\? form\.getFieldValue\("datasourceId"\);\s*const ds = dataSources\.find\(\(d\) => d\.datasourceId === dsId\);\s*const ticket = channelRecGate\.begin\(dsId\);\s*const res = await fetch\("\/api\/sync\/recommend-channel"/);
+    // 写页面状态(推荐本身 + 所选通道)都在过闸之后;写推荐只有这一处
+    expect(fn).toMatch(/const data = await res\.json\(\);\s*if \(!channelRecGate\.accepts\(ticket, form\.getFieldValue\("datasourceId"\)\)\) return;\s*setChannelRec\(data\.success \? data\.data : data\);\s*if \(data\.data\?\.recommended\) form\.setFieldValue\("channel", data\.data\.recommended\);/);
+    expect((src.match(/setChannelRec\(data/g) || []).length).toBe(1);
+    expect((src.match(/channelRecGate\.begin\(/g) || []).length).toBe(1);
+    // 重置两处:打开向导、恢复草稿(草稿会换掉数据源 / 模式 / 目标,所选通道以草稿为准、不重取)
+    expect(src).toMatch(/setChannelRec\(null\); channelRecGate\.reset\(\); setDdlPreview\(\{\}\); setCapabilityError\(null\); setPendingDraft\(loadSyncDraft\(/);
+    expect(src).toMatch(/const applyDraft = async \(d: SyncWizardDraft\) => \{\s*setPendingDraft\(null\);\s*setChannelRec\(null\); channelRecGate\.reset\(\);/);
+    expect((src.match(/channelRecGate\.reset\(\)/g) || []).length).toBe(2);
   });
 });
 

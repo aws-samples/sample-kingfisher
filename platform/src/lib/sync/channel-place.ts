@@ -28,13 +28,18 @@ const CHANNEL_PLACE_RULES: Record<SyncChannel, (targetId: string) => string | nu
       : `Zero-ETL 通道目前只在主控区提供;执行环境 ${targetId} 的数据源请改用 DMS 通道(增量 / 实时)或 Glue 通道`,
 };
 
-function isSyncChannel(v: unknown): v is SyncChannel {
-  return typeof v === "string" && Object.prototype.hasOwnProperty.call(CHANNEL_PLACE_RULES, v);
-}
+/**
+ * 按通道名取规则走这张 Map,不拿名字去做对象下标:通道名来自请求体,Map 里只有规则表自己的三个键,
+ * 继承来的键名(`constructor` / `__proto__` / `toString` …)查不到,也就不会被当成规则去调用。
+ */
+const RULE_BY_CHANNEL: ReadonlyMap<string, (targetId: string) => string | null> = new Map(Object.entries(CHANNEL_PLACE_RULES));
 
 /** 该通道在该执行区不可用的原因;可用 ⇒ `null`。通道不认识 ⇒ `null`(「通道合不合法」由各自的校验管,这里只管落点)。 */
 export function channelUnavailableReason(channel: unknown, targetId: string): string | null {
-  return isSyncChannel(channel) ? CHANNEL_PLACE_RULES[channel](targetId) : null;
+  const rule = typeof channel === "string" ? RULE_BY_CHANNEL.get(channel) : undefined;
+  // 按请求里的名字查出来的东西,调用之前先核它是函数:名字不认识时查到的是 `undefined`,不调用。
+  if (typeof rule !== "function") return null;
+  return rule(targetId);
 }
 
 export interface ChannelOption {
