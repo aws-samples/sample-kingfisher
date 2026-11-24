@@ -139,7 +139,7 @@ Key points:
 
 Page: "Smart Analytics → Ask-Your-Data".
 
-1. Confirm that "Execution scope" in the top bar is that region; the blue banner on the page reads "Asking in <region>: SQL runs on that region's data warehouse…".
+1. Confirm that "Execution scope" in the top bar is that region; the blue banner on the page reads "Asking in \<region>: SQL runs on that region's data warehouse…".
 2. For "Data source:" choose "Data Warehouse (Redshift)"; leave the workgroup at "Resolved automatically by execution target", and choose `dev` (or your database name) as the database.
 3. Click "New chat", then enter the questions below one at a time and press Enter to send each. While waiting you see "Thinking, generating, and running SQL..." and "Ns elapsed".
 
@@ -174,8 +174,8 @@ For every answer:
    - Are the filters right: Q4's time window is the last 30 days and uses `pay_time`.
 2. Expand "Execution path (N steps)": every step shows the tool name, phase (Prepare / Reasoning), success / failure, duration, "Input parameters:" and "Result:". Q2 should have one step whose tool is `run_registered_skill`.
 3. Look at the entry tags (type · name) listed under "Applied N business definition(s) (results follow these definitions):". If Q3 does not list "Payment rate", go back to §3 and check whether the name and content name the table columns.
-4. Check that "This SQL actually ran in: <region>" matches the execution scope you chose; if the red text "…does not match the current view…" appears, do not trust the result; switch region, ask again and report it to the admin.
-5. Note "Model used: <model id> · Backend <backend>" and write down the model id to compare after switching models in §10.
+4. Check that "This SQL actually ran in: \<region>" matches the execution scope you chose; if the red text "…does not match the current view…" appears, do not trust the result; switch region, ask again and report it to the admin.
+5. Note "Model used: \<model id> · Backend \<backend>" and write down the model id to compare after switching models in §10.
 
 ---
 
@@ -198,7 +198,7 @@ Page: "Data Governance → Data Governance" → tab "Data Classification".
 2. Ask Q5 again: "Which country and OS do the 10 devices with the most clicks come from?"
 3. What to expect:
    - The device column values in the result table look like `sha256:9f86d081` instead of the original device ids.
-   - A yellow notice above the result card: "Some sensitive fields are masked per data classification: <column> (for plaintext, use "Request Access" in Data Governance)".
+   - A yellow notice above the result card: "Some sensitive fields are masked per data classification: \<column> (for plaintext, use "Request Access" in Data Governance)".
    - Expand "View generated SQL": the model usually writes an alias such as `device_id AS device` — the column is called "device" and is masked all the same, because the platform resolved the result column back to the physical column `device_id`.
 4. Ask one more question that involves an expression: "What are the first 8 characters of each device id? List the 5 with the most clicks". Even if the SQL is written as `left(device_id, 8)`, the expression references a sensitive column, so the result is masked under the strongest policy just the same.
 5. The admin account sees plaintext for the same question — this is by design, not a masking failure.
@@ -220,14 +220,14 @@ Key points:
 ## 8. Save a card, continue the conversation and refresh
 
 1. Go back to the conversation that holds Q1 ~ Q5 (or ask them again with the non-admin account) and click "Save conversation" on any turn.
-2. In the dialog "Save conversation as card": enter `Ad-spend ROAS daily` as "Title"; read the notices "Will save: all N turns of this conversation (…)" and "The conversation body and title are stored only in <region> (execution environment <id>) and never leave that region."; click "Save" → "Saved as card". The button at the top right changes to "My cards 1/100".
+2. In the dialog "Save conversation as card": enter `Ad-spend ROAS daily` as "Title"; read the notices "Will save: all N turns of this conversation (…)" and "The conversation body and title are stored only in \<region> (execution environment \<id>) and never leave that region."; click "Save" → "Saved as card". The button at the top right changes to "My cards 1/100".
 3. Click "New chat" to clear the page, then click "My cards 1/100" to open the drawer:
    - Click "Open and continue" → the whole conversation is laid out again with the message "Conversation context restored (N turns); you can keep asking"; follow up with "And only paid channels?" to verify that the context is connected.
    - Click "Refresh now" → "Refreshed: N rows (same card; a run snapshot was kept)"; a refresh does not call the LLM, it only reruns the SQL stored in the card.
-   - Click "Scheduled refresh" → the dialog "Schedule refresh for this card" opens with the notice "On schedule, reruns the SQL saved in this card in <region> (no LLM call); it refreshes the same card without using quota and keeps a run snapshot each time; results are masked under the strictest policy."; keep the cron at `0 8 * * *` (08:00 every day), turn on the "Enable scheduled refresh" switch, and click "Save".
+   - Click "Scheduled refresh" → the dialog "Schedule refresh for this card" opens with the notice "On schedule, reruns the SQL saved in this card in \<region> (no LLM call); it refreshes the same card without using quota and keeps a run snapshot each time; results are masked under the strictest policy."; keep the cron at `0 8 * * *` (08:00 every day), turn on the "Enable scheduled refresh" switch, and click "Save".
    - The row shows the green tag "Schedule 0 8 * * *"; if it shows "Carrier not published", wait a moment and click "Refresh" at the top right of the drawer.
    - Click "History" → the dialog "Refresh history" lists every refresh: start time / trigger mode (Manual · Auto) / status / row count / error.
-4. Switch "Execution scope" in the top bar to another region and open the drawer again: this card is not in the list, and the top reads "0 in the current execution scope; you have 1 more in other scopes"; click "Show all scopes (1)" to see it; clicking "Open and continue" pops up "This card belongs to <id> (<region>)" with the choices "View read-only" or "Switch to <region> and continue the conversation".
+4. Switch "Execution scope" in the top bar to another region and open the drawer again: this card is not in the list, and the top reads "0 in the current execution scope; you have 1 more in other scopes"; click "Show all scopes (1)" to see it; clicking "Open and continue" pops up "This card belongs to \<id> (\<region>)" with the choices "View read-only" or "Switch to \<region> and continue the conversation".
 
 Key points:
 
@@ -287,8 +287,8 @@ Page: "System → Settings" → the "AI model" card. Non-admins only see the eff
    | Cannot call tools | "This model cannot call tools under Converse (tool-use probe failed); GenBI / Copilot / advisors would go silent, so it cannot be the global default" | Switch to a model that supports tool calling |
 
 4. After "Probe passed; you can save. An impact preview will ask for confirmation first." click "Save" → the dialog "Change the global default model?" lists "Effective now", "Change to" and "Impact preview (takes effect platform-wide immediately)": Affected capabilities (9) · Scope (All tenants, all projects) · Takes effect (≤5s after saving) · Reversible → click "Confirm change".
-5. The message "Global default switched to <model>; effective platform-wide within 5s" appears.
-6. Go back to "Ask-Your-Data" and ask Q1 again; "Model used: <model id>" on the result card should now be the new model.
+5. The message "Global default switched to \<model>; effective platform-wide within 5s" appears.
+6. Go back to "Ask-Your-Data" and ask Q1 again; "Model used: \<model id>" on the result card should now be the new model.
 7. To roll back: "Restore factory default" on the card (or "Restore factory default now" when the model misbehaves), and confirm "Restore factory default?".
 
 Key points:
@@ -338,7 +338,7 @@ Key points:
 
 Delete the practice objects in the order below (if a referenced object cannot be deleted, delete what references it first):
 
-1. Card: "Ask-Your-Data" → "My cards" → "Delete" at the end of the row → confirm "Delete this card?" ("The body will also be cleaned up from <region>; quota is released immediately."). It is safer to turn off "Enable scheduled refresh" under "Scheduled refresh" before deleting.
+1. Card: "Ask-Your-Data" → "My cards" → "Delete" at the end of the row → confirm "Delete this card?" ("The body will also be cleaned up from \<region>; quota is released immediately."). It is safer to turn off "Enable scheduled refresh" under "Scheduled refresh" before deleting.
 2. Request: "Requests" → open `Payment rate by channel, daily` → "Cancel" (enter a reason).
 3. Skill: "Skills" → "Delete" at the end of the `top_channels_by_roas` row → confirm "Delete this skill?".
 4. Definitions: "Business Glossary & Rules" → "Delete" each of the 5 entries → confirm "Delete this item?".

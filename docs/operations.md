@@ -52,7 +52,7 @@ do not start a deployment on the strength of last time's experience.
 ```bash
 ./scripts/01-preflight-account.sh <profile> [home-region] [second-region]
 # ❌ hard failure ⇒ non-zero exit (do not start until it is fixed) · ⚠️ soft warning ⇒ you can run, but know the boundary
-```text
+```
 
 🔴 **Why it was consolidated**: the table below used to be just "a string of commands in the runbook", and temporary accounts often last only 3 days ⇒ every few days
 someone had to type it all by hand, **and hands miss things**. On 2026-09-19 the item "`cdk.out` still holds the asset bucket name of the previous account" was missed,
@@ -73,7 +73,7 @@ First set `P="--profile <your-profile>"` and `R=<target-region>`.
 | 2 | **VPC quota** | `aws ec2 describe-vpcs $P --region $R --query 'length(Vpcs)'`; **the regional default limit is 5** | Full ⇒ creating a VPC fails immediately with `VpcLimitExceeded` and **the deployment dies at its first step**. Switch to §2 "import an existing VPC" |
 | 3 | **IAM role creation** | Create one and delete it (the platform creates dozens of roles) | If this is not allowed the whole deployment is hopeless. ⚠️ When probing, **do not write Chinese (or any other non-Latin text) in `--description`**: the regex of that IAM field accepts Latin only, and the resulting ValidationError is misread as "no permission" (this happened) |
 | 4 | 🔴 **Cognito administrative writes** (the most frequently trimmed, and the latest to fail) | Create a throwaway user pool, probe `CreateGroup` / `AdminCreateUser` / `AdminSetUserPassword` / `AdminAddUserToGroup` one by one, then `delete-user-pool` | Any one denied ⇒ see §3. **Note where it fails**: `deploy-all` step 11 creates groups and users. ✅ **Since 2026-08-31 its failure no longer aborts the whole deployment** (it goes through `run_step` bookkeeping): step 12 seeding and step 13 wiring check **run to completion as usual**, and the close-out lists the "steps that did not succeed" and **exits with a non-zero code**. So at that point **the infrastructure is ready** and only the login users are missing — follow the §3 workaround and re-run step 11 per §4 |
-| 5 | **Bedrock model** | The script calls `scripts/resolve-home-model.sh <profile> <home-region>`: following the candidate chain in `platform/ai-model.json` (`candidateModelIds`: Claude Opus 4.5 → GLM 5.3 → Kimi K3) it expands each candidate into this region's inference profile and makes one real call with `aws bedrock-runtime converse … maxTokens=1`; the first one that answers becomes the deployment-time default (it does not use `list-foundation-models`: being listable does not mean being invocable) | If not one link of the chain works ⇒ all 9 AI consumers are down; each stderr line "✗ candidate <C> → <id> —— <verbatim Bedrock message>" is the troubleshooting lead ("not available for this account" = not enabled at account level, ask your AWS account team; "on-demand throughput isn't supported" = the bare id cannot be invoked on demand, look at the expanded `us.` / `global.` line; AccessDenied + Marketplace = the subscription is blocked by an SCP). 🔴 **ACTIVE in the listing does not mean usable**; the real criterion is a real invoke that gets through. `BGP_MODEL_CANDIDATES="<id> <id>"` overrides the candidate chain explicitly, **for troubleshooting only** (stderr marks "candidates from env") |
+| 5 | **Bedrock model** | The script calls `scripts/resolve-home-model.sh <profile> <home-region>`: following the candidate chain in `platform/ai-model.json` (`candidateModelIds`: Claude Opus 4.5 → GLM 5.3 → Kimi K3) it expands each candidate into this region's inference profile and makes one real call with `aws bedrock-runtime converse … maxTokens=1`; the first one that answers becomes the deployment-time default (it does not use `list-foundation-models`: being listable does not mean being invocable) | If not one link of the chain works ⇒ all 9 AI consumers are down; each stderr line "✗ candidate \<C> → \<id> —— \<verbatim Bedrock message>" is the troubleshooting lead ("not available for this account" = not enabled at account level, ask your AWS account team; "on-demand throughput isn't supported" = the bare id cannot be invoked on demand, look at the expanded `us.` / `global.` line; AccessDenied + Marketplace = the subscription is blocked by an SCP). 🔴 **ACTIVE in the listing does not mean usable**; the real criterion is a real invoke that gets through. `BGP_MODEL_CANDIDATES="<id> <id>"` overrides the candidate chain explicitly, **for troubleshooting only** (stderr marks "candidates from env") |
 | 6 | **CDK bootstrap** | `aws ssm get-parameter $P --region $R --name /cdk-bootstrap/hnb659fds/version` | Absent is fine (step 2 does it); when it exists with a higher version the tool says "will not downgrade", which is normal |
 | 7 | **Docker** | `docker version` + `docker buildx version` | Required: the ECS image and the 3 AgentCore ECR images are all built locally |
 | 8 | **Dependencies installed** | `ls infra/node_modules platform/node_modules` | A fresh clone **must run `npm ci` first** (once in infra, once in platform), otherwise CDK synth fails straight away with TSError |
@@ -176,7 +176,7 @@ BGP_DEPLOY_MODE=<same as first install> ./scripts/10-bootstrap-cognito.sh <profi
 ./scripts/11-seed-demo-memberships.sh <profile> <region>   # step 11.6: add the four demo role accounts to the default workspace (🔴 demo mode only; production skips it; `--check` = read-only verification, truth-check item 12)
 ./scripts/20-seed-data.sh        <profile> <region>   # step 12: seed the e-commerce dataset (🔴 demo mode only; production seeds nothing)
 BGP_DEPLOY_MODE=<same as first install> ./scripts/redeploy-platform.sh <profile> <region>   # equivalent of step 13: re-wire + check (no bare cdk deploy); its step 2b also redeploys BgpExecEnvDeployStack (the execution-environment deployer of step 6.5; without it, creating an execution environment fails with Function not found)
-```text
+```
 
 > The **demo / acceptance environment orchestration** — the one-command bring-up after switching accounts, the multi-region end-to-end run, the headless close-out
 > and the shortest path — was moved to the development-environment runbook, which is not published with this repository (these are not production steps).
@@ -207,11 +207,11 @@ the initial password the deployment wrote to disk). When the home region is not 
 
 **Symptom** (measured in a brand-new account on 2026-08-31, same point as the 2026-08-24 occurrence):
 
-```
+```text
 Custom::S3AutoDeleteObjectsCustomResourceProvider/Handler  CREATE_FAILED
   AWS::Lambda::Function → "Uploaded file must be a non-empty zip" (400)
 ⇒ BgpPlatformStack ROLLBACK_COMPLETE (step 6)
-```text
+```
 
 Some versions of the CDK CLI package the built-in `S3AutoDelete` handler as a **22-byte empty zip** and upload it to the bootstrap asset bucket;
 and CDK uses the S3Key (content hash) to decide "already exists, do not re-upload" ⇒ **once the bad zip is in the bucket, every retry reuses it = guaranteed recurrence**.
@@ -270,7 +270,7 @@ aws cloudformation wait stack-delete-complete --stack-name BgpPlatformStack --pr
 BGP_DEPLOY_MODE=<same as first install> ./scripts/deploy-all.sh <profile> <region>      # or ./scripts/redeploy-platform.sh <profile> <region>
 ```
 
-**Criterion**: step 2.5 should print "provisioned/repaired zip: <hash>.zip (… → NNNN B)", and the closing line "manifest N, provisioned/repaired M, failed 0"
+**Criterion**: step 2.5 should print "provisioned/repaired zip: \<hash>.zip (… → NNNN B)", and the closing line "manifest N, provisioned/repaired M, failed 0"
 (the script prints these lines in Chinese; they are rendered here in English).
 
 **Known residual (not hidden)**: step 2.5 covers only the assets that `cdk synth --all` could synthesize at that moment. **New zip-type assets** that later steps synthesize
@@ -345,7 +345,7 @@ Set two shell variables once:
 
 ```bash
 P=<profile>; R=<home-region>
-```text
+```
 
 #### A.2.1 Which region is the home region
 
@@ -366,7 +366,7 @@ aws --profile $P --region $R cloudformation list-stacks \
   --query "StackSummaries[?starts_with(StackName,'Bgp')].StackName"
 aws --profile $P --region $R cloudformation describe-stacks --stack-name BgpPlatformStack \
   --query "Stacks[0].Outputs"
-```text
+```
 
 `BgpPlatformStack` outputs include the platform URL; `BgpOmServiceStack` outputs include the OpenMetadata URL; `BgpAuthStack` outputs include the user pool id.
 
@@ -386,7 +386,7 @@ aws --profile $P --region $R ssm get-parameters-by-path --path /bgp/ --recursive
 aws --profile $P --region $R dynamodb scan --table-name bgp-execution-envs \
   --projection-expression "targetId,#r,#s,components" \
   --expression-attribute-names '{"#r":"region","#s":"status"}'
-```text
+```
 
 The home target is `tgt_home`. Status `active` means the region accepts work; `draining`, `decommissioning` and `deleted` are the decommission states.
 
@@ -405,7 +405,7 @@ The meaning of each variable is in [deployment.md](deployment.md), Appendix A.1.
 
 ```bash
 curl -s https://<platform-host>/api/public/version
-```text
+```
 
 The same facts appear in the login page footer and under **Settings → Platform version**.
 For the three agent runtimes, `./scripts/redeploy-agents.sh <profile> <home-region> --check` prints the image tag each runtime is using and whether it differs
@@ -425,7 +425,7 @@ aws --profile $P --region $R codebuild list-builds-for-project --project-name bg
 ```bash
 aws --profile $P --region $R rds describe-db-instances --db-instance-identifier bgp-openmetadata-db \
   --query "DBInstances[0].[EngineVersion,DBInstanceStatus]"
-```bash
+```
 
 #### A.2.9 Residual resources after a decommission
 

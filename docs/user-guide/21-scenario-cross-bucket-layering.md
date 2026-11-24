@@ -19,7 +19,7 @@ Overview of the route:
 2. The platform admin registers the two buckets as routes under "System → Settings → Lake table buckets and routes": aliases `detail` / `agg`, tiers `detail(Detail tier)` / `agg(Aggregate tier)`, writable.
 3. The data engineer creates a Glue PySpark job under "Data Development → Batch Compute"; "Advanced Properties → Lake table buckets" defaults to all routes of the region (you can declare detail as read and agg as write).
 4. Scripts always use the three-part name `<alias>.<namespace>.<table>` and never contain any `--conf`.
-5. "Save" → "Run now · <region>" → "Run History" shows succeeded.
+5. "Save" → "Run now · \<region>" → "Run History" shows succeeded.
 6. Verify the rows of the aggregate table with the three-part name under "Data Development → Athena Query".
 7. (Optional) A sync task lands source-database detail rows directly in the detail bucket: the Table Bucket dropdown lists only writable routes and unregistered buckets (unregistered ones carry the "Not registered" tag and are rejected if chosen).
 8. (Optional) Bind the job to your own execution role: on save, s3tables permissions are checked per bucket and every missing one is listed on the spot.
@@ -76,7 +76,7 @@ aws s3tables create-table-bucket --region $REGION --name <detail-bucket>
 aws s3tables create-table-bucket --region $REGION --name <aggregate-bucket>
 aws s3tables create-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket> --namespace detail
 aws s3tables create-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<aggregate-bucket> --namespace agg
-```text
+```
 
 - Bucket name rules: 3–63 lowercase letters / digits / hyphens, starting and ending with a letter or digit.
 - Namespace, table and column names **must be all lowercase** (`[a-z0-9_]`), otherwise the federated catalog does not recognize them.
@@ -92,7 +92,7 @@ After signing in, select the execution environment where the table buckets live 
 
 ## 3. Step 1: Register the two routes (platform admin)
 
-**Page**: "System → Settings" → card "Lake table buckets and routes · <execution environment> (<region>)".
+**Page**: "System → Settings" → card "Lake table buckets and routes · \<execution environment> (\<region>)".
 
 The top of the card shows a purple note "Registered = routed: jobs get a Spark catalog per alias, sync can write it, and it shows up in lake query / governance catalog / NL2SQL" and a "Refresh" button. The first row of the table is always the region's platform table bucket: it carries the blue tag "Platform table bucket of this region", alias `s3tablescatalog`, the "Registered by / at" column reads "Created at deployment", and the action column reads "Implicit default route".
 
@@ -108,9 +108,9 @@ The top of the card shows a purple note "Registered = routed: jobs get a Spark c
 4. Leave the "Writable" switch on (the detail bucket has to be written by sync tasks).
 5. "Namespace ownership (optional, press Enter to add)": you can leave this step empty; it is only needed when both buckets contain a namespace of the same name.
 6. Enter a short description in "Notes (optional)", for example `detail tier`.
-7. Click "Register to <execution environment>".
+7. Click "Register to \<execution environment>".
 
-**You should see**: the green message "Route <detail-bucket> registered (alias detail): jobs can reach it as detail.<namespace>.<table>; lake query / governance catalog / NL2SQL will show it", and one more row in the table: alias `detail`, tier `detail`, the "Namespace ownership" column reads "Resolved from what exists", and the "Writable" column shows the green tag "Writable".
+**You should see**: the green message "Route \<detail-bucket> registered (alias detail): jobs can reach it as detail.\<namespace>.<table>; lake query / governance catalog / NL2SQL will show it", and one more row in the table: alias `detail`, tier `detail`, the "Namespace ownership" column reads "Resolved from what exists", and the "Writable" column shows the green tag "Writable".
 
 Note: the "governance catalog" half of that message currently holds only for routes of the **home region** (the catalog push to OpenMetadata scans only home-region routes), so tables in execution-region route buckets do not reach OpenMetadata for now; lake query and GenBI are unaffected.
 
@@ -122,20 +122,20 @@ Same steps, with alias `agg`, tier `agg(Aggregate tier)`, writable.
 
 | What you did | Page message (verbatim) | Next step |
 |---|---|---|
-| The alias contains uppercase letters / hyphens | Alias "<alias>" is invalid: it must start with a lowercase letter and may contain only lowercase letters / digits / underscores, at most 32 characters | Change the alias |
-| The alias is a reserved name | Alias "<alias>" is a reserved name (s3tablescatalog / spark_catalog / glue_catalog / default); choose another | Change the alias |
-| The alias is already used by another route in the same region | Alias "<alias>" is already used by route <bucket> of execution environment <execution environment>; choose another alias | Change the alias |
-| The bucket does not exist in the region | There is no S3 Tables table bucket named <bucket> in <region> (…) — create it in that region before registering, or check the name | Go back to 2.2 to create the bucket, or check which region the execution scope points to |
-| You picked the platform table bucket | <bucket> is the platform table bucket of execution environment <execution environment> (alias s3tablescatalog); it is already the default route and needs no registration | No registration needed |
-| The same bucket registered twice | <bucket> is already registered in execution environment <execution environment> (<time> by <registrant>, alias <alias>) | Change it with the inline "Edit" |
-| A namespace in the new bucket collides with an already registered route and neither side declares ownership | Namespace <namespace> exists in both <bucket A> (alias <alias A>) and <bucket B>. Declare in namespaces which route owns <namespace> (only one) and retry; three-part names <alias>.<namespace>.<table> are unaffected | Enter this namespace under "Namespace ownership" of one of the routes, then register |
+| The alias contains uppercase letters / hyphens | Alias "\<alias>" is invalid: it must start with a lowercase letter and may contain only lowercase letters / digits / underscores, at most 32 characters | Change the alias |
+| The alias is a reserved name | Alias "\<alias>" is a reserved name (s3tablescatalog / spark_catalog / glue_catalog / default); choose another | Change the alias |
+| The alias is already used by another route in the same region | Alias "\<alias>" is already used by route \<bucket> of execution environment \<execution environment>; choose another alias | Change the alias |
+| The bucket does not exist in the region | There is no S3 Tables table bucket named \<bucket> in \<region> (…) — create it in that region before registering, or check the name | Go back to 2.2 to create the bucket, or check which region the execution scope points to |
+| You picked the platform table bucket | \<bucket> is the platform table bucket of execution environment \<execution environment> (alias s3tablescatalog); it is already the default route and needs no registration | No registration needed |
+| The same bucket registered twice | \<bucket> is already registered in execution environment \<execution environment> (\<time> by \<registrant>, alias \<alias>) | Change it with the inline "Edit" |
+| A namespace in the new bucket collides with an already registered route and neither side declares ownership | Namespace \<namespace> exists in both \<bucket A> (alias \<alias A>) and \<bucket B>. Declare in namespaces which route owns \<namespace> (only one) and retry; three-part names \<alias>.\<namespace>.<table> are unaffected | Enter this namespace under "Namespace ownership" of one of the routes, then register |
 
 ### 3.4 Edit and revoke
 
-- Inline "Edit" → dialog "Edit route <bucket>": you can change "Alias (scripts using the three-part name must change too)", "Layer", "Writable (when off, sync / create-table / write declarations cannot use it)", "Namespace ownership" and "Notes" → "Save".
+- Inline "Edit" → dialog "Edit route \<bucket>": you can change "Alias (scripts using the three-part name must change too)", "Layer", "Writable (when off, sync / create-table / write declarations cannot use it)", "Namespace ownership" and "Notes" → "Save".
 - When you change the alias, a second confirmation appears: "Changing the alias breaks scripts that reference the old alias. Change it anyway?"; its body lists the jobs that declare this route (when none does, it reads "(No job currently declares this route explicitly, but scripts may still reference the old alias)") and ends with an API-flavored sentence "To change it, retry with confirmAliasChange=true"; just click "Change" as usual.
 - Inline "Revoke" → popover confirmation "Revoke the route? The bucket and its tables stay; the platform just stops injecting / listing it" → success message "Route revoked (the bucket and its tables are untouched)".
-- When a sync task still has it selected as Table Bucket, or a job declares it explicitly under "Lake table buckets", the revocation is rejected: "Table bucket <bucket> is still referenced; remove the references before revoking: sync task <name>; job <name>". Change the task / job first, then revoke.
+- When a sync task still has it selected as Table Bucket, or a job declares it explicitly under "Lake table buckets", the revocation is rejected: "Table bucket \<bucket> is still referenced; remove the references before revoking: sync task \<name>; job \<name>". Change the task / job first, then revoke.
 - The platform table bucket row has no "Edit" or "Revoke".
 
 > Note: registering / editing / revoking takes effect immediately — validations such as save / start, the Settings card and "Catalogs available to this job" on the job page all read live (the job page reads once when it opens; after registering, click "Refresh" on the right of the block to see it). Only read paths such as the table tree on the Athena query page and GenBI's bucket lookup by namespace have a 15-second cache and update within 15 seconds at most.
@@ -179,7 +179,7 @@ After choosing `agg → <aggregate-bucket>` in the dropdown "Default catalog (tw
 
 Click "Copy three-part name example" → the button changes to "Copied". The clipboard holds a read-route map generated from the catalogs available to this job and one cross-catalog `INSERT OVERWRITE … SELECT …` example.
 
-> Do not hand-write `spark.sql.catalog.<alias>.*` under "Job parameters" anymore. Hand-written entries with the same alias and the same bucket are taken over by the platform and ignored; the same alias pointing to a different bucket is rejected on save: "The hand-written Spark catalog '<alias>' points to table bucket <bucket A>, while platform route '<alias>' is <bucket B> — one alias cannot point to two buckets. Remove these spark.sql.catalog.<alias>* entries from the hand-written --conf (the platform injects them), or give the hand-written catalog a different alias".
+> Do not hand-write `spark.sql.catalog.<alias>.*` under "Job parameters" anymore. Hand-written entries with the same alias and the same bucket are taken over by the platform and ignored; the same alias pointing to a different bucket is rejected on save: "The hand-written Spark catalog '\<alias>' points to table bucket \<bucket A>, while platform route '\<alias>' is \<bucket B> — one alias cannot point to two buckets. Remove these spark.sql.catalog.\<alias>* entries from the hand-written --conf (the platform injects them), or give the hand-written catalog a different alias".
 > Catalog names that are not in the route table can still be hand-written; the platform appends them as-is and does not probe permissions. Hand-written entries that are taken over are not flagged on the page; save shows "Saved" as usual.
 
 ---
@@ -239,7 +239,7 @@ job.commit()
   ```python
   args = getResolvedOptions(sys.argv, ["JOB_NAME", "bgp_lake_catalogs"])
   catalogs = dict(kv.split("=", 1) for kv in args["bgp_lake_catalogs"].split(","))
-  ```text
+  ```
 
 - EMR Serverless jobs (type "EMR Serverless (PySpark, standalone engine)") have the same "Lake table buckets" block and use the same three-part names; the route map is read from `spark.conf.get("spark.bgp.lakeCatalogs")`.
 - `s3tablescatalog.<namespace>.<table>` in existing scripts keeps working; it is the implicit route of the platform table bucket.
@@ -249,7 +249,7 @@ job.commit()
 ## 6. Step 4: Save and run
 
 1. Click "Save" → message "Saved".
-2. Click "Run now · <region>" (when bound to several regions the button reads "Run now (once in each of N regions)") → message "Run submitted (business date <today>)" (when bound to several regions the message is "Submitted one run in each of N regions: … (business date <today>)").
+2. Click "Run now · \<region>" (when bound to several regions the button reads "Run now (once in each of N regions)") → message "Run submitted (business date \<today>)" (when bound to several regions the message is "Submitted one run in each of N regions: … (business date \<today>)").
 3. Switch to the "Run History (N)" tab and wait for the newest row to reach `succeeded`; the first run takes about 1–2 minutes including the Glue cold start. If it fails, click the inline "Logs" to read the original error.
 
 ![Batch job list](../screenshots/etl-jobs.webp)
@@ -258,10 +258,10 @@ job.commit()
 
 On save the platform validates the "Lake table buckets" declaration for every bound region; the messages for the rejected cases:
 
-- A bucket in the declaration is no longer a route (for example it was just revoked): "Table bucket '<bucket>' is not a lake route of execution environment <execution environment> (neither the platform table bucket '<platform-table-bucket>' nor a table bucket registered under 'Settings → Lake table buckets and routes'). Register it first (one registration = usable by jobs / sync, visible in lake query / governance catalog / NL2SQL)…"
-- A read-only route declared as "Write": "Lake route '<alias>' (<bucket>) is registered read-only; a job cannot declare it for 'Write' — change the access to 'Read', or make it writable under 'Settings → Lake table buckets and routes'"
-- The default catalog is not in the declaration: "Default catalog '<alias>' is not a catalog available to this job (available: …)"
-- Too many routes: "The injected Spark catalog configuration (--conf) is <N> bytes, exceeding the 10240-byte limit of a single Glue job parameter value — declare only the routes you use under the job's 'Lake table buckets' (each route is about 430–610 bytes)"
+- A bucket in the declaration is no longer a route (for example it was just revoked): "Table bucket '\<bucket>' is not a lake route of execution environment \<execution environment> (neither the platform table bucket '\<platform-table-bucket>' nor a table bucket registered under 'Settings → Lake table buckets and routes'). Register it first (one registration = usable by jobs / sync, visible in lake query / governance catalog / NL2SQL)…"
+- A read-only route declared as "Write": "Lake route '\<alias>' (\<bucket>) is registered read-only; a job cannot declare it for 'Write' — change the access to 'Read', or make it writable under 'Settings → Lake table buckets and routes'"
+- The default catalog is not in the declaration: "Default catalog '\<alias>' is not a catalog available to this job (available: …)"
+- Too many routes: "The injected Spark catalog configuration (--conf) is \<N> bytes, exceeding the 10240-byte limit of a single Glue job parameter value — declare only the routes you use under the job's 'Lake table buckets' (each route is about 430–610 bytes)"
 
 The declaration is saved together with the job definition: the scheduled runs after you enter a cron and "Publish to MWAA schedule", the workflows in ETL orchestration that reference this job, and the day-by-day "Backfill" runs all inject catalogs from the same declaration. After changing the declaration or the route table, "Save" the job again for the change to take effect; workflow orchestration freezes the job definition at publish time, so you also have to republish the workflows that reference it.
 
@@ -289,7 +289,7 @@ You can query the detail bucket the same way:
 
 ```sql
 SELECT count(*) FROM "s3tablescatalog/<detail-bucket>"."detail"."orders_detail"
-```text
+```
 
 ![Athena query](../screenshots/athena-run.webp)
 
@@ -297,7 +297,7 @@ SELECT count(*) FROM "s3tablescatalog/<detail-bucket>"."detail"."orders_detail"
 
 ### 7.2 Other places where it shows
 
-- The success message promises "lake query / governance catalog / NL2SQL will show it". In GenBI, a question that gives only a namespace and no alias is resolved to the corresponding bucket through the route table; when the namespace exists in two routes and no ownership is declared, it reports "Namespace <namespace> exists in both … — declare ownership for one of the routes under 'Settings → Lake table buckets and routes' (enter <namespace> in namespaces)".
+- The success message promises "lake query / governance catalog / NL2SQL will show it". In GenBI, a question that gives only a namespace and no alias is resolved to the corresponding bucket through the route table; when the namespace exists in two routes and no ownership is declared, it reports "Namespace \<namespace> exists in both … — declare ownership for one of the routes under 'Settings → Lake table buckets and routes' (enter \<namespace> in namespaces)".
 - The "governance catalog" half currently holds only for the home region: when pushing tables to "Governance Center (OpenMetadata)", only home-region routes are scanned, so tables in route buckets registered in execution regions are not pushed; the catalog on the Data Governance page and "Sync column information" cover warehouse tables only. To see tables in execution-region route buckets, query them by three-part name on the Athena query page.
 
 ---
@@ -321,9 +321,9 @@ In production the detail table is usually not filled by a script; a sync task wr
 
 What happens if you choose an **unregistered** bucket:
 
-- The option carries an orange "Not registered" tag; once selected, red text appears under the field: "Bucket <bucket> is not registered as a route for execution environment <execution environment>: save / start will be rejected. Register it under System settings → Lake table buckets and routes first (once registered: sync can write it, jobs reach it by alias, and it shows in lake query / governance catalog / NL2SQL), or clear the field to use the platform bucket.", followed by two links "Register →" and "Registered? Re-check". In the home region the wording is "Bucket <bucket> is not registered as a route in the home region: save / start will be rejected (the home region no longer accepts arbitrary buckets). …".
-- Forcing "Done" returns 400 with: "Execution environment <execution environment> cannot write to table bucket '<bucket>': it is neither the platform table bucket '<platform-table-bucket>' of that execution environment nor registered as a route for it under 'Settings → Lake table buckets and routes'. Register it first (one registration = writable by sync, visible in lake query / governance catalog / NL2SQL), or clear Table Bucket to use the platform table bucket; writable routes of this execution environment: …". "Start" gives the same message (409).
-- A read-only route selected: "Lake route '<alias>' (<bucket>) of execution environment <execution environment> is registered read-only; a sync task cannot pick it as Table Bucket. Make it writable under 'Settings → Lake table buckets and routes', or choose a writable route".
+- The option carries an orange "Not registered" tag; once selected, red text appears under the field: "Bucket \<bucket> is not registered as a route for execution environment \<execution environment>: save / start will be rejected. Register it under System settings → Lake table buckets and routes first (once registered: sync can write it, jobs reach it by alias, and it shows in lake query / governance catalog / NL2SQL), or clear the field to use the platform bucket.", followed by two links "Register →" and "Registered? Re-check". In the home region the wording is "Bucket \<bucket> is not registered as a route in the home region: save / start will be rejected (the home region no longer accepts arbitrary buckets). …".
+- Forcing "Done" returns 400 with: "Execution environment \<execution environment> cannot write to table bucket '\<bucket>': it is neither the platform table bucket '\<platform-table-bucket>' of that execution environment nor registered as a route for it under 'Settings → Lake table buckets and routes'. Register it first (one registration = writable by sync, visible in lake query / governance catalog / NL2SQL), or clear Table Bucket to use the platform table bucket; writable routes of this execution environment: …". "Start" gives the same message (409).
+- A read-only route selected: "Lake route '\<alias>' (\<bucket>) of execution environment \<execution environment> is registered read-only; a sync task cannot pick it as Table Bucket. Make it writable under 'Settings → Lake table buckets and routes', or choose a writable route".
 
 > Automatic registration when upgrading to 2.2.0: the upgrade script automatically registers as routes the not-yet-registered customer table buckets referenced by existing **home-region** sync tasks — the alias is derived from the bucket name (lowercased, characters other than letters / digits / underscores replaced with `_`, prefixed with `b_` when the first character is not a letter, suffixed with `_2` on a collision), tier `other`, writable, the "Remarks" column reads `auto-registered by upgrade`, and the operator in the audit log is `upgrade`; buckets that no longer exist in the region are only warned about in the upgrade log and not registered. After the upgrade, go to the "Lake table buckets and routes" card and change the alias and tier to the names you want (changing the alias prompts a confirmation).
 
@@ -335,8 +335,8 @@ To achieve "this job may only read the detail bucket and only write the aggregat
 
 **Page**: "Batch Compute" → job → "Advanced Properties" → "Execution Role".
 
-- The dropdown has three groups: "Platform default (recommended, permissions complete)", "Created by Role Advisor", "Your own roles (must trust glue.amazonaws.com and be able to read the buckets your job depends on)". "Refresh" on the right re-reads the IAM roles in the account, "Enter ARN manually" switches to a text field (placeholder "Leave empty = platform default role; or enter arn:aws:iam::<account>:role/<name>"), and "Check permissions" runs the check before you save.
-- When "Check permissions" passes it shows "Permissions complete (N checked)"; when it cannot check, it shows "Could not verify: <reason>" and saving is not blocked.
+- The dropdown has three groups: "Platform default (recommended, permissions complete)", "Created by Role Advisor", "Your own roles (must trust glue.amazonaws.com and be able to read the buckets your job depends on)". "Refresh" on the right re-reads the IAM roles in the account, "Enter ARN manually" switches to a text field (placeholder "Leave empty = platform default role; or enter arn:aws:iam::\<account>:role/\<name>"), and "Check permissions" runs the check before you save.
+- When "Check permissions" passes it shows "Permissions complete (N checked)"; when it cannot check, it shows "Could not verify: \<reason>" and saving is not blocked.
 - The help text reads: "The execution role decides which AWS resources the job can access. Empty = platform default role (permissions complete); your own role must trust glue.amazonaws.com and be able to read the buckets holding the job's dependencies / script references."
 
 ### 9.1 Which permissions the platform probes
@@ -381,10 +381,10 @@ After completing the role, click "Refresh" or "Check permissions", then "Save" �
 |---|---|---|
 | The run fails, log `[TABLE_OR_VIEW_NOT_FOUND] The table or view agg.orders_daily cannot be found` | A two-part name was used and Spark looked in the default catalog | Use the three-part name `agg.agg.orders_daily`; or choose `agg` as "Default catalog" and then use two-part names |
 | Log `REQUIRES_SINGLE_PART_NAMESPACE` | A catalog name that is neither in the route table nor hand-registered | Check the aliases under "Catalogs available to this job"; or register the bucket |
-| Save 400 "Table bucket '<bucket>' is not a lake route of execution environment … " | The declared bucket was revoked, or the region the job is bound to has no such route | Register it again in that region, or remove it from the "Lake table buckets" declaration |
-| Save 400 "The hand-written Spark catalog '<alias>' points to table bucket <bucket A>, while platform route '<alias>' is <bucket B> …" | A `--conf` left over from 2.1.x collides with a new route alias | Delete the hand-written `spark.sql.catalog.<alias>.*`, or give the route a different alias |
+| Save 400 "Table bucket '\<bucket>' is not a lake route of execution environment … " | The declared bucket was revoked, or the region the job is bound to has no such route | Register it again in that region, or remove it from the "Lake table buckets" declaration |
+| Save 400 "The hand-written Spark catalog '\<alias>' points to table bucket \<bucket A>, while platform route '\<alias>' is \<bucket B> …" | A `--conf` left over from 2.1.x collides with a new route alias | Delete the hand-written `spark.sql.catalog.<alias>.*`, or give the route a different alias |
 | Registration 409 "Namespace … exists in both … and …" | Both buckets contain a namespace of the same name | Enter the namespace under "Namespace ownership" of one route and retry |
-| Revoke 409 "Table bucket <bucket> is still referenced; remove the references before revoking: …" | A sync task or job still references it | Change the task / job as the message says, then revoke |
+| Revoke 409 "Table bucket \<bucket> is still referenced; remove the references before revoking: …" | A sync task or job still references it | Change the task / job as the message says, then revoke |
 | The run fails, log `… is not authorized to perform: s3tables:GetTableBucket …` | Your own role lacks permission on that bucket, and the bucket is not in the declaration (so it was not probed on save) | Add the bucket to the "Lake table buckets" declaration so that save checks it first; or add the `s3tables` permissions to the role |
 | The Athena query page reports "Only read-only SELECT / WITH / SHOW / DESCRIBE / EXPLAIN queries are allowed" | That page is read-only | Do writes through batch jobs |
 | Athena reports `Unsupported Federation Resource - Invalid table or column names` | Namespace / table / column names contain uppercase letters | Make them all lowercase |
@@ -411,7 +411,7 @@ aws s3tables delete-namespace --region $REGION --table-bucket-arn arn:aws:s3tabl
 aws s3tables delete-namespace --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket> --namespace detail
 aws s3tables delete-table-bucket --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<aggregate-bucket>
 aws s3tables delete-table-bucket --region $REGION --table-bucket-arn arn:aws:s3tables:$REGION:$ACCT:bucket/<detail-bucket>
-```text
+```
 
 ---
 

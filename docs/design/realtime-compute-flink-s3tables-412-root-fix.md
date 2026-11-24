@@ -157,7 +157,7 @@ if (snapshotsOn) {
     hasSnapshot = (ls.SnapshotSummaries?.length || 0) > 0;
   } catch { /* 查询失败保守回退 SKIP,不阻断启动 */ }   // ← AccessDenied 在这里被吞
 }
-```text
+```
 
 **`catch {}` squashed "I have no permission to query" and "I queried and there really is none" into the same `false`.** This is the true mechanism of this case, and a reusable architecture lesson (section 4.1).
 
@@ -226,14 +226,14 @@ Measured: MSAF always reuses the same Flink JobID `2dd04c3a17d9a825151c2d3268ede
 
 ### Section 3.1 — Three layers of defense (L1 mandatory, L2 mandatory, L3 safety net)
 
-```
+```text
 L1 capability layer: add the kinesisanalytics snapshot-family permissions (CDK)
    → makes the existing "restore from snapshot" chain genuinely usable for the first time
 L2 semantic layer: eliminate the silent swallow — a three-state probe result + trace and alert on failure
    → even if a permission goes missing again in the future, it "fails loudly" instead of quietly degrading into a 412
 L3 resilience layer: convergent behavior when restore is genuinely unavailable (no new cleanup debt)
    → explicit boundary: a blip may still occur once, but it is visible, diagnosable and self-healing
-```text
+```
 
 #### L1 — Add the permissions (`infra/lib/platform-stack.ts:207-219`, appending 4 actions)
 
@@ -270,7 +270,7 @@ export function pickRestoreType(snapshotsOn: boolean, probe: SnapshotProbe):
   //   故它是严格更安全的默认 —— 有快照则续编 checkpointId(不撞名),无快照则退化成冷启动。
   return "RESTORE_FROM_LATEST_SNAPSHOT";
 }
-```typescript
+```
 
 Probe side (the single exit; a failure always leaves a trace):
 

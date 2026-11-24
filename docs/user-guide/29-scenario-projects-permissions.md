@@ -179,7 +179,7 @@ Still on the details page of `ChannelSync-buy` ("Data Sync → click the task na
 1. Click "Publish to environment" at the right of the page header. The first line of the dropdown is the grey text "Current environment dev · order dev → staging → prod", followed by one item per target environment (shown as "Publish to staging" and "Publish to prod"); the prod item is tagged "approval required".
 2. Click the staging item. A notification "Published to staging" appears in the bottom-right corner with a button "Switch to staging to view"; the text reads "This resource was created in the target environment. You are looking at the dev environment; switch to staging to see it."
 3. Click "Switch to staging to view" (or switch the top-bar "Environment" to staging): the task with the same name appears in the "Data Sync" list with the environment tag staging and status draft / not run — it is a new, independent task with an empty run history.
-4. Switch back to dev. The "Environments" status next to "Publish to environment" on the details page shows "Published to staging: v1 from dev, <time>, by dev-buy".
+4. Switch back to dev. The "Environments" status next to "Publish to environment" on the details page shows "Published to staging: v1 from dev, \<time>, by dev-buy".
 
 Key points:
 
@@ -192,7 +192,7 @@ Key points:
 
 1. On the dev details page of `ChannelSync-buy` click "Publish to environment" → choose the prod item (tagged "approval required").
 2. The dialog "Publish approval submitted" appears with the text: "prod is a protected environment: a project owner must approve on the Project Spaces page. The resource appears in prod only after approval; the approver gets a "switch to prod" shortcut." Buttons "Go to Project Spaces to approve" / "Got it".
-3. The "Environments" status on the details page changes to "Publish to prod awaiting approval (requested by dev-buy, <time>)".
+3. The "Environments" status on the details page changes to "Publish to prod awaiting approval (requested by dev-buy, \<time>)".
 4. If you switch to the prod environment now, the task is not yet in the "Data Sync" list — nothing is deployed until the approval passes.
 
 Switch to the admin's browser:
@@ -201,7 +201,7 @@ Switch to the admin's browser:
 6. Click "Approve". A notification "Approved and published to prod" appears in the bottom-right corner with the text "ChannelSync-buy was created in the prod environment (v1). You are looking at a different environment; switch over to see it." and a button "Switch to prod to view".
 7. Click it: the top-bar "Environment" switches to prod and `ChannelSync-buy` appears in the "Data Sync" list (environment tag prod).
 
-Back as `dev-buy`: the "Environments" status on the details page shows "Published to prod: v1 from dev, <time>, by admin".
+Back as `dev-buy`: the "Environments" status on the details page shows "Published to prod: v1 from dev, \<time>, by admin".
 
 Key points:
 
@@ -247,7 +247,7 @@ Page: "System → Audit Log" (admin).
 |---|---|---|
 | "No access to this workspace" (403) | The current account is not a member of the workspace | Ask an admin to add you under "Workspace → Members / Approvals", or request under "Other workspaces you can request to join" |
 | "Insufficient permissions: a higher project role is required" (403) | A viewer tried to create / modify / delete | Ask an admin to change the project role to editor |
-| The task just published is not in the list | The top-bar "Environment" is still on the source environment | Click "Switch to <environment> to view" in the notification, or switch the top-bar "Environment" |
+| The task just published is not in the list | The top-bar "Environment" is still on the source environment | Click "Switch to \<environment> to view" in the notification, or switch the top-bar "Environment" |
 | "Workspaces are created by admins / R&D managers; contact them if you need a new one" | The Developer / Viewer platform roles cannot create spaces | Ask an admin to create it |
 | Requests for my own project do not appear in "Pending my approval" | You are an owner but your platform role is Developer; or "Execution scope" is set to a specific region | Have an admin approve; or switch "Execution scope" to "All" |
 | "This approval has already been handled" / "The approval status has changed; please refresh" | Another admin has already handled it | Refresh the page |

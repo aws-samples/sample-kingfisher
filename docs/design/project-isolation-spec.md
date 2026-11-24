@@ -75,7 +75,7 @@
 type MinRole = "viewer" | "editor" | "manager" | "admin";
 type ConflictMode = "rename" | "overwrite" | "cancel";
 type CopyableType = "workflow" | "etl-job" | "sync" | "redshift-task" | "engine-job";
-```text
+```
 
 | Method · path | Request | Response / guard |
 |---|---|---|
@@ -108,7 +108,7 @@ type CopyableType = "workflow" | "etl-job" | "sync" | "redshift-task" | "engine-
 
 ### 3.0 🔴 The authoritative `projectSchema()` (eliminates the 3 existing sanitize forks; P0-1)
 
-```
+```text
 // Current state — three mutually incompatible implementations: sync/s3tables-identifier.ts:22 sanitizeS3TablesIdentifier (lower-cases, lossy, no length cap)
 //                  modeling/redshift.ts:24 safeIdent (keeps case, throws on illegal characters)
 //                  the python re.sub(...) inside glue-script-generator
@@ -132,11 +132,11 @@ function projectSchema(projectId): string {
 //    (all digits, identical in either case, which happened to bypass exactly this dimension) to the real-environment form.
 // 🔴 The `proj-default` special case: its schema name is fixed as `proj_default` (not `proj_proj_default`), hard-coded in the mapping table (removes the ambiguity of review finding P2-2)
 // safeIdent serves only as a [validator]: the output of projectSchema() is passed through it; the two never act independently
-```text
+```
 
 ### 3.1 `projectFilter` extension (sharedTo + keeping the legacy fallback)
 
-```
+```text
 function projectFilter(projectId) {
   if (projectId === DEFAULT_PROJECT_ID)
     return "(projectId = :p OR attribute_not_exists(projectId) OR contains(sharedTo, :p))"
@@ -150,11 +150,11 @@ function projectFilter(projectId) {
 //       → [no project filter is added]; only the projectId attribute is added for attribution (adding a filter would miss existing records)
 //   Full list of consumers (confirmed by grep; missing one is an error): incidents/{signature,record}, diagnostics/evidence,
 //   alerting/ops-summary, baseline/workflow-runtime, finops/sweep, copilot/plan/{executor,discovery-tools,step-handlers/spi}, engines/emr/provider
-```text
+```
 
 ### 3.2 The three-state `guardResourceAccess` + `isReadOnlyAction` (P0-6)
 
-```
+```text
 function guardResourceAccess(item, ctx, minRole) {
   if (isPlatformAdmin(ctx)) return OK
   const owner = item.projectId ?? DEFAULT_PROJECT_ID
@@ -180,11 +180,11 @@ function isReadOnly(sql: string): boolean {
 }
 // ⚠️ The adapter [must not] execute the SQL rewritten by sanitizeReadOnly (it injects maxRows, which changes the semantics);
 //    only the verdict bit is taken. assertQuery in section 3.5 uses this adapter.
-```text
+```
 
 ### 3.3 `copyToProject` (generalized promote; P0-7 completion)
 
-```
+```text
 async function copyToProject(type, sourceId, toProjectId, {toEnv, conflict, includeDeps}) {
   requireRole(ctx, sourceProjectOf(sourceId), "viewer"); requireRole(ctx, toProjectId, "editor")
   const src = load(type, sourceId)
@@ -210,11 +210,11 @@ async function copyToProject(type, sourceId, toProjectId, {toEnv, conflict, incl
   audit("copy", {from:sourceId, to:draft.id}); return {newId: draft.id, status, unresolvedRefs}
 }
 // datasource is [shared only, never copied] (secretArn / glueConnectionName are not portable)
-```text
+```
 
 ### 3.4 🔴 L3 credential resolution: fail-closed **in three classes** (P0-3; the original two classes would have broken DMS / modeling / L3's own provisioning)
 
-```
+```text
 // Uniformly through getPrivilegedCred(targetId, {purpose, project}) of the multi-region execution specification, section 3.9; cache key (targetId, project, purpose)
 type Purpose = "project-context" | "governance-read" | "admin-ddl"
 async function resolveCred(targetId, project, purpose) {
@@ -248,7 +248,7 @@ async function resolveCred(targetId, project, purpose) {
   }
 }
 // 🔴 Classification is by [static categorization of the call site] (not by guessing from the SQL at run time); all three classes of calls are audited
-```text
+```
 - 🔴 **Fix the fail-open ternary (count corrected)**: **16 sites** across the repository of `...(SecretArn ? {SecretArn} : {})` — distribution: `redshift/execute:22`, `etl/job-service:351,403`, `backfill/execute:95`, `genbi/schema:33`, `genbi/redshift:51`, `modeling/redshift:40,201`, `quality/service:151`, **`zeroetl-service:240,260,292` (only 3 sites; the earlier draft's "6 sites" was an overestimate)**, `redshift/schemas/route:32`, `sensitive/scan:78`, `realtime/redshift-target:34`, `metrics/service:183`.
 - **Both single-value caches (`admin-secret:13 _arn`, `zeroetl:69 _secretArnCache`) are changed to composite keys**;
   missing zeroetl would let zero-ETL workgroup queries bypass isolation.
@@ -257,7 +257,7 @@ async function resolveCred(targetId, project, purpose) {
 
 ### 3.5 Revoking GRANT PUBLIC (L1) + the execute read-only guard + the ban on cross-project data movement
 
-```
+```text
 // L1: all [6 sites] of TO PUBLIC in the repository are revoked + existing grants migrated (grep confirms there is no 7th):
 //   ① execute-ddl:36 (run time) ② glue-script-generator:454 (every Glue script) ③ codegen:54 (the LLM prompt)
 //   ④⑤ cookbook/seed/glue.ts:307,323 (+ the compiled copy core-dist/cookbook/seed/glue.js:306,322 → change the source and redistribute)
@@ -268,11 +268,11 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
   if (/\bUNLOAD\b|\bCREATE\s+EXTERNAL\s+SCHEMA\b|\bdatashare\b/i.test(sql)) DENY
   // cross-project UNLOAD to a bucket other than the project's own is forbidden; enforced in three dimensions, (jurisdiction, project, target)
 }
-```text
+```
 
 ### 3.6 Result retrieval: unified on the queryHandle of the multi-region execution specification, section 3.7 (replacing the original `statementId→projectId` mapping)
 
-```
+```text
 // 🔴 This module no longer builds its own mapping table: the submit side uniformly uses submitStatement() (multi-region execution specification, section 3.7); the fetch side checks ownerSub + projectId (+ targetId)
 // Covers [all 8] submission points that produce retrievable results (missing one = a legitimate query cannot fetch its result = a fail-closed false rejection):
 //   ① redshift/execute ② genbi-redshift ③ genbi-athena ④ ~~data-service/execute~~ (retired on 2026-09-05; the multi-region execution specification, section 3.7, had long classified it as not emitting statement ids)
@@ -290,11 +290,11 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
 // 🔴 Clarification of the acceptance semantics (consistent with the multi-region execution specification, section 3.7): rejection condition = ownerSub does not match [and] the caller is not a member of that projectId
 //   ⇒ members of the same project can fetch each other's results (collaboration inside a project is intentional); the acceptance case "A uses B's statementId → 403"
 //     presupposes that [A and B belong to different projects]; it does not apply within one project (the test case must state this premise)
-```text
+```
 
 ### 3.7 public→proj_ migration (🔴 run once per target)
 
-```
+```text
 // Default (a): CREATE proj_<id>.t + COPY/INSERT + verify identical row counts + keep public read-only for a compatibility period + DROP after approval
 //   🔴 Before DROP, mandatory: UNLOAD/CTAS backup to S3 (or a snapshot) + second confirmation / approval + rerun the "public still has unmigrated tables" inspection
 // (b) ALTER TABLE ... SET SCHEMA: an [exception chosen explicitly per table] (no compatibility window, a one-way door), only for tables confirmed to have no consumer dependencies
@@ -305,11 +305,11 @@ function assertQuery(sql, {jurisdiction, project, targetId}) {
 // 🔴 Idempotent / resumable: the migration tool records {pending|migrated|failed|skipped} progress per table; an interrupted run can re-enter without migrating twice
 // 🔴 Before revoking existing GRANT PUBLIC: use the inspection to list "existing reports / Ask-Your-Data / BI / DataAPI that depend on that grant" → revoke gradually
 //    (SVV_TABLE_INFO / pg_default_acl + a static scan of platform-side configuration that references `public.`)
-```text
+```
 
 ### 3.8 🔴 Physical tables of the global-knowledge class land in `shared` (ruling 2: two dimensions, region × project; P0-4)
 
-```
+```text
 // Root of the conflict: modeling code tables land in public (modeling/service.ts:258 landCodeTable passes no schema → redshift.ts:82 defaults to public),
 //          dimension / fact tables land in the fixed global layers ods/dwd/dws/ads (service.ts:27-30)
 //          ⇒ after L1 revokes PUBLIC, role_proj_* cannot read the code tables; after L2 migrates them into proj_, the "enterprise common vocabulary" is broken through
@@ -323,11 +323,11 @@ const SHARED_SCHEMA = "shared"
 // ⑤ metadata FQNs (section 3.10) point to shared as well; cookbook / codegen reference code tables as shared.<t>
 // 🔴 Semantic boundary (aligned with commitment C2): "a project cannot see another project's tables" holds fully for [business data];
 //    `shared` is [an intentional global read-only knowledge layer] (code tables / conformed dimensions) and contains no project business data
-```text
+```
 
 ### 3.9 Cross-target reclamation on project deletion (jointly with the multi-region execution specification, section 3.12)
 
-```
+```text
 async function deleteProject(projectId) {
   assertBindingsZero(projectId)                    // resource definitions / members / schedules / runs all 0 (as for deleting an environment, multi-region execution specification, section 4.4)
   for (const targetId of listActiveTargets()) {    // 🔴 target by target (including other jurisdictions)
@@ -342,11 +342,11 @@ async function deleteProject(projectId) {
   await deleteControlPlaneRows(projectId)           // today only this step is done (project-service.ts:162-178)
 }
 // ⚠️ A destructive cross-target operation: approval + re-typing the project name to confirm + back up the data first (leave a way back, as before DROP in section 3.7)
-```text
+```
 
 ### 3.10 Metadata-side FQN convergence (P0-2; prevents masking from silently failing after migration → PII exposed in clear text)
 
-```
+```text
 // 🔴 **9 sites** of independent ||"public" / local FQN construction (confirmed by grep; the earlier "8 sites" missed the most critical one, the 9th on the write side),
 //    all of which must converge on [the same authoritative FQN function] (multi-region execution specification, section 3.10):
 //   🔴 ⑨ sync/glue-script-generator.ts:344  ← the **write-side** default `rs_schema = task.redshiftConfig?.schema || "public"`
@@ -363,11 +363,11 @@ async function deleteProject(projectId) {
 // The migration tool [rewrites in the same batch] `public.` → `proj_<id>.` / `shared.` in existing metadata (classification / lineage / metric fqn / OpenMetadata)
 // 🔴 End-to-end invariant (multi-region execution specification, section 3.10): the schema / target of the four hops scan→findings→classification→masking must agree;
 //    on disagreement, fail closed for sensitivity levels L3 / L4 (masking today fails open: on exception it returns the raw rows)
-```text
+```
 
 ### 3.11 Replacing the `public.` placeholder in cookbook / codegen / templates (P0-8; jointly with the multi-region execution specification, section 3.11)
 
-```
+```text
 // Current state: the 6 sites whose GRANT is revoked [also] hard-code public. table names (cookbook/seed/glue.ts:307 `GRANT ALL ON public.dws_channel_roi`,
 //      types/etl-job.ts:92 `public.sales_by_region`, codegen.ts:54 instructs the AI to use bgp-workgroup/dev + GRANT PUBLIC);
 //      cookbook/seed/redshift.ts has many `public.<...>` (numerous occurrences in lines 112-287)

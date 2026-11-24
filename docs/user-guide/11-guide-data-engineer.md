@@ -39,7 +39,7 @@ The concepts themselves (target, jurisdiction, long-running operation, object le
 ## 2. Data sources
 
 - Page: "Data Integration → Data Sources".
-- Key buttons: "New data source" (in a single-region view the button reads "New data source (in <region>)") · row actions "Browse tables", "Network configuration", "Detect", "Edit", "Delete" · at the top, "Check reachability" and "Refresh".
+- Key buttons: "New data source" (in a single-region view the button reads "New data source (in \<region>)") · row actions "Browse tables", "Network configuration", "Detect", "Edit", "Delete" · at the top, "Check reachability" and "Refresh".
 - The creation wizard has three steps: "Basic info" (data source name · database type · environment "Development" / "Staging" / "Production") → "Connection Config" → "Create Resource".
 - "Connection Config" for JDBC sources: "Manual input" or "Select from RDS"; host · port · database name · username · password · "Extra JDBC connection parameters (optional)" · "Probe & browse method" · "Network Access (optional)" (VPC / private subnets / security groups; leave empty to auto-detect).
 - "Test connection" only checks that the connection configuration can be created; after creation the source first shows "Testing", turns "Connected" only once it has really connected, and honestly shows "Unreachable" when it cannot.
@@ -99,7 +99,7 @@ Related scenario: [Scenario 1 · Steps 4–5](20-scenario-detail-to-daily-report
 ## 4. Batch compute
 
 - Page: "Data Development → Batch Compute". The job list is on the left; the editor for the selected job is on the right.
-- Key buttons: "New" → the "New ETL Job" dialog (job name + type) → "Create"; in the editor, "AI Generate Code", "Save", "Version history", "Dry run", "Run now · <region>", "Backfill", "Publish to MWAA schedule", "Publish to environment", "Parse lineage".
+- Key buttons: "New" → the "New ETL Job" dialog (job name + type) → "Create"; in the editor, "AI Generate Code", "Save", "Version history", "Dry run", "Run now · \<region>", "Backfill", "Publish to MWAA schedule", "Publish to environment", "Parse lineage".
 
 ### 4.1 The three job types
 
@@ -170,7 +170,7 @@ The "Add node" dropdown lists the node types: "Data Sync Node", "SQL Node", "Pyt
 
 - "Save" only stores the canvas; "Publish to scheduler" ships the DAG to the MWAA Serverless **of this workflow's own execution regions**, and success shows "Published to Airflow".
 - Pre-publish validation: an empty canvas, an unconfigured node, a Batch Job Node whose job is not bound to the workflow's execution region, or a sync node whose task is not in that region all return 400 naming the node, and nothing is published half-way; "Isolated nodes with no connections" is only a reminder ("Confirm before publishing → Continue publishing") and does not block.
-- "Recurring schedule": five-field cron, **UTC**; fill it in and click "Apply and publish", which shows "Schedule applied and published (<cron>); after MWAA loads (~1 min) it runs on schedule".
+- "Recurring schedule": five-field cron, **UTC**; fill it in and click "Apply and publish", which shows "Schedule applied and published (\<cron>); after MWAA loads (~1 min) it runs on schedule".
 - "Trigger run" runs once immediately regardless of the cron; with several regions bound it asks which regions to run in.
 - The "Run History (N)" tab: Run ID / Status / Trigger mode / Start / Finished / Duration / Error, with row actions "Logs", "Node", "AI Analysis". The "Node" dialog shows status and logs node by node, with back-links "Job run history" and "Sync run history".
 - The "Airflow Console" button is available to platform administrators only; Serverless scheduling has no web console anyway, so definitions and runs are viewed on this page and in "Task Monitor".
@@ -254,8 +254,8 @@ Details of multi-region direct query are in [Scenario 3: data stays in its regio
 
 | What you see on the page | Why | Next step |
 |---|---|---|
-| "Running in background: <label> (n s elapsed)" (bottom right) | The operation exceeded 45 seconds and moved to the background (long-running operation) | Wait for it to finish; the page shows the result automatically; do not click again |
-| "'<label>' is in progress (n s elapsed); please wait for it to finish before operating" (409) | Another long-running operation on the same object has not finished (object lease) | Wait for it to finish before editing / deleting |
+| "Running in background: \<label> (n s elapsed)" (bottom right) | The operation exceeded 45 seconds and moved to the background (long-running operation) | Wait for it to finish; the page shows the result automatically; do not click again |
+| "'\<label>' is in progress (n s elapsed); please wait for it to finish before operating" (409) | Another long-running operation on the same object has not finished (object lease) | Wait for it to finish before editing / deleting |
 | "This job still has N unfinished runs: … deletion refused" (409) | The job still had runs in progress when you tried to delete it | Wait for the runs to finish (or stop them first), then delete |
 | "This job is still referenced by the Batch Job Nodes of N workflows: … deletion refused" (409) | The job is referenced by a DAG | Remove that node from the workflow canvas first |
 | Deleting a data source returns 409 and lists tasks | The source is still referenced by sync / real-time tasks | Delete those tasks or point them elsewhere first |

@@ -188,7 +188,7 @@ Conditions: the source is an **RDS MySQL / Aurora MySQL managed instance**, the 
 3. Select tables and click "Done".
 4. Click "Start"; the message is "Zero-ETL incremental sync orchestration started (integration activation takes tens of minutes); check progress on the detail page"; status "Starting".
 5. The detail page shows the "Zero-ETL Incremental Sync (managed CDC)" card: "Integration Status" (creating → active), "Target Workgroup" (`bgp-zeroetl-wg`), "Target database" (`zeroetl_<task-suffix>`), "Source schema" (= source database name).
-6. Once the integration is active, a green note appears in the card, reading roughly "Incremental sync running: changes in source <db> are replicated to Redshift in near real time. …on the Redshift query page, select Workgroup 'bgp-zeroetl-wg' / database 'zeroetl_…' and run SELECT COUNT(*) FROM <source-db>.<table>."; the table below lists the "Row count copied" for each table (tables not yet in place show "Syncing").
+6. Once the integration is active, a green note appears in the card, reading roughly "Incremental sync running: changes in source \<db> are replicated to Redshift in near real time. …on the Redshift query page, select Workgroup 'bgp-zeroetl-wg' / database 'zeroetl_…' and run SELECT COUNT(*) FROM \<source-db>.<table>."; the table below lists the "Row count copied" for each table (tables not yet in place show "Syncing").
 7. Verify: on the "Redshift Query" page first choose the execution environment, then choose `bgp-zeroetl-wg` in the workgroup dropdown and `zeroetl_<task-suffix>` in the database dropdown, and run `SELECT COUNT(*) FROM <source-db>.payments;`. The workgroup dropdown lists **all** Redshift Serverless workgroups in the account for that region, so it appears as soon as the integration is created; an environment that has never run Zero-ETL (for example a demo install) has only the platform workgroup `bgp-workgroup`, with databases `dev`, `awsdatacatalog` and `sys:internal` only.
 
 Notes:
@@ -266,7 +266,7 @@ INSERT INTO s3t.`${S3TABLE_DB}`.`flink_region_agg`
 SELECT window_start, region, SUM(amount) AS total_amount, COUNT(*) AS order_cnt
 FROM TABLE(TUMBLE(TABLE orders_src, DESCRIPTOR(ts), INTERVAL '1' MINUTE))
 GROUP BY window_start, window_end, region;
-```text
+```
 
 Notes:
 
@@ -296,7 +296,7 @@ Notes:
 
 ## 10. B4 Verify the results on the Athena Query page
 
-Page path: "Data Development → Athena Query". The tag to the right of the title shows the current execution target (region); the blue bar reads "Query the current execution target's S3 Tables table bucket (Iceberg) via Amazon Athena. Strictly read-only; results are not persisted. Federated catalog: s3tablescatalog/<table-bucket>".
+Page path: "Data Development → Athena Query". The tag to the right of the title shows the current execution target (region); the blue bar reads "Query the current execution target's S3 Tables table bucket (Iceberg) via Amazon Athena. Strictly read-only; results are not persisted. Federated catalog: s3tablescatalog/\<table-bucket>".
 
 1. Switch the top-bar "Execution scope" to the region of the streaming job.
 2. In the "S3 Tables Table" tree on the left (the card has "Refresh tables" at the top right), expand the 📁 `realtime` namespace and click `flink_region_agg`. The editor is filled in automatically:

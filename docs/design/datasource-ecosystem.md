@@ -245,7 +245,7 @@ export interface SourceDataset {
   meta?: Record<string, any>;    // 范式专属（S3 format/压缩、DDB pk/sk、MSK 分区数…）
 }
 export interface SourceColumn { name: string; type?: string; nullable?: boolean; key?: string; comment?: string; }
-```text
+```
 
 ### 4.2 The Provider Interface (`datasource-spi/spi.ts`)
 
@@ -299,7 +299,7 @@ export function getProvider(type: DataSourceType): DataSourceProvider { return P
 export function listSourceTypes(): DataSourceType[] { return Object.keys(PROVIDERS) as DataSourceType[]; }
 // UI 建源下拉：由 provider.capabilities 派生（取代 DS_TYPE_OPTIONS 硬编码）
 export function sourceTypeCatalog() { return listSourceTypes().map(t => ({ type: t, ...getProvider(t).capabilities })); }
-```text
+```
 
 ---
 
@@ -339,7 +339,7 @@ export function readConnection(ds: DataSource): Record<string, any> {
   if (ds.connection) return ds.connection;                         // 新格式直接用
   return { host: ds.host, port: ds.port, database: ds.database };  // 旧 MySQL item 兜底映射
 }
-```text
+```
 
 - Creating a source: write the `connection` bag (the flat fields are no longer written).
 - Reading an old source: the normalizing layer maps the flat fields into the bag; the provider is unaware of the difference.
@@ -837,7 +837,7 @@ The `ConnectionField[]` dynamic-rendering contract (types.ts:42) is defined but 
 | Table builder | `ensureExternalTable(spec, place: AthenaPlace)` — the place is **mandatory** (no default in the type; at run time a missing / incomplete place also throws "place missing" and never falls back to the home region); the three DDL statements go through `startQuery(sql, ctx, place)`, and the status query `getExecution(id, place.region)` hits the region that started it; the return value additionally carries `targetId / region` | `lib/datasource-spi/object-store/athena-external.ts` |
 | Executor | After reading the source row, `resolveAthenaPlace(datasourceOwnerTarget(ds))`: the place = the stamp on the row (the single way to read it; legacy rows without a stamp = home region); for a non-home place, take that region's descriptor `athenaWorkgroup / datalakeBucket`; if that region is not ready / has no workgroup ⇒ reject on the spot; the response `data` additionally returns `targetId / region`; the audit detail records the same | `lib/datasource/long-ops.ts` (kind `datasource-s3-external`; long-running operation / object lease / error semantics unchanged) |
 | IAM | In `DataSourceReadOnly`, the Glue catalog statement changes `axis: "home"` → `"execution"`: the resources remain restricted to `catalog` / `database/bgp_s3_ext` / `table/bgp_s3_ext/*`, and the authorized list = home region ∪ execution regions (the `aws:RequestedRegion` condition is attached in pairs by `regionalStatement`);<br>the Athena actions were already on the execution-region axis | `infra/lib/platform-stack.ts` |
-| Page entry | The action column of the Data Sources page gains an "External table" button **for S3 sources only**<br>⇒ the dialog `app/datasources/S3ExternalTableModal.tsx`: the title carries a Tag with the place region; a dataset drop-down (`fetchSourceTables`, the same path as "Browse tables"; when there is exactly one it is selected directly, when there are several the user must name one — the first is never taken silently); a dataset with no inferred columns is warned about first; the button text reads "Create external table in <region>" (guardrail 2: a write operation restates its target on the button)<br>⇒ POST `…/s3-external { dataset }` (beyond 45 s the global fetch interceptor polls according to the long-running-operation protocol; the component is unaware)<br>⇒ success block: `bgp_s3_ext.<table>` + place region + column count / format / location + "Show CREATE TABLE statement" + **"Open in Lake Query"** (`/athena?scope=<targetId>&sql=<sample query>`) | `app/datasources/page.tsx` (the place is computed from the stamp on the row, `datasourceOwnerTarget`; an invalid stamp is reported as an error and never defaults to the home region) |
+| Page entry | The action column of the Data Sources page gains an "External table" button **for S3 sources only**<br>⇒ the dialog `app/datasources/S3ExternalTableModal.tsx`: the title carries a Tag with the place region; a dataset drop-down (`fetchSourceTables`, the same path as "Browse tables"; when there is exactly one it is selected directly, when there are several the user must name one — the first is never taken silently); a dataset with no inferred columns is warned about first; the button text reads "Create external table in \<region>" (guardrail 2: a write operation restates its target on the button)<br>⇒ POST `…/s3-external { dataset }` (beyond 45 s the global fetch interceptor polls according to the long-running-operation protocol; the component is unaware)<br>⇒ success block: `bgp_s3_ext.<table>` + place region + column count / format / location + "Show CREATE TABLE statement" + **"Open in Lake Query"** (`/athena?scope=<targetId>&sql=<sample query>`) | `app/datasources/page.tsx` (the place is computed from the stamp on the row, `datasourceOwnerTarget`; an invalid stamp is reported as an error and never defaults to the home region) |
 | Athena Query page | On entry, reads `?sql=` and pre-fills the editor (only when the editor is empty — the same "never overwrite what the user has already written" rule as the sample SQL of the table tree); the place is still decided by `?scope=` through the top-bar view | `app/athena/page.tsx` |
 | Dictionary | The 17 Chinese keys of the dialog and button enter the English dictionary (`en-coverage-guard` watches every literal `t()` key) | `lib/i18n/messages/en.ts` |
 

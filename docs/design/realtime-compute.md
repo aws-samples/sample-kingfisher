@@ -178,7 +178,7 @@ GROUP BY window_start, region;
   same bucket as the Glue scripts; not a CDK asset, to keep the 12 MB out of the stack).
 - Platform env (derived deterministically in platform-stack, avoiding cross-stack dependencies): `FLINK_RUNTIME_ROLE_ARN`=
   `arn:aws:iam::<ACCOUNT>:role/bgp-flink-role`, `FLINK_SOURCE_STREAM`=bgp-flink-source,
-  `FLINK_CODE_BUCKET`=bgp-glue-scripts-<ACCOUNT>, `FLINK_CODE_KEY`=flink/flink-sql-runner.jar.
+  `FLINK_CODE_BUCKET`=bgp-glue-scripts-\<ACCOUNT>, `FLINK_CODE_KEY`=flink/flink-sql-runner.jar.
 - Incremental grants on the platform TaskRole: `kinesisanalytics:*` (applications in this account), `iam:PassRole` (bgp-flink-role),
   `kinesis:PutRecord*` (data-generation demo, optional), with the corresponding resources narrowed.
 

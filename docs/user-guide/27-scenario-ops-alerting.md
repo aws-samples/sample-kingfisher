@@ -82,7 +82,7 @@ The on-call drill needs a real failed run. A Redshift SQL job that queries a non
 
 1. Left menu "Data Development → Batch Compute" → click "New" → dialog "New ETL Job": job name `ops-practice-fail`, type "Redshift SQL Job" → "Create".
 2. On the "Edit script" tab replace the whole script with `SELECT count(*) FROM showcase.table_that_does_not_exist;` → "Save".
-3. Click "Run now · <region>" (when the job is bound to a single region the button carries the region name). Expect the message "Run submitted (business date …)".
+3. Click "Run now · \<region>" (when the job is bound to a single region the button carries the region name). Expect the message "Run submitted (business date …)".
 4. A row appears in "Run History" after about 1 minute with status "Failed". Keep it; every later step uses it.
 
 ### 2.3 Prepare a self-test channel (optional but recommended)
@@ -151,14 +151,14 @@ Page path: the failed row in "Scheduling & Ops → Task Monitor", or the failed 
 
 Page path: "Scheduling & Ops → Alerting Center", tab "Notification Channels".
 
-1. The verbatim blue hint at the top of the page: "Verify without a real IM account: create a "Generic Webhook" channel with URL <platform-domain>/api/public/alerting-sink for end-to-end delivery testing."
+1. The verbatim blue hint at the top of the page: "Verify without a real IM account: create a "Generic Webhook" channel with URL \<platform-domain>/api/public/alerting-sink for end-to-end delivery testing."
 2. Click "New Channel" → dialog "New Channel":
    - "Channel name": for example `ops-oncall-group`.
    - "Channel type": Generic Webhook · DingTalk group bot · WeCom group bot · Email (SES). The type cannot be changed after saving.
    - Webhook types take a "Webhook URL"; DingTalk has one more field, "Signing secret (required when DingTalk security uses "Signing")".
    - The email type takes "Sender (must be SES-verified)" and "Recipients (comma-separated)".
 3. After "Save" the message is "Channel created". List columns: channel name / type / config (email shows sender → N recipients; webhooks show only a tail hint, never the full URL) / enable / actions.
-4. Click "Send test" on the row: on success the message is "Test delivered (HTTP 200)"; on failure "Test failed: <verbatim>". Get the test through before building rules.
+4. Click "Send test" on the row: on success the message is "Test delivered (HTTP 200)"; on failure "Test failed: \<verbatim>". Get the test through before building rules.
 5. When editing a channel, the dialog shows the yellow hint "For security, webhook URL / secret are not echoed; leave blank to keep, fill in to overwrite."
 
 ![Notification channels](../screenshots/alerting-channels.webp)
@@ -201,10 +201,10 @@ Practice: create one rule with "Offline Compute (ETL)" + "Alert on task failure"
 
 1. Switch to the "Alert Events" tab. Columns: severity / rule / execution environment / alert message / status / time.
    - The "Execution environment" column shows which region this alert belongs to; aggregate rules not limited to a region show "Platform-wide total".
-   - The "Alert message" reads for example "Task "ops-practice-fail" run failed: …"; for no-run, "No successful run in execution environment <region> over last 1440 min (possible data-flow interruption / scheduler stall)".
+   - The "Alert message" reads for example "Task "ops-practice-fail" run failed: …"; for no-run, "No successful run in execution environment \<region> over last 1440 min (possible data-flow interruption / scheduler stall)".
    - "Status": Notified · Partial · Delivery failed · Firing.
 2. Expand a row to see "Delivery results": one line per channel, type + success / failure + HTTP status code + verbatim failure reason; when the rule has no channel bound it shows "(this rule has no channel bound)".
-3. For events whose rule has "Auto-attach AI diagnosis on failure" on, the expanded area shows "AI diagnosis attached: <diagnosis id>", and the delivered message ends with an extra line "AI diagnosis started automatically (view the diagnosis report in the platform)".
+3. For events whose rule has "Auto-attach AI diagnosis on failure" on, the expanded area shows "AI diagnosis attached: \<diagnosis id>", and the delivered message ends with an extra line "AI diagnosis started automatically (view the diagnosis report in the platform)".
 
 ---
 
@@ -247,7 +247,7 @@ Page path: "Scheduling & Ops → Ops Dashboard". A read-only page in a dark proj
    - Under the punctuality card is the small verbatim text: "Punctuality: share of terminal runs under 30 min (baseline learning is future work)".
 4. Third row: "Recent Run Timeline (Gantt)" · "Top Slow Tasks (seconds)". Every bar on the Gantt is one run, coloured by status; when you see a red failed segment, go back to Task Monitor and filter by task name.
 5. Fourth row: "SLA risk board" (tag "N at risk" at the top right; each row name / committed / ETA / bottleneck / risk tag Breach predicted · Close · Has margin) · "Top baselines (p90 sec)" (shows "No baselines yet — run learning first" when no baselines have been learned).
-6. At the bottom, "Recent Alerts": severity / rule / message / time. The footer "Generated at <time>" tells you how fresh this screen's data is.
+6. At the bottom, "Recent Alerts": severity / rule / message / time. The footer "Generated at \<time>" tells you how fresh this screen's data is.
 
 Suggested inspection order: failed today → recent alerts → SLA risk board → red segments on the Gantt → back to Task Monitor to handle them.
 
@@ -274,7 +274,7 @@ Page path: "Scheduling & Ops → Incident Knowledge Base".
 1. Click "Details / fix" on the entry for `ops-practice-fail`; the drawer on the right opens: title, engine, status, "N recurrences", "Latest diagnosis root-cause summary".
 2. Write Markdown in the text box of the "Verified fix runbook" card: root cause + step-by-step fix actions + verification method. Verbatim placeholder: "Record in Markdown: root cause + step-by-step fix actions + verification method. Only after being marked "verified" will it be referenced by the diagnosis Agent."
 3. Once the fix is confirmed to really work, turn on the "Mark as verified" switch and click "Save fix runbook"; the message is "Fix runbook saved".
-4. After saving, the right of the card shows "Last verified: <user> @ <time>"; the row's status in the list changes to "Verified fix" with a green shield icon (hover "Has a verified fix runbook").
+4. After saving, the right of the card shows "Last verified: \<user> @ \<time>"; the row's status in the list changes to "Verified fix" with a green shield icon (hover "Has a verified fix runbook").
 5. The "Occurrence timeline" below lists every occurrence: time · task name · type · symptom summary · runId.
 6. When two people edit at the same time, the one who saves second gets "Version conflict; please refresh and retry" — refresh and write again.
 
@@ -302,14 +302,14 @@ General route: read the verbatim "Error" column in Task Monitor → click "Logs"
 | The page reports 504 / "Service response error", but the object or run was actually created | An older version's synchronous wait hit the 60-second gateway timeout | From 2.2.0 on, anything over 45 seconds moves to the background automatically, with "Running in background: …" at the bottom right; after a 504, refresh the list / run history first and do not click again |
 | The "Run Logs" dialog shows in red "Cannot determine the execution region of this run (targetId=…)…" | This run's region tag is missing or that region cannot be read | The platform deliberately does not fall back to the home region for logs; confirm that region's status on the Execution Environments page, or read the log in that region's Glue job run |
 | Deleting a batch job is rejected with 409 `JOB_RUN_IN_PROGRESS` listing runIds | The job still has runs in flight | Wait for the runs to reach a terminal state (or stop them in run history), then delete |
-| Any edit / delete is rejected with 409 ""<label>" is in progress (n s elapsed); wait for it to finish before acting" | The same object has an unfinished long-running operation (object lease) | Wait until "Running in background" at the bottom right disappears, then act; do not open a second tab and click again |
+| Any edit / delete is rejected with 409 ""\<label>" is in progress (n s elapsed); wait for it to finish before acting" | The same object has an unfinished long-running operation (object lease) | Wait until "Running in background" at the bottom right disappears, then act; do not open a second tab and click again |
 
 > The verbatim messages above are taken from the pages and from the customer manual's known boundaries; for anything not in the table, run "AI Diagnosis" first, then write the conclusion into the Incident Knowledge Base.
 
 ### 10.1 The two messages of long-running operations and 409
 
-- "Running in background: <label> (n s elapsed)": the bottom-right notice meaning this action took longer than 45 seconds and moved to the background; the page polls automatically until the terminal state and then shows the result. It continues even if you close the tab.
-- ""<label>" is in progress (n s elapsed); wait for it to finish before acting": a 409 meaning the object you want to edit / delete is held by a long-running operation. This is protection, not a fault.
+- "Running in background: \<label> (n s elapsed)": the bottom-right notice meaning this action took longer than 45 seconds and moved to the background; the page polls automatically until the terminal state and then shows the result. It continues even if you close the tab.
+- ""\<label>" is in progress (n s elapsed); wait for it to finish before acting": a 409 meaning the object you want to edit / delete is held by a long-running operation. This is protection, not a fault.
 
 ---
 

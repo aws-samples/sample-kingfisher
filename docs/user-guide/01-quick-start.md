@@ -66,7 +66,7 @@ The three context layers at the left of the top bar decide **what you see and wh
 
 - The "Execution scope" dropdown is grouped by region; each item shows the environment name, the "Home region" or 🌍 jurisdiction tag and the component count; a region that cannot take new work at the moment carries the "Not accepting work" tag (you can still select it to view data).
 - Once a region is selected, each list shows the notice "Other execution scopes have N more" and a "View all" button at the top, reminding you that other regions hold objects too; pages such as "Ask-Your-Data" **require** a selected region before they can be used.
-- Objects created from the "All" view land in the home region; the button restates the target, e.g. "New data source (in <region>)".
+- Objects created from the "All" view land in the home region; the button restates the target, e.g. "New data source (in \<region>)".
 
 ![Top-bar execution scope dropdown](../screenshots/scope-dropdown.webp)
 
@@ -74,7 +74,7 @@ The three context layers at the left of the top bar decide **what you see and wh
 
 Page: "Data Integration → Data Sources".
 
-1. Make sure the top-bar "Execution scope" has the home region selected. Click "New data source" (in a single-region view the button reads "New data source (in <region>)", and the hover tip says the secret, security group and Glue connection are all created in that region).
+1. Make sure the top-bar "Execution scope" has the home region selected. Click "New data source" (in a single-region view the button reads "New data source (in \<region>)", and the hover tip says the secret, security group and Glue connection are all created in that region).
 2. Wizard step 1 "Basic info":
    - "Data source name": enter `GameData-MySQL` (the placeholder reads "e.g. e-commerce business database").
    - "Database type": choose `MySQL` (other options: PostgreSQL · Oracle · SQL Server · Kinesis stream · MSK / Kafka · DynamoDB · S3 object storage).
@@ -169,7 +169,7 @@ Note:
 
 Page: "Smart Analytics → Ask-Your-Data".
 
-1. This page **must be anchored to an execution environment**: if the top-bar "Execution scope" is "All", the page says "This page requires an execution environment to be anchored first (pick one under 'Execution scope' in the top bar)". Once the sync's region is selected, the top of the page says "Asking in <region>: SQL runs on that region's data warehouse…".
+1. This page **must be anchored to an execution environment**: if the top-bar "Execution scope" is "All", the page says "This page requires an execution environment to be anchored first (pick one under 'Execution scope' in the top bar)". Once the sync's region is selected, the top of the page says "Asking in \<region>: SQL runs on that region's data warehouse…".
 2. Under "Data source:" choose "Data Lake (S3 Tables · Athena)" and pick `gamedata` under "Select namespace". (Choosing "Data Warehouse (Redshift)" queries that region's warehouse instead, with workgroup and database "Resolved automatically by execution target".)
 3. In the input box (placeholder "Ask a question or follow up, e.g. count customers by region; then ask "What about by category?" (Enter to send / Shift+Enter for newline)") type:
 

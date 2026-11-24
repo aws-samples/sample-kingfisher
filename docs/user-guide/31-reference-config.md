@@ -122,7 +122,7 @@ The wizard has five steps: "Source configuration" → "Select Tables & Mapping" 
 | Job type | Engine | "Glue PySpark Script Job" · "Redshift SQL Job" · "EMR Serverless (PySpark, standalone engine)" | New ETL Job |
 | Execution region (multi-select) | Execution environments the job is bound to; one run executes once in each region | Checkboxes; "Select all active regions (N)" | Edit script |
 | Business date | The `ds` of this run | `YYYY-MM-DD`, default today (UTC) | Edit script → run bar |
-| Run now | Submits a run; the button restates the target | "Run now · <region>" / "Run now (once in each of N regions)" | Edit script → run bar |
+| Run now | Submits a run; the button restates the target | "Run now · \<region>" / "Run now (once in each of N regions)" | Edit script → run bar |
 | Dry run | Redshift SQL only: validates with EXPLAIN without writing data | "Dry run" / "Dry run (N regions)" | Edit script → run bar |
 | Backfill | Runs day by day over a business date range | Dialog "Backfill (run day by day over a business date range)": "Start Date", "End date", ≤31 days → "Start backfill" | Edit script → run bar |
 | cron / Publish to MWAA schedule | Attaches the job to this region's scheduler | `cron: 0 * * * *`; "Publish to MWAA schedule" · "Take schedule offline" · "Trigger once" | Edit script → run bar |
@@ -177,7 +177,7 @@ The card shows the execution environment selected in the top-bar "Execution scop
 | Namespace ownership | Declares which namespaces this route owns; required on one of the two routes when both contain a namespace of the same name | Press Enter to add, multiple allowed; the table shows "Resolved from what exists" when empty | Registration form → Namespace ownership (optional, press Enter to add) |
 | Notes | Free text, up to 80 characters | Rows registered automatically by an upgrade read `auto-registered by upgrade` | Registration form → Notes (optional) |
 | Registered by / at | Who registered it and when | The platform table bucket shows "Created at deployment" | Route table |
-| Actions | "Edit" → dialog "Edit route <bucket>"; "Revoke" → popover confirmation | Changing the alias prompts "Changing the alias breaks scripts that reference the old alias. Change it anyway?"; revoking a route that is still referenced is rejected | Route table → Actions |
+| Actions | "Edit" → dialog "Edit route \<bucket>"; "Revoke" → popover confirmation | Changing the alias prompts "Changing the alias breaks scripts that reference the old alias. Change it anyway?"; revoking a route that is still referenced is rejected | Route table → Actions |
 
 Quick rules:
 

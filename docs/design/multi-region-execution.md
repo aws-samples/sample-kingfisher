@@ -585,7 +585,7 @@ The page header has three tiers: project space, environment, **execution scope**
 Six guard rails apply on every scoped page:
 
 1. Never lose things: in one-region view a notice says "other scopes have N more items" with a link to "all".
-2. Write buttons restate the target: "Run now - <region>", "Publish to 2 regions"; confirmations name every region.
+2. Write buttons restate the target: "Run now - \<region>", "Publish to 2 regions"; confirmations name every region.
 3. Instances point back to their definition: "from home definition X - v3".
 4. A single-target page in "all" view asks the user to choose; it never silently picks home.
 5. In "all" view a definition is one row that expands into per-region instances.

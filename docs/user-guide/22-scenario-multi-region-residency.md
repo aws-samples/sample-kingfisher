@@ -82,8 +82,8 @@ Page path: **System → Execution Environments**, click "New execution environme
 ### 3.1 Step 1 "Choose region + name"
 
 - "region" dropdown: the list comes from the account's actual state; each region is suffixed with "pre-authorized, usable right after the build" or "ops must release it once after the build". Choose `us-west-2`.
-  - Regions that already have an execution environment show "Already has an execution environment <targetId> (<status>)" and are **not selectable** (one region, one set).
-  - Regions blocked by organization policy show "Blocked by your organization's service control policy (SCP); cannot deploy here: <blocked action>" and are not selectable.
+  - Regions that already have an execution environment show "Already has an execution environment \<targetId> (\<status>)" and are **not selectable** (one region, one set).
+  - Regions blocked by organization policy show "Blocked by your organization's service control policy (SCP); cannot deploy here: \<blocked action>" and are not selectable.
   - Regions marked "Organization policy could not be verified" remain selectable; click "Refresh" next to the dropdown to check again first.
   - The line under the dropdown reads "N of them are pre-authorized by the control plane (usable right after the build); the others need ops to run the release command once after the build, then 'Probe'". Remember which kind your region is; it decides whether you need §4.2.
 - "Jurisdiction tag (jurisdiction)": keep `home` for the same jurisdiction; for a different jurisdiction enter a value that starts with a lowercase letter and contains only `a-z` / `0-9` / `-` (example `eu-sim`). The hint under the field reads "If this execution region is in a different jurisdiction from the home region, change the jurisdiction label".
@@ -107,7 +107,7 @@ Page path: **System → Execution Environments**, click "New execution environme
 
   > This platform assumes no legal liability related to cross-border data transfer or data compliance. You are responsible for constraining and controlling data compliance in accordance with the laws and regulations of your local government. By clicking [Agree and continue] you acknowledge and agree to the above.
 
-- Click "Start deployment". You should see the messages "Registered: <targetId>" and "Deployment triggered (buildId …)" in turn, and then the wizard turns into a progress view in place: "Environment <targetId> created; deployment in progress".
+- Click "Start deployment". You should see the messages "Registered: \<targetId>" and "Deployment triggered (buildId …)" in turn, and then the wizard turns into a progress view in place: "Environment \<targetId> created; deployment in progress".
   - If you chose a region flagged "ops must release it once after the build", one more yellow message appears here: "The control plane has not enabled this region yet: the deployment can finish, but Probe will fail until it is enabled". This is normal; §4.2 handles it.
   - Click "Done (you can keep following progress on the details page)" to close the wizard; the new card in the list shows the status "Deploying" and its component tags read "Pending deployment".
 
@@ -153,7 +153,7 @@ Page path: **System → Execution Environments**, click "New execution environme
 
 ### 4.5 "Execution scope" in the top bar: take a look at the new region
 
-- The third level of the top bar is "Execution scope" (Workspace → Environment → Execution scope). The first entry of the dropdown is "All (N regions)", followed by every execution environment grouped by region: name + "Home region" tag (home region only) + "🌍 <jurisdiction>" tag (cross-jurisdiction only) + component count; regions that cannot accept new work right now carry the "Not accepting work" tag but remain selectable.
+- The third level of the top bar is "Execution scope" (Workspace → Environment → Execution scope). The first entry of the dropdown is "All (N regions)", followed by every execution environment grouped by region: name + "Home region" tag (home region only) + "🌍 \<jurisdiction>" tag (cross-jurisdiction only) + component count; regions that cannot accept new work right now carry the "Not accepting work" tag but remain selectable.
 - The dropdown lists only installed execution environments (the hover tip reads "Switch the current execution scope (only installed execution environments are listed; switching stays on the current page)"), so `us-west-2`, which you just enabled with "Enable", should now appear in it. Switching stays on the current page and does not reload; the address bar gets `?scope=`, which survives a refresh.
 - In a region's view, list pages keep a line at the top "Other execution scopes have N more" + "View all", so you do not think things have disappeared.
 - Pages that follow the execution scope: home statistics, data sources, data sync, batch compute, ETL orchestration, Redshift query, Athena query, stream compute, data governance, data modeling, task monitor, backfill center, alerting center, FinOps, audit log, the resource cards in Settings, and so on.
@@ -176,7 +176,7 @@ Page path: **Data Development → Batch Compute**. First switch "Execution scope
   ```sql
   CREATE TABLE IF NOT EXISTS public.region_probe (at timestamp);
   INSERT INTO public.region_probe VALUES (getdate());
-  ```text
+  ```
 
 - Click "Save".
 
@@ -190,7 +190,7 @@ Page path: **Data Development → Batch Compute**. First switch "Execution scope
   - top bar in a region's view ⇒ only that region checked by default, with the hint "By default only the current execution scope (…) runs; checking other regions will not change the execution scope in the top bar.";
   - with both checked, the note at the bottom reads "These 2 runs are grouped into one linked run: view them as a group, cancel unfinished ones in one click, and retry only the failed regions."; the confirm button reads "Run now (once in each of 2 regions)".
 - **Cross-jurisdiction branch**: this is your first data operation on the `eu-sim` region, so the "Disclaimer" appears first (see §7); after you click "Agree and continue" the run continues automatically.
-- You should see the message "Submitted one run in each of 2 regions: tgt_home, tgt_usw2_a (business date …)". If a region did not start, an extra message says "N of these regions are not up: <region> (<reason>)".
+- You should see the message "Submitted one run in each of 2 regions: tgt_home, tgt_usw2_a (business date …)". If a region did not start, an extra message says "N of these regions are not up: \<region> (\<reason>)".
 - Redshift jobs can also "Dry run (2 regions)" first: only an EXPLAIN validation, no data is written.
 
 ### 5.3 "Run History": one row per region
@@ -238,7 +238,7 @@ Page path: **Data Development → Redshift Query**.
 - The result area is a set of tabs: the first is "⚖ Compare" (absent for single-region queries), followed by one sheet per region.
 - Each sheet's tab title carries its status: `us-east-1 ✓ 1 rows · 1s`, `us-west-2 ⏳ Running 12s`, `✗ Failed`, `⏱ Timed out`, "Cancelled". Cross-jurisdiction sheets additionally carry the "🌍 eu-sim" tag.
 - Regions return and display independently, without waiting for the slowest one; the first sheet to return is activated once automatically, and afterwards focus is not stolen again.
-- The top line of every sheet is "Target": region · workgroup · database · credential-mode tag; cross-jurisdiction sheets also carry "🌍 eu-sim" and "Audit #<ID>" (hover tip "Regional audit record ID for this query (the full record stays in that region; the central store keeps only a summary)"). Note this ID down; §8 needs it.
+- The top line of every sheet is "Target": region · workgroup · database · credential-mode tag; cross-jurisdiction sheets also carry "🌍 eu-sim" and "Audit #\<ID>" (hover tip "Regional audit record ID for this query (the full record stays in that region; the central store keeps only a summary)"). Note this ID down; §8 needs it.
 - When a region fails, its sheet shows "Execution failed in this region (other regions are unaffected)" + the engine's original message + the platform's classification advice + that region's target; the other sheets are unaffected.
 - When a region exceeds 5 minutes it shows "⏱ This region timed out (Ns) — it may still be running in the background", with "Keep waiting" and "Cancel this region"; cancelling only cancels that one region.
 
@@ -260,7 +260,7 @@ Page path: **Data Development → Redshift Query**.
 ## 7. First operation on a cross-jurisdiction region: the "Disclaimer" dialog (once per user per region)
 
 - Trigger: any user's **first** data operation on a cross-jurisdiction region — a query, running / dry-running a job, a modeling landing, reading SQL text kept in the region, GenBI questions and card refreshes.
-- The dialog title is "⚠️ Disclaimer (v1)", the first line reads "Execution target <targetId> belongs to another jurisdiction. Before your first data operation on it, please read and agree to the notice below (your choice is retained: user / target / version / time).", and the body is the text quoted in §3.3.
+- The dialog title is "⚠️ Disclaimer (v1)", the first line reads "Execution target \<targetId> belongs to another jurisdiction. Before your first data operation on it, please read and agree to the notice below (your choice is retained: user / target / version / time).", and the body is the text quoted in §3.3.
 - "Cancel": nothing is executed and nothing is recorded; the next operation shows the dialog again.
 - "Agree and continue": the platform records (user, target, text version, time) and then **automatically retries** the operation you just attempted. The same person sees it only once for the same region and the same text version; it reappears only when the text version changes.
 - Bypassing the page and calling the API directly does not work either: without a consent record the server always rejects, and the dialog is merely how that rejection is presented.
@@ -308,7 +308,7 @@ Page path: **Data Development → Redshift Query**.
 
 ### 8.3 The "Consents" card on the execution environment details page
 
-- **System → Execution Environments** → click the `us-west-2` card. The "Jurisdiction" row in the header shows the "🌍 eu-sim" tag and the small text "Consented v1 ✓" (hover: "<who> agreed to disclaimer v1 at registration on <time> (auditable; immutable)").
+- **System → Execution Environments** → click the `us-west-2` card. The "Jurisdiction" row in the header shows the "🌍 eu-sim" tag and the small text "Consented v1 ✓" (hover: "\<who> agreed to disclaimer v1 at registration on \<time> (auditable; immutable)").
 - The "Consents" card (cross-jurisdiction environments only) lists row by row: the admin "At registration", every user who consented "At first use", the time and the text-version tag. The table is append-only and cannot be edited or deleted; it is the single authority that "avoids disputes". When empty it shows "No consent records yet".
 
 <!-- Screenshot to be added: execution environment details · "Consents" card (with both "At registration" and "At first use" records) -->
@@ -322,11 +322,11 @@ The "Danger zone" at the bottom of the details page offers exactly one path, bas
 ### 9.1 An environment that was never installed: "Discard"
 
 - For an environment whose deployment failed and that created not a single resource in the target region, the danger zone shows "Discard this environment": "This environment was never installed (it has no resources in the target region). After discarding it shows as 'Deleted' and frees the execution-environment slot in us-west-2, so you can register again there."
-- Click "Discard this environment" → dialog "Confirm discarding <targetId>" → type the `targetId` → "Discard". The platform first checks live that the target region really has none of its stacks.
+- Click "Discard this environment" → dialog "Confirm discarding \<targetId>" → type the `targetId` → "Discard". The platform first checks live that the target region really has none of its stacks.
 
 ### 9.2 An environment that was deployed: four gates
 
-1. **1. Stop accepting work (drain)**: the danger zone reads "This environment was deployed: to delete it, first stop accepting work, then review the impact preview, type the region name to confirm, and get approval before it is destroyed (data buckets / table bucket / final snapshot are retained).". Click the button → dialog "Stop accepting work: <targetId>", enter the "Reason (required, recorded in the audit log)" → "Stop accepting work".
+1. **1. Stop accepting work (drain)**: the danger zone reads "This environment was deployed: to delete it, first stop accepting work, then review the impact preview, type the region name to confirm, and get approval before it is destroyed (data buckets / table bucket / final snapshot are retained).". Click the button → dialog "Stop accepting work: \<targetId>", enter the "Reason (required, recorded in the audit log)" → "Stop accepting work".
    - You should see "Stopped accepting work: new bindings / schedules / runs are all rejected"; the card status is "Draining"; the region immediately stops accepting new bindings, schedules and runs, in-flight jobs finish, and no resource is destroyed.
    - As observed in the demo environment: after confirming, the top of the details page shows "This execution environment has stopped accepting work (drained; intent=drain) — not accepting new bindings, schedules or runs (status=draining)", the card and list status are "Draining", "Current intent: draining — not accepting new work (in-flight jobs still run to completion)", and the former "Drain (stop accepting new work)" button becomes "Resume accepting new work".
    - If you change your mind, click "Resume accepting new work"; the dialog "Resume accepting new work? … the phase returns to 'Running' only after the next all-green probe" appears; after "Confirm" the intent immediately returns to accepting, but the status is still "Draining" (hint "Phase cannot accept new work (phase=draining)"); only after one more "Check initialization" with all probes green does it return to "Running / Accepting work".
@@ -336,7 +336,7 @@ The "Danger zone" at the bottom of the details page offers exactly one path, bas
    - Click "2. Request deletion" → dialog "Delete execution environment us-west-2 — impact preview" → "Next".
 3. **Type the region name to confirm**: the dialog "Confirm deletion us-west-2" reads: "This destroys all execution resources in the region. Data buckets / table bucket / final snapshot are retained and must be cleaned up separately; they are not deleted by this action.". Type `us-west-2` into the field (the button is enabled only when it matches the region name exactly) → "Confirm deletion".
    - You should see "Deletion request submitted; waiting for a platform admin to approve"; the danger zone shows "Deletion request submitted (approval …); waiting for a platform admin to approve".
-4. **Platform admin approval**: **System → Workspace** → the "Pending my approval (N)" card shows the red tag "Delete execution environment" + "Delete execution environment <targetId> (us-west-2)", replaying below it "Impact preview snapshot (<time>): bound resources 0 · enabled schedules 0 · running runs 0" and the "Retained (not deleted):" list.
+4. **Platform admin approval**: **System → Workspace** → the "Pending my approval (N)" card shows the red tag "Delete execution environment" + "Delete execution environment \<targetId> (us-west-2)", replaying below it "Impact preview snapshot (\<time>): bound resources 0 · enabled schedules 0 · running runs 0" and the "Retained (not deleted):" list.
    - Click "Approve" (or "Reject"). On approval the server recomputes the impact preview; if it differs from the one submitted with the request, the approval is refused and you must reject and request again.
    - You should see "Approved and executed"; if it shows "Approved, but destruction could not start: …", go back to the execution environment details page and see §9.3.
 
@@ -344,7 +344,7 @@ The "Danger zone" at the bottom of the details page offers exactly one path, bas
 
 ### 9.3 Destruction and wrap-up
 
-- The danger zone of the details page shows "Destroying": "Managed services go first, then component stacks in reverse dependency order, then core and base; build status: …". When finished it shows "Deleted", together with "Warehouse final snapshot: <name> (<state>)" and the retained list.
+- The danger zone of the details page shows "Destroying": "Managed services go first, then component stacks in reverse dependency order, then core and base; build status: …". When finished it shows "Deleted", together with "Warehouse final snapshot: \<name> (\<state>)" and the retained list.
 - When stuck it shows "Destruction is stuck" + the resource and reason by name; click "Retry destruction" (type the region name again): it reuses the same deletion plan and the same final snapshot name and does not take a second snapshot.
 - **Data resources are not deleted by the destruction and keep billing**: data buckets, table buckets, the warehouse namespace / workgroup and final snapshot, the data-domain CMK and its alias, the Airflow Serverless DAG bucket, and the regional audit table / result bucket of non-`home` jurisdictions. Clean them up separately after human confirmation (list in [the customer production deployment manual, section 7bis](../deployment.md)).
 - After the deletion, have operations run one more control-plane redeployment to withdraw the control plane's release of that region (manual section 7bis).

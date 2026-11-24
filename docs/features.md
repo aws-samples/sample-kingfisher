@@ -165,7 +165,7 @@ Jobs run immediately or on a cron schedule published to the region's scheduler; 
 - Lake table buckets: a job declares which S3 Tables buckets it reads and writes (default: every route of the region); the platform registers one Spark catalog per bucket, so scripts address tables as `alias.namespace.table` without a hand-written `--conf`, and the save-time preflight checks the chosen role against each declared bucket.
 - Run, rerun, backfill, run groups, logs and dependency view.
 - Job submission runs as a background task, so an EMR application cold start cannot time out the page.
-- The job detail names its execution region, and the run button repeats "run now in <region>".
+- The job detail names its execution region, and the run button repeats "run now in \<region>".
 - The Multi-Region Dashboard checks that job versions are consistent across regions.
 
 ![Batch job list](screenshots/etl-jobs.webp)

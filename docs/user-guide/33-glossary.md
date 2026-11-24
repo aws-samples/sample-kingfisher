@@ -122,8 +122,8 @@ Note: the "English term" column is the word that appears in the console's Englis
 
 | English term | One-line explanation | Where you see it |
 |---|---|---|
-| Long-running operation / running in background | An action that waits for an external system to reach a terminal state: returns synchronously if done within 45 seconds; otherwise moves to the background with "Running in background: <label> (n s elapsed)" at the bottom right, disappearing at the terminal state; 5-minute ceiling | Bottom-right notice |
-| Object lease | While a background execution runs, the object is "held": a second one on the same object, or an edit / delete ⇒ 409 ""<label>" is in progress (n s elapsed); wait for it to finish before acting" | 409 message |
+| Long-running operation / running in background | An action that waits for an external system to reach a terminal state: returns synchronously if done within 45 seconds; otherwise moves to the background with "Running in background: \<label> (n s elapsed)" at the bottom right, disappearing at the terminal state; 5-minute ceiling | Bottom-right notice |
+| Object lease | While a background execution runs, the object is "held": a second one on the same object, or an edit / delete ⇒ 409 ""\<label>" is in progress (n s elapsed); wait for it to finish before acting" | 409 message |
 
 ## 8. Smart analytics
 

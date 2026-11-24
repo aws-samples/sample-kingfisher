@@ -78,7 +78,7 @@ The full document map, the reading paths and how the guide works together with t
 
 ### 1.3 Execution-region data plane: one complete stack group per region
 
-![Execution-region data plane: the BgpExecEnv-<slug>-* stack group (base / core / redshift / dms / flink / airflow-serverless / residency-api) and the single cross-region channel that reports back to the home region](docs/diagrams/aws-execution-region.png)
+![Execution-region data plane: the BgpExecEnv-\<slug>-* stack group (base / core / redshift / dms / flink / airflow-serverless / residency-api) and the single cross-region channel that reports back to the home region](docs/diagrams/aws-execution-region.png)
 
 ### 1.4 How multi-region works
 

@@ -227,7 +227,7 @@ Listing a Bedrock model as active is not proof that it can be invoked; only the 
 
 ```bash
 BGP_DEPLOY_MODE=production ./scripts/deploy-all.sh <profile> <home-region>
-```text
+```
 
 - 🔴 **Both positional arguments must be written**: when omitted they silently fall back to defaults (profile `temp-account` / region `us-east-1`).
   When the home region is not us-east-1 the script prints one English WARNING line saying "only us-east-1 is tested" — that is an old notice and **can be ignored**
@@ -332,7 +332,7 @@ BGP_DEPLOY_MODE=production ./scripts/redeploy-platform.sh <profile> <home-region
 
 ```bash
 ./scripts/02-postdeploy-truth.sh <profile> <home-region>
-```text
+```
 
 - 10 truth queries (all stacks green / ECS running == desired / entry point reachable / unauthenticated 401 / can log in and carries the bgp-admin group / key table / AI wiring / execution-environment deployment mechanism /
   registry home already active / S3 Tables federated catalog `s3tablescatalog` opened (since the federated-catalog fix; the script of `release-2026-10-13` has 9 items)); only all ✅ counts as in place;
@@ -471,7 +471,7 @@ Two paths; the detail page offers only the one that matches the environment's ac
    ```bash
    ./scripts/redeploy-agents.sh <profile> <home-region> --check   # read-only: the image tag each agent's live Runtime is using vs the local HEAD, and whether the agent sources differ between the two ⇒ whether a refresh is needed
    ./scripts/redeploy-agents.sh <profile> <home-region>           # recompile core-dist → build and push the three ARM64 images (tag = git short hash) → deploy the agent stacks one by one → read the Runtime image tags back to verify
-   ```text
+   ```
 
    🔴 Both positional arguments must be written (the script provides no silent defaults; a missing argument stops it, and a leading `--flag` in place of the profile is refused); the deployment machine needs Docker + buildx;
    the script **exists only in the new tag** (`release-2026-10-13` does not have it) — when upgrading from that tag, `git checkout <new-tag>` first, then run it.
@@ -518,8 +518,8 @@ The platform ECS service rolls with minimum healthy percent 100, so pages stay a
 |---|---|---|---|
 | 1 | New DynamoDB table **`bgp-long-ops`** (long-running-operation tasks + object leases; TTL 7 days), created by step 2c′ of `redeploy-platform.sh` together with the database stack | The upgrade script must be the version that deploys the database stack (this version includes it); without this table, landing / altering tables / AI calls all fail with 500 | After the upgrade `aws --profile <p> --region <home-region> dynamodb describe-table --table-name bgp-long-ops` should be ACTIVE (`02-postdeploy-truth.sh` checks it too) |
 | 2 | The `bgp-ai-tasks` table, which existed only in a pre-release version (the AI long-call fix), is removed from the stack (RETAIN) | **Customer production never had it** (it appeared only after `release-2026-10-13`), no impact; a test environment that installed the pre-release version keeps an empty shell table, which can be deleted by hand as needed | None |
-| 3 | Container environment variables: the five `AI_*` removed, `LONG_OPS_SYNC_WAIT_MS` added (default 45000; **in production do not** change it with `-c long-ops-sync-wait-ms`, see the section 7 red lines) | Any operation longer than 45 seconds (landing / table creation while the warehouse cold-starts, AI calls to a reasoning model) no longer ends in a page 504; instead the bottom right shows "Running in background: <operation> (n s elapsed)" and the result appears unchanged when done | None |
-| 4 | Object leases: while a long-running operation on an object is in progress, landing / editing / deleting the same object is blocked with 409 "'<operation>' is in progress (n s elapsed), please wait for it to finish" | The behavior changes only in the single case "pressing again before the long-running operation has ended"; wait for it to finish, then operate | None |
+| 3 | Container environment variables: the five `AI_*` removed, `LONG_OPS_SYNC_WAIT_MS` added (default 45000; **in production do not** change it with `-c long-ops-sync-wait-ms`, see the section 7 red lines) | Any operation longer than 45 seconds (landing / table creation while the warehouse cold-starts, AI calls to a reasoning model) no longer ends in a page 504; instead the bottom right shows "Running in background: \<operation> (n s elapsed)" and the result appears unchanged when done | None |
+| 4 | Object leases: while a long-running operation on an object is in progress, landing / editing / deleting the same object is blocked with 409 "'\<operation>' is in progress (n s elapsed), please wait for it to finish" | The behavior changes only in the single case "pressing again before the long-running operation has ended"; wait for it to finish, then operate | None |
 | 5 | **A second batch of 14 operations joins the same framework** (merged on the development branch 2026-10-23): governance "Sync column information" (its dedicated 200 / 202 protocol retired) · delete workspace (its "waking up the warehouse" protocol retired) · sync wizard "Generate DDL" / "Execute table creation" · stream compute job start / stop / delete · ETL orchestration publish / take offline / trigger / delete · S3 data source "create Athena external table" (API) · metrics and model metrics "Compute" | Page behavior is unchanged (results still arrive synchronously within 45 seconds); only beyond 45 seconds does it switch to "Running in background" at the bottom right; editing / deleting the same object (workspace / stream job / orchestration / data source) while its long-running operation is in progress is likewise blocked with 409; "enable/disable schedule" on the monitor page is blocked with 409 while an orchestration publish / take-offline / delete is in progress | None |
 
 ### 7ter.1e Two things to know when upgrading to the version with "page-driven acceptance, second pass (network advisor probes by the region of the place)" (`release-2026-10-27`)
@@ -863,7 +863,7 @@ Measured in two test environments: first start in an execution region until the 
 
   ```bash
   aws glue create-catalog --profile <profile> --region <region> --name s3tablescatalog --catalog-input '{"Description":"Federated catalog for S3 Tables","FederatedCatalog":{"Identifier":"arn:aws:s3tables:<region>:<account-id>:bucket/*","ConnectionName":"aws:s3tables"},"CreateDatabaseDefaultPermissions":[{"Principal":{"DataLakePrincipalIdentifier":"IAM_ALLOWED_PRINCIPALS"},"Permissions":["ALL"]}],"CreateTableDefaultPermissions":[{"Principal":{"DataLakePrincipalIdentifier":"IAM_ALLOWED_PRINCIPALS"},"Permissions":["ALL"]}]}'
-  ```text
+  ```
 
   Or start any sync task with S3 Tables as its target once; the criterion is that `aws glue get-catalog --profile <profile> --region <region> --catalog-id s3tablescatalog` returns `FederatedCatalog.ConnectionName = aws:s3tables`.
 - **Right after creating a data source its status cell shows "Connected (N ms)", which only means the Glue connection is in place, not that the source database is reachable** (**fixed from `release-2026-10-27`; the previous tag still has it**:

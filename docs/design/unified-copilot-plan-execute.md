@@ -261,7 +261,7 @@ registerStepHandler(syncGlueHandler)   // stepType="sync-glue"
 registerStepHandler(redshiftSqlHandler)
 registerStepHandler(emrHandler)
 ...
-```text
+```
 
 ### 6.1 Step type → real API mapping (all verified to exist)
 
@@ -283,7 +283,7 @@ registerStepHandler(emrHandler)
 
 **StepStatus**: `awaiting-confirmation | confirmed | blocked | pending | running | succeeded | failed | skipped`
 
-```
+```text
                  ┌─ produced by the planner ─┐
                  ▼                           │
 blocked ──(all upstream succeeded)──> awaiting-confirmation   ← [core addition: backfill has no such state]
@@ -297,7 +297,7 @@ blocked ──(all upstream succeeded)──> awaiting-confirmation   ← [core 
                                                                                     │(reconcile reads the terminal state / timeout)
                                                                                     ▼
                                                                            succeeded / failed
-```text
+```
 
 **Key gating**: the claim phase of the tick gains one check — **only steps with `status=confirmed` are allowed to go
 `claim→running`**; a step in `awaiting-confirmation` is **not advanced automatically** even when its dependencies are satisfied. This is the iron rule "the AI never executes on its own"
@@ -328,7 +328,7 @@ landed at the state-machine layer. After resolveBlocked unlocks a step, it lands
 
 ## 9. Directory structure (single self-contained directory, following the global self-install architecture)
 
-```
+```text
 platform/package.json             // + dependency @strands-agents/sdk (Node≥20, Apache-2.0)
 platform/src/lib/copilot/
   plan/

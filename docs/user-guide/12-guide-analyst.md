@@ -53,7 +53,7 @@ The Ask-Your-Data page **must be anchored to one execution environment**. While 
 - "This page requires an execution environment to be anchored first (pick one under 'Execution scope' in the top bar); N available now"
 
 Select an execution environment in the "Execution scope" dropdown in the top bar (the home region entry carries the "Home region" tag; entries marked "Not accepting work" cannot take new work right now); a blue hint bar then appears on the page:
-"Asking in <region>: SQL runs on that region's data warehouse (Ask-Your-Data uses the same AgentCore; conversation memory and skills are shared across regions). Answers and data come from real queries in that region."
+"Asking in \<region>: SQL runs on that region's data warehouse (Ask-Your-Data uses the same AgentCore; conversation memory and skills are shared across regions). Answers and data come from real queries in that region."
 
 ![Execution scope dropdown in the top bar](../screenshots/scope-dropdown.webp)
 
@@ -69,7 +69,7 @@ Key points:
 | Option | Description | Selectors beside it |
 |---|---|---|
 | "Data Warehouse (Redshift)" | Ask about tables in that region's Redshift Serverless | Workgroup (default "Resolved automatically by execution target") · Database (default `dev`) · "Refresh" |
-| "Data Lake (S3 Tables · Athena)" | Ask about Iceberg tables in that region's S3 Tables table bucket | "Federated catalog <catalog name> (Iceberg)" tag · "Namespace:" dropdown · "Refresh" |
+| "Data Lake (S3 Tables · Athena)" | Ask about Iceberg tables in that region's S3 Tables table bucket | "Federated catalog \<catalog name> (Iceberg)" tag · "Namespace:" dropdown · "Refresh" |
 
 Key points:
 
@@ -98,9 +98,9 @@ Each turn's answer is an "Assistant" card, from top to bottom:
 | Block | What to look at | Key points |
 |---|---|---|
 | Conclusion | A natural-language conclusion | All numbers come from real queries, not made up by the model |
-| "Model used: <model id> · Backend <backend>" | The model actually used in this turn | If an admin switched the global model you see it here immediately; "degraded to fallback" means a candidate model was used |
-| "This SQL actually ran in: <region>" | Which region the SQL really ran in | If it differs from the current view a red warning appears: "This SQL actually ran in <A>, not the current view <B> — this answer is NOT that region's data" |
-| Masking note | "Some sensitive fields are masked per data classification: <columns> (for plaintext, use 'Request Access' in Data Governance)" | Classification lives on the physical column; aliased and expression columns are masked all the same; see §1.9 |
+| "Model used: \<model id> · Backend \<backend>" | The model actually used in this turn | If an admin switched the global model you see it here immediately; "degraded to fallback" means a candidate model was used |
+| "This SQL actually ran in: \<region>" | Which region the SQL really ran in | If it differs from the current view a red warning appears: "This SQL actually ran in <A>, not the current view <B> — this answer is NOT that region's data" |
+| Masking note | "Some sensitive fields are masked per data classification: \<columns> (for plaintext, use 'Request Access' in Data Governance)" | Classification lives on the physical column; aliased and expression columns are masked all the same; see §1.9 |
 | "Matched tables:" | The tables retrieved this turn and why | Those tagged "Finalized" are tables consolidated through request delivery and are preferred |
 | "Applied N business definition(s) (results follow these definitions):" | The entries that were referenced (tags read "type · name"; "Modeling metric · metric name (table)" is a metric definition from "Data Modeling → Metric system") | Not shown = your definition was not referenced; go back to §2 and check the wording |
 | Data area | A single value shows as a large metric; multiple rows show as a table or chart | "Display mode:" can switch between "Auto", "Table", "Bar chart", "Line chart"; tables paginate and show "N rows" |
@@ -120,7 +120,7 @@ Each turn's answer is an "Assistant" card, from top to bottom:
 1. Click "Save conversation" on any turn; the "Save conversation as card" dialog opens.
 2. Fill in "Title" (required, at most 80 characters, defaulting to the first 40 characters of the first question).
 3. The dialog explains: "Will save: all N turns of this conversation (question / conclusion / SQL / data / chart / matched tables / definitions / masked columns / reasoning)."
-4. Note the blue hint: "The conversation body and title are stored only in <region> (execution environment <id>) and never leave that region." — the card content stays in that region under the data residency rules.
+4. Note the blue hint: "The conversation body and title are stored only in \<region> (execution environment \<id>) and never leave that region." — the card content stays in that region under the data residency rules.
 5. Click "Save". On success the toast "Saved as card" appears; saving the same conversation again gives "Card updated" and does not use more quota.
 
 Key points:
@@ -136,7 +136,7 @@ Click "My cards u/l" at the top right to open the drawer; one row per card, with
 |---|---|---|
 | "Open and continue" | Lays the whole conversation back onto the page and restores the context | Success toast "Conversation context restored (N turns); you can keep asking" |
 | "Refresh now" | Re-runs the SQL stored in the card in the card's region, without calling the LLM | Toast "Refreshed: N rows (same card; a run snapshot was kept)"; does not use quota |
-| "Scheduled refresh" | Dialog "Schedule refresh for this card": enter a cron (default 08:00 daily) and toggle "Enable scheduled refresh" | The carrier is published to the scheduler of the card's region; a green "Schedule <cron>" tag appears on the row; "Carrier not published" means it has not been published yet |
+| "Scheduled refresh" | Dialog "Schedule refresh for this card": enter a cron (default 08:00 daily) and toggle "Enable scheduled refresh" | The carrier is published to the scheduler of the card's region; a green "Schedule \<cron>" tag appears on the row; "Carrier not published" means it has not been published yet |
 | "History" | Dialog "Refresh history": start time / trigger mode (Auto · Manual) / status / rows / error | Both manual and scheduled refreshes are here |
 | "Delete" | Confirm "Delete this card?" | The body is cleaned up from its region as well, and the quota is released immediately |
 
@@ -146,10 +146,10 @@ The top of the drawer also has:
 - "N in the current execution scope; you have M more in other scopes" + "Show all scopes (M)"; once expanded, the hint "Showing all N of your cards (across all execution scopes); the execution scope in the top bar has not changed" appears, and you can click "Current scope only" to collapse.
 - "The titles of N cards cannot be read right now (titles and bodies live in their own regions) — the cards themselves still exist; retry or open them directly".
 
-**Opening a card that belongs to another region** shows a two-way dialog "This card belongs to <id> (<region>)":
+**Opening a card that belongs to another region** shows a two-way dialog "This card belongs to \<id> (\<region>)":
 
 - "View read-only": the conversation is laid out but the input box is disabled, with the hint "Read-only: this card belongs to …; switch the execution scope there to continue the conversation.", and "Switch region and continue" beside it.
-- "Switch to <region> and continue the conversation": the execution scope in the top bar switches only when you click it; the platform never switches silently.
+- "Switch to \<region> and continue the conversation": the execution scope in the top bar switches only when you click it; the platform never switches silently.
 - When that region cannot take work right now, only "View read-only" is offered, with the reason and a "Go to Execution Environments to resolve" entry.
 
 ### 1.8 "Raise as request"
@@ -304,7 +304,7 @@ List columns: Title · Priority · Status · Requested by · Assign to · Update
 - "Actions": depending on the current status and your role, "Submit", "Assign developer", "Reject", "Start development", "Submit Delivery", "Return for revision", "Accepted", "Cancel", "Reopen" and so on appear; reject / return / cancel / reopen ask you to fill in "Note / reason (optional)".
 - "Basic info": priority, requester, assignee, description, business value, acceptance criteria.
 - "Source insights (Ask-Your-Data)": the original question and SQL snapshot.
-- "Development implementation (<engine>)" (e.g. "Development implementation (Redshift SQL)"): the code and explanation the developer generated with "Generate implementation with LLM"; once the job is built it shows "Job created →".
+- "Development implementation (\<engine>)" (e.g. "Development implementation (Redshift SQL)"): the code and explanation the developer generated with "Generate implementation with LLM"; once the job is built it shows "Job created →".
 - "Activity timeline": every action, status change and comment; at the bottom the input box "Add comment...", then click "Comment".
 
 An analyst's daily routine is simply: raise the request → watch the status under "Submitted by me" → add definitions via comments → check the result when the status reaches "Pending acceptance" → the manager marks it "Accepted". Generating the implementation and building the job are the developer's work.
@@ -322,9 +322,9 @@ Both pages are in the "Data Development" group and need the `bgp-developer` or h
 - Page: "Data Development → Redshift Query"
 - Steps: pick regions in "Execution regions (multi-select)" (or "Select all active regions (N)") → optionally click "Load Schema" to browse "Database object" → write SQL in the "SQL Editor" (optionally from "SQL Template") → "Execute"; with several regions the button reads "Run (N regions)" and the results have one sheet per region.
 - Read-only rule: a non-SELECT / WITH statement submitted by a non-platform-admin is rejected with the literal message:
-  "Warehouse direct query for non-platform-admins only allows read-only queries (a single SELECT / WITH): <reason>. For write operations / DDL contact a platform admin, or submit through job development".
+  "Warehouse direct query for non-platform-admins only allows read-only queries (a single SELECT / WITH): \<reason>. For write operations / DDL contact a platform admin, or submit through job development".
   The CREATE TABLE AS / MERGE / UNLOAD entries in "SQL Template" can only be run by admins.
-- Masked columns in the result are shown in the sheet header as "Masked columns: <column>".
+- Masked columns in the result are shown in the sheet header as "Masked columns: \<column>".
 - "Saved N tasks": fill in "Task name" and click "Save" to store the SQL as a task; "Execution history (N)" lets you look back and "Load".
 - The first query against a region in another jurisdiction pops up the disclaimer (once per person per region); the "Audit #" in the sheet header is the regional audit record id of that query.
 
@@ -333,9 +333,9 @@ Both pages are in the "Data Development" group and need the `bgp-developer` or h
 ### 6.2 Athena Query (data-lake query)
 
 - Page: "Data Development → Athena Query", page title "Athena Query (S3 Tables / Iceberg)".
-- Hint bar: "Query the current execution target's S3 Tables table bucket (Iceberg) via Amazon Athena. Strictly read-only, results are not persisted. Federated catalog: <catalog>".
+- Hint bar: "Query the current execution target's S3 Tables table bucket (Iceberg) via Amazon Athena. Strictly read-only, results are not persisted. Federated catalog: \<catalog>".
 - The "S3 Tables Table" list on the left is grouped by namespace, with "Refresh tables" at the top right; clicking a table name brings up a query. Write SQL and click "Execute"; while running you can "Cancel".
-- Above the result it shows "Scanned <size>", "Duration <seconds>", "N rows returned"; the result table paginates and shows "N rows".
+- Above the result it shows "Scanned \<size>", "Duration \<seconds>", "N rows returned"; the result table paginates and shows "N rows".
 - Only a single read-only statement is allowed (SELECT / WITH / SHOW / DESCRIBE / EXPLAIN); the platform limits the number of returned rows to prevent full-table scans.
 - Your own table buckets registered as routes appear in the table tree on the left (the platform bucket first, then external buckets in registration order); the tree takes the route table of the execution environment the execution scope resolves to. You can also skip the tree and query directly with the three-part name `<alias>.<namespace>.<table>`.
 
@@ -390,7 +390,7 @@ Key points:
 | The result contains `***` / `sha256:…` with the note "Some sensitive fields are masked per data classification: …" | The column is classified and you are not authorized | Under "Data Governance → Data Classification" click "Request access to this table"; ask again after approval |
 | Red text "This SQL actually ran in <A>, not the current view <B>" | The target reported by the execution layer differs from the view | Do not trust this answer; switch the execution scope and ask again, and report it to an admin |
 | "Save conversation" is rejected and shows Used 100/100 | Card quota is full; the platform does not evict automatically | Delete unused cards in "My cards" |
-| Opening a card shows "This card's content is no longer in <region> — you can delete it to free up quota" | The region holding the body has been cleaned up or retired | Delete this card |
+| Opening a card shows "This card's content is no longer in \<region> — you can delete it to free up quota" | The region holding the body has been cleaned up or retired | Delete this card |
 | "Applied N business definition(s)" does not appear | The definition name does not match how you asked, or the entry belongs to another project | Rename / make the content name the table and columns; check the workspace in the top bar |
 | Redshift Query reports "Warehouse direct query for non-platform-admins only allows read-only queries…" | You are not a platform admin and the statement contains a write operation | Change it to SELECT / WITH; leave write operations to jobs or an admin |
 | A report card shows "Data service retired" | The legacy data source has been stopped | Rebuild that visual with "Visual builder" or "Free SQL" |

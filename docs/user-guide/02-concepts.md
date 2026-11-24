@@ -105,7 +105,7 @@ It is deliberately not called Region: what you select is an execution environmen
 
 - Switching the execution scope **does not reload and does not leave the current page** (unlike "Workspace" and "Environment").
 - The scope only filters **reads**; **writes do not read the execution scope**; the execution environment comes only from the region you explicitly chose in the form or from the object's own binding (see the next section, "Target").
-- An invalid value in the address ⇒ 400 "Invalid execution scope ?scope= value… valid forms: global / <targetId> / cmp:<t1>,<t2>[,<t3>,<t4>]"; the page shows "Invalid execution scope value in the URL: …".
+- An invalid value in the address ⇒ 400 "Invalid execution scope ?scope= value… valid forms: global / \<targetId> / cmp:\<t1>,\<t2>[,\<t3>,\<t4>]"; the page shows "Invalid execution scope value in the URL: …".
 - The referenced region does not exist, has been deleted or has not finished initializing ⇒ 404 "The execution environment … referenced by the execution scope does not exist, has been deleted, or has not finished initializing — select the execution scope again (it will not switch back to the home region automatically)".
 - This project is not authorized for that region ⇒ 403. The page shows the uniform hint "It may have been deleted, not finished initializing, be going offline, or this project is not authorized for it. This will not switch to another region automatically."
 - **Never a silent fallback**: it never quietly switches to the home region, nor quietly to "All" — the former would amount to data leaving the country across jurisdictions, and the latter would make you think you are looking at one region when you are looking at all of them.
@@ -120,7 +120,7 @@ It is deliberately not called Region: what you select is an execution environmen
 
 **Where you see it on the pages**
 
-- The create button restates the target: "New data source (in <region>)"; the tooltip reads "This data source will be created in <region>: its secret, security group and Glue connection all live in that region, and sync tasks derived from it run there too".
+- The create button restates the target: "New data source (in \<region>)"; the tooltip reads "This data source will be created in \<region>: its secret, security group and Glue connection all live in that region, and sync tasks derived from it run there too".
 - The note at the top of the "Data Sync" page: "Sync tasks follow the data source's execution environment: create a data source in the current region, then create tasks that run in place (source and task must be in the same region; cross-region data pulls are prohibited by design)".
 - "Execution regions (multi-select)" and "Select all active regions" in the "Batch Compute" job editor; "Run now (once in each of N regions)"; one entry per region in "Run History".
 - "Execution regions (multi-select)" in "Redshift Query"; multi-region results have one sheet per region.
@@ -200,7 +200,7 @@ wait 45 seconds in-process first; if it finishes, return synchronously like an o
 
 **Where you see it on the pages**
 
-- The hint "Running in background: <label> (n s elapsed)" at the bottom right of the page, updated every two seconds, disappearing automatically at the final state; several concurrent long-running operations get one hint each.
+- The hint "Running in background: \<label> (n s elapsed)" at the bottom right of the page, updated every two seconds, disappearing automatically at the final state; several concurrent long-running operations get one hint each.
   Common labels: "New data source", "Publish workflow", "Land code table to execution target", "Sync column information to the data catalog", "Generate DDL and probe target table", "Run engine job", "Delete workspace", "Copilot chat".
 - When it finishes, the page's **original success toast and list refresh happen as usual**; failures keep the original wording and status code.
 
@@ -218,7 +218,7 @@ wait 45 seconds in-process first; if it finishes, return synchronously like an o
 
 **Where you see it on the pages**
 
-- The literal 409 message: "'<label>' is in progress (n s elapsed); wait for it to finish before trying again".
+- The literal 409 message: "'\<label>' is in progress (n s elapsed); wait for it to finish before trying again".
 - Similar guards: deleting a data source still referenced by sync / streaming tasks ⇒ 409 listing each referencing task; deleting a batch job with in-flight runs ⇒ 409 listing each runId; deleting a job referenced by a workflow ⇒ 409; deleting a modeling definition with landed artifacts ⇒ 409, requiring cleanup or explicit retention first.
 
 **Rules that bite**
@@ -264,11 +264,11 @@ Job scripts read and write across buckets with the three-part name `<alias>.<nam
 | "Can't see what you just published? Switch here to the target environment first." | It was published to another environment | Section 2 |
 | Hint "Other execution scopes have N more" + button "View all" | Other regions have objects; you are only looking at one region | Section 4 |
 | "This page requires an execution environment to be anchored first" | This page needs one region selected | Section 4 |
-| "New data source (in <region>)" | The target for new objects = the currently selected region | Section 5 |
+| "New data source (in \<region>)" | The target for new objects = the currently selected region | Section 5 |
 | "⚠️ Disclaimer (v1)" | First data operation on a region in another jurisdiction | Section 6 |
 | "Operations analyst accounts may only use Ask-Your-Data and submit requests" | The account is only in the `bgp-analyst` group | Section 7 |
-| "Running in background: <label> (n s elapsed)" | The operation exceeded 45 seconds and moved to the background; do not click again | Section 8 |
-| "'<label>' is in progress (n s elapsed); wait for it to finish before trying again" | A long-running operation on the same object has not finished | Section 9 |
+| "Running in background: \<label> (n s elapsed)" | The operation exceeded 45 seconds and moved to the background; do not click again | Section 8 |
+| "'\<label>' is in progress (n s elapsed); wait for it to finish before trying again" | A long-running operation on the same object has not finished | Section 9 |
 | "Not registered" / "Register →" | The table bucket is not yet a writable route of that region | Section 10 |
 
 ## Further reading

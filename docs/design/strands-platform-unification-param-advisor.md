@@ -78,7 +78,7 @@ export async function runAdvisorAgent(input, spec) {
   //   spec.captureSuffix       —— 权威结果工具名后缀(param:"recommend_parameters" / net:"analyze_connectivity")
   //   spec.finalize(reasoning, lastX, steps, usage) —— 唯一真差异:组装各自 wire 结构
 }
-```text
+```
 
 - The paramadvisor container `agent.js` → slims down to:
   ```js

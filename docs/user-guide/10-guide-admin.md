@@ -21,7 +21,7 @@ The ❓ "How to use this page" at the top right of every page and "Walk me throu
 | Create workspaces / add members / approve requests | System → Workspace | "New workspace" "Members / Approvals" "Approve" "Reject" | When a new team onboards; glance at pending approvals daily |
 | Add / enable / retire execution regions | System → Execution Environments | "New execution environment" "Check initialization" "Enable" "Authorized projects" | When the business expands into a new region |
 | Change the AI model / check wiring health | System → Settings | "Change global default" "Test this model" "Refresh status" | When the model is unavailable or you switch vendor |
-| Register customer-owned table buckets as routes | System → Settings → "Lake table buckets and routes" | "Register to <execution environment>" "Edit" "Revoke" | When the business wants to use its own S3 Tables buckets |
+| Register customer-owned table buckets as routes | System → Settings → "Lake table buckets and routes" | "Register to \<execution environment>" "Edit" "Revoke" | When the business wants to use its own S3 Tables buckets |
 | Look up who did what | System → Audit Log | Search box, "Filter by action type" | Weekly check; when something goes wrong |
 | Create notification channels | Scheduling & Ops → Alerting Center → "Notification Channels" | "New Channel" "Send test" | Once at go-live; when a group bot changes |
 
@@ -55,7 +55,7 @@ From left to right the top bar has three switches that affect "what you can see"
 Open "System → Settings" and look at three blocks from top to bottom:
 
 - The "Service status" card: User authentication / Metadata store / Data Warehouse / Data Lake storage each show "Normal" or the raw error (such as an HTTP status code); when "User authentication" is normal it shows "N users"; click "Refresh status" to re-check.
-- The "AI model" card: shows the "Effective model" and its "Source" ("Factory default (ai-model.json)" / "Deploy env (BEDROCK_MODEL_ID)" / "Runtime config") and the "Latest probe" result. On first go-live it usually shows "Not customized: using <factory default>".
+- The "AI model" card: shows the "Effective model" and its "Source" ("Factory default (ai-model.json)" / "Deploy env (BEDROCK_MODEL_ID)" / "Runtime config") and the "Latest probe" result. On first go-live it usually shows "Not customized: using \<factory default>".
 - The "Platform version" card: "Release tag" "Product commit" "Committed at" "VERSION file"; this is the same fact as the sign-in page footer, use it to reconcile before and after an upgrade.
 
 ![Settings](../screenshots/settings-full.webp)
@@ -103,7 +103,7 @@ Key points:
 
 ### 2.4 Reset a password
 
-1. Click "Reset password" in the list row; the dialog title is "Reset password for <username>".
+1. Click "Reset password" in the list row; the dialog title is "Reset password for \<username>".
 2. Fill in "New password" "Confirm new password" and click "Reset".
 3. Hint text: "At least 12 characters with upper-case, lower-case, digit and symbol. Takes effect immediately; the user signs in with it next time".
 4. The audit log records one `user.password.reset` entry (who reset whose password), never the password itself.
@@ -139,7 +139,7 @@ A user with the Developer platform role has only developer permissions even when
 
 ### 3.3 Add members and set roles
 
-1. Click "Members / Approvals" in the project row to open the "Members & Approvals · <project name>" drawer.
+1. Click "Members / Approvals" in the project row to open the "Members & Approvals · \<project name>" drawer.
 2. In the form under the "Members" table enter the "Cognito Username" (the username from the Users page), choose a role, click "Add / Update".
 3. Look for "Members updated". Adding the same user again changes their role.
 4. To remove a member, click "Remove" in that row → confirm "Remove this member?".
@@ -162,7 +162,7 @@ Recommended go-live agreement: open only one project and grant editor only to tr
 ### 3.5 Handling requests: two entry points
 
 - The "Pending my approval (N)" card at the top of the page: aggregates the pending items of every project you can decide on, each row with a type tag — "Join group" "Promote" "Data access" "DDL" "Delete execution environment" (the last one is visible to platform administrators only). Click "Approve" or "Reject" in the row.
-- "Pending approval (access/role requests)" at the bottom of the project drawer: only this project's requests, with columns "Requester" and "Request" (such as "Request to join project (role editor)" "Promote <name> → prod").
+- "Pending approval (access/role requests)" at the bottom of the project drawer: only this project's requests, with columns "Requester" and "Request" (such as "Request to join project (role editor)" "Promote \<name> → prod").
 
 Key points:
 
@@ -173,7 +173,7 @@ Key points:
 
 ### 3.6 Switch the current workspace
 
-Click "Switch to this" in the project row; after the toast Switched to "<project name>" the page refreshes; the top-bar "Workspace" selector switches directly as well.
+Click "Switch to this" in the project row; after the toast Switched to "\<project name>" the page refreshes; the top-bar "Workspace" selector switches directly as well.
 
 ### 3.7 Delete a workspace
 
@@ -214,7 +214,7 @@ Click "New execution environment"; the wizard goes "Choose region + name" → "C
 
 Step 1 "Choose region + name":
 
-- The "region" dropdown lists only the regions enabled in this account; the header shows "N regions enabled in this account · queried at <time>". A region that already has an execution environment is tagged "Already has an execution environment" and cannot be selected.
+- The "region" dropdown lists only the regions enabled in this account; the header shows "N regions enabled in this account · queried at \<time>". A region that already has an execution environment is tagged "Already has an execution environment" and cannot be selected.
 - Regions blocked by organization policy are listed but not selectable, with the note "Blocked by your organization's service control policy (SCP); cannot deploy here". A region tagged "Organization policy could not be verified" can be re-checked with "Refresh".
 - Each region also shows its release status: "pre-authorized, usable right after the build" or "ops must release it once after the build"; the header sums it up as "N of them are pre-authorized by the control plane (usable right after the build); the others need ops to run the release command once after the build, then 'Probe'".
 - "Jurisdiction tag (jurisdiction)" defaults to `home`. When the execution region is not in the same jurisdiction as the home region it must be changed to another value (such as `eu-sim`). Format: starts with a lower-case letter, only a-z / 0-9 / -, 2–32 characters. The platform does not derive it from the region, it cannot be changed after registration, and no legal judgement is made.
@@ -225,14 +225,14 @@ Step 2 "Components (full set)": the component list is read-only and every item i
 Step 3 "Confirm and deploy":
 
 - A non-home jurisdiction requires ticking the "I have read and agree" disclaimer (the text carries a version number); without it "Start deployment" is disabled. The consent record (who / when / which version) is kept in the "Consents" card on that environment's details page and cannot be changed.
-- Click "Start deployment". Look for "Environment <id> created; deployment in progress" and "Deployment triggered (buildId …)". Click "Done (you can keep following progress on the details page)" to close the wizard.
+- Click "Start deployment". Look for "Environment \<id> created; deployment in progress" and "Deployment triggered (buildId …)". Click "Done (you can keep following progress on the details page)" to close the wizard.
 - If it shows "Registered, but triggering the deployment failed: … (you can retry on the details page)", click "Trigger deployment" on the details page.
 
 ### 4.3 Wait for the deployment and release the region if needed
 
 - The "Deployment progress" card on the details page shows the build status and per-stack details live; click "View build log (tail)". Measured on the demo environment at about 11 minutes (6 stacks in the same jurisdiction; the three demo accounts took 10.9 / 11.2 / 10.9 minutes); a cross-jurisdiction environment adds one residency API stack and takes slightly longer.
 - If the region was pre-authorized at installation or upgrade (tagged "pre-authorized, usable right after the build" in the wizard), go straight to the next step once the deployment succeeds.
-- If the wizard tagged it "ops must release it once after the build", the details page shows a yellow notice "Control plane has not enabled region <region>: Probe will fail until it is enabled".
+- If the wizard tagged it "ops must release it once after the build", the details page shows a yellow notice "Control plane has not enabled region \<region>: Probe will fail until it is enabled".
   In that case ops must run one control-plane redeployment on the deployment machine (the platform ECS service rolls once, a few minutes); afterwards come back and click "Check initialization". The command and its "will change / will not change" list are in the [production deployment manual](../deployment.md) §7.
 - To avoid releasing every new region in the future, have ops pre-authorize the candidate regions in one go at the next upgrade (manual §7 step 2).
 
@@ -241,7 +241,7 @@ Step 3 "Confirm and deploy":
 ### 4.4 Check initialization → Enable
 
 1. In the "Initialize / probe" area of the details page click "Check initialization". The platform probes the region's buckets / table buckets / Glue / Athena / warehouse / scheduler and so on item by item, and enables the region's S3 Tables federated catalog along the way.
-2. When all green it shows "All probes green" and "Last probe: <time>"; with red items it shows "Some probe items failed; see details below". If "Finalize did not pass. This is the root cause of the red items below" appears, read that one first; the red items are mostly derived from it.
+2. When all green it shows "All probes green" and "Last probe: \<time>"; with red items it shows "Some probe items failed; see details below". If "Finalize did not pass. This is the root cause of the red items below" appears, read that one first; the red items are mostly derived from it.
 3. The "Enable" button is clickable only when the status is "Testing" and all probes are green (hovering explains "Can only be enabled when status=testing and all probes are green"). After clicking, the toast "Enabled; now accepting pushed work" appears and the status becomes "Running".
 4. From then on the region appears in the execution-region dropdowns of batch jobs, Redshift Query and modeling landings.
 
@@ -285,8 +285,8 @@ An environment that was never built (deployment failed; no resources of it in th
 
 An environment that was built, in two steps:
 
-1. "1. Stop accepting work (drain)": click "Stop accepting work: <id>" → "Stop accepting work". The page shows "Stopped accepting work: new bindings / schedules / runs are all rejected".
-2. "2. Request deletion": opens "Delete execution environment <region> — impact preview". "Pre-delete checks (all must be 0)" lists "Bound resources" "Enable scheduling" "Running runs"; when non-zero it offers "Go unbind these tasks"; when a source cannot be read it honestly says "Some sources could not be read, so zero cannot be confirmed (unreadable is not the same as none)" and refuses.
+1. "1. Stop accepting work (drain)": click "Stop accepting work: \<id>" → "Stop accepting work". The page shows "Stopped accepting work: new bindings / schedules / runs are all rejected".
+2. "2. Request deletion": opens "Delete execution environment \<region> — impact preview". "Pre-delete checks (all must be 0)" lists "Bound resources" "Enable scheduling" "Running runs"; when non-zero it offers "Go unbind these tasks"; when a source cannot be read it honestly says "Some sources could not be read, so zero cannot be confirmed (unreadable is not the same as none)" and refuses.
    Once all are 0, fill in "Reason (required, recorded in the audit log)", "Type the region name to confirm", and click "Confirm deletion". The toast reads "Deletion request submitted (approval …); waiting for a platform admin to approve".
 3. A platform administrator goes to "Workspace → Pending my approval", finds the "Delete execution environment" approval with its "Impact preview snapshot" under the row. The page reminds: "On approval the server recomputes the impact preview; if it differs from the one submitted, approval is refused (reject and request again)". Clicking "Approve" starts the destruction (managed services first, then the component stacks, core and base in reverse dependency order).
 4. If destruction gets stuck, the details page shows "Destruction is stuck" and "Retry destruction", which reuses the same deletion plan and the same final snapshot name without taking another snapshot.
@@ -315,10 +315,10 @@ The "AI model" card is the global default shared by all 9 AI capabilities of the
 Steps:
 
 1. Click "Change global default"; the "Change global default model" dialog opens.
-2. The "Select a model (grouped by vendor series: <series list>)" dropdown groups by series (Claude / GPT / GLM / Kimi and so on, from the region's real catalog); entries carry an "inference profile" or "profile only" tag; "GPT series" entries are visible but tagged "not open in phase 1" and cannot be selected.
+2. The "Select a model (grouped by vendor series: \<series list>)" dropdown groups by series (Claude / GPT / GLM / Kimi and so on, from the region's real catalog); entries carry an "inference profile" or "profile only" tag; "GPT series" entries are visible but tagged "not open in phase 1" and cannot be selected.
 3. Click "Test this model". The platform really makes one call; saving is allowed only after you see "Probe passed (N s)". Page wording: "You must Test this model and pass before saving (the server probes once more on save)."
 4. Click "Save"; the dialog "Change the global default model?" appears with "Impact preview (takes effect platform-wide immediately)": "Affected capabilities (9)" "All tenants, all projects" "Within 5s after saving (active cache invalidation, no restart)". Click "Confirm change".
-5. Look for "Global default switched to <model>; effective platform-wide within 5s".
+5. Look for "Global default switched to \<model>; effective platform-wide within 5s".
 
 When the probe fails, the page gives "why + what to do" by type:
 
@@ -375,7 +375,7 @@ Registration steps:
 1. "Table bucket": pick from the dropdown or type the bucket name (such as `demo-agg-bucket`); it must really exist in this region and this account; the platform resolves it "Resolved from what exists".
 2. "Alias (Spark catalog name, pre-filled from the bucket name)": may be shortened, such as `agg`.
 3. Choose a "Layer"; "Writable" is on by default; fill in "Namespace ownership (optional, press Enter to add)" as needed; "Notes (optional)".
-4. Click "Register to <execution environment name>". Success toast: "Route <bucket> registered (alias <alias>): jobs can reach it as <alias>.<namespace>.<table>; lake query / governance catalog / NL2SQL will show it".
+4. Click "Register to \<execution environment name>". Success toast: "Route \<bucket> registered (alias \<alias>): jobs can reach it as \<alias>.\<namespace>.<table>; lake query / governance catalog / NL2SQL will show it".
 
 Editing and revoking:
 
@@ -434,7 +434,7 @@ Channels are usually created centrally by the administrator, rules by each team.
 1. Click "New Channel". Fill in "Channel name" and choose "Channel type": "DingTalk group bot" "WeCom group bot" "Email (SES)" "Generic Webhook".
 2. DingTalk / WeCom / Generic Webhook take a "Webhook URL"; when DingTalk security is set to "Signing", also fill in "Signing secret". Email takes "Sender (must be SES-verified)" and "Recipients (comma-separated)".
 3. Click "Save"; the toast "Channel created" appears.
-4. Click "Send test" in the row; success shows "Test delivered (HTTP 200)", failure shows "Test failed: <message>".
+4. Click "Send test" in the row; success shows "Test delivered (HTTP 200)", failure shows "Test failed: \<message>".
 5. Afterwards, when you click "New Rule" in the "Alert Rules" tab (dialog title "New Alert Rule"), the channel can be chosen under "Select channels (multiple allowed)". Rule conditions are "Alert on task failure" "Run timeout (duration over threshold)" "Success rate below threshold" "No-run (no success within window)", with the option "Auto-attach AI diagnosis on failure".
 
 Key points:

@@ -110,7 +110,7 @@
 🔴 **Ruling: the body always lands in the regional S3 of "the target the data came from"; the center stores only a pointer with no data values.**
 
 - **Why not one central table**: a card contains **real business data rows** (≤200 rows/turn × N turns). Writing them into the home region = moving eu data into us — exactly what the data-residency track of the multi-region execution design exists to prevent. Nobody has hit it so far only because **no feature has ever persisted result rows until now**; this feature is **the first**. If this is not settled at design time, go-live day is a residency incident.
-- **Why not "store only the SQL and re-run on open"**: ① the requirement is "exactly as it was"; ② re-running costs money; ③ when the data changes the conclusion changes — then it is a live query, not a card; ④ if permissions / the warehouse change, it simply fails to open. **The snapshot is right**; the price is to label it in the UI as "a snapshot taken at <time>" and to offer a "re-run this turn with current data" button (added value, and it does not change the snapshot semantics).
+- **Why not "store only the SQL and re-run on open"**: ① the requirement is "exactly as it was"; ② re-running costs money; ③ when the data changes the conclusion changes — then it is a live query, not a card; ④ if permissions / the warehouse change, it simply fails to open. **The snapshot is right**; the price is to label it in the UI as "a snapshot taken at \<time>" and to offer a "re-run this turn with current data" button (added value, and it does not change the snapshot semantics).
 - 🔴 **The title also stays in the region (decided, revision 1.5)**: my default in revision 1.0 was "store the title centrally" (reason: it is metadata the user typed in; the list renders from a single query).
   That was overruled ⇒ the center holds **not a single data-value field**, the title included. The cost and the handling already done are in the revision header and section 4.
 - **Shape (one definition, no same-jurisdiction / cross-jurisdiction fork)**:
@@ -200,7 +200,7 @@ The dialog copy flips with the decision: revision 1.0 said "the title will be sa
                            "chart": {}, "steps": [], "usage": {}, "maskedColumns": [],
                            "matchedTables": [], "usedContext": [], "retrievalNote": "…", "_meta": {} },
                "error": null } ] }
-```text
+```
 
 **Store everything**: `rows` are not truncated, and `steps` (the reasoning trace) are kept too (the requirement said "all content").
 
@@ -269,7 +269,7 @@ idempotency lookup on the GSI → `TransactWriteItems` (Put the pointer + the co
     "used": 13, "limit": 100,
     "hiddenByScope": 3,          // 🔴 how many more cards exist outside the current scope (guardrail 1: what is left out must be said; no silent under-listing)
     "titleUnavailableCount": 0 } }  // 🔴 how many titles cannot be read right now (revision 1.5: titles live in their own regions) ⇒ the page says so honestly
-```text
+```
 
 ### 5.3 `GET /api/genbi/cards/[cardId]` — fetch the body (open)
 

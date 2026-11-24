@@ -94,7 +94,7 @@ In the left menu, "Data Governance → Governance Center"; the page should show 
 Page path: "Data Governance → Data Governance", tab "Data Catalog (N)".
 
 1. Keep the view dropdown to the right of the page title at "View: current target".
-2. Above the tabs there is a blue note: "Showing only <region>: the data catalog comes from the same OpenMetadata (one service per execution environment) and reflects the state at the time of metadata sync; quality checks and sensitive scans run live on that region's data warehouse." The line below shows the sync status and last sync time of that region's catalog.
+2. Above the tabs there is a blue note: "Showing only \<region>: the data catalog comes from the same OpenMetadata (one service per execution environment) and reflects the state at the time of metadata sync; quality checks and sensitive scans run live on that region's data warehouse." The line below shows the sync status and last sync time of that region's catalog.
 3. Narrow down with the filter bar: choose Redshift for "Source" and `showcase` for "Schema / Namespace"; or type `dws_channel_roi_daily` in the search box and click "Search".
    The filter conditions are written into the address bar and survive a page refresh; click "Reset" to return to the full list.
 4. Table columns: Data Assets (name + FQN) · Source · Database / Table bucket · Schema / Namespace · Format · Field count · Sensitivity level · Actions.
@@ -123,7 +123,7 @@ Page path: "Data Governance → Data Governance", tab "Data Classification".
    - Click "Apply" at the end of the row. The toast "Saved device_id: L3 / partial" appears.
 4. Then select the table `showcase.payments`, set `amount_usd` to "L2 Internal", leave the masking policy at "No masking", enter the classification tag `Finance`, and click "Apply". This entry classifies without masking, so that the classification coverage in the catalog and on the workbench changes.
 5. If a real column is missing from the catalog, type the column name in "Enter field name manually (use when the column isn't in OM)", click "Add field to list", then set its level and "Apply".
-6. Changing a column's "Sensitivity level" back to "Unclassified" and clicking "Apply" clears that column's classification, with the toast "Cleared classification for <column>".
+6. Changing a column's "Sensitivity level" back to "Unclassified" and clicking "Apply" clears that column's classification, with the toast "Cleared classification for \<column>".
 
 Go back to the "Data Catalog" tab and refresh the search once; the "Sensitivity level" of the `ad_events` row should show "L3 Confidential" (the highest level among that table's fields).
 
@@ -271,7 +271,7 @@ Page path: "Data Governance → Data Governance", tab "Scheduled governance task
 
 1. Card note: "Quality checks / sensitive scans / catalog sync run automatically on cron in the selected execution scope; each region schedules itself, and only result metadata returns to the home region."
 2. The "Execution scope" in the top bar must be a specific execution environment; otherwise "New scheduled task" is disabled with the hint "Select an execution environment in the top bar first: a scheduled governance task runs in the region selected when it was created".
-3. Click "New scheduled task"; the "New scheduled governance task" dialog restates at the top: "Runs on cron in <region> (<targetId>); the schedule is published to that region's MWAA Serverless and never falls back to the home region".
+3. Click "New scheduled task"; the "New scheduled governance task" dialog restates at the top: "Runs on cron in \<region> (\<targetId>); the schedule is published to that region's MWAA Serverless and never falls back to the home region".
 4. Fill in:
    - "Task name": `daily-quality-inspection-dws_channel_roi_daily`;
    - Action dropdown: choose "Quality check (run rules on that region's warehouse)";
@@ -279,7 +279,7 @@ Page path: "Data Governance → Data Governance", tab "Scheduled governance task
    - In the cron editor choose "Daily", time 03:00 (equivalent expression `0 3 * * *`; you can also choose "Hourly", "Weekly", "Monthly", "Every N minutes" or "Custom"; "Next run:" is shown below);
    - Check "Enable the schedule right after creating";
    - Click "Create". The toast "Scheduled governance task created and enabled" appears.
-5. List columns: Name · Action · Execution scope (shows 🌍 <region>) · Cron Expression · Schedule type · Enable · Actions.
+5. List columns: Name · Action · Execution scope (shows 🌍 \<region>) · Cron Expression · Schedule type · Enable · Actions.
    A green "Auto schedule" under "Schedule type" means it has been published to that region's MWAA Serverless; orange "Carrier not published" means the switch is on but the carrier has not been published yet; grey "Not enabled" means the switch is off.
 6. The switch in the "Enable" column can disable / enable at any time; the "Runs" link jumps to "Task Monitor" to view the logs of each run; "Delete" first withdraws the schedule artifacts in that region and does not delete the record if they cannot be withdrawn.
 
@@ -330,7 +330,7 @@ Note: the OpenMetadata login password is randomly generated and replaced by the 
 
 Page path: "Data Governance → Data Governance", switch the dropdown to the right of the title to "View: all targets (read-only metadata)".
 
-1. The page becomes the "Cross-region metadata overview": rows are metrics, columns are execution regions (column header = region name + targetId; regions in a non-home jurisdiction carry a purple "🌍 <jurisdiction>" tag; retired regions are still shown and marked "Retired"), and the rightmost column is "Total".
+1. The page becomes the "Cross-region metadata overview": rows are metrics, columns are execution regions (column header = region name + targetId; regions in a non-home jurisdiction carry a purple "🌍 \<jurisdiction>" tag; retired regions are still shown and marked "Retired"), and the rightmost column is "Total".
 2. The rows, in order: Assets (tables) · Database / Namespace · Columns (Glue side) · several "Not collected" items (hover for the reason) · Metadata mirror · Warehouse catalog (manual collection).
 3. The "Metadata mirror" cell shows ✓ / "⚠ Mirror stale" / "⚠ Mirror expired" / "— Never synced" / "⚠ Last sync failed", with a line below "Last synced N minutes ago".
    Cells that need a refresh give admins a "Sync now" link (collects the Glue catalog, free).

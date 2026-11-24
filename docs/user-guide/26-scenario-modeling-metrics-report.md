@@ -37,7 +37,7 @@ Overview of the route:
 ## 1. How it works (one page)
 
 - **Six kinds of definitions, two of which land.** Layers, data domains, data standards and metrics are platform-level definitions, not per region; only **code tables** and **dimension / fact tables** have a "which region to land in" dimension.
-  In a single-region view the page says so explicitly: "Showing only <region>: code tables and dimensional modeling are filtered by 'bound / landed in this region'; layers, data domains, data standards and metrics are platform-level definitions, not per region. New definitions are bound to the home region only by default — to take effect in this region, use 'Land' in the row to materialize it here."
+  In a single-region view the page says so explicitly: "Showing only \<region>: code tables and dimensional modeling are filtered by 'bound / landed in this region'; layers, data domains, data standards and metrics are platform-level definitions, not per region. New definitions are bound to the home region only by default — to take effect in this region, use 'Land' in the row to materialize it here."
 - **Landing = really creating the table in that region's Redshift.** A code table lands as `public.dim_code_<code>` (three columns value / label / seq) and is filled with the enum values; a dimension / fact table lands as the `schema.physical table name` you entered, generated from the column definitions as `CREATE SCHEMA IF NOT EXISTS` + `CREATE TABLE IF NOT EXISTS` + column comments.
   The DDL only accepts allow-listed types (VARCHAR / CHAR / INTEGER / BIGINT / SMALLINT / DECIMAL / DOUBLE PRECISION / REAL / BOOLEAN / DATE / TIMESTAMP / TIMESTAMPTZ / SUPER), and identifiers may contain only letters / digits / underscores.
 - **The status is observed state, not a promise.** After every landing the platform reads back the real table structure in that region and compares it with the definition fingerprint, giving one of six states: ✓ Landed · ⚠ Version mismatch (the definition changed but that region still has the old structure) · 🔴 drift (that region already has a table with the same name but a different structure, and the platform did not overwrite it) · ⊘ Needs re-landing (an old record; land once more) · ✗ Landing failed · ⚠ Not landed.
@@ -161,7 +161,7 @@ Tab "Dimensional modeling".
    - Warehouse is warm: after a few seconds the message "Landed in 2 regions (status comes from actual observation after landing; bindings in other regions unchanged)" appears, the observed state of both rows becomes "✓ Landed", and "Observed at" is the time just now;
    - A region's warehouse cold-starts: the bottom right of the page shows "Running in background: Land code table to execution target (n s elapsed)", possibly for a minute or two, and the same success message appears as usual when it finishes. Do not click land again in the meantime, and do not delete this code table (a 409 refuses it).
    - The execution region and the home region are not in the same jurisdiction and this is your first data operation on it: "⚠️ Disclaimer" pops up first; read it and click "Agree and continue", and the landing continues automatically.
-6. Close the panel; the "Landed (observed per region)" column shows "Local: ✓" and "<execution-region targetId>: ✓".
+6. Close the panel; the "Landed (observed per region)" column shows "Local: ✓" and "\<execution-region targetId>: ✓".
 7. Go to the "Dimensional modeling" tab, click "Apply" once each on "Channel dimension" and "Ad daily fact", and land them in the two regions the same way.
 
 ### 8.1 Verify that the tables really exist
@@ -170,7 +170,7 @@ In the left menu "Data Development → Redshift Query", check both regions under
 
 ```sql
 SELECT * FROM public.dim_code_channel_type ORDER BY seq
-```text
+```
 
 Click "Execute". There is one result sheet per region, each with two rows (paid / organic). Then query `SELECT COUNT(*) FROM dwd.dim_channel`; both regions return 0 rows (a dimension table only gets its structure; data is written by jobs).
 
@@ -178,7 +178,7 @@ Click "Execute". There is one result sheet per region, each with two rows (paid 
 
 In the left menu "Scheduling & Ops → Multi-Region Dashboard", click "Rows: all" to switch to "Rows: modeling artifacts only".
 
-1. One row per code table / dimension / fact table (tags "🧱 Code tables", "🧱 Dimension / fact tables"); the row header reads "Definition fingerprint <first 10 chars> · place <physical table>"; one column per region.
+1. One row per code table / dimension / fact table (tags "🧱 Code tables", "🧱 Dimension / fact tables"); the row header reads "Definition fingerprint <first 10 chars> · place \<physical table>"; one column per region.
 2. Cell semantics: ✓ consistent · "⚠ Version mismatch" · "⚠ Not landed" · "✗ Failed" · "🔴 Structure drift" · "—" not bound · "⊘ Data unavailable" (that region lacks the unique data it depends on and naturally cannot be bound) · "⊘ Needs re-landing" (an old record left from before the write channel was delivered; land once more for this region on the modeling page).
    The last four kinds do not take part in the red / yellow judgment and never alert. Cells carry an "Observed at" time; the "Leftover" tag means that region is not bound but the table still exists in the database.
 3. Cells that need handling give admins a "Land in this region" link; 🔴 structure-drift cells only show "Needs manual handling → "Modeling" page".
@@ -201,7 +201,7 @@ In the left menu "Scheduling & Ops → Multi-Region Dashboard", click "Rows: all
 
 - "🔴 drift" means that region already has a table with the same name but a different structure, and the platform did not overwrite it. Typical sources: someone created a table with that name manually in the database, or the dimension table definition changed its columns while the table in the database still has the old structure.
 - The "Actions" column of that row in the panel shows "View diff" and "Force rebuild from platform definition":
-  - "View diff" opens "Column-level diff · <region>": columns only in the platform definition / columns only in that region's table / type mismatches, plus the definition signature and the observed signature;
+  - "View diff" opens "Column-level diff · \<region>": columns only in the platform definition / columns only in that region's table / type mismatches, plus the definition signature and the observed signature;
   - "Force rebuild from platform definition" DROPs the existing table in that region and recreates it from the definition; the data disappears with it. The dialog warns in red: "This will DROP the existing table on this execution target, and the data in it will be lost. Back it up first." You must type `FORCE-REBUILD` exactly before you can click "Confirm force rebuild".
 - If you do not want to lose data: run the ALTER yourself in Redshift according to the diff, then click "Re-detect (all bound regions)" in the panel; once the structure matches it returns to ✓.
 - The "Multi-Region Dashboard" only says "Needs manual handling → "Modeling" page" for drift; it never DROPs for you.
@@ -232,7 +232,7 @@ Tab "Metric system". The notice at the top: "Required: metric name + technical s
 ### 10.3 Compute
 
 1. Switch "Execution scope" in the top bar to one specific region (in a single-region view the "Latest value" column shows that region's value; in the "All" view it shows the most recently computed value and the hover tip tells which region computed it).
-2. Click "Compute" row by row. The message "Computed: <value>" appears, the "Latest value" column updates, and hovering shows the computation time.
+2. Click "Compute" row by row. The message "Computed: \<value>" appears, the "Latest value" column updates, and hovering shows the computation time.
 3. Switch to the other region and click "Compute" again; that region gets its own value. The `showcase` data of both regions comes from the same demo source, so the numbers should be identical; in production each region has different data and therefore different values.
 4. A derived metric with "Time period" set to "Last 30 Days" most likely computes 0 on the demo data — the demo timestamps are fixed historical dates written at data generation; this is not an error.
 
@@ -279,7 +279,7 @@ Notes:
   the "Metric" method computes on the warehouse (Redshift) and is always a metric card; use the first two methods when you need a breakdown by dimension.
 - When a referenced metric is deleted in the "Metric system", its card on the dashboard shows a red hint saying that the referenced metric no longer exists and asking you to edit the visual and select a metric again; it is never shown as 0.
 - Report results also go through data-classification masking (see [Scenario 6](25-scenario-governance-loop.md)).
-- Ask-Your-Data answers by these metric definitions automatically: name the metric in your question and the result card lists "Modeling metric · <metric name> (<table>)" under "Applied N business definition(s)";
+- Ask-Your-Data answers by these metric definitions automatically: name the metric in your question and the result card lists "Modeling metric · \<metric name> (<table>)" under "Applied N business definition(s)";
   supplementary rules the metric system cannot express (term aliases, exclusion conditions) still go into the "Business Glossary & Rules" page (see the [analyst guide](12-guide-analyst.md)).
 
 ---
@@ -329,8 +329,8 @@ Delete the practice objects in this order (do not delete the sample objects `Sho
 
 1. "Report Builder": delete `Channel ad-spend daily` in "Analyses".
 2. "Metric system": "Delete" the three practice metrics one by one (the derived metric references an atomic metric; deleting the derived one before the atomic one is safer).
-3. "Code table" / "Dimensional modeling": for each practice object click "Land" / "Apply" to open the panel, and region by region click "Unbind…" → choose "Unbind and clean up: DROP <physical table>" → type the physical table name exactly → "Unbind and clean up".
-   The message "Unbound and cleaned up <region>: the table in that region was dropped; landing record removed" appears. Unbinding the last binding shows "This is the last binding: after unbinding, the definition falls back to the default home".
+3. "Code table" / "Dimensional modeling": for each practice object click "Land" / "Apply" to open the panel, and region by region click "Unbind…" → choose "Unbind and clean up: DROP \<physical table>" → type the physical table name exactly → "Unbind and clean up".
+   The message "Unbound and cleaned up \<region>: the table in that region was dropped; landing record removed" appears. Unbinding the last binding shows "This is the last binding: after unbinding, the definition falls back to the default home".
 4. After all regions are cleaned up, click "Delete" at the end of the row; if something is left over, "This definition still has landed physical tables" pops up; follow the dialog.
 5. "Data Standard", "Data Domain", "Warehouse layers": "Delete" as needed (before deleting a layer, confirm that no dimension / fact table belongs to it).
 6. Go to "Multi-Region Dashboard → modeling artifacts only" and confirm that the rows of the practice objects are gone and there is no "Leftover" tag.

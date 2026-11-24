@@ -106,12 +106,12 @@ export const COPILOT = {
   memoryId: process.env.COPILOT_MEMORY_ID || "",
   maxIters: int("COPILOT_MAX_ITERS", 8), maxTokens: int("COPILOT_MAX_TOKENS", 2400),
 };
-```text
+```
 Resource names are always `bgp_copilot_*` / `bgp-copilot-*` (standard naming), with **no account ids, region literals or secrets whatsoever** (they pass `redline-scan.sh`). Table names (if any) are `process.env.COPILOT_*_TABLE || "bgp-copilot-*"`.
 
 ### Principle 3 — Abstraction: tools are a "capability registry", not hard-coded branches
 The actions available to the Copilot are abstracted into one **tool registry** (`lib/copilot/tools/registry.ts`); each tool is described declaratively:
-```
+```text
 { name, kind: "read"|"create", description, inputSchema, actionCode: "datasource.create", handler }
 ```
 - **Adding a Copilot capability = adding one row to the registry** (the same "table-driven" approach consistently used by the FinOps recommendation registry, the sensitive-data detector registry and the engine SPI registry), without changing the loop / dispatch core.

@@ -49,7 +49,7 @@
 export type ResourceType = "workflow" | "etl-job" | "sync" | "redshift-task";
 const RESOURCES: Record<ResourceType, ResourceMeta> = { workflow: {...}, ... };
 export function isResourceType(v: unknown): v is ResourceType { return typeof v === "string" && v in RESOURCES; }
-```text
+```
 → **Borrowed**: `Record<EngineType, EngineProvider>` + an `isEngineType` guard + `getProvider(type)`. **Adding an engine = adding one row to the table**.
 
 ### 2.2 Reference two · factory adapter switch (`lib/network-advisor/prefill-adapters.ts:44-56`)
@@ -142,7 +142,7 @@ export interface EngineJob {
   createdBy: string; createdBySub: string; createdAt: string; updatedAt: string;
 }
 export type EngineJobStatus = "draft" | "ready" | "running" | "succeeded" | "failed";
-```text
+```
 
 ### 4.2 The EngineProvider interface (`lib/engines/spi.ts`; semantics derived from section 3.2)
 ```ts
@@ -170,10 +170,10 @@ const PROVIDERS: Record<EngineType, EngineProvider> = { "emr-serverless": emrSer
 export function isEngineType(v: unknown): v is EngineType { return typeof v === "string" && v in PROVIDERS; }
 export function getProvider(type: EngineType): EngineProvider { return PROVIDERS[type]; }
 export function listEngines(): EngineType[] { return Object.keys(PROVIDERS) as EngineType[]; }
-```text
+```
 
 ### 4.4 EMR provider (`lib/engines/emr/**`)
-```
+```text
 lib/engines/emr/
   provider.ts      # implements the seven EngineProvider methods
   application.ts   # per-job CreateApplication / DeleteApplication / ensureStarted (GetApplication STOPPED → StartApplication)
@@ -181,7 +181,7 @@ lib/engines/emr/
   network.ts       # EmrNetwork type + resolution of subnets / SGs from data sources / advisor prefill
   script.ts        # lands the PySpark script in S3 (following ensureGlueJob; prefix emr-scripts/<jobId>.py)
   run-record.ts    # createRunRecord / finishRunRecord (replicated from job-service.ts:54-94; writes bgp-task-runs)
-```text
+```
 
 ---
 
@@ -235,7 +235,7 @@ new iam.ManagedPolicy(this, "EmrServerlessOrchestration", {
       conditions: { StringEquals: { "iam:PassedToService": "emr-serverless.amazonaws.com" } } }),
   ],
 });
-```text
+```
 - Environment variables (appended at `platform-stack.ts:530-608`; derived from the account to avoid cross-stack dependencies): `EMR_EXECUTION_ROLE_ARN`, `EMR_DEFAULT_SG_ID` (or Describe at run time), `EMR_CODE_BUCKET`, `EMR_OUTPUT_BUCKET`, `EMR_LOG_BUCKET`, `EMR_RELEASE_LABEL`.
 - **Risk**: the first CreateApplication may require the EMR Serverless service-linked role (`AWSServiceRoleForAmazonEMRServerless`) — drawing on the service-linked-role experience recorded in the engineering note `bedrock-marketplace-devops-slr`, if verification reports a missing SLR, add `iam:CreateServiceLinkedRole` (limited to `emr-serverless.amazonaws.com`).
 

@@ -113,7 +113,7 @@ Example item (phase-one global default):
 ```json
 { "pk":"system", "sk":"ai-model#global", "modelId":"global.anthropic.claude-opus-4-8",
   "probedAt":1756... , "probeOk":true, "updatedBy":"admin@..", "updatedAt":1756..., "version":7 }
-```typescript
+```
 
 ---
 
@@ -500,7 +500,7 @@ export function vendorOf(id: string): VendorProfile | null;  export function isS
 export function isOpenAIFamily(id: string): boolean;         // 保留,D9 门还用
 export interface FamilySummary { family: Family; label: string; toolUse: VendorProfile["toolUse"]; reasoningBlocks: boolean }
 export function familySummaries(): FamilySummary[];          // GET /catalog 的 families[]
-```text
+```
 
 - `(?![0-9])`: `zai.glm-5` / `zai.glm-5.3` pass, `zai.glm-50` does not; `moonshotai.kimi-k3` passes, `kimi-k30` does not. glm-4.x / kimi-k2.x / sonnet / haiku / other vendors do not pass.
 - `Family` / `GEO_PREFIX_RE` / `stripGeoPrefix` / `familyOf` / `isOpenAIFamily` in `capabilities.ts` have been changed to re-export this file;
@@ -538,7 +538,7 @@ export function isTransientModelError(e: unknown): boolean; // 名 / 原话 / co
 export const TRANSIENT_MAX_RETRIES: 1;                    // 不含首发
 export function transientBackoffMs(attempt: number, rand?: () => number, baseMs = 600, capMs = 2400): number; // 全幅抖动 [0, min(cap, base·2^attempt)]
 export function describeModelError(e: unknown): { name: string; message: string; status: number | null; transient: boolean }; // message 截 400
-```text
+```
 
 - Locations: `infra/agent/genbi/agent.js` and `infra/agent/_runtime/agent-runner.js` (+ the distributed copies under `netadvisor` / `paramadvisor/_runtime/`): `const mkAgent = () => new Agent({ …, messages: [...messages] })`;
   - `for (attempt = 0; ; attempt++) { try { result = await mkAgent().invoke(…); break } catch (e) { const d = describeModelError(e); console.error(…); if (d.transient && attempt < TRANSIENT_MAX_RETRIES) { steps.push({ tool: "model", phase: "retry", … }); await sleep(transientBackoffMs(attempt)); continue } return <existing fallback> } }`.
@@ -547,24 +547,24 @@ export function describeModelError(e: unknown): { name: string; message: string;
 
 ### 7.3 Probe (`probe.ts`) changes
 
-```
+```text
 PROBE_MAX_TOKENS 8 → 24 (with 16 tokens Kimi's output is entirely consumed by reasoning and still returns 200; with 24 at least one block is visible)
 both commands — the tiny ping and the tool-use second probe — go through shapeConverseInput ⇒ the same path as real calls (Kimi's ping actually sends maxTokens=48 because of the ×2 factor, pinned by unit test)
 toolUseOk = vendorOf(modelId)?.toolUse === "probe" ? await probeToolUse(modelId) : true      // previously only for openai
 classifyProbeError:  ① /is not available for this account|contact AWS Sales/i ⇒ "NotAvailableForAccount" (new; placed first — the body is also an AccessDeniedException and contains "not available")
                      ② the former order MarketplaceSCP / AccessDenied / Throttle / NotFound is unchanged
 ProbeError = "AccessDenied" | "NotFound" | "MarketplaceSCP" | "Throttle" | "NotAvailableForAccount"
-```text
+```
 
 ### 7.4 PUT `/api/admin/model-config` flow change (step ③′ inserted after step ④)
 
-```
+```text
 ① format pre-screen → ② ∈ catalog (after filtering to the four families; NotInCatalog detail = "<id> 不在可选系列目录内(<VENDORS 四个 label 以 / 连接>)", not hand-written)
 → ③ openai family && !gptTransportReady() ⇒ 400 NotAllowedFamily (unchanged)
 → ④ probeModel (must pass) → ③′ vendorOf(modelId)?.toolUse === "probe" && probe.toolUseOk !== true ⇒ **400 ToolUseUnavailable**
    { detail: "<modelId> 在 Converse 下不能调用工具(tool-use 探测未通过),问数 / Copilot / 顾问会哑火,不能设为全局默认" } (nothing written to the table, no audit record)
 → ⑤ putGlobalModel (unchanged)
-```text
+```
 The `modelConfigError` error-code union (`lib/settings/admin-guard.ts`) gains `ToolUseUnavailable`. The Claude family (`toolUse:"assumed"`) does not look at `toolUseOk`.
 
 ### 7.5 Catalog GET `/catalog`
@@ -630,7 +630,7 @@ if nothing in the whole chain works ⇒ exit 1, stderr summary 「找不到能�
 | `app/api/admin/model-config/route.ts` · `lib/settings/admin-guard.ts` | changed | section 7.4 |
 | `lib/ai/invoke.ts` · `lib/copilot/plan/planner.ts` | changed | section 7.2 platform location + Strands factor; `InvokeOutcome.shaped` |
 | `components/settings/AiModelCard.tsx` · `lib/i18n/messages/en.ts` | changed | interaction design, section 7 (families grouping, two F8 lines, two family tags, four-family tour text + English keys) |
-| `app/genbi/page.tsx` | changed | result card "Model used: <id> · backend <backend> (· degraded to fallback)" (`data-testid=genbi-model-used`, attributes `data-model / data-backend / data-degraded`); answer section `genbi-answer` — the ground truth for page-driven acceptance (the result-card decision of [the design document](./model-configuration.md)) |
+| `app/genbi/page.tsx` | changed | result card "Model used: \<id> · backend \<backend> (· degraded to fallback)" (`data-testid=genbi-model-used`, attributes `data-model / data-backend / data-degraded`); answer section `genbi-answer` — the ground truth for page-driven acceptance (the result-card decision of [the design document](./model-configuration.md)) |
 | `infra/agent/genbi/agent.js` · `infra/agent/_runtime/agent-runner.js` (+ distributed copies `netadvisor` / `paramadvisor/_runtime/`) | changed | section 7.2 container locations |
 | new `lib/ai/core/transient.ts` + `core/__tests__/transient.test.ts`;<br>`agent.js` / `agent-runner.js` Agent factory + one transient retry + structured log;<br>`tsconfig.ai-core.json` include;<br>`core-dist/ai/transient.*` in the three containers;<br>`model-config-guard.test.ts` (h) for the transient-retry decision | new / changed | section 7.2b (revision 2.2; the 1-in-3 intermittent failure caught on the first page-driven acceptance run) |
 | `platform/ai-model.json` · `scripts/resolve-home-model.sh` · `scripts/01-preflight-account.sh` · `infra/lib/shared/model.ts` · `infra/test/resolve-model/test_resolve_model.sh` · `infra/prod-only-layers.json` | changed | section 7.7 |

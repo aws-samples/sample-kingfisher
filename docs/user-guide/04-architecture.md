@@ -55,7 +55,7 @@
 4. The routing layer then applies three guards: **workspace** (membership judged by the project that owns the resource), **execution scope** (read APIs accept only `?scope=` in the URL; invalid / unauthorized values always get 4xx) and **target** (write operations must state which region they run in; missing ⇒ 400, never defaulting to the home region).
 5. Metadata reads and writes go to **DynamoDB**; data-plane actions (creating tables, starting jobs, querying the warehouse, GenBI) obtain AWS clients explicitly **for the target's region** under the platform task role and call that region's Redshift / Glue / EMR / Athena and other services directly.
 6. Before every write operation finishes, one audit record is written to `bgp-audit` (who, when, action, resource, region).
-7. Requests that wait for an external system to reach a final state (create table, landing, sync generation, large-model calls and so on) wait at most 45 seconds in-process; if not finished they return 202 and move to the background, the page shows "Running in background: <operation> (ns elapsed)" at the bottom right and polls automatically until the result arrives, so the page never hits the 60-second gateway timeout.
+7. Requests that wait for an external system to reach a final state (create table, landing, sync generation, large-model calls and so on) wait at most 45 seconds in-process; if not finished they return 202 and move to the background, the page shows "Running in background: \<operation> (ns elapsed)" at the bottom right and polls automatically until the result arrives, so the page never hits the 60-second gateway timeout.
 
 ## 3. The data plane of each region
 
@@ -105,7 +105,7 @@
 | Mechanism | In one sentence | What you see on the page |
 |---|---|---|
 | Execution scope | Three levels in the top bar: workspace → environment → execution scope (all regions / one region); lists, runs, costs and catalogs are filtered by the selected region | The "Execution scope" dropdown in the top bar; in the wrong region, objects "cannot be seen" |
-| Explicit target | Every object / every run carries an execution environment; an entry point without a target always gets 400 and never defaults to the home region | The create button restates "New data source (in <region>)"; a job's "Execution regions (multi-select)" is mandatory; run buttons spell out "once in each of N regions" |
+| Explicit target | Every object / every run carries an execution environment; an entry point without a target always gets 400 and never defaults to the home region | The create button restates "New data source (in \<region>)"; a job's "Execution regions (multi-select)" is mandatory; run buttons spell out "once in each of N regions" |
 | No cross-region data access | Source and task targets differ ⇒ permanent 409; each region's execution roles are locked to the region; execution VPCs have no egress | Picking a source in another region is rejected with an explanation |
 | Autonomous scheduling per region | Each region has its own MWAA Serverless; only run records return to the home region | The "Region" column in the Task Monitor; "Publish to scheduler" generates a DAG per region |
 | Jurisdiction and disclaimer | An execution region can be tagged with a non-home jurisdiction; the first data operation on it requires clicking "Agree and continue" and the consent is kept on record; dual auditing | The disclaimer dialog; the "Consents" card on the execution environment details page; the residency.* actions in the audit log |

@@ -179,7 +179,7 @@ interface Recipe {                // 验证过的代码范式
   verifiedAt?: string;            // 【新增】验证时间戳(证明"跑通过",非凭记忆)
   source: "system" | "admin";     // 内嵌只读 / 管理员扩展
 }
-```text
+```
 
 **Controlled capability vocabulary (new in revision 2, see section 10, finding E)**: `capability` stays a string so that flexibility is not broken, but a
 **controlled vocabulary + alias mapping** is maintained (for example `aggregate|rollup` and the localized Chinese alias all normalize to `aggregate`); retrieve normalizes during scoring,
@@ -206,7 +206,7 @@ and retrieve prefers the one matching the platform's current engine version (for
 The platform is bilingual Chinese / English (the i18n module: "the Chinese string is the key" + antd integration). For the UI parts of the Cookbook, **all user-visible text must go through `useT()`**:
 - **Phase 1 (pure library foundation)**: no UI → no i18n need (recipe template / rule texts are **engineering code / engine facts**, not UI text, and are not translated).
 - **The CookbookLibrary management page** (lifted from RecipeLibrary): table headers, buttons, system / administrator badges, add / delete form labels and placeholders → all through `useT()`.
-- **The guard echo in each codegen outlet** (for example "the AI wrote X, automatically corrected to Y", "this SQL violates <rule> and was blocked"):
+- **The guard echo in each codegen outlet** (for example "the AI wrote X, automatically corrected to Y", "this SQL violates \<rule> and was blocked"):
   the **framework text** of the message goes through `useT()`; the embedded **rule title / SQL fragment** is data and is not translated (following the i18n module's "business data is not translated" principle).
 - **Not translated**: recipe template (code), DialectRule.rule (engine constraints shown to the AI, not end-user UI), the canonical capability words (retrieval keys).
 
@@ -214,7 +214,7 @@ The platform is bilingual Chinese / English (the i18n module: "the Chinese strin
 
 ## 7. Directory structure (platform level, self-contained in one directory)
 
-```
+```text
 platform/src/lib/cookbook/          # platform level (lifted + generalized from lib/copilot/recipes)
   types.ts            # DialectRule / Recipe / CookbookSlice + engineVersion / verifiedAt / target
   retrieve.ts         # [core] retrieve(engine, opts) deterministic retrieval (engine filter → capability scoring → topK)

@@ -133,7 +133,7 @@ From left to right, the left side of the top bar holds three layers of context, 
 
 - To the right, in order: ❓ "User guide", the Copilot entry, "Switch language" (Chinese / English), "Switch theme", and the avatar menu ("Change password", "Sign out").
 - In a single region's view, the top of the list always shows a line "Other execution scopes have N more" with a "View all" button, so you never think things are gone.
-- Write actions restate the target on the button, for example "New data source (in <region>)"; objects created from the "All" view land in the home region.
+- Write actions restate the target on the button, for example "New data source (in \<region>)"; objects created from the "All" view land in the home region.
 - Details and rules are in the "Execution scope" and "Target" sections of [Core concepts](02-concepts.md).
 
 ![Top-bar execution scope dropdown](../screenshots/scope-dropdown.webp)

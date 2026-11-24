@@ -34,7 +34,7 @@ On a demo installation where the administrator has run the showcase-object scrip
 - **How lake tables are referenced**: in every region the platform pre-configures the Iceberg catalog `s3tablescatalog` for jobs (pointing at that region's platform table bucket). In PySpark write `s3tablescatalog.<namespace>.<table>`; on the Athena query page write `"s3tablescatalog/<table-bucket>"."<namespace>"."<table>"`.
 - **Business date**: jobs and sync tasks share one set of 15 date variables; a manual run can set it, a scheduled run uses the run date.
 - **Scheduling**: every region has its own MWAA Serverless. A job's "Publish to MWAA schedule" and a workflow's "Publish to scheduler" both ship the artifact to **that region's own** scheduler; run records all come back to "Task Monitor".
-- **Long-running operations**: requests that may exceed 45 seconds, such as creating a source or submitting a run, move to the background automatically; the bottom-right corner shows "Running in background: <label> (n s elapsed)"; there is no 504 and nothing is created twice.
+- **Long-running operations**: requests that may exceed 45 seconds, such as creating a source or submitting a run, move to the background automatically; the bottom-right corner shows "Running in background: \<label> (n s elapsed)"; there is no 504 and nothing is created twice.
 
 ![Data sync run sequence (Glue channel)](../diagrams/mr-flow-sync-run.png)
 
@@ -64,7 +64,7 @@ On a demo installation where the administrator has run the showcase-object scrip
 
 Page: "Data Integration → Data Sources".
 
-1. Click "New data source" (in a single-region view the button reads "New data source (in <region>)").
+1. Click "New data source" (in a single-region view the button reads "New data source (in \<region>)").
 2. "Basic info": Data source name `game-ads-mysql`; Database type MySQL; Environment "Development". Click "Next".
 3. "Connection Config":
    - For the demo database choose "Select from RDS" and pick the demo instance from the list (the platform reads the credentials from the RDS Secrets Manager secret automatically and shows "Credentials are read automatically from RDS Secrets Manager; no manual entry needed").
@@ -183,14 +183,14 @@ What you should see: one run-history row "Success" with rows written > 0; the "G
 
 Page: "Data Development → Athena Query" (page title "Athena Query (S3 Tables / Iceberg)").
 
-1. In the page header confirm that the execution environment tag is the region where you created the task; the blue banner states "Read-only, results are not persisted." and gives "Federated catalog: s3tablescatalog/<table-bucket>".
+1. In the page header confirm that the execution environment tag is the region where you created the task; the blue banner states "Read-only, results are not persisted." and gives "Federated catalog: s3tablescatalog/\<table-bucket>".
 2. Click "Refresh tables" in the table tree on the left; the 7 tables should appear under the namespace `gamedata`.
 3. Click the table name `players`; the editor is filled with `SELECT * FROM "s3tablescatalog/<table-bucket>"."gamedata"."players" LIMIT 100`. Click "Execute".
 4. Change the SQL to a count and execute again:
 
    ```sql
    SELECT COUNT(*) AS n FROM "s3tablescatalog/<table-bucket>"."gamedata"."players"
-   ```text
+   ```
 
 What you should see: above the result "Scanned … / Duration … / 1 rows returned", with `n` around 70–100 thousand (the data generator adds a random amount).
 
@@ -275,7 +275,7 @@ job.commit()
 1. "Execution regions (multi-select)": confirm that the region where you created the sync task is ticked (default = the region of the current top-bar view). With only one region ticked it shows "📍 Region-specific".
 2. Resource row: Worker type `G.1X(4vCPU/16GB)`, Workers `2`, "Timeout (min)" 60; keep the default in the Glue version dropdown (it shows text such as "Glue 6.0 (Spark 4.1.1 / Python 3.13)"). Leave "Glue Connection (optional, to access in-VPC sources like RDS)" empty — this job only reads lake tables.
 3. Expand "Advanced Properties (retry / execution class / bookmark / custom parameters / dependent libraries)":
-   - Keep the "Execution Role" dropdown at "Platform default role · <role name>" (group "Platform default (recommended, permissions complete)"). Using your own role is covered in scenario 2.
+   - Keep the "Execution Role" dropdown at "Platform default role · \<role name>" (group "Platform default (recommended, permissions complete)"). Using your own role is covered in scenario 2.
    - "Lake table buckets" with nothing selected = all routes of this region; "Catalogs available to this job" should list at least `s3tablescatalog`.
    - "Job parameters" and "Dependency libraries" are not used in this scenario.
 4. Click "Save"; the toast "Saved" appears.
@@ -283,7 +283,7 @@ job.commit()
 ### 6.4 Run now and run history
 
 1. Enter `2026-06-20` in the "Business date" box (the date the demo data covers; empty = today).
-2. Click "Run now · <region>". The toast "Run submitted (business date 2026-06-20)" appears.
+2. Click "Run now · \<region>". The toast "Run submitted (business date 2026-06-20)" appears.
 3. Switch to the "Run History (N)" tab and click "Refresh". The first run including the Glue cold start takes about 1–3 minutes and the status goes from running to `succeeded`; the columns show execution region / Trigger "Manual" / business date `2026-06-20` / duration.
 4. "Logs" in the row opens "Run Logs": you can see the 6 channel ROI rows printed by `show()`. Logs come from CloudWatch and lag on a cold start; click "Refresh".
 5. On failure click "AI Diagnosis"; the platform uses the run log to explain the cause and suggest a fix.
@@ -328,11 +328,11 @@ The report builder reads the warehouse fastest, so create a second, Redshift SQL
    LEFT JOIN inst i ON i.channel_id = ch.channel_id
    LEFT JOIN rev  r ON r.channel_id = ch.channel_id;
    COMMIT;
-   ```text
+   ```
 
 3. Confirm "Execution regions (multi-select)" is the same region as before; leave Workgroup / DB empty ("Leave blank to resolve automatically"; the target is decided by that execution environment). Click "Save".
 4. Click "Dry run": the toast "Trial run submitted (EXPLAIN validation, no data written)" appears; "Run History" gains a row with "Trigger" = "Dry run".
-5. Enter `2026-06-20` as "Business date" and click "Run now · <region>"; the run history shows one row `succeeded`.
+5. Enter `2026-06-20` as "Business date" and click "Run now · \<region>"; the run history shows one row `succeeded`.
 6. In "Redshift Query" run `SELECT * FROM gamedata.dws_channel_roi_daily ORDER BY roas DESC`; it should return 6 rows.
 
 > Key points: separate multiple statements with semicolons; keep DELETE and INSERT inside `BEGIN; … COMMIT;` so readers never hit the window where the table is cleared but not yet rewritten. `${ds}` is replaced with the business date by the platform before submission.
@@ -343,11 +343,11 @@ Page: "Data Development → ETL Orchestration".
 
 ### 8.1 Create the workflow and the canvas
 
-1. Click "New workflow": name `flow-channel-roi-daily`, any description; in "Execution regions (multi-select)" tick the same region as before (default = the region of the current top-bar view, shown as "📍 Single region"). After confirming, the toast "Created" appears (in a single-region view it reads "Created in <region> (scheduling runs only in this region)").
+1. Click "New workflow": name `flow-channel-roi-daily`, any description; in "Execution regions (multi-select)" tick the same region as before (default = the region of the current top-bar view, shown as "📍 Single region"). After confirming, the toast "Created" appears (in a single-region view it reads "Created in \<region> (scheduling runs only in this region)").
 2. Click "Edit DAG" in the row to open the details. Buttons at the top: "Add node" "Save" "Version history" "Publish to scheduler" "Trigger run".
 3. "Add node" → "Data Sync Node". Click the node on the canvas; the "Node configuration" drawer opens on the right:
    - Node name `Sync 7 tables`;
-   - In "Linked sync task" choose `game-ads-7tables (…→ both) · <region>`; the top of the drawer carries a line "Candidates are filtered by this workflow's execution regions: <region>".
+   - In "Linked sync task" choose `game-ads-7tables (…→ both) · <region>`; the top of the drawer carries a line "Candidates are filtered by this workflow's execution regions: \<region>".
 4. "Add node" → "Batch Job Node". The "Linked batch job" dropdown has two groups, "Batch compute (Glue / Redshift)" and "EMR Serverless", with entries of the form `name · engine · execution environment id`; choose `channel_roi_daily_lake · Glue · <execution environment id>`; node name `ROI lake table`.
 5. Add another "Batch Job Node" and choose `channel_roi_daily_dws · Redshift · <execution environment id>`; node name `ROI warehouse table`.
 6. Drag from the sync node's outlet to "ROI lake table", then from "ROI lake table" to "ROI warehouse table". The page header shows "3 nodes / 2 edges".

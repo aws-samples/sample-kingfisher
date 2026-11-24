@@ -57,7 +57,7 @@ Overview route:
 
 ## 2. Preparation
 
-1. Set the top-bar "Execution scope" to "All regions" first. In a single-region view, "Month to date" is only that region's money, and the page explains with a hint: "This total only covers <region>; another $… is not included".
+1. Set the top-bar "Execution scope" to "All regions" first. In a single-region view, "Month to date" is only that region's money, and the page explains with a hint: "This total only covers \<region>; another $… is not included".
 2. Account side: Cost Explorer must be enabled (data appears only within 24 hours after first enabling it). The platform only reads the bill and changes no billing settings.
 3. Make sure "Alerting Center → Notification Channels" has at least one usable channel (how to create one: [Scenario 8](27-scenario-ops-alerting.md) §5); budget and anomaly alerts use it.
 4. Roles: any member can view the four tabs; "Collect now" and "Detect & notify" need project editor; "New budget" needs project owner.
@@ -69,12 +69,12 @@ Overview route:
 Page path: "Scheduling & Ops → FinOps", tab "Cost overview".
 
 1. On first open, the tag at the top reads "Not collected yet — click 'Collect now' to pull billing data" and the body shows "No cost data yet".
-2. Click "Collect now". When it finishes you see "Collected: N billing rows, M runs attributed" and the tag changes to "Billing watermark: <time>". The first collection looks back about 30 days and at least to the 1st of last month, so month-over-month can be computed.
+2. Click "Collect now". When it finishes you see "Collected: N billing rows, M runs attributed" and the tag changes to "Billing watermark: \<time>". The first collection looks back about 30 days and at least to the 1st of last month, so month-over-month can be computed.
 3. The "Cost by region (month to date)" card group, with the small print "Grouped by AWS region, not attributed to execution targets" next to the title:
    - Each card = one AWS region's month-to-date amount, with the subtitle "▲/▼N% vs same period last month" or "No data for the same period last month".
    - When the region has exactly one execution environment, clicking the card switches the top-bar "Execution scope" to it; with several, a "N execution targets, click to choose" dropdown appears; with none, the card is marked "No execution target in this region" and is not clickable.
    - A separate "No region (global services)" card lists Tax / Support / Route 53 and other money that belongs to no region.
-4. Three metric cards: "Month to date" (in a single-region view "Month to date (<region>)") · "Yesterday" (subtitle "+N% vs prior day") · "Engine spend MTD (attributable workloads)".
+4. Three metric cards: "Month to date" (in a single-region view "Month to date (\<region>)") · "Yesterday" (subtitle "+N% vs prior day") · "Engine spend MTD (attributable workloads)".
 5. The "MTD breakdown (base / engine / other)" donut: "Platform base" = standing components (OpenMetadata, load balancers, VPC, WAF, KMS, etc.), "Compute engines" = the part that scales with tasks (Glue, EMR, Athena, Redshift, DMS, Kinesis, Flink, S3, Bedrock, etc.), "Other" = unclassified.
 6. The "14-day spend trend (USD)" area chart and the "Top services MTD" bar chart, by service name (Cost Explorer naming, such as "AWS Glue", "Amazon Redshift").
 
@@ -137,7 +137,7 @@ Page path: "FinOps", tab "Budgets".
    - The "Enable" switch.
 2. After saving you see "Budget created". List columns: Name / Scope ("Entire account" or the service name) / Monthly limit / "MTD progress" / Enabled / Actions.
 3. "MTD progress" shows numbers only after "Cost anomalies → Detect & notify": the progress bar shows `$spent (N%)`, turns active above 80% and red above 100%. Before evaluation it reads "Not evaluated (click 'Detect & notify' on the anomalies tab)".
-4. When a threshold is crossed, the message pushed to the channel reads like: "Budget 'Monthly total budget' 2026-11 has used $… / limit $… (N%), crossed the 80% threshold." Title "[FinOps] Budget warning: <name>" (the 100% threshold uses "Budget exceeded", severity P2; the 80% threshold P3).
+4. When a threshold is crossed, the message pushed to the channel reads like: "Budget 'Monthly total budget' 2026-11 has used $… / limit $… (N%), crossed the 80% threshold." Title "[FinOps] Budget warning: \<name>" (the 100% threshold uses "Budget exceeded", severity P2; the 80% threshold P3).
 5. In a single-region view only budgets with the "Single execution target" scope are filtered; account-level and service-level budgets are visible in every view.
 
 ![Budgets](../screenshots/finops-budget.webp)
@@ -148,7 +148,7 @@ Lower on the same tab, the "Advice (deterministic rules)" list is probed when th
 
 | Advice title | When it appears | What you should do |
 |---|---|---|
-| "DMS replication instance idle (<region>; no running task but still billing)" | The region has a DMS replication instance but no running replication task; probed per region | The advice text explains the reclaim policy and points the way: delete the region's real-time sync tasks you no longer need; once the last one is deleted the instance is reclaimed after a 10-minute idle grace; marked "Est. monthly saving ~$120" |
+| "DMS replication instance idle (\<region>; no running task but still billing)" | The region has a DMS replication instance but no running replication task; probed per region | The advice text explains the reclaim policy and points the way: delete the region's real-time sync tasks you no longer need; once the last one is deleted the instance is reclaimed after a 10-minute idle grace; marked "Est. monthly saving ~$120" |
 | "Glue job with tiny per-run usage at high frequency" | A task had ≥5 recent runs averaging under 120 DPU-seconds | Glue bills at least 1 minute per run; consolidate the schedule or lower the worker count |
 | "Large gap between task attribution and the bill (price list or coverage needs calibration)" | The platform's attributed monthly Glue cost differs from the Glue amount in the bill by more than half | Usually Crawler / interactive-session or other non-task usage, or an outdated price list; trust the bill |
 | "Sync task fell back from COPY to INSERT (the slow path costs more)" | A sync task's history contains a run where COPY fell back to row-by-row INSERT | Check the type mapping, then rerun |
@@ -205,7 +205,7 @@ In the "Execution Environments" details, "1. Stop accepting work (drain)" → "2
 |---|---|---|
 | Each "Cost by region (month to date)" card | Group by REGION, from the 1st of this month to today | The platform only collects up to yesterday (T+1); CE has not settled today's money either |
 | "Month to date" (all-regions view) | No grouping, from the 1st of this month to today | Did you overlook the "No region (global services)" card? |
-| "Month to date (<region>)" (single-region view) | Filter by REGION to that region | The hint "This total only covers <region>; another $… is not included" tells you where the difference is |
+| "Month to date (\<region>)" (single-region view) | Filter by REGION to that region | The hint "This total only covers \<region>; another $… is not included" tells you where the difference is |
 | "Top services MTD" | Group by SERVICE | Use CE's service names (e.g. "EC2 - Other" is NAT / EBS) |
 | "Region bill" in "Task costs" | Filter by REGION + time window | The hint "Billing only covers from …": the time window starts before the billing coverage |
 | "Attributed" | No counterpart in CE | Computed by the platform from engine metering × price list; compare with CE's Glue / EMR amounts — a large gap produces the "price list deviation" advice |
@@ -216,7 +216,7 @@ In the "Execution Environments" details, "1. Stop accepting work (drain)" → "2
 
 ## 10. Verify the result
 
-- [ ] The top of "Cost overview" shows "Billing watermark: <time>" and "Cost by region" has at least one card.
+- [ ] The top of "Cost overview" shows "Billing watermark: \<time>" and "Cost by region" has at least one card.
 - [ ] The "Task costs" ranking has rows, and expanding one shows the "Price version".
 - [ ] On "Cost anomalies", "Detect & notify" shows "Detection done: …".
 - [ ] "Budgets" has one budget and "MTD progress" shows a progress bar (set the monthly limit below what has already been spent, and you can see "[FinOps] Budget exceeded: …" under "Alerting Center → Alert Events").

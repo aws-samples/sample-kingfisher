@@ -87,7 +87,7 @@ dmsServerlessConfig?: {
 };
 // 启动后回写(替代旧 replicationTaskArn)
 realtimeConfig.replicationConfigArn?: string;
-```text
+```
 - DCU value normalization: min ∈ [1, maxAllowed], max ∈ [min, upper limit], max ≥ min. Common range 1..16 (2..32 GB).
 
 ---
@@ -145,7 +145,7 @@ New (coexisting with or replacing the existing instance-mode functions):
 ## 8. Cost and teardown
 - **Advantages**: no idle always-on instance; stopping the replication stops billing; automatic deprovisioning after 48 h.
 - **Teardown checklist** (after verification):
-  ```
+  ```text
   StopReplication(configArn) → wait for stopped → DeleteReplicationConfig
   → delete-endpoint (source / target) → cdk destroy BgpRealtimeStack (-c enable-realtime=1)
   ```

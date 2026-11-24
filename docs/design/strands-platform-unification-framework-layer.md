@@ -111,7 +111,7 @@ buildAgent({
   prepare?: (input) => {extras,messages},  // 可选:GenBI 独有(检索/口径预取);advisor 无
   memory?, steps?, toolNameStrategy?,       // 软钩子:默认实现覆盖多数
 })
-```text
+```
 Built in (zero parameters): MCP connection / tool hot-loading / iteration cap / multi-turn history / error feedback / token accounting.
 
 ### ③ AgentCoreStackBase (the CDK base class) — takes 6 kinds of parameters
