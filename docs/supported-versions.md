@@ -21,7 +21,7 @@ Declared ranges come from `package.json`; the Version column shows the lockfile-
 | Component | Version | Default | Minimum | Notes |
 |---|---|---|---|---|
 | Node.js, platform container | 20 | — | — | Image `node` tag `20-alpine`, builder and runner stages |
-| Next.js | 15.5.28 | — | — | Declared `^15.5.28`, App Router, standalone output |
+| Next.js | 15.5.29 | — | — | Declared `^15.5.29`, App Router, standalone output |
 | React and react-dom | 19.3.1 | — | — | Declared `^19.3.1` |
 | antd | 6.3.4 | — | — | Declared `^6.3.4` |
 | TypeScript, platform | 5.9.3 | — | — | Declared `^5.9.3` |
