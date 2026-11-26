@@ -88,6 +88,48 @@ describe("B2 ① 判别函数:五态各自成立(行为判据)", () => {
   });
 });
 
+// 2026-11-25 真环境:同步任务 / 平台动作的定时停用之后,调度服务里的载体真删了,行里的发布记录却留着
+//   ⇒ 调度配置页对这条已停用的行显示「无法确认」(一句英文 Resource not found)或「载体需重新发布」+ 一个点了会报错的「重新发布」。
+//   之后停用的行记录随停用一起清;之前留下的行靠这条规则:定时已停用 + 服务确认每个有记录的区都没有载体 ⇒ 没有载体。
+describe("B2 ①b 过期的发布记录不是载体(定时已停用 + 服务确认没有载体 ⇒ n/a)", () => {
+  const stale = (itemType: string | undefined, scheduleEnabled: boolean | undefined, drift: Record<string, { state: string; reason?: string }>) => ({
+    ...armedRow(Object.keys(drift), drift),
+    ...(itemType === undefined ? {} : { itemType }),
+    ...(scheduleEnabled === undefined ? {} : { scheduleEnabled }),
+  });
+
+  it("🔴 同步任务 / 治理任务 / 问数卡片 / 造数:已停用且每个有记录的区都是 missing ⇒ n/a", () => {
+    for (const t of ["sync", "governance", "genbi-card", "seed"]) {
+      expect(carrierDriftView(stale(t, false, { tgt_home: { state: "missing" } })).kind, t).toBe("n/a");
+      // 从没写过启用字段的存量行(没有这个属性)与显式 false 同一口径
+      expect(carrierDriftView(stale(t, undefined, { tgt_home: { state: "missing" } })).kind, t).toBe("n/a");
+      expect(carrierDriftView(stale(t, false, { a: { state: "missing" }, b: { state: "missing" } })).kind, t).toBe("n/a");
+    }
+  });
+
+  it("🔴🔴 定时还开着而载体不在 ⇒ 真问题,不许吞成 n/a(到点不会触发,必须说出来)", () => {
+    const v = carrierDriftView(stale("sync", true, { tgt_home: { state: "missing", reason: "该区没有这个工作流的载体" } }));
+    expect(v.kind).toBe("indeterminate");
+    expect(v.kind === "indeterminate" && v.reasons).toEqual(["该区没有这个工作流的载体"]);
+  });
+
+  it("🔴 工作流不适用:已发布的工作流不开定时也有载体,载体不在要如实说", () => {
+    expect(carrierDriftView(stale("workflow", false, { tgt_home: { state: "missing" } })).kind).toBe("indeterminate");
+    // 没带行类型(别的调用方)⇒ 不套这条规则
+    expect(carrierDriftView(stale(undefined, false, { tgt_home: { state: "missing" } })).kind).toBe("indeterminate");
+  });
+
+  it("🔴 只认 missing:已停用但读得到载体(还在 / 落后 / 判不了)⇒ 照旧各归各态", () => {
+    expect(carrierDriftView(stale("sync", false, { tgt_home: { state: "stale" } })).kind).toBe("stale");
+    expect(carrierDriftView(stale("sync", false, { tgt_home: { state: "ok" } })).kind).toBe("ok");
+    expect(carrierDriftView(stale("sync", false, { tgt_home: { state: "unknown" } })).kind).toBe("indeterminate");
+    // 一个区没有、另一个区还在 ⇒ 不是「没有载体」
+    expect(carrierDriftView(stale("sync", false, { a: { state: "missing" }, b: { state: "ok" } })).kind).toBe("indeterminate");
+    // 没查全照旧是「未检查」
+    expect(carrierDriftView({ ...armedRow(["a", "b"], { a: { state: "missing" } }), itemType: "sync", scheduleEnabled: false }).kind).toBe("unchecked");
+  });
+});
+
 describe("B2 ② 接线:界面真的接到了那个唯一作者", () => {
   const panel = strip(read("components/monitor/SchedulePanel.tsx"));
 

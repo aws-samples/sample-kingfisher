@@ -17,7 +17,9 @@ import { schedulerEndpointFor, isServerlessEndpoint, unpauseWhenLoaded, MwaaNotI
 // 多节点编排也走 serverless(SPEC v3.43 §3.15;形状只有 tasks)
 import { assertServerlessExpressible, buildWorkflowTasksYaml } from "@/lib/scheduler/serverless/workflow-yaml";
 import { publishServerlessWorkflow, offlineServerlessWorkflow } from "@/lib/scheduler/serverless/publish";
-import { findWorkflowArnByName, getWorkflow } from "@/lib/scheduler/serverless/workflow-client";
+import { findWorkflowArnByName, getWorkflow, isWorkflowNotFound } from "@/lib/scheduler/serverless/workflow-client";
+// 发布记录的删除只有这一个写口(撤下来的区同步清记录)
+import { removeDeployment } from "@/lib/exec-env/deployments";
 import { buildDagSpec } from "@/lib/workflow/dag-generator-v2";
 import { offlineDag } from "@/lib/scheduler/mwaa-offline";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
@@ -145,6 +147,41 @@ export function normalizeCarrierDefinition(text: string): string {
   return out;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// **服务读回的那一份不一定是完整的**(2026-11-24 真环境抓到,2026-11-25 按字符类量过)
+//
+// 现象:启用了定时的同步任务(载体名恒带中文后缀)在「调度配置」页恒显示「载体需重新发布」,
+//   点「重新发布」也消不掉;名字或 SQL 带中文的工作流、平台动作的载体同理。定时本身照常触发。
+// 事实(三个测试账号、两个区的存量载体 + 另建的一次性工作流,2 / 3 / 4 字节字符与混排各量一条):
+//   定义里有非 ASCII 字符时,调度服务读接口回的 `WorkflowDefinition` 是完整定义的**前缀**,
+//   末尾少的字符数恰好 = 定义的 UTF-8 字节数 − 字符数;纯 ASCII 的定义原样读回。
+//   服务登记的那份定义对象是完整的,调度按完整定义执行。
+// ⇒ 这时「逐字比」比不出结论:读到的部分一致,末尾那一段没读到。
+//   照旧判成落后 = 误报(重新发布之后读回来照样被截断,所以永远消不掉);判成一致 = 假绿。
+//   只能如实说判不了。
+// 🔴 三个条件**同时**成立才这么判,其余照旧算不一致(不许把真落后也吞成「判不了」):
+//   ① 读回的那份是当前这份的**真前缀** —— 读到的部分里只要有一处不同,就是确定的落后;
+//   ② 当前这份里**有非 ASCII 字符** —— 纯 ASCII 的定义服务原样读回,短了就是真的不一样;
+//   ③ 少的字符数**不超过**「UTF-8 字节数 − 字符数」—— 实测恰好相等;少得更多,截断解释不了。
+// ══════════════════════════════════════════════════════════════════════════════
+export type CarrierReadbackRelation =
+  | { kind: "same" }
+  | { kind: "truncated"; readChars: number; missingChars: number }
+  | { kind: "differ" };
+
+/** 服务读回的定义(`published`)与当前生成器产出的定义(`current`)是什么关系。两边都先归一。纯函数。 */
+export function compareCarrierReadback(published: string, current: string): CarrierReadbackRelation {
+  const pub = normalizeCarrierDefinition(published);
+  const cur = normalizeCarrierDefinition(current);
+  if (pub === cur) return { kind: "same" };
+  const missingChars = cur.length - pub.length;
+  const nonAsciiExcess = Buffer.byteLength(cur, "utf8") - cur.length;
+  if (pub.length > 0 && missingChars > 0 && missingChars <= nonAsciiExcess && cur.startsWith(pub)) {
+    return { kind: "truncated", readChars: pub.length, missingChars };
+  }
+  return { kind: "differ" };
+}
+
 export type CarrierDriftState = "ok" | "stale" | "missing" | "unsupported" | "unknown";
 
 /**
@@ -172,12 +209,37 @@ export async function carrierDefinitionDrift(
   if (!arn) {
     return { state: "missing", scheduler: art.scheduler, dagId: art.dagId, reason: "该区没有这个工作流的载体(从未发布 / 已被撤下)" };
   }
-  const live = await getWorkflow(art.ep.region, arn);
+  // 🔴 行里记着的那条载体可能已经不在了(2026-11-25 真环境:定时停用后发布记录没清 ⇒ 这里直接抛「Resource not found」,
+  //   页面上是一句看不懂的英文「无法确认」)。服务是真值源:记着的不在 ⇒ 按名字再问一次;都没有 ⇒ 如实回「没有这条载体」。
+  const noCarrier = { state: "missing" as const, scheduler: art.scheduler, dagId: art.dagId, reason: "该区没有这个工作流的载体(从未发布 / 已被撤下)" };
+  let live: Awaited<ReturnType<typeof getWorkflow>>;
+  try {
+    live = await getWorkflow(art.ep.region, arn);
+  } catch (e) {
+    if (!isWorkflowNotFound(e)) throw e;
+    const byName = known ? await findWorkflowArnByName(art.ep.region, art.dagId) : undefined;
+    if (!byName || byName === arn) return noCarrier;
+    try {
+      live = await getWorkflow(art.ep.region, byName);
+    } catch (e2) {
+      if (!isWorkflowNotFound(e2)) throw e2;
+      return noCarrier;
+    }
+  }
   const published = String((live as unknown as { WorkflowDefinition?: string }).WorkflowDefinition || "");
   if (!published) {
     return { state: "unknown", scheduler: art.scheduler, dagId: art.dagId, reason: "服务没回 WorkflowDefinition ⇒ 判不了,**不许当成一致**" };
   }
-  const same = normalizeCarrierDefinition(published) === normalizeCarrierDefinition(art.content);
+  const rel = compareCarrierReadback(published, art.content);
+  if (rel.kind === "truncated") {
+    return {
+      state: "unknown", scheduler: art.scheduler, dagId: art.dagId,
+      reason:
+        `调度服务读回的定义不完整:定义里有非 ASCII 字符(例如中文名字)时,服务只回前 ${rel.readChars} 个字符、末尾少 ${rel.missingChars} 个。` +
+        "读到的部分与当前生成器逐字一致,没读到的部分判不了 ⇒ 不当成一致,也不当成落后;定时照常按已发布的定义执行",
+    };
+  }
+  const same = rel.kind === "same";
   return {
     state: same ? "ok" : "stale",
     scheduler: art.scheduler,
@@ -585,7 +647,11 @@ export interface UnpublishFanoutResult extends UnpublishResult {
 }
 
 export async function unpublishWorkflowDag(
-  workflow: Pick<Workflow, "workflowId" | "airflowDagId"> & { targets?: unknown; targetId?: unknown; deployments?: unknown }
+  workflow: Pick<Workflow, "workflowId" | "airflowDagId"> & { targets?: unknown; targetId?: unknown; deployments?: unknown },
+  // 🔴 发布记录不在工作流表里的载体(同步任务的定时 / 平台动作的定时)由调用方声明记在哪一行:每撤下一个区,那一行里该区的发布记录跟着清。
+  //   2026-11-25 真环境:这两类停用后载体真删了、记录还留着 ⇒ 调度配置页对已停用的行显示「无法确认」或「载体需重新发布」。
+  //   不给 = 改动前的行为(编排自己的下线在它的执行体里清记录)。
+  opts: { ledger?: CarrierLedger } = {}
 ): Promise<UnpublishFanoutResult> {
   const dagId = workflow.airflowDagId || `bgp_${workflow.workflowId}`;
   // 🔴🔴 下线必须覆盖**每一个有产物的区**,不只是绑定里的第一个:
@@ -602,7 +668,12 @@ export async function unpublishWorkflowDag(
   const failures: Array<{ targetId: string; error: string; code?: string }> = [];
   for (const wfTarget of all) {
     try {
-      perTarget.push(await unpublishWorkflowDagFromTarget(workflow, wfTarget, dagId));
+      const r = await unpublishWorkflowDagFromTarget(workflow, wfTarget, dagId);
+      // 载体撤下来了 ⇒ 记录跟着清(清不掉按「这个区没撤干净」报出去,调用方不改启用状态,再点一次即可)
+      if (opts.ledger && r.removed) {
+        await removeDeployment({ table: opts.ledger.table, key: opts.ledger.key as Record<string, string>, targetId: wfTarget });
+      }
+      perTarget.push(r);
     } catch (e) {
       // 🔴 「该区没装调度组件」**不是失败**:那里不可能有产物,没有东西可下线。
       //   `offlineDag` 早就是这个口径(它自己 catch 掉 MwaaNotInstalled 回 `skipped`);

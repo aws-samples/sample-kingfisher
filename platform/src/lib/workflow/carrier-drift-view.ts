@@ -18,7 +18,17 @@
 export interface CarrierDriftRow {
   deployments?: Record<string, { workflowArn?: string } | undefined> | null;
   carrierDrift?: Record<string, { state?: string; reason?: string } | undefined> | null;
+  /** 行的类型(调度配置页的 `itemType`)。只用来认下面 ①b 那一种残留。 */
+  itemType?: string;
+  /** 这一行的定时现在是否启用。只用来认下面 ①b 那一种残留,不用来判「有没有载体」。 */
+  scheduleEnabled?: boolean | null;
 }
+
+/**
+ * 载体**只为定时而存在**的那几类行:同步任务与平台动作(治理任务 / 问数卡片 / 造数)。
+ * 工作流不在此列 —— 已发布的工作流不开定时也有载体。
+ */
+export const SCHEDULE_ONLY_CARRIER_TYPES: readonly string[] = ["sync", "governance", "genbi-card", "seed"];
 
 export type CarrierDriftView =
   | { kind: "n/a" }
@@ -45,6 +55,16 @@ export function carrierDriftView(row: CarrierDriftRow): CarrierDriftView {
 
   const states: Record<string, string> = {};
   for (const t of armed) states[t] = String(drift[t]?.state);
+
+  // ①b 一条**过期的发布记录**不是载体:这一类行的载体只为定时而存在,定时已停用,而且服务确认每个有记录的区都没有这条载体
+  //   ⇒ 与「没有载体」同一态。(2026-11-25 之前停用过的行,记录没被清掉;之后停用的行记录随停用一起清。)
+  //   🔴 三个条件缺一不可:定时还开着而载体不在 = 真问题,照旧走 ⑤ 如实说;工作流不适用。
+  if (
+    row.itemType !== undefined && SCHEDULE_ONLY_CARRIER_TYPES.indexOf(row.itemType) >= 0 &&
+    !row.scheduleEnabled && armed.every((t) => states[t] === "missing")
+  ) {
+    return { kind: "n/a" };
+  }
 
   // ④ 有确定的坏消息就先报坏消息(用户有明确动作可做);完整状态一并带出去,不藏别的区
   const staleTargets = armed.filter((t) => states[t] === "stale");

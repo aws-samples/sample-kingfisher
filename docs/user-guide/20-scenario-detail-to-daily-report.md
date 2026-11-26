@@ -373,6 +373,7 @@ What you should see: one workflow run succeeded; the run histories of the two jo
 
 - "Take schedule offline" (or "Take offline" in the list row) removes the DAG from the scheduler and keeps the definition; only "Delete" deletes the workflow.
 - After changing the canvas, "Save" and "Publish to scheduler" again; when "Carrier definition" in "Task Monitor → Schedule config" shows "Carrier needs republishing", click "Republish".
+  When the workflow name contains non-ASCII characters this column shows "Undetermined" (the scheduler service returned an incomplete definition; it is not an error); the workflow of this scenario has a pure-ASCII name, so it shows "Up to date".
 
 ## 9. Backfill a stretch of history
 

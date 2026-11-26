@@ -71,6 +71,11 @@ export interface EnsureWorkflowResult {
   created: boolean;
 }
 
+/** 「这条 workflow 在服务里不存在」的唯一判法(行里记着的 ARN 已被删 / 从没建过)。 */
+export function isWorkflowNotFound(e: unknown): boolean {
+  return /ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""));
+}
+
 /** 重试策略:307 传播期最多 6 次 × 10s(交互式发布不能等 5 分钟;超过就把人话抛出去)。 */
 export async function ensureWorkflow(input: EnsureWorkflowInput, opts: { attempts?: number; intervalMs?: number } = {}): Promise<EnsureWorkflowResult> {
   const attempts = opts.attempts ?? 6;
@@ -99,7 +104,7 @@ export async function ensureWorkflow(input: EnsureWorkflowInput, opts: { attempt
       return { workflowArn: r.WorkflowArn, workflowVersion: r.WorkflowVersion ?? "", workflowName: workflowNameOf(r.WorkflowArn), created: true };
     } catch (e) {
       lastErr = e;
-      if (input.existingArn && /ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) {
+      if (input.existingArn && isWorkflowNotFound(e)) {
         // 台账里的 arn 已不存在(被人删了)⇒ 重新 Create
         input = { ...input, existingArn: undefined };
         continue;
@@ -154,7 +159,7 @@ export async function deleteWorkflow(region: string, workflowArn: string): Promi
       }
     }
   } catch (e) {
-    if (!/ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) throw e;
+    if (!isWorkflowNotFound(e)) throw e;
     return { deleted: true, stoppedRuns };
   }
   // 🔴 Stop 之后**必须等 run 真到终态**再删。
@@ -169,7 +174,7 @@ export async function deleteWorkflow(region: string, workflowArn: string): Promi
         .filter((r) => NON_TERMINAL.includes(String(r.RunDetailSummary?.Status ?? "")))
         .map((r) => `${r.RunId}:${r.RunDetailSummary?.Status}`);
     } catch (e) {
-      if (/ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) return { deleted: true, stoppedRuns };
+      if (isWorkflowNotFound(e)) return { deleted: true, stoppedRuns };
       throw e;
     }
     if (busy.length === 0) break;
@@ -182,7 +187,7 @@ export async function deleteWorkflow(region: string, workflowArn: string): Promi
       await c.send(new DeleteWorkflowCommand({ WorkflowArn: workflowArn }));
       return { deleted: true, stoppedRuns };
     } catch (e) {
-      if (/ResourceNotFound/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) return { deleted: true, stoppedRuns };
+      if (isWorkflowNotFound(e)) return { deleted: true, stoppedRuns };
       lastErr = e;
       if (!/Conflict|in a state|InvalidRequest/i.test(String((e as Error)?.name ?? "") + String((e as Error)?.message ?? ""))) throw e;
       await new Promise((r) => setTimeout(r, 4_000 * (i + 1)));   // 冲突 = 服务还在收尾,退避重试

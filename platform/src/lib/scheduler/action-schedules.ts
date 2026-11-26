@@ -217,7 +217,8 @@ export async function setActionScheduleEnabled(
 /** 撤载体(删除对象 / 停用都走它)。集合口径 = 绑定 ∪ 台账里有产物的区(`unpublishWorkflowDag` 自己算)。 */
 export async function offlineActionScheduleCarrier(row: ActionScheduleRow) {
   const wf = buildActionCarrierWorkflow(row, null);
-  return unpublishWorkflowDag(wf as unknown as Parameters<typeof unpublishWorkflowDag>[0]);
+  // 发布记录在调度对象自己那一行:撤下来的区,记录同步清掉
+  return unpublishWorkflowDag(wf as unknown as Parameters<typeof unpublishWorkflowDag>[0], { ledger: ledgerOf(row) });
 }
 
 /** 「这个调度对象的载体是不是落后了」—— 必须带 ledger(否则 `ledger_task_*` 回缺省 ⇒ 每个都误报落后)。 */

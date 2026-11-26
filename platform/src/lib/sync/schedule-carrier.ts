@@ -131,7 +131,10 @@ export async function publishSyncScheduleCarrier(
  */
 export async function offlineSyncScheduleCarrier(task: SyncTaskForCarrier) {
   const wf = buildSyncCarrierWorkflow(task, null);
-  return unpublishWorkflowDag(wf as unknown as Parameters<typeof unpublishWorkflowDag>[0]);
+  // 发布记录在同步任务自己那一行:撤下来的区,记录同步清掉(否则已停用的行在调度配置页仍被当成有载体)
+  return unpublishWorkflowDag(wf as unknown as Parameters<typeof unpublishWorkflowDag>[0], {
+    ledger: syncTaskCarrierLedger(task.taskId, TABLES.SYNC_TASKS),
+  });
 }
 
 /** 取同步任务行(载体发布/下线都要先拿到 targets 与 glueJobName)。 */

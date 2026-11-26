@@ -945,6 +945,11 @@ Measured in two test environments: first start in an execution region until the 
   the platform finds the replication task already running and only changes the status back to "Running" (the full load is not repeated). From 2.2.0 the platform accepts only a settled "stopped" (one that carries a stop reason and whose stop time is after the latest start).
 - **"Start" of a DMS task occasionally fails with a reason saying the endpoint "already exists" or "DMS security group … not ready" although the security group exists (all versions)**: when an AWS API call fails transiently (throttling and the like),
   the platform takes "could not read" for "does not exist"; pressing "Start" once more usually works; if it keeps happening, contact the platform administrator.
+- **The "Carrier definition" column on the schedule-configuration page always shows "Carrier needs republishing" for a sync task with a schedule, and "Republish" does not clear it (2.1.2 and all earlier versions; shown truthfully from 2.2.0)**:
+  the scheduler service returns an incomplete definition when the definition contains non-ASCII characters (the schedule carrier of a sync task always does, and so does a workflow with such a name), so the platform cannot tell whether it is out of date. The schedule itself fires as usual; go by the run records.
+  From 2.2.0 such rows show "Undetermined" and the tooltip states the reason (the part that was read back is identical, the tail was not read); when the part that was read back really differs, the row still shows "Carrier needs republishing".
+- **After a schedule is disabled, "Carrier definition" on that row of the schedule-configuration page is not "—" (2.1.2 and all earlier versions; fixed in 2.2.0)**: in the production version this column means nothing on a disabled row,
+  and "Republish" on such a row fails — ignore it. From 2.2.0 a disabled row shows "—", and so do rows that were disabled before the upgrade.
 - Deferred items (least-privilege narrowing, secret rotation, OpenSearch sizing and snapshots, alerting and so on) are recorded as deferred in the engineering defect records.
 
 ## Appendix A. Configuration reference

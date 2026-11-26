@@ -194,7 +194,9 @@ Related scenario: [Scenario 1 · Step 8](20-scenario-detail-to-daily-report.md).
 | Batch job (Glue / Redshift / EMR) | Enter a cron in the editor → "Publish to MWAA schedule" | One artifact in each region the job is bound to |
 | Workflow | "Recurring schedule" on the details page → "Apply and publish" | The scheduler of the workflow's execution regions |
 
-All of them are managed on the "Task Monitor → Schedule config" tab, with the columns Name / Type / Cron Expression / Enabled / Schedule type (Auto schedule / Carrier not published / Manual trigger) / Carrier definition (Up to date / Carrier needs republishing / Not checked) / Status / Recent runs. "Carrier needs republishing" means the published definition no longer matches the current generator; click "Republish".
+All of them are managed on the "Task Monitor → Schedule config" tab, with the columns Name / Type / Cron Expression / Enabled / Schedule type (Auto schedule / Carrier not published / Manual trigger) / Carrier definition (Up to date / Carrier needs republishing / Undetermined / Not checked / —) / Status / Recent runs. "Carrier needs republishing" means the published definition no longer matches the current generator; click "Republish".
+"Undetermined" = the scheduler service returned an incomplete definition (this happens when the definition contains non-ASCII characters: the schedule rows of sync tasks, and workflows with such a name); the part that was read back is identical and the tail was not read — nothing to do, the schedule fires as usual;
+"—" = this row has no carrier (the schedule is not enabled, or has been disabled).
 
 ![Schedule config](../screenshots/monitor-schedule.webp)
 
