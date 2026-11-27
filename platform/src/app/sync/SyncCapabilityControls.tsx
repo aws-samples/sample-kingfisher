@@ -8,26 +8,29 @@
 //
 // 🔴 本文件的表单控件刻意放在既有控件**之后**、且第 0 步不加 textarea:无头验收按「对话框里第一个 textarea」
 //    找过滤条件输入框、按下标找前三个下拉,新控件插到前面会让那些段静默点错。
-import React, { useState } from "react";
+import React from "react";
 import type { FormInstance } from "antd";
-import { Form, Input, Select, AutoComplete, Space, Button, Tag, Radio, Checkbox, Alert, Divider } from "antd";
+import { Form, Input, Select, AutoComplete, Space, Button, Tag, Radio, Checkbox, Alert, Divider, Switch } from "antd";
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { useT } from "@/lib/i18n/useT";
 import { SYNC_RUN_VAR_NAMES, DERIVED_COLUMN_FORMATS, isValidBusinessTimezone } from "@/lib/sync/run-vars";
 import { overwriteOptionsApply, allowEmptyApplies, mergeKeysApply, type FieldMappingRow } from "./sync-task-payload";
-import { previewToday, previewTemplate, varToken, checkTemplateTableEntry, cloneColumnMapping } from "./sync-capability-helpers";
+import { previewToday, previewTemplate, varToken, cloneColumnMapping } from "./sync-capability-helpers";
+import { EMPTY_PENDING_TEMPLATE, type PendingTemplateEntry } from "./sync-edit-roundtrip";
 
 // ───────────────────────── ① WHERE 区:可用变量 + 渲染预览 + 方言说明 ─────────────────────────
-export function WhereClauseHelp({ form }: { form: FormInstance }) {
+// onUserEdit:「快捷」是替用户往表单里填值(不经表单控件,表单的 onValuesChange 不会响)⇒ 填完告诉向导「用户改过了」
+export function WhereClauseHelp({ form, onUserEdit }: { form: FormInstance; onUserEdit?: () => void }) {
   const t = useT();
+  const quickFill = (where: string) => { form.setFieldValue("whereClause", where); onUserEdit?.(); };
   return (
     <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }} data-testid="sync-where-help">
       <div>
         {t("可用变量")}: {SYNC_RUN_VAR_NAMES.map((n) => <Tag key={n} data-testid="sync-where-var">{varToken(n)}</Tag>)}
       </div>
       <div style={{ marginTop: 4 }}>
-        {t("快捷")}: <a onClick={() => form.setFieldValue("whereClause", "created_at >= '" + varToken("run_date") + "'")}>{t("当天")}</a>
-        {" | "}<a onClick={() => form.setFieldValue("whereClause", "created_at >= CURRENT_DATE - INTERVAL 7 DAY")}>{t("最近7天")}</a>
+        {t("快捷")}: <a onClick={() => quickFill("created_at >= '" + varToken("run_date") + "'")}>{t("当天")}</a>
+        {" | "}<a onClick={() => quickFill("created_at >= CURRENT_DATE - INTERVAL 7 DAY")}>{t("最近7天")}</a>
         <span> {t("(「最近7天」是 MySQL 写法,仅适用于 MySQL 源)")}</span>
       </div>
       <div style={{ marginTop: 4 }}>{t("该条件会下推到源库执行,请使用源库自己的 SQL 方言;只写 WHERE 后面的部分,不要带分号。")}</div>
@@ -90,7 +93,14 @@ export function BusinessTimezoneField({ form }: { form: FormInstance }) {
 // 模板在源库里不存在,此前它没有列 ⇒ 客户为了看列把某个月表也勾成普通表 ⇒ 两者目标名相同,
 //   同一次运行向同一张目标表写两次。现在模板可以指定一张「样例表」(源库里同结构的真表)只用来读列结构:
 //   添加 / 改样例时把样例表的列映射复制给模板(fieldMappings[模板]),第 1 步字段映射 / 建表预览 / 派生列候选随之可见;样例表不会被同步。
-export function TemplateTablesEditor({ form, templateTables, setTemplateTables, sourceTableNames, templateSamples, setTemplateSamples, fieldMappings, setFieldMappings }: {
+//
+// 2026-11-26 客户反馈后两处改动:
+//   ① 新增行的三个框改成受控(状态在向导里):原来它们只是这个控件的内部状态,填好没点「添加」就点「完成」⇒ 不进保存请求、也不提示。
+//      现在「添加」按钮与向导的「下一步 / 完成」走同一条收进来的路(onAdd / 向导的 commitPendingTemplate,校验只有一份)。
+//   ② 这一块用开关收起:不按日期分表的任务只看到一行开关与一句说明;打开后才出现三个框(各带标签)与只跟它有关的提示。
+//      已经添加了带日期变量的表名时恒打开(开关置灰)—— 不让「关上开关」把已有的内容藏起来。
+export function TemplateTablesEditor({ form, templateTables, setTemplateTables, sourceTableNames, templateSamples, setTemplateSamples, fieldMappings, setFieldMappings,
+  pending, setPending, pendingError, setPendingError, onAdd, open, setOpen, onUserEdit }: {
   form: FormInstance;
   templateTables: string[];
   setTemplateTables: (v: string[]) => void;
@@ -102,13 +112,23 @@ export function TemplateTablesEditor({ form, templateTables, setTemplateTables, 
   /** 每张表的列映射(模板那份由样例表复制而来) */
   fieldMappings: Record<string, FieldMappingRow[]>;
   setFieldMappings: (v: Record<string, FieldMappingRow[]>) => void;
+  /** 新增行的三个输入(受控:向导的「下一步 / 完成」也要读到它) */
+  pending: PendingTemplateEntry;
+  setPending: (v: PendingTemplateEntry) => void;
+  /** 新增行下面那句红字(校验不过的原因;中文键,这里过译文) */
+  pendingError: string | null;
+  setPendingError: (v: string | null) => void;
+  /** 「添加」按钮:与「下一步 / 完成」同一条收进来的路(在向导里) */
+  onAdd: () => void;
+  /** 用户有没有打开这一块的开关(已有带日期变量的表名时恒展开,不看它) */
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  /** 用户在这一块做了不经表单控件的改动(移除 / 换样例)⇒ 告诉向导「用户改过了」 */
+  onUserEdit?: () => void;
 }) {
   const t = useT();
-  const [tpl, setTpl] = useState("");
-  const [target, setTarget] = useState("");
-  const [sample, setSample] = useState<string | undefined>(undefined);
-  const [err, setErr] = useState<string | null>(null);
   const sampleOptions = sourceTableNames.map((n) => ({ label: n, value: n }));
+  const editPending = (patch: Partial<PendingTemplateEntry>) => { setPending({ ...pending, ...patch }); setPendingError(null); };
   /** 改 / 清某个模板的样例表:样例列映射复制给模板;清掉 ⇒ 模板不再有列(运行时仍读全列,只是向导里看不到) */
   const setSampleFor = (name: string, next: string | undefined) => {
     const nextSamples = { ...templateSamples };
@@ -116,15 +136,7 @@ export function TemplateTablesEditor({ form, templateTables, setTemplateTables, 
     if (next) { nextSamples[name] = next; nextMaps[name] = cloneColumnMapping(fieldMappings[next]); } else { delete nextSamples[name]; delete nextMaps[name]; }
     setTemplateSamples(nextSamples);
     setFieldMappings(nextMaps);
-  };
-  const add = () => {
-    const e = checkTemplateTableEntry(tpl, target, templateTables);
-    if (e) { setErr(e); return; }
-    const name = tpl.trim();
-    setTemplateTables([...templateTables, name]);
-    form.setFieldValue(["targetTableNames", name], target.trim());
-    if (sample) setSampleFor(name, sample);
-    setTpl(""); setTarget(""); setSample(undefined); setErr(null);
+    onUserEdit?.();
   };
   const remove = (name: string) => {
     setTemplateTables(templateTables.filter((x) => x !== name));
@@ -137,42 +149,67 @@ export function TemplateTablesEditor({ form, templateTables, setTemplateTables, 
   // 「今天」按表单里的业务日期时区取(没填 = UTC);useWatch 让改时区时预览跟着变
   const watchTz = Form.useWatch("businessTimezone", { form, preserve: true });
   const today = previewToday(watchTz);
-  const preview = tpl.trim() ? previewTemplate(tpl.trim(), today.ds) : null;
+  const preview = pending.tpl.trim() ? previewTemplate(pending.tpl.trim(), today.ds) : null;
   const exampleTpl = "orders_" + varToken("bizmonth");
+  const hasTemplates = templateTables.length > 0;
+  const expanded = hasTemplates || open;
+  const cell = (width: number): React.CSSProperties => ({ display: "inline-block", width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "middle" });
   return (
-    <div data-testid="sync-template-tables" style={{ marginTop: 16 }}>
+    <div data-testid="sync-template-tables" data-open={expanded ? "true" : "false"} style={{ marginTop: 16 }}>
       <Divider>{t("带日期变量的表名")}</Divider>
-      <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }} data-testid="sync-template-help">
-        <div>{t("源库里按日期分表(例如每月一张:{a}、{b})时,把表名里的日期写成变量({tpl}),每次运行只读业务日期对应的那一张,并写到一个固定的目标表(例如 {target})。", { a: "orders_202609", b: "orders_202610", tpl: exampleTpl, target: "ods_orders" })}</div>
-        <div>{t("要看列结构、做字段映射、预览建表,请为它选一张同结构的真表作「样例表」:样例表只用来读列,不会被同步。不要再在上面的清单里勾选这些月表 —— 勾了就会多同步一份,并与模板写同一张目标表。")}</div>
-      </div>
-      {templateTables.map((name) => (
-        <Space key={name} style={{ display: "flex", marginBottom: 6 }} data-testid="sync-template-table-row" data-template={name} data-sample={templateSamples[name] || ""}>
-          <code>{name}</code> →
-          <Form.Item name={["targetTableNames", name]} noStyle>
-            <Input size="small" style={{ width: 200 }} placeholder={t("固定的目标表名")} />
-          </Form.Item>
-          <Select size="small" style={{ width: 220 }} allowClear showSearch disabled={sampleOptions.length === 0} value={templateSamples[name]}
-            placeholder={sampleOptions.length ? t("样例表(只读列结构)") : t("先选数据源才有样例表可选")} options={sampleOptions}
-            onChange={(v) => setSampleFor(name, v ? String(v) : undefined)} data-testid="sync-template-sample" />
-          <MinusCircleOutlined onClick={() => remove(name)} data-testid="sync-template-table-remove" />
-        </Space>
-      ))}
-      <Space wrap style={{ marginTop: 4 }}>
-        <Input size="small" style={{ width: 240 }} value={tpl} onChange={(e) => { setTpl(e.target.value); setErr(null); }}
-          placeholder={t("源表名,例如 {example}", { example: exampleTpl })} data-testid="sync-template-table-name" />
-        →
-        <Input size="small" style={{ width: 200 }} value={target} onChange={(e) => { setTarget(e.target.value); setErr(null); }}
-          placeholder={t("固定的目标表名")} data-testid="sync-template-table-target" />
-        <Select size="small" style={{ width: 220 }} allowClear showSearch disabled={sampleOptions.length === 0} value={sample}
-          placeholder={sampleOptions.length ? t("样例表(只读列结构)") : t("先选数据源才有样例表可选")} options={sampleOptions}
-          onChange={(v) => setSample(v ? String(v) : undefined)} data-testid="sync-template-sample-new" />
-        <Button size="small" icon={<PlusOutlined />} onClick={add} data-testid="sync-template-table-add">{t("添加带日期变量的表名")}</Button>
+      <Space align="center" style={{ marginBottom: 8 }}>
+        {/* 关上开关 = 这个任务不按日期分表:新增行里还没添加的内容一并清掉(用户自己关的,不算无声丢失) */}
+        <Switch size="small" checked={expanded} disabled={hasTemplates} data-testid="sync-template-toggle"
+          onChange={(v) => { setOpen(v); if (!v) { setPending(EMPTY_PENDING_TEMPLATE); setPendingError(null); } }} />
+        <span>{t("源库按日期分表(每月 / 每天一张表)")}</span>
+        {hasTemplates ? <span style={{ fontSize: 12, color: "#888" }}>{t("(已添加带日期变量的表名;要关掉这一块,请先把它们移除)")}</span> : null}
       </Space>
-      {preview && "ok" in preview ? (
-        <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{t("按今天({ds},{tz})读的表:", { ds: today.ds, tz: today.tz })} <code>{preview.ok}</code></div>
-      ) : null}
-      {err ? <div style={{ fontSize: 12, color: "#ff4d4f", marginTop: 4 }} data-testid="sync-template-table-error">{t(err)}</div> : null}
+      {!expanded ? (
+        <div style={{ fontSize: 12, color: "#888" }} data-testid="sync-template-collapsed-hint">
+          {t("源库里同一类数据按日期分成多张表(例如 {a}、{b})时打开:用带日期变量的表名,每次运行只读业务日期对应的那一张。只同步上面勾选的表,就不用打开。", { a: "orders_202609", b: "orders_202610" })}
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }} data-testid="sync-template-help">
+            <div>{t("源库里按日期分表(例如每月一张:{a}、{b})时,把表名里的日期写成变量({tpl}),每次运行只读业务日期对应的那一张,并写到一个固定的目标表(例如 {target})。", { a: "orders_202609", b: "orders_202610", tpl: exampleTpl, target: "ods_orders" })}</div>
+            <div>{t("要看列结构、做字段映射、预览建表,请为它选一张同结构的真表作「样例表」:样例表只用来读列,不会被同步。不要再在上面的清单里勾选这些月表 —— 勾了就会多同步一份,并与模板写同一张目标表。")}</div>
+          </div>
+          {/* 三个框各自的标签(原来只有占位提示,填上就看不出哪个框是什么) */}
+          <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }} data-testid="sync-template-labels">
+            <span style={cell(240)}>{t("源表名(带日期变量)")}</span>
+            <span style={cell(30)} />
+            <span style={cell(208)}>{t("固定的目标表名")}</span>
+            <span style={cell(228)}>{t("样例表(只读列结构,不会被同步)")}</span>
+          </div>
+          {templateTables.map((name) => (
+            <Space key={name} style={{ display: "flex", marginBottom: 6 }} data-testid="sync-template-table-row" data-template={name} data-sample={templateSamples[name] || ""}>
+              <span style={cell(240)} title={name}><code>{name}</code></span> →
+              <Form.Item name={["targetTableNames", name]} noStyle>
+                <Input size="small" style={{ width: 200 }} placeholder={t("固定的目标表名")} />
+              </Form.Item>
+              <Select size="small" style={{ width: 220 }} allowClear showSearch disabled={sampleOptions.length === 0} value={templateSamples[name]}
+                placeholder={sampleOptions.length ? t("样例表(只读列结构)") : t("先选数据源才有样例表可选")} options={sampleOptions}
+                onChange={(v) => setSampleFor(name, v ? String(v) : undefined)} data-testid="sync-template-sample" />
+              <MinusCircleOutlined onClick={() => remove(name)} data-testid="sync-template-table-remove" />
+            </Space>
+          ))}
+          <Space wrap style={{ marginTop: 4 }} data-testid="sync-template-new-row">
+            <Input size="small" style={{ width: 240 }} value={pending.tpl} onChange={(e) => editPending({ tpl: e.target.value })}
+              placeholder={t("源表名,例如 {example}", { example: exampleTpl })} data-testid="sync-template-table-name" />
+            →
+            <Input size="small" style={{ width: 200 }} value={pending.target} onChange={(e) => editPending({ target: e.target.value })}
+              placeholder={t("固定的目标表名")} data-testid="sync-template-table-target" />
+            <Select size="small" style={{ width: 220 }} allowClear showSearch disabled={sampleOptions.length === 0} value={pending.sample}
+              placeholder={sampleOptions.length ? t("样例表(只读列结构)") : t("先选数据源才有样例表可选")} options={sampleOptions}
+              onChange={(v) => editPending({ sample: v ? String(v) : undefined })} data-testid="sync-template-sample-new" />
+            <Button size="small" icon={<PlusOutlined />} onClick={onAdd} data-testid="sync-template-table-add">{t("添加带日期变量的表名")}</Button>
+          </Space>
+          {preview && "ok" in preview ? (
+            <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>{t("按今天({ds},{tz})读的表:", { ds: today.ds, tz: today.tz })} <code>{preview.ok}</code></div>
+          ) : null}
+          {pendingError ? <div style={{ fontSize: 12, color: "#ff4d4f", marginTop: 4 }} data-testid="sync-template-table-error">{t(pendingError)}</div> : null}
+        </>
+      )}
     </div>
   );
 }

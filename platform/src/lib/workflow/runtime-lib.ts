@@ -55,7 +55,9 @@ import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 //   (在途运行对删作业可见;作业行回写一律 attribute_exists(jobId) 条件写,不造幽灵行;软限 timeout-pending 带后端句柄)。
 //   🔴 已发布的工作流 / 单作业 DAG 仍 import 旧版本号的库 ⇒ 要重新发布才拿到新执行体(升级须知)。
 // v12 → **v13**(2026-11-10):同步节点把工作流的业务日期(ds)传给同步 Glue 运行(--ds)并记进运行行 runDate;已发布 DAG 要重发才生效。
-export const RUNTIME_LIB_VERSION = 13;
+// v13 → **v14**(2026-11-26):Redshift SQL 作业(作业族共享块 `_run_redshift`)与编排 SQL 节点(`_exec_sql`)在提交前把脚本里的业务日期变量
+//   换成取值(`RUN_PARAMS_PY` 的 `bgp_render_run_params`;原来原文发给数仓);Glue 作业失败的异常带上服务给的原因。已发布 DAG 要重发才生效。
+export const RUNTIME_LIB_VERSION = 14;
 export const RUNTIME_LIB_MODULE = `bgp_workflow_runtime_v${RUNTIME_LIB_VERSION}`;
 export const RUNTIME_LIB_FILENAME = `${RUNTIME_LIB_MODULE}.py`;
 
@@ -166,6 +168,7 @@ def _make_operator(env, node, tasks_meta):
         return PythonOperator(task_id=task_id, python_callable=_job)
     if ntype == "sql":
         # 透传原始 node id(node["id"])做锁属性,与 backfill/execute.ts 补数锁字节对齐(不是 task_id!)。
+        #   业务日期:_exec_sql 的 ds 形参由 Airflow 上下文按名传入(与同步 / 离线作业节点同一口径),执行器据此换掉脚本里的业务日期变量。
         return PythonOperator(task_id=task_id, python_callable=_exec_sql,
                               op_kwargs={"env": env, "sql": data.get("sql", "SELECT 1"),
                                          "sqls": data.get("sqls"),   # 多语句 ⇒ 单事务;缺省 None = 老路
@@ -228,7 +231,7 @@ def _make_operator(env, node, tasks_meta):
             _sqls_tmpl = list(sub_data.get("sqls") or [])      # 多语句 ⇒ 单事务(与 sql 节点同口径)
             def _foreach_sql(item, _env=env, _tmpl=_sql_tmpl, _tmpls=_sqls_tmpl, **kw):
                 _exec_sql(_env, _tmpl.replace("{{item}}", str(item)),
-                          sqls=[str(s).replace("{{item}}", str(item)) for s in _tmpls] or None)
+                          sqls=[str(s).replace("{{item}}", str(item)) for s in _tmpls] or None, ds=kw.get("ds"))
             return PythonOperator.partial(task_id=task_id, python_callable=_foreach_sql).expand(
                 op_kwargs=[{"item": it} for it in items])
         _script = str(sub_data.get("script", ""))

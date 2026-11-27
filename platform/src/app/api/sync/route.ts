@@ -166,6 +166,8 @@ export async function POST(req: NextRequest) {
     status: "draft",
     createdAt: now,
     updatedAt: now,
+    // 配置最近一次保存的时刻(保存路由每次刷新;运行状态回写不动它)—— 向导的本地草稿靠它判断草稿是不是已经作废
+    configSavedAt: now,
   };
   // 选的通道在任务所在的执行区不提供 ⇒ 保存即拒并说明改用哪个(改动前保存能成、点「启动」才被拒)。
   const [boundTargetId] = bindingTargets(item as { targets?: unknown; targetId?: unknown });

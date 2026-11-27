@@ -41,6 +41,7 @@ import { landingOfScope, toScopeParam } from "@/lib/scope/scope";
 import { groupsFromToken } from "@/lib/auth/roles";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import { GLUE_WORKER_TYPES, GLUE_MAX_WORKERS, FLEX_CAPABLE_WORKER_TYPES } from "@/lib/etl/worker-types";
+import { scheduledTriggerFollow, TRIGGER_FOLLOW_INTERVAL_MS, TRIGGER_FOLLOW_MAX_TICKS } from "@/lib/etl/trigger-follow";
 // Glue 版本清单 / 缺省 / 下拉文案的单一作者(缺省最高,用户可降版)
 import { GLUE_VERSIONS, GLUE_VERSION_DEFAULT, GLUE_VERSION_FOR_UNVERSIONED_RECORDS, glueVersionLabel } from "@/lib/sync/glue-version";
 import PromoteButton from "@/components/common/PromoteButton";
@@ -187,6 +188,9 @@ export default function EtlJobsPage() {
   // serverless run 的日志来自 CloudWatch,标题要写明日志组(INTERACTION §2.2b)
   const [logModal, setLogModal] = useState<{ open: boolean; runId: string; logs: string[]; loading: boolean; status?: string; error?: string | null; logGroup?: string; scheduler?: string; runType?: string }>({ open: false, runId: "", logs: [], loading: false });
   const pollRef = useRef<any>(null);
+  // 现在选中的是哪条作业(给跨多拍的轮询用:用户中途换了作业,就不再把上一条作业的运行历史画到这一条下面)
+  const selIdRef = useRef<string | null>(null);
+  useEffect(() => { selIdRef.current = sel?.jobId ?? null; }, [sel]);
 
   const viewLog = async (runId: string) => {
     if (!sel) return;
@@ -336,6 +340,30 @@ export default function EtlJobsPage() {
       const latest = (await (await fetch(`/api/etl-jobs/${id}/runs`)).json())?.data?.[0];
       if (n > 40 || (latest && latest.status !== "running")) { clearInterval(pollRef.current); fetchJobs(); }
     }, 6000);
+  };
+
+  const fetchRunRows = async (id: string): Promise<any[] | null> => {
+    try {
+      const d = await (await fetch(`/api/etl-jobs/${id}/runs`)).json();
+      return d?.success ? d.data : null;
+    } catch { return null; }
+  };
+
+  // 「触发一次调度」之后:跟到这次触发的运行行出现并结束 —— 期间自动重取运行历史,结束后刷新作业列表(列表那一行的状态跟着变)。
+  //   调度服务把触发变成运行行要几十秒到一分钟;原来只在第 5 秒重取一次,新行、它的结果与失败原因都要用户自己点「刷新」才看得到。
+  //   `before` = 触发**之前**已有的运行行;判断「看完了没有」的规则在 lib/etl/trigger-follow.ts(单测钉着)。
+  const followTrigger = (id: string, before: string[], expected: number) => {
+    clearInterval(pollRef.current);
+    let n = 0;
+    pollRef.current = setInterval(async () => {
+      n++;
+      const rows = await fetchRunRows(id);
+      if (rows && selIdRef.current === id) setRuns(rows);
+      if (n >= TRIGGER_FOLLOW_MAX_TICKS || (rows && scheduledTriggerFollow(before, rows, expected) === "done")) {
+        clearInterval(pollRef.current);
+        fetchJobs();
+      }
+    }, TRIGGER_FOLLOW_INTERVAL_MS);
   };
 
   // 🔴 绑了**多个**区时先弹对话框问「这次在哪些区跑」(默认跟随视角);
@@ -515,6 +543,8 @@ export default function EtlJobsPage() {
     if (!sel) return;
     setBusy(true);
     try {
+      // 触发之前先记下已有的运行行:之后新出现的才是这次触发的(读不到就用页面上现有的那份)
+      const before: string[] = ((await fetchRunRows(sel.jobId)) ?? runs).map((r: any) => String(r.runId || "")).filter(Boolean);
       const res = await fetch(`/api/etl-jobs/${sel.jobId}/schedule/trigger`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
       const d = await res.json();
       if (d?.success) {
@@ -522,7 +552,7 @@ export default function EtlJobsPage() {
         const okN = rows.filter((r) => r.status === "ok").length;
         if (d.data.partial) message.warning(t("部分触发成功:{ok}/{all};失败:{bad}", { ok: okN, all: rows.length, bad: rows.filter((r) => r.status !== "ok").map((r) => `${r.targetId}(${r.error || r.status})`).join("、") }));
         else message.success(t("已触发 {n} 个区的调度产物各跑一次(运行历史约 1 分钟后出现新行)", { n: okN }));
-        setTimeout(() => fetchRuns(sel.jobId), 5000);
+        if (okN > 0) followTrigger(sel.jobId, before, okN);
       } else message.error(d?.error?.message || t("触发失败"));
     } finally { setBusy(false); }
   };

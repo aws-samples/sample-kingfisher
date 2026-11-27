@@ -57,7 +57,7 @@ try:
     elif ${JSON.stringify(fn)} == "_run_emr":
         rt._run_emr(spec, "r1", time.time(), "2026-10-11")
     else:
-        rt._run_redshift(spec, "r1", time.time())
+        rt._run_redshift(spec, "r1", time.time(), "2026-10-11")
 except Exception as e:
     out["error"] = str(e)
 out["clients"] = boto3.CLIENTS

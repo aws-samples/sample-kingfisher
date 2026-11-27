@@ -4,6 +4,8 @@
 // (与 TS 侧 lib/etl/run-params.ts 的 `runParamArguments` / `runParamArgv` 逐项同值,parity 判据用真 python3 逐日比对):
 //   · bgp_run_param_args(ds) → {"--ds": "2026-09-01", …}      Glue start_job_run 的 Arguments
 //   · bgp_run_param_argv(ds) → ["--ds", "2026-09-01", …]       EMR start_job_run 的 entryPointArguments(追加在用户入参之后)
+//   · bgp_render_run_params(text, ds) → 把 SQL 文本里的业务日期变量换成取值(Redshift SQL 作业 / 编排 SQL 节点在调度执行体里提交前调用;
+//     与 TS 侧 `renderTemplate(text, paramSet(ds))` 同语义:只换取值表里有的变量名,不认识的写法原样保留;parity 判据逐日逐文本比对)
 // 🔴 宿主 Python 文件必须 `import re, sys`(SYNC_RUN_VARS_PY 用到)。
 // 🔴 本串会被嵌进 TS 模板字符串:禁写反引号与「美元 + 左花括号」的连写。
 import { SYNC_RUN_VARS_PY } from "@/lib/sync/run-vars-py";
@@ -26,4 +28,16 @@ def bgp_run_param_argv(ds):
         out.append(k)
         out.append(v)
     return out
+
+
+# SQL 文本里的业务日期变量 → 取值(与平台「立即运行」/ 试运行 / 补数同一张表、同一种写法:只换取值表里有的变量名,
+#   不认识的写法原样保留;ds 非法即拒)。模式用字符类拼,本串里不出现「美元 + 左花括号」的连写。
+_BGP_RUN_PARAM_RE = re.compile("[$][{]([a-zA-Z0-9_]+)[}]")
+
+
+def bgp_render_run_params(text, ds):
+    run_vars = dict((k[2:], v) for k, v in bgp_run_param_args(ds).items())
+    if not text:
+        return text
+    return _BGP_RUN_PARAM_RE.sub(lambda m: run_vars.get(m.group(1), m.group(0)), str(text))
 `;

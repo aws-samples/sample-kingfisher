@@ -105,7 +105,7 @@ After you choose the target type, "Channel Recommendation" appears below: for th
 
 1. Tick the 7 tables in "Select sync tables"; you can use "Search table name" and "Select all N shown"; the tag on the right shows "7 selected / 7 total".
 2. "Field mapping" below lists source field / source type / target type / target field per table; keep the defaults.
-3. The "Table names with date variables" block is not used in this scenario (it is for sources that shard tables by month, such as `orders_202609`).
+3. The "Table names with date variables" block is not used in this scenario (it is for sources that shard tables by month, such as `orders_202609`); it sits behind a switch and stays hidden unless the switch is turned on.
 
 Click "Next".
 

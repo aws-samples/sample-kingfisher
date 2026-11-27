@@ -279,7 +279,7 @@ describe("① 作业锁:同一把锁、同一个顺序", () => {
     expect(fast.ok, fast.error).toBe(true);
     expect(runRow(fast)!.status).toBe("succeeded");
     // 源码字面:三引擎的软限时钟都是 node_started,台账 startedAt 仍是 started
-    expect(NODE_EXEC_PY).toMatch(/_run_redshift\(spec, job_run_id, node_started\)/);
+    expect(NODE_EXEC_PY).toMatch(/_run_redshift\(spec, job_run_id, node_started, ds\)/);
     expect(NODE_EXEC_PY).toMatch(/_run_glue\(spec, job_run_id, node_started, ds\)/);
     expect(NODE_EXEC_PY).toMatch(/_run_emr\(spec, job_run_id, node_started, ds\)/);
     expect(NODE_EXEC_PY).toMatch(/_record\(spec, job_run_id, "succeeded", started_at=_iso\(started\), extra=extra\)/);

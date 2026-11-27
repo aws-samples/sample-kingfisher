@@ -127,7 +127,7 @@ describe("SW-1 节点语义单一作者", () => {
     expect(slsBody).toMatch(/if ntype == "job":[\s\S]{0,600}return _exec_job\(e, node, ds=ds, workflow_run_id=e\.get\("ledger_run_id"\)\)/);
     // 单作业载体 run_job 调的也是这同一族(不是第二份副本)
     const runJob = BGP_RUNTIME_PY.slice(BGP_RUNTIME_PY.indexOf("def run_job("), BGP_RUNTIME_PY.indexOf("def _wf_ledger_close("));
-    for (const f of ["_acquire_run_lock(spec, token)", "_run_redshift(spec, run_id, started)", "_run_glue(spec, run_id, started, ds)", "_run_emr(spec, run_id, started, ds)", "_release_run_lock(spec, token)"]) {
+    for (const f of ["_acquire_run_lock(spec, token)", "_run_redshift(spec, run_id, started, ds)", "_run_glue(spec, run_id, started, ds)", "_run_emr(spec, run_id, started, ds)", "_release_run_lock(spec, token)"]) {
       expect(runJob, `run_job 没调 ${f}`).toContain(f);
     }
   });
@@ -213,7 +213,7 @@ describe("SW-2b / SW-2d 台账三写点的写法", () => {
     const fe = body.slice(body.indexOf('if ntype == "foreach"'));
     // 子任务同时透传预切的多语句 sqls(每条都替换 {{item}}),与 sql 节点同口径
     expect(fe).toContain('_exec_sql(e, str(sub_data.get("sql", "SELECT 1")).replace("{{item}}", str(item)),');
-    expect(fe).toContain('sqls=[str(s).replace("{{item}}", str(item)) for s in (sub_data.get("sqls") or [])] or None)');
+    expect(fe).toContain('sqls=[str(s).replace("{{item}}", str(item)) for s in (sub_data.get("sqls") or [])] or None, ds=ds)');
     expect(fe, "foreach 子任务传了 node_id ⇒ N 个子任务串成一队,与经典分叉").not.toContain("node_id=");
   });
 });

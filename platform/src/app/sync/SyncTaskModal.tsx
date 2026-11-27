@@ -16,7 +16,7 @@ import { buildSyncTaskPayload, paradigmForCapabilityCheck } from "./sync-task-pa
 // 取表清单的唯一作者(直连 / 经 Glue 连接发现 + 轮询)
 import { fetchSourceTables } from "@/lib/datasource/tables-client";
 // 向导本地草稿(单一作者 lib/sync/wizard-draft.ts):每步改动落 localStorage,保存成功才清;再打开问「恢复 / 丢弃」
-import { clearSyncDraft, describeDraftAge, loadSyncDraft, saveSyncDraft, type SyncWizardDraft } from "@/lib/sync/wizard-draft";
+import { clearSyncDraft, describeDraftAge, loadUsableSyncDraft, saveSyncDraft, type SyncWizardDraft } from "@/lib/sync/wizard-draft";
 // UX ②:第一步三个选择题的缺省值(唯一作者)
 import { SYNC_WIZARD_DEFAULTS } from "@/lib/sync/wizard-defaults";
 // 通道推荐的取数闸(唯一作者):只认最后一次请求、且数据源没换;换数据源时要不要重取也问它
@@ -24,6 +24,8 @@ import { createChannelRecGate } from "@/lib/sync/channel-rec-gate";
 import { WhereClauseHelp, BusinessTimezoneField, TemplateTablesEditor, WriteOptionsSection } from "./SyncCapabilityControls";
 // 模板实例识别(守卫 1 黄标)与样例列映射复制(纯函数,单测在 __tests__/template-sample-table.test.ts)
 import { templateInstanceOf, cloneColumnMapping } from "./sync-capability-helpers";
+// 再次编辑不丢东西(纯函数):新增行「填了没点添加」的收进来 / 拦下、保存过的列映射读回
+import { EMPTY_PENDING_TEMPLATE, commitTemplateEntry, mergeSavedFieldMappings, type PendingTemplateEntry, type TemplateWizardState } from "./sync-edit-roundtrip";
 
 // 数据源类型→图标(由 DS_TYPE_OPTIONS 单一事实源派生,不再散落硬编码 mysql?🐬:🐘)。
 const DS_TYPE_ICON: Record<string, string> = Object.fromEntries(DS_TYPE_OPTIONS.map((o) => [o.value, o.icon]));
@@ -92,6 +94,17 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   const [templateSamples, setTemplateSamples] = useState<Record<string, string>>({});
   const templateSamplesRef = useRef(templateSamples);
   templateSamplesRef.current = templateSamples;
+  // 带日期变量的表名「新增行」的三个输入与它下面那句红字:放在向导里(受控)——「下一步 / 完成」要读得到它,
+  //   填了没点「添加」的那一行按「添加」同一套校验收进来,或者拦下并说明原因(原来是控件内部状态,不进保存请求也不提示)。
+  const [pendingTpl, setPendingTpl] = useState<PendingTemplateEntry>(EMPTY_PENDING_TEMPLATE);
+  const [pendingTplError, setPendingTplError] = useState<string | null>(null);
+  // 「源库按日期分表」开关(已有带日期变量的表名时恒展开,不看它);每次打开向导归位
+  const [tplSectionOpen, setTplSectionOpen] = useState(false);
+  // 草稿只在用户改过之后才写:只在用户动作里置真(表单控件改值、勾表、列映射、带日期变量的表名、几处替用户往表单里填值的按钮);
+  //   打开向导时的回填、读表清单、恢复草稿都不算。打开 / 关闭时归假。
+  const dirtyRef = useRef(false);
+  // 列映射是否已经按源库的表清单重建完:没读完 / 读失败时点「完成」,这次没有列映射的表保持任务里原来那份(不写成空)
+  const mappingsReadyRef = useRef(false);
   // 拉表请求序号:只有**最后一次**选源的结果能落进 tables / fieldMappings。
   //   编辑打开时自动按旧源拉表(经 Glue 发现要 1–3 分钟),此时用户换源 ⇒ 两次拉表并发,先发后到的旧源结果会盖掉新源表清单(stale-response 竞态)。
   const dsReqSeq = useRef(0);
@@ -178,6 +191,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       setDdlPreview({}); setChannelRec(null); setCapabilityError(null);
       if (channelRecGate.wanted) void fetchChannelRec(dsId);
     }
+    // 从这里到列映射按新读到的表清单重建完之前,列映射「还没准备好」(这期间点「完成」不把任务里原有的列映射写成空)
+    mappingsReadyRef.current = false;
     // 源在哪个区,任务就在那个区跑。workgroup 下拉改拉**该区**清单。
     // 🔴 落点字段(表桶/workgroup/库)在前端**一律不预填**:留空 = 服务端按该章的描述符解析
     // (start 路由 tableBucketName / resolveRedshiftBinding 是唯一作者)。此处刻意不按 home 与否
@@ -200,6 +215,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     }
     // 直连读不到且有 Glue 连接时后端起发现作业(202),唯一作者 fetchSourceTables 负责轮询;源在自有网络的客户向导才建得了任务
     let tableList: any[] = [];
+    let tablesRead = true;
     setTablesLoading(true);
     try {
       const r = await fetchSourceTables(dsId, ds.database, {
@@ -208,6 +224,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       tableList = r.tables;
       if (r.via === "glue-discovery") message.success(t("表结构经数据源的 Glue 连接发现({n} 张表)", { n: r.tables.length }));
     } catch (e: any) {
+      tablesRead = false;
       if (seq === dsReqSeq.current) message.error(e?.message || t("获取表列表失败"));
     }
     // 🔴 先发后到的旧源结果不许盖掉新源的表清单 / 映射(用户已经换了源,这次结果作废)
@@ -227,6 +244,8 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       const samplesNow = templateSamplesRef.current;
       const keptSamples = Object.fromEntries(Object.entries(samplesNow).filter(([, sampleName]) => names.has(sampleName)));
       if (Object.keys(keptSamples).length !== Object.keys(samplesNow).length) { templateSamplesRef.current = keptSamples; setTemplateSamples(keptSamples); }
+      // 新增行里选好还没添加的样例表同理(不在新源里 ⇒ 清掉样例,其余两个框保留)
+      setPendingTpl((p) => (p.sample && !names.has(p.sample) ? { ...p, sample: undefined } : p));
     }
     const mappings: Record<string, any[]> = {};
     for (const tbl of tableList) {
@@ -241,7 +260,13 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       if (mappings[sampleName]) mappings[tpl] = cloneColumnMapping(mappings[sampleName]);
     }
     if (seq !== dsReqSeq.current) return;
-    setFieldMappings(mappings);
+    // 再次编辑同一个数据源的任务:以任务里保存的列映射为准合到新读到的列清单上(保存过的列 = 开着 + 保存的目标字段名;没保存的列 = 关着)。
+    //   原来这里整份按新读到的表清单重建 ⇒ 用户关掉的列又是开着的、改过的目标字段名回到缺省,点「完成」就把缺省写回去。
+    //   带日期变量的表名那份先按样例表新读到的列复制(上面),再与任务里保存的那份合。换了数据源 ⇒ 不合(旧源的列映射不作数)。
+    const savedMappings = editing && dsId === editing.datasourceId ? editing.fieldMappings : undefined;
+    setFieldMappings(mergeSavedFieldMappings(mappings, savedMappings));
+    // 表清单读失败 ⇒ 列映射仍算「没准备好」(保存时保持任务里原来那份)
+    mappingsReadyRef.current = tablesRead;
   };
 
   // 数据源可以显式传入(换源当下调用):不依赖「表单值此刻是否已经写进去」的时序。重取会把所选通道重置成新推荐的那个,
@@ -284,12 +309,16 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     else message.error(data.error?.message || t("建表失败"));
   };
 
-  // 草稿:每一步 / 每次改值都存(便宜,不防抖);保存成功才清。恢复 = 回填表单 + 选表 + 映射 + 步骤,再按源重拉表清单(映射以草稿为准)。
+  // 草稿:用户改过之后,每一步 / 每次改值都存(便宜,不防抖);保存成功才清。恢复 = 回填表单 + 选表 + 映射 + 步骤,再按源重拉表清单(映射以草稿为准)。
+  //   🔴 没改过不写:原来弹窗一打开(回填状态触发下面那个副作用)就写一份,只看了一眼就关掉也留下「未保存的配置」,下次再编辑就问「恢复 / 丢弃」。
+  //   草稿里记下写它时任务的「配置最近一次保存」标记;再打开时不一样 ⇒ 任务在草稿之后又保存过 ⇒ 草稿作废(loadUsableSyncDraft)。
   const draftKey = editing?.taskId;
   const saveDraftNow = () => {
-    if (!open) return;
-    saveSyncDraft(draftKey, { step, formValues: form.getFieldsValue(true) as Record<string, unknown>, selectedTables, templateTables, templateSamples, fieldMappings });
+    if (!open || !dirtyRef.current) return;
+    saveSyncDraft(draftKey, { step, formValues: form.getFieldsValue(true) as Record<string, unknown>, selectedTables, templateTables, templateSamples, fieldMappings, baseConfigSavedAt: editing?.configSavedAt });
   };
+  /** 用户动了配置(唯一置真的入口);随手存一次(状态类的改动由下面那个副作用在状态刷新后再存一次)。 */
+  const markEdited = () => { dirtyRef.current = true; saveDraftNow(); };
   useEffect(() => { saveDraftNow(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, step, selectedTables, templateTables, fieldMappings]);
   const applyDraft = async (d: SyncWizardDraft) => {
     setPendingDraft(null);
@@ -312,28 +341,56 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
   };
   const discardDraft = () => { clearSyncDraft(draftKey); setPendingDraft(null); };
 
+  /**
+   * 把带日期变量的表名「新增行」收进任务 ——「添加」按钮(emptyIsError = true)与「下一步 / 完成」(false)同一条路。
+   * 返回 null = 被拦下(原因已经显示在那一行下面);否则返回收进来之后的四样状态。
+   * 🔴 调用方接着要用的(校验、提交整形)一律用返回值,不许读 templateTables / templateSamples / fieldMappings 这几个状态变量:
+   *   setState 要到下一次渲染才生效,「完成」这一下读到的还是收进来之前的值 ⇒ 刚收进来的那一张又丢了。
+   */
+  const commitPendingTemplate = (emptyIsError: boolean): TemplateWizardState | null => {
+    const state: TemplateWizardState = { templateTables, templateSamples, fieldMappings, targetTableNames: { ...(form.getFieldValue("targetTableNames") || {}) } };
+    const r = commitTemplateEntry(pendingTpl, state, { emptyIsError });
+    if (r.kind === "empty") return state;
+    if (r.kind === "error") { setPendingTplError(r.error); return null; }
+    dirtyRef.current = true;
+    setTemplateTables(r.state.templateTables);
+    setTemplateSamples(r.state.templateSamples); templateSamplesRef.current = r.state.templateSamples;
+    setFieldMappings(r.state.fieldMappings);
+    form.setFieldValue("targetTableNames", r.state.targetTableNames);
+    setPendingTpl(EMPTY_PENDING_TEMPLATE); setPendingTplError(null);
+    // 不是点「添加」收进来的 ⇒ 说一声(不无声)
+    if (!emptyIsError) message.info(t("已把填好但还没点「添加」的带日期变量的表名「{name}」加进任务", { name: r.name }), 6);
+    return r.state;
+  };
+
   const handleSubmit = async () => {
     // 🔴 整个提交路径都在 try 里:原来整形 / 校验在 try 之外,一旦抛错 Modal 的 onOk 静默吞掉 ⇒ 用户看到的就是「点『完成』没反应」;
     //   现在任何异常都落成一条 message.error,且草稿一直在,关掉重开能恢复。
     //   「完成」从第 2 步起任何一步都能点(UX ②:第 1 步只留「下一步」,三个选择题有缺省)⇒ 先按用户的话复述前两步的必填项(任务名称 / 数据源 / 模式 / 至少一张表),
     //   而不是让后端那句带字段名的拒绝(「`sourceTables` 为空 …」)当第一道提示(2026-10-15 页面驱动 p42b W3 看到的就是它)。
-    if (!validateUpTo(1)) return;
+    //   在这之前先把带日期变量的表名「新增行」收进来:填了没点「添加」的不许无声丢失;填得不对就拦下,回到那一步让用户看见原因。
+    const committed = commitPendingTemplate(false);
+    if (!committed) { setStep(1); message.warning(t("带日期变量的表名那一行还没填对:请按那一行下面的提示改好,或把它清空,再点「完成」")); return; }
+    if (!validateUpTo(1, undefined, committed.templateTables)) return;
     try {
-      await handleSubmitInner();
+      await handleSubmitInner(committed);
     } catch (e: any) {
       message.error(t("保存失败:{m}", { m: String(e?.message || e).slice(0, 200) }));
     }
   };
 
-  const handleSubmitInner = async () => {
-    // 整形抽成纯函数(判据钉住改动前的输出 + 存量任务逐键不变)
+  const handleSubmitInner = async (committed: TemplateWizardState) => {
+    // 整形抽成纯函数(判据钉住改动前的输出 + 存量任务逐键不变)。带日期变量的表名那三样状态用「收进来之后」的值(见 commitPendingTemplate);
+    //   固定的目标表名在表单里(form.setFieldValue 是同步写进表单仓的,这里读到的已经含刚收进来的那一条)。
     const values: Record<string, any> = buildSyncTaskPayload({
       formValues: form.getFieldsValue(true),
       selectedTables,
-      templateTables,
-      templateSamples,
-      fieldMappings,
+      templateTables: committed.templateTables,
+      templateSamples: committed.templateSamples,
+      fieldMappings: committed.fieldMappings,
       original: editing as Record<string, unknown> | undefined,
+      // 表清单还没读完 / 读失败时点「完成」:这次没有列映射的表保持任务里原来那份
+      mappingsReady: mappingsReadyRef.current,
     });
     // 前端先校验一遍(后端同一函数再校验)。数据源范式只在「过滤条件 / 表名模板是本次新填或改过的」时参与:
     // 存量任务里那条从前不生效的过滤条件原样保存时,不因为源不是 JDBC 就被拦住保存。
@@ -377,8 +434,11 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     } finally { setSaving(false); }
   };
 
-  /** 校验到第 upTo 步(含)为止的必填项;「下一步」只校验当前步,「完成」校验前两步(后面几步都有默认值)。 */
-  const validateUpTo = (upTo: number, only?: number) => {
+  /**
+   * 校验到第 upTo 步(含)为止的必填项;「下一步」只校验当前步,「完成」校验前两步(后面几步都有默认值)。
+   * tplTables = 带日期变量的表名清单(刚把新增行收进来时传收进来之后的那份,状态变量要到下一次渲染才更新)。
+   */
+  const validateUpTo = (upTo: number, only?: number, tplTables: string[] = templateTables) => {
     const v = form.getFieldsValue(true);
     const covers = (i: number) => (only === undefined ? i <= upTo : i === only);
     if (covers(0)) {
@@ -388,10 +448,20 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
       if (!v.writeMode) { message.warning(t("请选择写入模式")); return false; }
       if (!v.targetType) { message.warning(t("请选择目标类型")); return false; }
     }
-    if (covers(1) && selectedTables.length === 0 && templateTables.length === 0) { message.warning(t("请至少选择一张表")); return false; }
+    if (covers(1) && selectedTables.length === 0 && tplTables.length === 0) { message.warning(t("请至少选择一张表")); return false; }
     return true;
   };
-  const validateStep = () => validateUpTo(step, step);
+  const validateStep = (tplTables?: string[]) => validateUpTo(step, step, tplTables);
+  /** 「下一步」:离开选表那一步之前先把带日期变量的表名「新增行」收进来(填得不对就留在这一步,原因显示在那一行下面)。 */
+  const goNext = () => {
+    let tplTables: string[] | undefined;
+    if (step === 1) {
+      const committed = commitPendingTemplate(false);
+      if (!committed) return;
+      tplTables = committed.templateTables;
+    }
+    if (validateStep(tplTables)) setStep(step + 1);
+  };
 
   const STEPS = [{ title: t("源端配置") }, { title: t("选表 & 映射") }, { title: t("目标配置") }, { title: t("建表预览") }, { title: t("调度设置") }];
   // 有样例表(⇒ 有列)的模板,在字段映射(只读)/ 建表预览 / 派生列与合并键候选里与普通表一起列出;
@@ -404,7 +474,9 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
     <Modal title={isEdit ? t("编辑同步任务") : t("新建同步任务")} open={open} width={900} onCancel={onClose} onOk={handleSubmit} confirmLoading={saving} okText={t("完成")}
       // UX ②:第一步只留「下一步」(用户 10-20 拍板);第 2 步起「完成」才出现(后面几步都有缺省,可直接完成)
       okButtonProps={{ "data-testid": "sync-wizard-finish", style: step === 0 ? { display: "none" } : undefined } as any}
-      afterOpenChange={(o) => { if (o) { form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS); setStep(0); setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType); setChannelRec(null); channelRecGate.reset(); setDdlPreview({}); setCapabilityError(null); setPendingDraft(loadSyncDraft(editing?.taskId)); setTableFilter(""); setOnlySelected(false);
+      afterOpenChange={(o) => { if (o) { form.setFieldsValue(editing ? withRecordGlueVersion(editing) : SYNC_WIZARD_DEFAULTS); setStep(0); setTargetType(editing?.targetType || SYNC_WIZARD_DEFAULTS.targetType); setChannelRec(null); channelRecGate.reset(); setDdlPreview({}); setCapabilityError(null); setPendingDraft(loadUsableSyncDraft(editing?.taskId, editing?.configSavedAt)); setTableFilter(""); setOnlySelected(false);
+        // 每次打开都从「没改过」开始;新增行与开关归位;列映射要等表清单读完才算准备好
+        dirtyRef.current = false; mappingsReadyRef.current = false; setPendingTpl(EMPTY_PENDING_TEMPLATE); setPendingTplError(null); setTplSectionOpen(false);
         // 带日期变量的表名与普通表分开回填(见 templateTables 的注释)
         const editTables = editing?.sourceTables || [];
         setSelectedTables(editTables.filter((x) => !x.includes("$" + "{"))); setTemplateTables(editTables.filter((x) => x.includes("$" + "{")));
@@ -414,7 +486,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         const editNs = (editing as any)?.s3Config?.namespace;
         const editDsDb = dataSources.find((d) => d.datasourceId === editing?.datasourceId)?.database;
         setNsMode(editing && editNs && editNs !== editDsDb ? "manual" : "auto");
-      } else { form.resetFields(); setTables([]); setFieldMappings({}); setSelectedTables([]); setTemplateTables([]); setTemplateSamples({}); setCapabilityError(null); setNsMode("auto"); } }}>
+      } else { dirtyRef.current = false; form.resetFields(); setTables([]); setFieldMappings({}); setSelectedTables([]); setTemplateTables([]); setTemplateSamples({}); setCapabilityError(null); setNsMode("auto"); setPendingTpl(EMPTY_PENDING_TEMPLATE); setPendingTplError(null); setTplSectionOpen(false); } }}>
       <Steps current={step} size="small" style={{ marginBottom: 24 }} items={STEPS} />
       {pendingDraft ? (
         <Alert type="info" showIcon style={{ marginBottom: 16 }} data-testid="sync-draft-banner"
@@ -422,7 +494,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
           action={<Space><Button size="small" type="primary" data-testid="sync-draft-restore" onClick={() => { void applyDraft(pendingDraft); }}>{t("恢复")}</Button><Button size="small" data-testid="sync-draft-discard" onClick={discardDraft}>{t("丢弃")}</Button></Space>} />
       ) : null}
       {capabilityError ? <Alert type="error" showIcon closable style={{ marginBottom: 16 }} message={capabilityError} data-testid="sync-capability-error" onClose={() => setCapabilityError(null)} /> : null}
-      <Form form={form} layout="vertical" style={{ minHeight: 380 }} preserve onValuesChange={() => saveDraftNow()}>
+      <Form form={form} layout="vertical" style={{ minHeight: 380 }} preserve onValuesChange={() => markEdited()}>
 
         {/* ===== Step 0: 源端配置 ===== */}
         <div style={{ display: step === 0 ? undefined : "none" }}>
@@ -509,7 +581,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             <Input.TextArea rows={2} placeholder={"created_at >= '${run_date}' AND status = 'completed'"} />
           </Form.Item>
           {/* 可用变量取自 SYNC_RUN_VAR_NAMES + 按今天渲染预览 + 方言说明 */}
-          <WhereClauseHelp form={form} />
+          <WhereClauseHelp form={form} onUserEdit={markEdited} />
           <BusinessTimezoneField form={form} />
           <Form.Item noStyle shouldUpdate>
             {() => form.getFieldValue("syncMode") === "incremental" ? (
@@ -526,7 +598,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                   <Form.Item label={t("当前水位 (incrementalValue)")} tooltip={t("增量同步每次只读「增量字段 > 当前水位」的行;成功后自动前进到本次最大值。落库为幂等先删后写,重跑不会重复。需要重新全量回填可清空或填 0。")}>
                     <Space>
                       <Form.Item name="incrementalValue" noStyle><Input placeholder={t("(尚未运行)")} style={{ width: 220 }} /></Form.Item>
-                      <Button size="small" onClick={() => form.setFieldValue("incrementalValue", "0")}>{t("重置为 0(重新回填)")}</Button>
+                      <Button size="small" onClick={() => { form.setFieldValue("incrementalValue", "0"); markEdited(); }}>{t("重置为 0(重新回填)")}</Button>
                     </Space>
                   </Form.Item>
                 )}
@@ -544,14 +616,14 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             //   🔴 不用 Checkbox.Group:它在 onChange 时会把**没渲染出来**的已选值滤掉(筛掉一半表再勾一个 = 其余已选全丢),所以逐个 Checkbox 自己维护。
             const kw = tableFilter.trim().toLowerCase();
             const shown = tables.filter((tbl) => (!kw || String(tbl.name).toLowerCase().includes(kw)) && (!onlySelected || selectedTables.includes(tbl.name)));
-            const toggle = (name: string, on: boolean) => setSelectedTables((prev) => (on ? (prev.includes(name) ? prev : [...prev, name]) : prev.filter((x) => x !== name)));
+            const toggle = (name: string, on: boolean) => { markEdited(); setSelectedTables((prev) => (on ? (prev.includes(name) ? prev : [...prev, name]) : prev.filter((x) => x !== name))); };
             return (
               <div data-testid="sync-table-picker">
                 <Space wrap style={{ marginBottom: 8 }}>
                   <Input allowClear placeholder={t("搜索表名")} value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} style={{ width: 240 }} data-testid="sync-table-filter" />
                   <Checkbox checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} data-testid="sync-table-only-selected">{t("只看已选")}</Checkbox>
-                  <Button size="small" disabled={shown.length === 0} onClick={() => setSelectedTables((prev) => Array.from(new Set([...prev, ...shown.map((x) => String(x.name))])))} data-testid="sync-table-select-shown">{t("全选筛出的 {n} 张", { n: String(shown.length) })}</Button>
-                  <Button size="small" disabled={selectedTables.length === 0} onClick={() => setSelectedTables([])} data-testid="sync-table-clear">{t("清空已选")}</Button>
+                  <Button size="small" disabled={shown.length === 0} onClick={() => { markEdited(); setSelectedTables((prev) => Array.from(new Set([...prev, ...shown.map((x) => String(x.name))]))); }} data-testid="sync-table-select-shown">{t("全选筛出的 {n} 张", { n: String(shown.length) })}</Button>
+                  <Button size="small" disabled={selectedTables.length === 0} onClick={() => { markEdited(); setSelectedTables([]); }} data-testid="sync-table-clear">{t("清空已选")}</Button>
                   <Tag color={selectedTables.length ? "cyan" : "default"} data-testid="sync-table-count">{t("已选 {n} / 共 {m}", { n: String(selectedTables.length), m: String(tables.length) })}</Tag>
                 </Space>
                 <div style={{ maxHeight: 320, overflowY: "auto" }}>
@@ -583,22 +655,30 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
           ) : <Alert type="info" message={t("请先在上一步选择数据源")} />}
           {/* 带日期变量的源表名(加进 sourceTables + 固定目标表名进 targetTableNames) */}
           {/* 样例表候选 = 源库表清单;添加 / 改样例把样例列映射复制给模板 */}
+          {/* 新增行受控(「下一步 / 完成」也读得到);「添加」按钮与它们同一条收进来的路;这一块用开关收起 */}
           <TemplateTablesEditor form={form} templateTables={templateTables} setTemplateTables={setTemplateTables}
             sourceTableNames={tables.map((x) => String(x.name))} templateSamples={templateSamples} setTemplateSamples={setTemplateSamples}
-            fieldMappings={fieldMappings} setFieldMappings={setFieldMappings} />
+            fieldMappings={fieldMappings} setFieldMappings={setFieldMappings}
+            pending={pendingTpl} setPending={setPendingTpl} pendingError={pendingTplError} setPendingError={setPendingTplError}
+            onAdd={() => { commitPendingTemplate(true); }} open={tplSectionOpen} setOpen={setTplSectionOpen} onUserEdit={markEdited} />
           {(selectedTables.length > 0 || templatesWithColumns.length > 0) && (() => {
             // 同一组列定义两种用法:普通表可改(同步开关 / 目标字段名);模板只读(列结构来自样例表,运行时按业务日期读对应那张表)
             const mappingColumns = (tableName: string, readOnly: boolean) => [
-              { title: t("同步"), dataIndex: "include", width: 50, render: (_: any, r: any, i: number) => <Switch size="small" disabled={readOnly} checked={r.include} onChange={(v) => { const m = { ...fieldMappings }; m[tableName] = [...m[tableName]]; m[tableName][i] = { ...m[tableName][i], include: v }; setFieldMappings(m); }} /> },
+              { title: t("同步"), dataIndex: "include", width: 50, render: (_: any, r: any, i: number) => <Switch size="small" disabled={readOnly} checked={r.include} onChange={(v) => { markEdited(); const m = { ...fieldMappings }; m[tableName] = [...m[tableName]]; m[tableName][i] = { ...m[tableName][i], include: v }; setFieldMappings(m); }} /> },
               { title: t("源字段"), dataIndex: "source", render: (v: string) => <code>{v}</code> },
               { title: t("源类型"), dataIndex: "sourceType", render: (v: string) => <Tag>{v}</Tag> },
               { title: "", width: 30, render: () => "→" },
               { title: t("目标类型"), dataIndex: "targetType", render: (v: string, r: any) => <Space>{compatIcon(r.compatibility)}<Tag color={r.compatibility === "compatible" ? "green" : "orange"}>{v}</Tag></Space> },
-              { title: t("目标字段"), dataIndex: "target", render: (_: any, r: any, i: number) => <Input size="small" disabled={readOnly} value={r.target} onChange={(e) => { const m = { ...fieldMappings }; m[tableName] = [...m[tableName]]; m[tableName][i] = { ...m[tableName][i], target: e.target.value }; setFieldMappings(m); }} /> },
+              { title: t("目标字段"), dataIndex: "target", render: (_: any, r: any, i: number) => <Input size="small" disabled={readOnly} value={r.target} onChange={(e) => { markEdited(); const m = { ...fieldMappings }; m[tableName] = [...m[tableName]]; m[tableName][i] = { ...m[tableName][i], target: e.target.value }; setFieldMappings(m); }} /> },
             ];
             return (
             <div>
               <Divider><SwapOutlined /> {t("字段映射")}</Divider>
+              {isEdit ? (
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }} data-testid="sync-mapping-saved-hint">
+                  {t("开关与目标字段名按任务上次保存的显示;关着的列里也包括上次保存之后源库新增的列。")}
+                </div>
+              ) : null}
               {selectedTables.map((tableName) => (
                 <div key={tableName} style={{ marginBottom: 16 }}>
                   <h4>📋 {tableName}</h4>
@@ -620,14 +700,28 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
         <div style={{ display: step === 2 ? undefined : "none" }}>
           {/* target table naming */}
           <Divider>{t("目标表命名")}</Divider>
-          <Space size={16}>
-            <Form.Item name="targetTablePrefix" label={t("表名前缀")} tooltip={t("应用到所有目标表，默认与源表同名")}>
-              <Input placeholder={t("如 ods_")} style={{ width: 180 }} allowClear />
-            </Form.Item>
-            <Form.Item name="targetTableSuffix" label={t("表名后缀")}>
-              <Input placeholder={t("如 _v2")} style={{ width: 180 }} allowClear />
-            </Form.Item>
-          </Space>
+          {/* 表名前缀 / 后缀只对勾选的普通表生效(带日期变量的表名用各自固定的目标表名)⇒ 任务里只有带日期变量的表名时,这两个框与它们的提示不出现 */}
+          {selectedTables.length === 0 && templateTables.length > 0 ? (
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }} data-testid="sync-target-naming-template-only">
+              {t("这个任务只有带日期变量的表名:目标表名就是上一步为它们各自填的「固定的目标表名」,这里不用再填(表名前缀 / 后缀只对勾选的普通表生效)。")}
+            </div>
+          ) : (
+            <>
+              <Space size={16}>
+                <Form.Item name="targetTablePrefix" label={t("表名前缀")} tooltip={t("应用到所有目标表，默认与源表同名")}>
+                  <Input placeholder={t("如 ods_")} style={{ width: 180 }} allowClear />
+                </Form.Item>
+                <Form.Item name="targetTableSuffix" label={t("表名后缀")}>
+                  <Input placeholder={t("如 _v2")} style={{ width: 180 }} allowClear />
+                </Form.Item>
+              </Space>
+              {templateTables.length > 0 ? (
+                <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }} data-testid="sync-target-naming-template-note">
+                  {t("表名前缀 / 后缀只对勾选的普通表生效;带日期变量的表名用上一步各自填的「固定的目标表名」。")}
+                </div>
+              ) : null}
+            </>
+          )}
           {selectedTables.length > 0 && (
             <Form.Item noStyle shouldUpdate>
               {() => {
@@ -677,6 +771,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                         const ds = dataSources.find((d) => d.datasourceId === form.getFieldValue("datasourceId"));
                         form.setFieldValue(["s3Config", "namespace"], ds?.database || "");
                       }
+                      markEdited();
                     }}>
                       <Radio.Button value="auto">{t("自动跟随库名")}</Radio.Button>
                       <Radio.Button value="manual">{t("手动指定")}</Radio.Button>
@@ -822,6 +917,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
                     ...(p.redshiftConfig ? { redshiftConfig: { ...(form.getFieldValue("redshiftConfig") || {}), ...p.redshiftConfig } } : {}),
                   });
                 }
+                markEdited();
               }}
               title={t("同步参数智能顾问（{engine}）", { engine: watchChannel === "glue" ? "Glue" : "DMS" })}
             />
@@ -931,7 +1027,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
               {watchChannel === "dms" ? <RoleAdvisorPanel
                 request={{ engine: watchChannel === "dms" ? "dms" : "glue", resources: { needsS3Tables: watchTargetType === "s3-tables" || watchTargetType === "both", needsRedshift: watchTargetType === "redshift" || watchTargetType === "both", needsGlueCatalog: true, needsCloudWatchLogs: true } }}
                 isAdmin={isAdmin}
-                onFilled={(arn) => form.setFieldValue(["glueConfig", "executionRoleArn"], arn)}
+                onFilled={(arn) => { form.setFieldValue(["glueConfig", "executionRoleArn"], arn); markEdited(); }}
               /> : null}
               <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
                 {t("网络接入(VPC/子网/安全组)由「数据源」的 Glue 连接决定;请到「数据源管理 → 网络配置」调整。")}
@@ -943,7 +1039,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
             {() => form.getFieldValue("scheduleEnabled") ? (
               <div>
                 <Form.Item name="cronExpression" label={t("Cron 表达式")}>
-                  <Input placeholder="0 2 * * *" addonAfter={<Select style={{ width: 130 }} placeholder={t("快捷")} onChange={(v) => form.setFieldValue("cronExpression", v)} options={[{ label: t("每小时"), value: "0 * * * *" }, { label: t("每天2点"), value: "0 2 * * *" }, { label: t("每6小时"), value: "0 */6 * * *" }]} />} />
+                  <Input placeholder="0 2 * * *" addonAfter={<Select style={{ width: 130 }} placeholder={t("快捷")} onChange={(v) => { form.setFieldValue("cronExpression", v); markEdited(); }} options={[{ label: t("每小时"), value: "0 * * * *" }, { label: t("每天2点"), value: "0 2 * * *" }, { label: t("每6小时"), value: "0 */6 * * *" }]} />} />
                 </Form.Item>
                 <Space size={24}>
                   <Form.Item name="retryCount" label={t("失败重试")} initialValue={2}><InputNumber min={0} max={5} /></Form.Item>
@@ -967,7 +1063,7 @@ export default function SyncTaskModal({ open, editing, onClose, onSuccess }: Pro
 
       <div style={{ textAlign: "right", marginTop: 12, borderTop: "1px solid #1d4254", paddingTop: 12 }}>
         {step > 0 && <Button onClick={() => setStep(step - 1)} style={{ marginRight: 8 }}>{t("上一步")}</Button>}
-        {step < STEPS.length - 1 && <Button type="primary" onClick={() => { if (validateStep()) setStep(step + 1); }}>{t("下一步")}</Button>}
+        {step < STEPS.length - 1 && <Button type="primary" onClick={goNext}>{t("下一步")}</Button>}
       </div>
     </Modal>
   );

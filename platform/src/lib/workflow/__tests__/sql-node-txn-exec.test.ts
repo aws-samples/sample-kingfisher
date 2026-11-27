@@ -17,6 +17,8 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NODE_EXEC_PY } from "@/lib/workflow/node-exec-py";
+// 2026-11-26:执行器提交前用业务日期渲染函数换掉脚本里的变量 ⇒ 宿主要拼这一段(两份运行时产物里都拼着)
+import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
 import { RUNTIME_LIB_SOURCE, RUNTIME_LIB_VERSION } from "@/lib/workflow/runtime-lib";
 import { BGP_RUNTIME_PY } from "@/lib/scheduler/serverless/runtime-py";
 import { buildDagSpec } from "@/lib/workflow/dag-generator-v2";
@@ -39,6 +41,7 @@ function runExecSql(args: { sql: string; sqls?: string[] | null; descs: Desc[] }
     py,
     `${NODE_EXEC_PY}
 import json, sys
+${RUN_PARAMS_PY}
 time.sleep = lambda s: None
 ARGS = json.loads(sys.argv[1])
 CALLS = []

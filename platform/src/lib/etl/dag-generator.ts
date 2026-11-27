@@ -125,23 +125,25 @@ def run_job(**ctx):
     if not job_name:
         raise Exception("Glue job not created yet — run it once from the platform first")
     # 2026-11-04:开跑即落 running 行(在途运行对「删作业」可见;done / on_failure 用 update 收口)
-    rid = _airflow_run_id(ctx)
-    _record_start(rid)
     # 与平台"立即运行"同一参数集(--ds 等业务日期,全套 15 个,同一张表 bgp_sync_run_vars):脚本可能
     # getResolvedOptions(['ds']),不传则调度运行必失败(GlueArgumentError)。ds 取 Airflow 逻辑日期;
     # 其余变量由同一张表推导(Airflow 2.2+ context 已移除 yesterday/tomorrow)。
     ds = ctx.get("ds") or datetime.utcnow().strftime("%Y-%m-%d")
+    rid = _airflow_run_id(ctx)
+    _record_start(rid, run_date=ds)   # 2026-11-26:业务日期从开跑行起就写上(运行历史「业务日期」列)
     args = bgp_run_param_args(ds)
     run_id = glue.start_job_run(JobName=job_name, Arguments=args)["JobRunId"]
     print(f"Started Glue job {job_name} run {run_id}")
     _record(rid, "running", extra={"glueJobName": job_name, "glueJobRunId": run_id})   # 后端句柄进 running 行:平台读时对账能据此收口
     while True:
-        state = glue.get_job_run(JobName=job_name, RunId=run_id)["JobRun"]["JobRunState"]
+        jr = glue.get_job_run(JobName=job_name, RunId=run_id)["JobRun"]
+        state = jr["JobRunState"]
         if state in ("SUCCEEDED", "FAILED", "STOPPED", "ERROR", "TIMEOUT"):
             break
         time.sleep(15)
     if state != "SUCCEEDED":
-        raise Exception(f"Glue job {job_name} ended with {state}")
+        reason = str(jr.get("ErrorMessage") or "")   # 2026-11-26:带上 Glue 给的失败原因(运行历史的「错误」列能直接读到)
+        raise Exception(f"Glue job {job_name} ended with {state}" + ((": " + reason) if reason else ""))
     print(f"Glue job {job_name} SUCCEEDED")
 `
       : `
@@ -189,8 +191,11 @@ def _release_run_lock(token):
     except Exception:
         pass
 
-def _run_statements_once(rid):
-    resp = rsdata.batch_execute_statement(WorkgroupName="${workgroup}", Database="${database}", Sqls=STATEMENTS${secretKw})
+def _run_statements_once(rid, ds):
+    # 2026-11-26:脚本里的业务日期变量在提交前换成取值(与平台"立即运行" / 试运行 / 补数同一张表、同一种写法;STATEMENTS 是脚本原文)。
+    #   原来这里把原文直接发给数仓 ⇒ 语句报错,或静默查不到数据。
+    sqls = [bgp_render_run_params(s, ds) for s in STATEMENTS]
+    resp = rsdata.batch_execute_statement(WorkgroupName="${workgroup}", Database="${database}", Sqls=sqls${secretKw})
     sid = resp["Id"]
     _record(rid, "running", extra={"statementId": sid})   # 2026-11-04:后端句柄进 running 行(平台读时对账能据此收口)
     while True:
@@ -208,11 +213,12 @@ def run_job(**ctx):
         raise AirflowSkipException("run lock busy: another run holds the job lock; skip this tick")
     try:
         # 2026-11-04:抢到锁即落 running 行(在途运行对「删作业」可见;done / on_failure 用 update 收口)。在 try 里:写不成也走 finally 放锁
+        ds = ctx.get("ds") or datetime.utcnow().strftime("%Y-%m-%d")
         rid = _airflow_run_id(ctx)
-        _record_start(rid)
+        _record_start(rid, run_date=ds)   # 2026-11-26:业务日期从开跑行起就写上(运行历史「业务日期」列)
         last_err = ""
         for attempt in range(4):
-            desc = _run_statements_once(rid)
+            desc = _run_statements_once(rid, ds)
             if desc["Status"] == "FINISHED":
                 print("Redshift SQL FINISHED")
                 return
@@ -268,17 +274,20 @@ def _update_job_row(run_id, status):
             raise
         print("job row gone, skip status write", JOB_ID, run_id, status)
 
-def _record_start(run_id, **ctx):
+def _record_start(run_id, run_date=None, **ctx):
         # 2026-11-04:开跑即落一条 running 行 —— 在途运行必须在台账里可见(删作业前核的就是它);结束时 _record 用 update 收口,
         #   不再整行 put(put 会冲掉这里的 startedAt 与章)。写不成即抛(同 _record)。
         # 🔴 2026-09-07 真环境:台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
         #   两区的 run 行同键、**后写盖掉先写**(实测两区都跑成功而台账只剩一行)。口径单一作者 = lib/monitor/run-key.ts。
-    ddb.Table("bgp-task-runs").put_item(Item={
+    item = {
         "taskId": JOB_ID, ${runKeyFields}, "taskType": "etl-" + JOB_TYPE,
         "status": "running", "startedAt": datetime.utcnow().isoformat() + "Z",
         "triggeredBy": "schedule", "airflowDagId": "${dagId}",
         ${stampFields},
-    })
+    }
+    if run_date:
+        item["runDate"] = str(run_date)
+    ddb.Table("bgp-task-runs").put_item(Item=item)
     _update_job_row(run_id, "running")
 
 def _record(run_id, status, extra=None, **ctx):
@@ -327,7 +336,9 @@ def on_success(**ctx):
     _record(_airflow_run_id(ctx), "succeeded")
 
 def on_failure(ctx):
-    _record(_airflow_run_id(ctx), "failed")
+    # 2026-11-26:失败原因进运行行(截 500 字符)—— 原来只写状态,运行历史的「错误」列是空的
+    err = str(ctx.get("exception") or "")[:500]
+    _record(_airflow_run_id(ctx), "failed", extra=({"error": err} if err else None))
 
 with DAG(
     dag_id="${dagId}",

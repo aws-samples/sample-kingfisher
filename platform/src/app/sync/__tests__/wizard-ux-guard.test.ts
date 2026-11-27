@@ -11,10 +11,11 @@ const strip = (raw: string) => raw.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*
 
 describe("③ 向导「完成」不许静默:整条提交路径在 try 里,异常落成 message.error;草稿保存成功才清", () => {
   const src = strip(read("SyncTaskModal.tsx"));
-  it("handleSubmit 先按用户的话校验前两步必填(validateUpTo(1)),再包一层 try/catch 调 handleSubmitInner;catch 里 message.error 带错误原话", () => {
-    expect(src).toMatch(/const handleSubmit = async \(\) => \{\s*if \(!validateUpTo\(1\)\) return;\s*try \{\s*await handleSubmitInner\(\);\s*\} catch \(e: any\) \{\s*message\.error\(t\("保存失败:\{m\}"/);
-    expect(src).toMatch(/const validateStep = \(\) => validateUpTo\(step, step\);/); // 「下一步」仍只校验当前步
-    expect(src).toMatch(/const handleSubmitInner = async \(\) => \{/);
+  it("handleSubmit 先按用户的话校验前两步必填(validateUpTo(1, …)),再包一层 try/catch 调 handleSubmitInner;catch 里 message.error 带错误原话", () => {
+    // 2026-11-26 起校验之前先把带日期变量的表名「新增行」收进来(填了没点「添加」不许无声丢失);校验与提交用收进来之后的值
+    expect(src).toMatch(/const handleSubmit = async \(\) => \{\s*const committed = commitPendingTemplate\(false\);\s*if \(!committed\) \{[^}]*return; \}\s*if \(!validateUpTo\(1, undefined, committed\.templateTables\)\) return;\s*try \{\s*await handleSubmitInner\(committed\);\s*\} catch \(e: any\) \{\s*message\.error\(t\("保存失败:\{m\}"/);
+    expect(src).toMatch(/const validateStep = \(tplTables\?: string\[\]\) => validateUpTo\(step, step, tplTables\);/); // 「下一步」仍只校验当前步
+    expect(src).toMatch(/const handleSubmitInner = async \(committed: TemplateWizardState\) => \{/);
   });
   it("两条成功路径(直接成功 / 覆盖确认后成功)都先 clearSyncDraft 再 onSuccess;失败路径不清草稿", () => {
     expect((src.match(/clearSyncDraft\(draftKey\); onSuccess\(\);/g) || []).length).toBe(2);
@@ -23,8 +24,9 @@ describe("③ 向导「完成」不许静默:整条提交路径在 try 里,异�
   it("Modal 的确定按钮文案是「完成」且带 testid;草稿横幅 / 恢复 / 丢弃三个 testid 在", () => {
     expect(src).toMatch(/okText=\{t\("完成"\)\}\s*okButtonProps=\{\{ "data-testid": "sync-wizard-finish", style: step === 0 \? \{ display: "none" \} : undefined \}/);
     for (const id of ["sync-draft-banner", "sync-draft-restore", "sync-draft-discard"]) expect(src).toContain(`data-testid="${id}"`);
-    expect(src).toMatch(/setPendingDraft\(loadSyncDraft\(editing\?\.taskId\)\)/); // 打开时读草稿
-    expect(src).toMatch(/onValuesChange=\{\(\) => saveDraftNow\(\)\}/);           // 每次改值都存
+    expect(src).toMatch(/setPendingDraft\(loadUsableSyncDraft\(editing\?\.taskId, editing\?\.configSavedAt\)\)/); // 打开时读草稿(任务在草稿之后又保存过 ⇒ 当作没有)
+    expect(src).toMatch(/onValuesChange=\{\(\) => markEdited\(\)\}/);             // 用户每次改值都存(markEdited = 记「改过」+ 存)
+    expect(src).toMatch(/const markEdited = \(\) => \{ dirtyRef\.current = true; saveDraftNow\(\); \};/);
     expect(src).toMatch(/useEffect\(\(\) => \{ saveDraftNow\(\);[\s\S]*\}, \[open, step, selectedTables, templateTables, fieldMappings\]\)/); // 步骤 / 选表 / 映射变了也存
   });
 });
@@ -111,7 +113,7 @@ describe("换数据源:请求序号防竞态 + 用户换源后清掉不在新源
     expect((src.match(/setChannelRec\(data/g) || []).length).toBe(1);
     expect((src.match(/channelRecGate\.begin\(/g) || []).length).toBe(1);
     // 重置两处:打开向导、恢复草稿(草稿会换掉数据源 / 模式 / 目标,所选通道以草稿为准、不重取)
-    expect(src).toMatch(/setChannelRec\(null\); channelRecGate\.reset\(\); setDdlPreview\(\{\}\); setCapabilityError\(null\); setPendingDraft\(loadSyncDraft\(/);
+    expect(src).toMatch(/setChannelRec\(null\); channelRecGate\.reset\(\); setDdlPreview\(\{\}\); setCapabilityError\(null\); setPendingDraft\(loadUsableSyncDraft\(/);
     expect(src).toMatch(/const applyDraft = async \(d: SyncWizardDraft\) => \{\s*setPendingDraft\(null\);\s*setChannelRec\(null\); channelRecGate\.reset\(\);/);
     expect((src.match(/channelRecGate\.reset\(\)/g) || []).length).toBe(2);
   });
@@ -136,6 +138,8 @@ describe("⑥ 新建向导第一步:三个选择题有缺省(唯一作者 SYNC_W
   });
   it("第一步页脚只有「下一步」:Modal 确定按钮(完成)在 step === 0 时 display:none;下一步按钮仍只在非末步显示", () => {
     expect(src).toContain('style: step === 0 ? { display: "none" } : undefined');
-    expect(src).toMatch(/\{step < STEPS\.length - 1 && <Button type="primary" onClick=\{\(\) => \{ if \(validateStep\(\)\) setStep\(step \+ 1\); \}\}>\{t\("下一步"\)\}<\/Button>\}/);
+    // 「下一步」接 goNext(离开选表那一步之前先把带日期变量的表名「新增行」收进来,再校验当前步)
+    expect(src).toMatch(/\{step < STEPS\.length - 1 && <Button type="primary" onClick=\{goNext\}>\{t\("下一步"\)\}<\/Button>\}/);
+    expect(src).toMatch(/if \(validateStep\(tplTables\)\) setStep\(step \+ 1\);/);
   });
 });

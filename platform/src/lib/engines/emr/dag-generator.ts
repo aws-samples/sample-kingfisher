@@ -85,11 +85,11 @@ def _ensure_started():
 
 def run_job(**ctx):
     # 2026-11-04:开跑即落 running 行(在途运行对「删作业」可见;done / on_failure 用 update 收口)
-    rid = _airflow_run_id(ctx)
-    _record_start(rid)
-    _ensure_started()
     # 业务日期取 Airflow 逻辑日期(与 Glue 定时作业同口径);参数**追加**在用户入参之后,与平台「立即运行」同一张表、同一顺序。
     ds = ctx.get("ds") or datetime.utcnow().strftime("%Y-%m-%d")
+    rid = _airflow_run_id(ctx)
+    _record_start(rid, run_date=ds)   # 2026-11-26:业务日期从开跑行起就写上(运行历史「业务日期」列)
+    _ensure_started()
     resp = emr.start_job_run(
         applicationId=APPLICATION_ID,
         executionRoleArn=EXEC_ROLE,
@@ -139,16 +139,19 @@ def _update_job_row(run_id, status):
             raise
         print("job row gone, skip status write", JOB_ID, run_id, status)
 
-def _record_start(run_id, **ctx):
+def _record_start(run_id, run_date=None, **ctx):
         # 2026-11-04:开跑即落一条 running 行 —— 在途运行必须在台账里可见(删作业前核的就是它);结束时 _record 用 update 收口。
         # 🔴 2026-09-07 真环境:台账 runId 必须带 targetId 段,否则同一作业绑两个 region 时
         #   两区的 run 行同键、**后写盖掉先写**(实测两区都跑成功而台账只剩一行)。口径单一作者 = lib/monitor/run-key.ts。
-    ddb.Table("bgp-task-runs").put_item(Item={
+    item = {
         "taskId": JOB_ID, ${runKeyFields}, "taskType": "emr-serverless",
         "status": "running", "startedAt": datetime.utcnow().isoformat() + "Z",
         "triggeredBy": "schedule", "airflowDagId": "${dagId}",
         ${stampFields},
-    })
+    }
+    if run_date:
+        item["runDate"] = str(run_date)
+    ddb.Table("bgp-task-runs").put_item(Item=item)
     _update_job_row(run_id, "running")
 
 def _record(run_id, status, extra=None, **ctx):
@@ -196,7 +199,9 @@ def on_success(**ctx):
     _record(_airflow_run_id(ctx), "succeeded")
 
 def on_failure(ctx):
-    _record(_airflow_run_id(ctx), "failed")
+    # 2026-11-26:失败原因进运行行(截 500 字符)—— 原来只写状态,运行历史的「错误」列是空的
+    err = str(ctx.get("exception") or "")[:500]
+    _record(_airflow_run_id(ctx), "failed", extra=({"error": err} if err else None))
 
 with DAG(
     dag_id="${dagId}",

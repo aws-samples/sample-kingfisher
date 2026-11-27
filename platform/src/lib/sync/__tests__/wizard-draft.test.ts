@@ -1,7 +1,7 @@
 // 同步任务向导本地草稿(用户 2026-10-15:「任务配置失败了…退出后需要重新从头配置,最好增加一个临时保存」)。
 // 钉:① 空壳不存、有内容才存;② 读回逐键一致;③ 坏形状 / 过期 ⇒ null 且清掉;④ 新建与某 taskId 的草稿互不覆盖;⑤ storage 拿不到 / 抛错不打断。
 import { describe, it, expect } from "vitest";
-import { SYNC_DRAFT_TTL_MS, clearSyncDraft, describeDraftAge, isDraftWorthSaving, loadSyncDraft, saveSyncDraft, syncDraftKey, type DraftStorage } from "../wizard-draft";
+import { SYNC_DRAFT_TTL_MS, clearSyncDraft, describeDraftAge, isDraftStale, isDraftWorthSaving, loadSyncDraft, loadUsableSyncDraft, saveSyncDraft, syncDraftKey, type DraftStorage } from "../wizard-draft";
 
 function memStorage(): DraftStorage & { map: Map<string, string> } {
   const map = new Map<string, string>();
@@ -70,6 +70,42 @@ describe("⑤ storage 不可用不打断", () => {
     expect(() => clearSyncDraft(null, null)).not.toThrow();
     const bad: DraftStorage = { getItem: () => null, setItem: () => { throw new Error("QuotaExceededError"); }, removeItem: () => {} };
     expect(saveSyncDraft(null, DRAFT, bad, at(T0))).toBe(false);
+  });
+});
+
+// 2026-11-26:任务在草稿写下之后又被保存过 ⇒ 草稿作废(原来仍弹「发现上次未保存的配置」,点「恢复」就用旧状态整体盖掉新保存的内容)。
+//   不比时钟:比「写草稿时看到的保存标记」与「任务现在的保存标记」是不是同一个值。
+describe("⑥ 作废判断:任务在草稿之后又保存过 ⇒ 打开时当作没有草稿并清掉", () => {
+  const SAVED_1 = "2026-11-26T03:00:00.000Z";
+  const SAVED_2 = "2026-11-26T04:00:00.000Z";
+  it("标记相同 ⇒ 不作废;不同 ⇒ 作废(哪怕任务现在的标记比草稿里的「早」—— 不比先后,只比是不是同一个)", () => {
+    expect(isDraftStale({ baseConfigSavedAt: SAVED_1 }, SAVED_1)).toBe(false);
+    expect(isDraftStale({ baseConfigSavedAt: SAVED_1 }, SAVED_2)).toBe(true);
+    expect(isDraftStale({ baseConfigSavedAt: SAVED_2 }, SAVED_1)).toBe(true);
+  });
+  it("两边都没有(新建任务 / 旧草稿配还没有标记的存量任务)⇒ 不作废;只有一边有 ⇒ 作废", () => {
+    expect(isDraftStale({}, undefined)).toBe(false);
+    expect(isDraftStale({}, null)).toBe(false);
+    expect(isDraftStale({ baseConfigSavedAt: undefined }, "")).toBe(false);
+    expect(isDraftStale({}, SAVED_1)).toBe(true);       // 旧草稿(或写草稿时任务还没有标记),之后任务被保存过
+    expect(isDraftStale({ baseConfigSavedAt: SAVED_1 }, undefined)).toBe(true);
+  });
+  it("草稿带着写它时的标记存取;loadUsableSyncDraft:没作废 ⇒ 原样返回;作废 ⇒ null 且从存储里清掉;别的键不受影响", () => {
+    const s = memStorage();
+    saveSyncDraft("task-9", { ...DRAFT, baseConfigSavedAt: SAVED_1 }, s, at(T0));
+    saveSyncDraft(null, DRAFT, s, at(T0));
+    expect(loadSyncDraft("task-9", s, at(T0))!.baseConfigSavedAt).toBe(SAVED_1);
+    expect(loadUsableSyncDraft("task-9", SAVED_1, s, at(T0))).toEqual({ version: 1, savedAt: T0.toISOString(), ...DRAFT, baseConfigSavedAt: SAVED_1 });
+    expect(s.map.has(syncDraftKey("task-9"))).toBe(true);
+    expect(loadUsableSyncDraft("task-9", SAVED_2, s, at(T0))).toBeNull();
+    expect(s.map.has(syncDraftKey("task-9"))).toBe(false);
+    // 新建任务的草稿(两边都没有标记)照常可用
+    expect(loadUsableSyncDraft(null, undefined, s, at(T0))).not.toBeNull();
+    expect(s.map.has(syncDraftKey(null))).toBe(true);
+  });
+  it("没有草稿 / 存储拿不到 ⇒ null,不抛", () => {
+    expect(loadUsableSyncDraft("nope", SAVED_1, memStorage(), at(T0))).toBeNull();
+    expect(loadUsableSyncDraft("nope", SAVED_1, null, at(T0))).toBeNull();
   });
 });
 

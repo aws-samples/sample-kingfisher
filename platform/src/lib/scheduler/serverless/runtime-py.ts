@@ -91,19 +91,22 @@ def run_job(**ctx):
     started = time.time()
     try:
         # 2026-11-04:开跑即落 running 行(在途运行对「删作业」可见;结束时 _record 用 update 收口)。放在 try 里:写不成也要走 finally 放锁
-        _record_start(spec, run_id, started_at=_iso(started), extra={"airflowRunId": airflow_run_id}, run_group_id=run_group_id)
+        #   2026-11-26:业务日期(runDate)从开跑行起就写上 —— 运行历史的「业务日期」列对定时运行同样有值
+        _record_start(spec, run_id, started_at=_iso(started), extra={"airflowRunId": airflow_run_id, "runDate": ds}, run_group_id=run_group_id)
         engine = spec["engine"]
         if engine == "redshift":
-            _run_redshift(spec, run_id, started)
+            _run_redshift(spec, run_id, started, ds)
         elif engine == "glue":
             _run_glue(spec, run_id, started, ds)
         elif engine == "emr":
             _run_emr(spec, run_id, started, ds)
         else:
             raise Exception("unknown engine " + str(engine))
-        _record(spec, run_id, "succeeded", started_at=_iso(started), extra={"airflowRunId": airflow_run_id, "duration": int(time.time() - started)}, run_group_id=run_group_id)
-    except Exception:
-        _record(spec, run_id, "failed", started_at=_iso(started), extra={"airflowRunId": airflow_run_id, "duration": int(time.time() - started)}, run_group_id=run_group_id)
+        _record(spec, run_id, "succeeded", started_at=_iso(started), extra={"airflowRunId": airflow_run_id, "runDate": ds, "duration": int(time.time() - started)}, run_group_id=run_group_id)
+    except Exception as je:
+        # 2026-11-26:失败原因进运行行(截 500 字符,与编排作业节点同口径)—— 原来只写状态与时长,运行历史的「错误」列是空的
+        fail_extra = {"airflowRunId": airflow_run_id, "runDate": ds, "duration": int(time.time() - started), "error": str(je)[:500]}
+        _record(spec, run_id, "failed", started_at=_iso(started), extra=fail_extra, run_group_id=run_group_id)
         raise
     finally:
         _release_run_lock(spec, token)
@@ -182,7 +185,8 @@ def _run_node_body(e, node, ti, ds=None):
     data = node.get("data") or {}
     if ntype == "sql":
         # data.sqls(发布时预切的多语句)⇒ 执行器走单事务;没有就是单语句老路
-        _exec_sql(e, data.get("sql", "SELECT 1"), node_id=node.get("id"), sqls=data.get("sqls"))
+        #   业务日期与离线作业节点同一口径:脚本里的业务日期变量在执行器里换成取值
+        _exec_sql(e, data.get("sql", "SELECT 1"), node_id=node.get("id"), sqls=data.get("sqls"), ds=ds)
         return "ok"
     if ntype == "sync":
         # 带节点 id 与这次工作流 run 的台账键 ⇒ 执行器写同步任务自己的运行行并回链;
@@ -226,7 +230,7 @@ def _run_node_body(e, node, ti, ds=None):
         sub_data = sub.get("data") or {}
         if sub_type == "sql":
             _exec_sql(e, str(sub_data.get("sql", "SELECT 1")).replace("{{item}}", str(item)),
-                      sqls=[str(s).replace("{{item}}", str(item)) for s in (sub_data.get("sqls") or [])] or None)
+                      sqls=[str(s).replace("{{item}}", str(item)) for s in (sub_data.get("sqls") or [])] or None, ds=ds)
         elif sub_type == "python":
             _exec_python_safe(str(sub_data.get("script", "")), {"params": {"item": item}})
         return "ok"

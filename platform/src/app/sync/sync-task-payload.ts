@@ -29,6 +29,12 @@ export interface BuildSyncTaskPayloadInput {
   fieldMappings: Record<string, FieldMappingRow[] | undefined>;
   /** 编辑时的原任务(新建 = undefined) */
   original?: Record<string, unknown>;
+  /**
+   * 列映射是否已经按源库的表清单重建完(缺省 true = 改动前行为)。
+   * false = 表清单还没读完或读失败(经数据源的 Glue 连接读表要 1–3 分钟,这期间「完成」已经能点)⇒
+   *   数据源没换、这张表这次没有列映射、而原任务有 ⇒ 保持原任务那份,不把它写成空。
+   */
+  mappingsReady?: boolean;
 }
 
 /**
@@ -110,7 +116,7 @@ const EXPLICIT_DEFAULT: Record<(typeof SYNC_CAPABILITY_SHAPED_KEYS)[number], unk
 };
 
 export function buildSyncTaskPayload(input: BuildSyncTaskPayloadInput): Record<string, unknown> {
-  const { formValues, selectedTables, templateTables = [], templateSamples, fieldMappings, original } = input;
+  const { formValues, selectedTables, templateTables = [], templateSamples, fieldMappings, original, mappingsReady = true } = input;
   const values: Record<string, unknown> = { ...formValues };
   // 样例表是向导状态(不在 Form 里),先放进 values 再由下面的整形按模板清单过滤
   if (templateSamples !== undefined) values.templateSampleTables = templateSamples;
@@ -121,7 +127,16 @@ export function buildSyncTaskPayload(input: BuildSyncTaskPayloadInput): Record<s
   const sourceTables = [...selectedTables, ...templateTables.filter((x) => !selectedTables.includes(x))];
   values.sourceTables = sourceTables;
   const fm: Record<string, FieldMappingRow[]> = {};
-  sourceTables.forEach((tbl) => { fm[tbl] = fieldMappings[tbl]?.filter((f) => f.include) || []; });
+  // 表清单还没读完就保存:这次没有列映射的表保持原任务那份(只在数据源没换时;换了源,旧源的列映射不作数)
+  const keepFrom = !mappingsReady && original && original.datasourceId !== undefined && values.datasourceId === original.datasourceId
+    && original.fieldMappings && typeof original.fieldMappings === "object" && !Array.isArray(original.fieldMappings)
+    ? (original.fieldMappings as Record<string, unknown>)
+    : undefined;
+  sourceTables.forEach((tbl) => {
+    const rows = fieldMappings[tbl];
+    const kept = rows === undefined ? keepFrom?.[tbl] : undefined;
+    fm[tbl] = Array.isArray(kept) ? (kept as FieldMappingRow[]) : rows?.filter((f) => f.include) || [];
+  });
   values.fieldMappings = fm;
   // ── 新字段:等于缺省且原任务没有这个键 ⇒ 剔除;原任务有 ⇒ 显式写回缺省 ──
   for (const key of SYNC_CAPABILITY_SHAPED_KEYS) {

@@ -8,8 +8,9 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { generateEtlJobDag } from "@/lib/etl/dag-generator";
+import { generateEtlJobDag, splitSql } from "@/lib/etl/dag-generator";
 import { generateEmrJobDag } from "@/lib/engines/emr/dag-generator";
+import { renderTemplate, paramSet } from "@/lib/etl/run-params";
 import type { EtlJob } from "@/types/etl-job";
 
 // 🔴 夹具 id 末 12 位必含字母
@@ -110,7 +111,7 @@ try:
 except Exception as e:
     out = {"ok": False, "error": str(e)}
     try:
-        g["on_failure"]({"dag_run": DR()})
+        g["on_failure"]({"dag_run": DR(), "exception": e})   # Airflow 把任务抛出的异常放在回调上下文的 exception 里
     except Exception as e2:
         out["callbackError"] = str(e2)
 out["calls"] = boto3.CALLS
@@ -241,6 +242,56 @@ describe("🔴 经典 EMR DAG", () => {
     const o = runDag(generateEmrJobDag(EMR, CTX), { jobRowGoneTable: "bgp-engine-jobs" });
     expect(o.ok, o.error).toBe(true);
     expect(finalRow(o)!.status).toBe("succeeded");
+  });
+});
+
+// 2026-11-26 —— 定时路径上的业务日期变量与失败原因(与 serverless 载体同口径;那一侧的判据在 scheduled-run-params-render.test.ts)。
+//   变异:Redshift 分支把 `Sqls=sqls` 改回 `Sqls=STATEMENTS` ⇒ 第一条红;`_record_start(rid, run_date=ds)` 去掉 run_date ⇒ 业务日期那几条红;
+//   on_failure 不写 error ⇒ 失败原因那两条红。
+describe("🔴 经典单作业 DAG:脚本里的业务日期变量在提交前换成取值;运行行带业务日期与失败原因", () => {
+  const SCRIPT = "delete from dws.t where dt = '${ds}';\ninsert into dws.t select '${ds}', '${bizdate}', '${not_a_var}' from ods.o_${ds_nodash};";
+  const RS = { ...BASE, type: "redshift" as const, script: SCRIPT };
+  const DS = "2026-10-11"; // runDag 传给 run_job 的 ds
+  it("Redshift:产物里存的是脚本原文;提交给数仓的语句 == 「立即运行」的换法(逐条相等,取值表之外的写法原样保留);开跑行与收口后都带业务日期", () => {
+    const py = generateEtlJobDag(RS);
+    expect(py).toContain("${ds_nodash}");
+    const o = runDag(py);
+    expect(o.ok, o.error).toBe(true);
+    const exec = o.calls.filter((c) => c.api === "redshift-data.batch_execute_statement");
+    expect(exec).toHaveLength(1);
+    expect(exec[0].Sqls).toEqual(splitSql(renderTemplate(SCRIPT, paramSet(DS))));
+    expect(exec[0].Sqls[0]).toBe("delete from dws.t where dt = '2026-10-11'");
+    expect(exec[0].Sqls[1]).toBe("insert into dws.t select '2026-10-11', '20261010', '${not_a_var}' from ods.o_20261011");
+    const start = o.calls.find((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs")!.Item;
+    expect(start.runDate).toBe(DS);
+    expect(finalRow(o)).toMatchObject({ status: "succeeded", runDate: DS });
+    expect(finalRow(o)!.error).toBeUndefined();
+  });
+  it("Redshift 语句失败 ⇒ 运行行 failed 且带失败原因(数仓原话)与业务日期", () => {
+    const o = runDag(generateEtlJobDag(RS), { rsStatus: "FAILED" });
+    expect(o.ok).toBe(false);
+    expect((o as Record<string, unknown>).callbackError).toBeUndefined();
+    const row = finalRow(o)!;
+    expect(row.status).toBe("failed");
+    expect(row.runDate).toBe(DS);
+    expect(row.error).toBe("Redshift SQL failed: boom");
+  });
+  it("Glue:开跑行带业务日期(与传给作业的 --ds 同一天);失败 ⇒ 运行行带失败原因", () => {
+    const ok = runDag(generateEtlJobDag(BASE));
+    expect(ok.ok, ok.error).toBe(true);
+    expect(ok.calls.find((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs")!.Item.runDate).toBe(DS);
+    expect(ok.calls.find((c) => c.api === "glue.start_job_run")!.Arguments["--ds"]).toBe(DS);
+    const bad = runDag(generateEtlJobDag(BASE), { glueState: "FAILED" });
+    expect(bad.ok).toBe(false);
+    expect(finalRow(bad)).toMatchObject({ status: "failed", runDate: DS });
+    expect(String(finalRow(bad)!.error)).toContain("ended with FAILED");
+  });
+  it("EMR:开跑行带业务日期", () => {
+    const EMR = { ...BASE, name: "emr-job", engine: "emr-serverless", env: "dev", createdBy: "u", status: "ready", script: "x" } as never;
+    const o = runDag(generateEmrJobDag(EMR, { entryPoint: "s3://b/k.py", sparkSubmitParameters: "", executionRoleArn: "arn:aws:iam::123456789012:role/r", applicationId: "app-classic", logUri: "s3://b/", entryPointArguments: [] }));
+    expect(o.ok, o.error).toBe(true);
+    expect(o.calls.find((c) => c.api === "ddb.put_item" && c.table === "bgp-task-runs")!.Item.runDate).toBe(DS);
+    expect(finalRow(o)).toMatchObject({ status: "succeeded", runDate: DS });
   });
 });
 

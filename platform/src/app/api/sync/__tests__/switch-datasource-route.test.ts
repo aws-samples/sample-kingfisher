@@ -144,3 +144,22 @@ describe("④ 没换源 / ⑤ 换到没有库名的源", () => {
     expect(setValue("sourceDatabase")).toBe("gamedata");
   });
 });
+
+// 2026-11-26:任务行的「配置最近一次保存」标记(向导的本地草稿靠它判断「任务在草稿之后又保存过」)。
+//   编辑表单用整条记录预填后原样 PUT 回来,请求体里带着上一次的标记 —— 路由必须先剔除再自己写,否则与那句 SET 路径重叠,整个保存 500。
+describe("⑥ 保存时刷新「配置最近一次保存」标记;客户端带回来的旧值不落库", () => {
+  it("请求体回显旧标记 ⇒ 200;表达式里 configSavedAt 只出现一次(路由自己写的那个),值与 updatedAt 是同一个时刻、不是请求体里的旧值", async () => {
+    const OLD = "2026-01-01T00:00:00.000Z";
+    const res = await put({ ...ECHO, name: "renamed", configSavedAt: OLD, updatedAt: OLD });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const u = update()!;
+    const names = u.ExpressionAttributeNames as Record<string, string>;
+    expect(Object.entries(names).filter(([, v]) => v === "configSavedAt")).toEqual([["#cfg", "configSavedAt"]]);
+    expect(Object.entries(names).filter(([, v]) => v === "updatedAt")).toEqual([["#upd", "updatedAt"]]);
+    expect(String(u.UpdateExpression)).toMatch(/, #upd = :now, #cfg = :now$/);
+    const now = (u.ExpressionAttributeValues as Record<string, unknown>)[":now"];
+    expect(typeof now).toBe("string");
+    expect(now).not.toBe(OLD);
+    expect(Object.values(u.ExpressionAttributeValues as Record<string, unknown>)).not.toContain(OLD);
+  });
+});

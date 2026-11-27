@@ -65,12 +65,12 @@ Related scenario: [Scenario 1 · Step 3](20-scenario-detail-to-daily-report.md).
 | Step | Title | Required / key points |
 |---|---|---|
 | 1 | "Source configuration" | Task name · select data source · "Sync mode" (Full-load sync / Incremental sync (CDC) / Real-time sync (DMS CDC)) · "Write mode" (overwrite / append / merge, **must be chosen explicitly**) · "Target type" (S3 Data Lake / Redshift / S3 + Redshift) · "Data filter (WHERE)" |
-| 2 | "Select Tables & Mapping" | Tick tables ("Search table name", "Selected only", "Select all N shown", "Clear selection") · field mapping · "Table names with date variables" (for monthly-split tables) |
+| 2 | "Select Tables & Mapping" | Tick tables ("Search table name", "Selected only", "Select all N shown", "Clear selection") · field mapping · "Table names with date variables" (for monthly-split tables; the block sits behind a switch — turn it on to get the three inputs "Source table name (with date variables)", "Fixed target table name" and "Sample table") |
 | 3 | "Target configuration" | Table name prefix / suffix · S3 Tables: "Table Bucket", "Namespace" (follows the database name automatically / set manually) · partition config · Redshift: Workgroup / Database / Schema / distribution style · derived columns · overwrite options · merge keys |
 | 4 | "Create table preview" | "Generate DDL"; each table is marked "New", "Table exists (created by platform)" or, in red, "Table exists (not created by platform; overwrite needs confirmation)" |
 | 5 | "Schedule settings" | Glue job resources (Worker Type / Worker Count / Glue Version / job timeout / retry on failure) · execution role · "Enable scheduling" + Cron Expression · downstream dependencies |
 
-Click "Done" to save; the first two steps have required-field validation, the later steps all have defaults. The wizard automatically keeps a browser draft (7 days); when you close and reopen it you can "Resume" or "Discard".
+Click "Done" to save; the first two steps have required-field validation, the later steps all have defaults. The wizard automatically keeps a browser draft of what you changed (7 days); when you close and reopen it you can "Resume" or "Discard"; nothing changed means no draft, and a draft is dropped once the task has been saved after it.
 
 ### 3.2 The three settings most often chosen wrongly
 
@@ -106,7 +106,7 @@ Related scenario: [Scenario 1 · Steps 4–5](20-scenario-detail-to-daily-report
 | Type | What you write | How it runs | How to get the business date |
 |---|---|---|---|
 | "Glue PySpark Script Job" | PySpark; the platform has preconfigured the S3 Tables catalog, so write tables as `s3tablescatalog.<namespace>.<table>` | After saving, "Run now" creates / updates the Glue job of the same name and starts it; cold start takes about 1–2 minutes | `getResolvedOptions(sys.argv, ["JOB_NAME", "ds"])` reads `--ds` and the other parameters |
-| "Redshift SQL Job" | Several SQL statements separated by semicolons, executed through the Data API | "Dry run" validates with EXPLAIN and writes no data; "Run now" really runs | Write `${ds}`, `${ds_nodash}`, `${yesterday_ds}` and the other variables directly in the script |
+| "Redshift SQL Job" | Several SQL statements separated by semicolons, executed through the Data API | "Dry run" validates with EXPLAIN and writes no data; "Run now" really runs | Write `${ds}`, `${ds_nodash}`, `${yesterday_ds}` and the other variables directly in the script; they are replaced before the script is submitted to the warehouse on "Run now", on a scheduled run and when the job is referenced by a workflow |
 | "EMR Serverless (PySpark, standalone engine)" | PySpark; each job gets its own application | After saving, "Run now" submits one job-run; cold start takes about 1–2 minutes | The business date is appended after the "Script arguments" as `--ds` and the other parameters |
 
 A script template is preloaded after creation; just edit it. The Glue version dropdown shows text such as "Glue 6.0 (Spark 4.1.1 / Python 3.13)" and defaults to the highest version; writing to S3 Tables needs at least 5.1; from Glue 6.0 on, Spark ANSI mode is on by default, so division by zero / invalid casts raise errors instead of returning NULL.
@@ -134,7 +134,7 @@ The EMR job panel is "Script & Spec": execution role, lake table buckets, "Drive
 
 | Button | What it does | Where to see the result |
 |---|---|---|
-| "Publish to MWAA schedule" | Attaches a cron to this job in the **current environment** and ships the artifact to the scheduler of every region the job is bound to; the "Dispatch preview" dialog lists artifact / scheduler / execution identity per region, then click "Confirm dispatch" | The job card shows ⏱ cron; "Task Monitor → Schedule config" gains a row; "Take schedule offline" removes it; "Trigger once" runs it immediately without changing the cron |
+| "Publish to MWAA schedule" | Attaches a cron to this job in the **current environment** and ships the artifact to the scheduler of every region the job is bound to; the "Dispatch preview" dialog lists artifact / scheduler / execution identity per region, then click "Confirm dispatch" | The job card shows ⏱ cron; "Task Monitor → Schedule config" gains a row; "Take schedule offline" removes it; "Trigger once" runs it immediately without changing the cron; the run appears in "Run History" by itself and is followed to its end (when it fails, the "Error" column gives the reason) |
 | "Publish to environment" | Copies the job **definition** (script / bound regions / parameters) to staging or prod, without run history; publishing to prod requires approval | The job card's environment status shows `staging · Current` / `prod · Pending approval` and so on; switch the top-bar "Environment" to see it |
 
 ### 4.5 Backfill and delete

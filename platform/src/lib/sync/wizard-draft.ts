@@ -13,6 +13,11 @@ export interface SyncWizardDraft {
   fieldMappings: Record<string, unknown[]>;
   /** 带日期变量的源表名 → 样例表(旧草稿没有这个键 ⇒ 视为没选样例) */
   templateSamples?: Record<string, string>;
+  /**
+   * 写这份草稿时看到的「任务配置最近一次保存」标记(任务行的 configSavedAt;新建任务 / 旧草稿 / 还没有这个标记的任务 = 没有这个键)。
+   * 再打开时与任务当前的标记不一样 ⇒ 任务在草稿之后又被保存过 ⇒ 草稿作废(见 isDraftStale)。
+   */
+  baseConfigSavedAt?: string;
 }
 
 export interface DraftStorage {
@@ -77,6 +82,26 @@ export function loadSyncDraft(taskId: string | null | undefined, storage: DraftS
     try { storage.removeItem(key); } catch { /* 忽略 */ }
     return null;
   }
+}
+
+/**
+ * 草稿是不是已经作废:任务在草稿写下之后又被保存过(换了浏览器 / 别人保存 / 本机草稿没清掉)。
+ * 🔴 不比时钟(浏览器时钟与服务器时钟会差):比的是「写草稿时看到的保存标记」与「任务现在的保存标记」是不是同一个值。
+ *   两边都没有(新建任务 / 旧草稿配还没有标记的任务)⇒ 不算作废,行为与没有这个判断时一样。
+ */
+export function isDraftStale(d: Pick<SyncWizardDraft, "baseConfigSavedAt">, currentConfigSavedAt: string | null | undefined): boolean {
+  return String(d.baseConfigSavedAt ?? "") !== String(currentConfigSavedAt ?? "");
+}
+
+/** 打开向导时读草稿:作废的(任务在它之后又保存过)当场清掉并当作没有,不拿出来问用户「恢复 / 丢弃」。 */
+export function loadUsableSyncDraft(taskId: string | null | undefined, currentConfigSavedAt: string | null | undefined, storage: DraftStorage | null = defaultStorage(), now: () => Date = () => new Date()): SyncWizardDraft | null {
+  const d = loadSyncDraft(taskId, storage, now);
+  if (!d) return null;
+  if (isDraftStale(d, currentConfigSavedAt)) {
+    clearSyncDraft(taskId, storage);
+    return null;
+  }
+  return d;
 }
 
 export function clearSyncDraft(taskId: string | null | undefined, storage: DraftStorage | null = defaultStorage()): void {

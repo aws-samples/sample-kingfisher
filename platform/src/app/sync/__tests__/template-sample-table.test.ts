@@ -128,7 +128,8 @@ describe("⑤ 接线:向导 / 控件真的用上了样例与守卫", () => {
   const modal = strip(read("SyncTaskModal.tsx"));
   const controls = strip(read("SyncCapabilityControls.tsx"));
   it("提交整形带 templateSamples;编辑打开 / 恢复草稿 / 关闭都回填或清空样例;草稿带样例", () => {
-    expect(modal).toMatch(/buildSyncTaskPayload\(\{[\s\S]*?templateTables,\s*templateSamples,[\s\S]*?original: editing/);
+    // 2026-11-26 起这三样用「新增行收进来之后」的值(committed.*),不直接读状态变量
+    expect(modal).toMatch(/buildSyncTaskPayload\(\{[\s\S]*?templateTables: committed\.templateTables,\s*templateSamples: committed\.templateSamples,[\s\S]*?original: editing/);
     expect(modal).toContain("setTemplateSamples(editing?.templateSampleTables || {})");
     expect(modal).toContain("setTemplateSamples(d.templateSamples || {})");
     expect(modal).toMatch(/setTemplateTables\(\[\]\); setTemplateSamples\(\{\}\)/);
@@ -152,7 +153,9 @@ describe("⑤ 接线:向导 / 控件真的用上了样例与守卫", () => {
   it("控件:样例下拉(新增行 + 每个模板行)、添加时复制样例列、删除时连样例与列映射一起删、占位示例是中性的 orders_", () => {
     expect(controls).toContain('data-testid="sync-template-sample-new"');
     expect(controls).toContain('data-testid="sync-template-sample"');
-    expect(controls).toMatch(/if \(sample\) setSampleFor\(name, sample\);/);
+    // 「添加」不再由控件自己做:它与向导的「下一步 / 完成」同一条收进来的路(纯函数 commitTemplateEntry 里复制样例列,判据在 sync-edit-roundtrip.test.ts)
+    expect(controls).toMatch(/onClick=\{onAdd\} data-testid="sync-template-table-add"/);
+    expect(controls).not.toMatch(/checkTemplateTableEntry/);
     expect(controls).toMatch(/nextMaps\[name\] = cloneColumnMapping\(fieldMappings\[next\]\)/);
     expect(controls).toMatch(/form\.setFieldValue\("targetTableNames", names\);\s*setSampleFor\(name, undefined\);/);
     expect(controls).toContain('const exampleTpl = "orders_" + varToken("bizmonth")');

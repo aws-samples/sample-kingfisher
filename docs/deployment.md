@@ -644,6 +644,18 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 Platform only plus "Redeploy" on the page for every execution region; no new table, no `redeploy-agents.sh`. The platform container has four environment variables fewer (this only matters to those who set up a local development environment from `platform/.env.example`).
 Measured in two test environments: first start in an execution region until the replication task appears 527 / 544 seconds; endpoints removed 81 / 82 seconds after the delete; back to "Running" after a password change and a restart 79 / 115 seconds.
 
+### 7ter.1p Three things to know when upgrading to the version with "sync tasks keep their configuration when edited again + business-date variables of Redshift SQL jobs on the scheduled path" (ships with 2.2.0)
+
+1. **Publish the schedules of batch jobs and the workflows that are already published once more**: the replacement of business-date variables (`${ds}` and so on) in Redshift SQL job scripts and inline SQL nodes of a workflow on the scheduled / orchestrated path,
+   and the business date and failure reason on the rows of scheduled runs, live in the carrier that is generated at publish time (`RUNTIME_LIB_VERSION` 13 → 14; the Serverless code package is generated at publish time).
+   How: open the job on the Batch Compute page and press "Publish to MWAA schedule"; press "Publish to scheduler" on the orchestration page (a workflow that shows "Carrier needs republishing" under "Task Monitor → Schedule config" can also be republished with "Republish" on that row).
+   Until they are republished they keep running as before, without errors or interruption — the variables are still sent to the warehouse unchanged, exactly as before the upgrade.
+2. **Scripts that were rewritten to work around the missing replacement need not be changed back**: date functions of the warehouse (for example `current_date - 1`) keep working; to go back to `${ds}`, republish first and change the script afterwards.
+   For a scheduled run and for "Trigger once" the business date is the day of the trigger (UTC), the same as "Run now" on the page.
+3. **Editing a sync task again**: the "Table names with date variables" block now sits behind a switch (it stays expanded for tasks that already have such table names); a row that was filled in but not added is taken in through the same validation when "Next" / "Done" is pressed,
+   or the wizard stops and states the reason; field mappings are read back from the saved task. Wizard drafts left in the browser before the upgrade: once the task has been saved again after the upgrade, the old draft is dropped automatically;
+   where the task has not been saved again, "Found an unsaved configuration" still appears — press "Discard". Platform only: no new table, no new permission, no `redeploy-agents.sh`, no redeployment of execution regions.
+
 ### 7ter.1 Six things to know when upgrading to the "data-sync capability completion" version (`release-2026-10-13`)
 
 | # | Change | Impact on existing objects | What to do |
@@ -950,6 +962,14 @@ Measured in two test environments: first start in an execution region until the 
   From 2.2.0 such rows show "Undetermined" and the tooltip states the reason (the part that was read back is identical, the tail was not read); when the part that was read back really differs, the row still shows "Carrier needs republishing".
 - **After a schedule is disabled, "Carrier definition" on that row of the schedule-configuration page is not "—" (2.1.2 and all earlier versions; fixed in 2.2.0)**: in the production version this column means nothing on a disabled row,
   and "Republish" on such a row fails — ignore it. From 2.2.0 a disabled row shows "—", and so do rows that were disabled before the upgrade.
+- **After a sync task is edited again, its table names with date variables or its field mappings are "gone" (2.1.2 and all earlier versions; fixed in 2.2.0)**: a table name that was added with "Add a table name with date variables" is not lost; what is lost are three paths —
+  the new row was filled in but "Done" was pressed without adding it (no notice), field mappings fall back to the defaults when the task is edited again and are written back on save, and a draft is left even when nothing was changed ("Resume" replaces the current content with the old state).
+  Workaround in the production version: always press "Add a table name with date variables" after filling in the row; after editing again, check the field mappings before pressing "Done"; press "Discard" when "Found an unsaved configuration" appears.
+- **Business-date variables (`${ds}` and so on) in the script of a Redshift SQL batch job are not replaced when the job is started by its schedule or by a workflow (2.1.2 and all earlier versions; fixed in 2.2.0)**:
+  "Run now", "Dry run" and backfills replace them; the scheduled and orchestrated paths send the variables to the warehouse unchanged — the statement fails, or silently matches no rows (inline SQL nodes of a workflow behave the same). Glue / EMR jobs are not affected.
+  Workaround in the production version: do not use these variables in Redshift SQL jobs that run on a schedule; use the warehouse's own date functions (for example `current_date - 1`). After upgrading to 2.2.0, publish the already published schedules and workflows once more (§7ter.1p).
+- **When a scheduled run of a batch job fails, its row in "Run History" has neither a failure reason nor a business date (2.1.2 and all earlier versions; fixed in 2.2.0)**:
+  workaround in the production version: open "Logs" on that row to read the run log of the scheduler service.
 - Deferred items (least-privilege narrowing, secret rotation, OpenSearch sizing and snapshots, alerting and so on) are recorded as deferred in the engineering defect records.
 
 ## Appendix A. Configuration reference

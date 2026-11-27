@@ -301,7 +301,7 @@ def _exec_job(env, node, ds=None, workflow_run_id=None, scheduler=None, **kwargs
         engine = spec["engine"]
         # 软限的时钟 = node_started(含等锁);台账的 startedAt / duration = started(作业真正开跑)
         if engine == "redshift":
-            _run_redshift(spec, job_run_id, node_started)
+            _run_redshift(spec, job_run_id, node_started, ds)
         elif engine == "glue":
             _run_glue(spec, job_run_id, node_started, ds)
         elif engine == "emr":
@@ -482,7 +482,13 @@ def _sql_error_of(desc):
     return "; ".join([e for e in [err] + subs if e])
 
 
-def _exec_sql(env, sql, node_id=None, sqls=None, **kwargs):
+def _exec_sql(env, sql, node_id=None, sqls=None, ds=None, **kwargs):
+    # 2026-11-26:节点 SQL 里的业务日期变量在提交前换成取值(与离线 Redshift 作业、补数同一张表;发布期预切的 sqls 逐条换)。
+    #   业务日期 = 载体给的 ds(经典 Airflow 的 ds / serverless 的 ctx),没有则与离线作业节点同口径取今天(UTC)。
+    #   原来这里把原文直接发给数仓,而同一个节点走补数时是换了的。
+    ds = ds or datetime.utcnow().strftime("%Y-%m-%d")
+    sql = bgp_render_run_params(sql, ds)
+    sqls = [bgp_render_run_params(s, ds) for s in sqls] if sqls else sqls
     # node_id 提供 → 抢跨执行体作业级锁(与 MWAA etl DAG / Node 补数互斥);叠加 OID 退避重试。
     # workflow 节点【不能跳过】(破坏下游依赖):等满仍抢不到 → 抛错让这个节点失败(YAML 的 retries 可以是 0,不承诺重试;lease 兜底自愈)。
     # 锁属性名走唯一口径(含 target 维;home 时与存量同名)。

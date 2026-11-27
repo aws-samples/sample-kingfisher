@@ -70,6 +70,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   delete body.createdAt;
   // 既有目标收养的时间戳只有服务端写(lib/sync/foreign-guard-adoption.ts);客户端传了一律剔除。
   delete body.foreignGuardAdoptedAt;
+  // 「配置最近一次保存」的标记只有本路由与新建路由写(下面与 updatedAt 一起 SET);客户端回填整条任务时带回来的那个值一律剔除,
+  //   否则与下面那句 SET 路径重叠(同 updatedAt),整个保存 500。
+  delete body.configSavedAt;
   // 实时(CDC)任务通道恒为 DMS——编辑时同样兜底(取本次或现存 syncMode 判定)。
   const effectiveSyncMode = body.syncMode ?? current.syncMode;
   if (effectiveSyncMode === "realtime") body.channel = "dms";
@@ -183,8 +186,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   //   少了条件写,「保存」就会把一条已删的任务**凭空造回来**,而且只带本次提交的那几个字段。
   const { ok, Attributes } = await updateSyncTaskIfExists({
     taskId: params.id,
-    UpdateExpression: `SET ${expr}, #upd = :now`,
-    ExpressionAttributeNames: { ...names, "#upd": "updatedAt" },
+    // configSavedAt = 配置最近一次保存的时刻:向导的本地草稿靠它判断「任务在草稿之后又被保存过」(updatedAt 会被运行状态回写刷新,不能当这个用)
+    UpdateExpression: `SET ${expr}, #upd = :now, #cfg = :now`,
+    ExpressionAttributeNames: { ...names, "#upd": "updatedAt", "#cfg": "configSavedAt" },
     ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
     ReturnValues: "ALL_NEW",
   });

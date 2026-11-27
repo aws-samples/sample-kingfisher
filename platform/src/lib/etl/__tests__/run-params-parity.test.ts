@@ -4,7 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { RUN_PARAMS_PY } from "@/lib/etl/run-params-py";
-import { paramSet, runParamArguments, runParamArgv, RUN_PARAM_NAMES, RUN_PARAM_ARG_NAMES } from "@/lib/etl/run-params";
+import { paramSet, runParamArguments, runParamArgv, renderTemplate, RUN_PARAM_NAMES, RUN_PARAM_ARG_NAMES } from "@/lib/etl/run-params";
 import { syncRunVars, SYNC_RUN_VAR_NAMES } from "@/lib/sync/run-vars";
 
 const DATES = ["2026-01-01", "2026-01-31", "2026-03-01", "2024-02-29", "2024-03-01", "2026-10-12", "2026-12-31", "2027-01-01", "2026-07-15", "2000-01-01"];
@@ -52,6 +52,36 @@ print(json.dumps(res))`);
     expect(() => py(`bgp_run_param_argv("2026-7-3")`)).toThrow(/BAD_RUN_DATE/);
     expect(() => runParamArguments("20260703")).toThrow(/YYYY-MM-DD/);
     expect(() => runParamArgv("")).toThrow(/YYYY-MM-DD/);
+  });
+
+  it("SQL 文本渲染:Python bgp_render_run_params(text, ds) == TS renderTemplate(text, paramSet(ds))(逐日 × 逐文本;不认识的写法两侧都原样保留)", () => {
+    const TEXTS = [
+      "select * from t where dt = '${ds}'",
+      "insert into t_${ds_nodash} select '${yesterday_ds}', '${tomorrow_ds_nodash}', '${bizdate}', '${bizmonth_std}', '${last_month}'",
+      "${ds}${ds_nodash}${ds}",
+      "select '${not_a_var}', '${ ds }', '$ds', '{ds}', '${ds', '$${ds}', '${DS}', '${}'",
+      "多行\n-- ${run_date}\nselect '${yesterday}' as 昨天, '${ds_month}' as 月, '${tomorrow_ds}', '${yesterday_ds_nodash}', '${last_month_std}', '${bizdate_std}', '${bizmonth}'",
+      "select 1",
+      "",
+    ];
+    // 夹具自检:15 个变量名每个都至少出现一次(少一个 = 那个变量没被这条判据看着)
+    for (const k of RUN_PARAM_NAMES) expect(TEXTS.some((t) => t.includes("${" + k + "}")), k).toBe(true);
+    const out = py(
+      `T = json.loads(sys.argv[1])\nprint(json.dumps({s: [bgp_render_run_params(t, s) for t in T] for s in ${JSON.stringify(DATES)}}))`,
+      [JSON.stringify(TEXTS)]
+    );
+    const got = JSON.parse(out) as Record<string, string[]>;
+    for (const d of DATES) {
+      expect(got[d], d).toEqual(TEXTS.map((t) => renderTemplate(t, paramSet(d))));
+    }
+    expect(got["2026-10-12"][0]).toBe("select * from t where dt = '2026-10-12'");
+    expect(got["2026-10-12"][3]).toBe("select '${not_a_var}', '${ ds }', '$ds', '{ds}', '${ds', '$2026-10-12', '${DS}', '${}'");
+  });
+
+  it("SQL 文本渲染:业务日期非法即拒(文本为空也拒 —— 不许带着一个坏日期悄悄跑过去)", () => {
+    expect(() => py(`bgp_render_run_params("select 1", "20260703")`)).toThrow(/BAD_RUN_DATE/);
+    expect(() => py(`bgp_render_run_params("", "2026-7-3")`)).toThrow(/BAD_RUN_DATE/);
+    expect(() => py(`bgp_render_run_params("select 1", None)`)).toThrow(/BAD_RUN_DATE/);
   });
 
   it("同步任务那张表(syncRunVars / SYNC_RUN_VAR_NAMES)与 paramSet 键名、取值、顺序逐字相同(后续可直接改成引用它)", () => {

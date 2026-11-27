@@ -4149,4 +4149,15 @@ export const EN: Record<string, string> = {
   "已清理 {n} 个遗留端点": "{n} leftover endpoint(s) removed",
   "{n} 个端点仍被残留的复制任务引用,未清理:{list}": "{n} endpoint(s) are still referenced by a leftover replication task and were not removed: {list}",
   "若删后该区再无 DMS 任务,复制实例将在空闲宽限后由后台自动回收(下次启动需重新创建,约 10–15 分钟);停止态任务保留检查点、实例不回收。": "If no DMS task remains in this region after deletion, the replication instance is reclaimed automatically after an idle grace period (the next start recreates it, about 10–15 minutes); stopped tasks keep their checkpoint and the instance is kept.",
+  // 同步向导再次编辑不丢东西:带日期变量的表名这一块用开关收起、三个框带标签、填了没点「添加」的收进来或拦下、列映射读回
+  "源库按日期分表(每月 / 每天一张表)": "The source splits tables by date (one table per month / day)",
+  "(已添加带日期变量的表名;要关掉这一块,请先把它们移除)": "(Table names with date variables have been added; remove them first to turn this section off)",
+  "源库里同一类数据按日期分成多张表(例如 {a}、{b})时打开:用带日期变量的表名,每次运行只读业务日期对应的那一张。只同步上面勾选的表,就不用打开。": "Turn this on when the source keeps the same kind of data in one table per date (for example {a}, {b}): a table name with date variables reads only the table for the business date on each run. Leave it off if you only sync the tables ticked above.",
+  "源表名(带日期变量)": "Source table name (with date variables)",
+  "样例表(只读列结构,不会被同步)": "Sample table (columns only, never synced)",
+  "已把填好但还没点「添加」的带日期变量的表名「{name}」加进任务": "The table name with date variables “{name}” was filled in but not added yet; it has been added to the task",
+  "带日期变量的表名那一行还没填对:请按那一行下面的提示改好,或把它清空,再点「完成」": "The row for a table name with date variables is not valid yet: fix it as the message under that row says, or clear it, then click Finish",
+  "这个任务只有带日期变量的表名:目标表名就是上一步为它们各自填的「固定的目标表名」,这里不用再填(表名前缀 / 后缀只对勾选的普通表生效)。": "This task only has table names with date variables: each one writes to the fixed target table name you entered in the previous step, so nothing needs to be filled in here (the table-name prefix / suffix only apply to regular tables ticked in the list).",
+  "表名前缀 / 后缀只对勾选的普通表生效;带日期变量的表名用上一步各自填的「固定的目标表名」。": "The table-name prefix / suffix only apply to regular tables ticked in the list; table names with date variables use the fixed target table name entered for each in the previous step.",
+  "开关与目标字段名按任务上次保存的显示;关着的列里也包括上次保存之后源库新增的列。": "Switches and target field names are shown as last saved in the task; columns that are off also include columns added to the source after the last save.",
 };

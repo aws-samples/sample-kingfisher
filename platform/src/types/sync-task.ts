@@ -84,6 +84,11 @@ export interface SyncTask {
   // 升级兼容:既有目标收养的时间戳(ISO)。🔴 只有服务端写(lib/sync/foreign-guard-adoption.ts,
   //   首次运行时一次性写入);PUT 路由剔除客户端传来的这个键。存在 = 收养已判过(不再查 run 台账)。
   foreignGuardAdoptedAt?: string;
+  // 每张源表的列映射(向导第 2 步;只存「同步」开着的列)。再次编辑时以它为准合到新读到的列清单上。
+  fieldMappings?: Record<string, Array<Record<string, unknown>>>;
+  // 任务配置最近一次保存的时刻(ISO)。🔴 只有新建 / 保存两条路由写;运行状态回写不动它(updatedAt 会被运行状态回写刷新,不能当这个用)。
+  //   向导的本地草稿记下写草稿时看到的这个值,再打开时不一样 ⇒ 草稿作废。存量任务没有这个键。
+  configSavedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

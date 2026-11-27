@@ -8,7 +8,8 @@
 //   由 characterization 判据钉住),两份产物都拼这一份;单作业载体的 `run_job` 仍在 `runtime-py.ts`,调的就是这同一族。
 //
 // 【宿主要求】宿主 Python 文件必须:`import os, time, uuid, random` + `from datetime import datetime`;
-//   并已拼入 `PLACE_WIRE_PY`(`bgp_read_place` / `bgp_place_leg`)与 `RUN_PARAMS_PY`(`bgp_run_param_args` / `bgp_run_param_argv`)。
+//   并已拼入 `PLACE_WIRE_PY`(`bgp_read_place` / `bgp_place_leg`)与 `RUN_PARAMS_PY`(`bgp_run_param_args` / `bgp_run_param_argv` /
+//   `bgp_render_run_params`)。
 // 【边界】本块**不依赖 Airflow**(判据钉:代码里不许出现 airflow);台账 runId 的作者(`_ledger_run_id_for`)与 `run_job` 本身
 //   仍留在 serverless 载体(它们读 serverless 独有的 AIRFLOW_CTX_DAG_ID)。
 // 🔴 本文件是 Python 源码字符串:禁反引号、禁 `${`(会截断 TS 模板 / 触发插值);改这里等于改**两份**运行时产物
@@ -190,11 +191,14 @@ def _exec_place(spec):
     return place
 
 
-def _run_redshift(spec, run_id, started):
+def _run_redshift(spec, run_id, started, ds):
     place = _exec_place(spec)
     leg = bgp_place_leg(place, "redshift")
     rsdata = boto3.client("redshift-data", region_name=place["region"])
-    kwargs = {"WorkgroupName": leg["workgroup"], "Database": leg["database"], "Sqls": spec["statements"]}
+    # 2026-11-26:脚本里的业务日期变量在提交前换成取值(与平台「立即运行」/ 试运行 / 补数同一张表、同一种写法;
+    #   spec 里存的是脚本原文,日期不烙进产物)。原来这里把原文直接发给数仓 ⇒ 语句报错,或静默查不到数据。
+    sqls = [bgp_render_run_params(s, ds) for s in spec["statements"]]
+    kwargs = {"WorkgroupName": leg["workgroup"], "Database": leg["database"], "Sqls": sqls}
     if leg.get("secretArn"):
         kwargs["SecretArn"] = leg["secretArn"]
     last_err = ""
@@ -229,13 +233,16 @@ def _run_glue(spec, run_id, started, ds):
     handles = {"glueJobName": job_name, "glueJobRunId": rid}
     _record(spec, run_id, "running", extra=handles)   # 2026-11-04:提交后立刻把后端句柄补到 running 行(对账能据此收口)
     while True:
-        state = glue.get_job_run(JobName=job_name, RunId=rid)["JobRun"]["JobRunState"]
+        jr = glue.get_job_run(JobName=job_name, RunId=rid)["JobRun"]
+        state = jr["JobRunState"]
         if state in ("SUCCEEDED", "FAILED", "STOPPED", "ERROR", "TIMEOUT"):
             break
         _check_soft_limit(spec, run_id, started, handles)
         time.sleep(15)
     if state != "SUCCEEDED":
-        raise Exception("Glue job " + job_name + " ended with " + state)
+        # 2026-11-26:带上 Glue 给的失败原因(运行历史的「错误」列要能直接读到,不必去翻日志)
+        reason = str(jr.get("ErrorMessage") or "")
+        raise Exception("Glue job " + job_name + " ended with " + state + ((": " + reason) if reason else ""))
     print("Glue job", job_name, "SUCCEEDED")
 
 
