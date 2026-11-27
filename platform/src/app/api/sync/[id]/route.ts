@@ -4,7 +4,7 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { snapshotVersion } from "@/lib/versions/version-service";
-import { apiError } from "@/lib/api-response";
+import { apiError, orPayloadTooLarge } from "@/lib/api-response";
 import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OVERWRITE_CONFIRM_KIND, overwriteConfirmMessage, writesS3Tables, clearsWholeTable } from "@/lib/sync/target-table-guard";
 import { getCorrelationId } from "@/lib/observability/logger";
 // 停止 / 删除走长操作(执行体 lib/sync/long-ops.ts);保存前核同一把租约
@@ -184,14 +184,19 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   // 走唯一写通道(条件写)。
   // 🔴 上面那道 Get + 404 是主防线;这里兜的是并发窗口(强读之后、写之前那一瞬被别人删掉)。
   //   少了条件写,「保存」就会把一条已删的任务**凭空造回来**,而且只带本次提交的那几个字段。
-  const { ok, Attributes } = await updateSyncTaskIfExists({
-    taskId: params.id,
-    // configSavedAt = 配置最近一次保存的时刻:向导的本地草稿靠它判断「任务在草稿之后又被保存过」(updatedAt 会被运行状态回写刷新,不能当这个用)
-    UpdateExpression: `SET ${expr}, #upd = :now, #cfg = :now`,
-    ExpressionAttributeNames: { ...names, "#upd": "updatedAt", "#cfg": "configSavedAt" },
-    ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
-    ReturnValues: "ALL_NEW",
-  });
+  //   配置太大(列映射、筛选条件加起来超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500。
+  const written = await orPayloadTooLarge(
+    updateSyncTaskIfExists({
+      taskId: params.id,
+      // configSavedAt = 配置最近一次保存的时刻:向导的本地草稿靠它判断「任务在草稿之后又被保存过」(updatedAt 会被运行状态回写刷新,不能当这个用)
+      UpdateExpression: `SET ${expr}, #upd = :now, #cfg = :now`,
+      ExpressionAttributeNames: { ...names, "#upd": "updatedAt", "#cfg": "configSavedAt" },
+      ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+  if (written instanceof NextResponse) return written;
+  const { ok, Attributes } = written;
   // 行在这一瞬被删掉 ⇒ 如实回 404(**不许**建行,也不许假装保存成功)
   if (!ok) return NextResponse.json({ error: "Not found" }, { status: 404 });
   await snapshotVersion("sync", params.id, Attributes as any, guard.identity.username, "保存").catch(() => {});

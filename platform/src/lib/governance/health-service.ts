@@ -7,8 +7,8 @@
 // 维度与权重(见 design/36 §4):
 //   安全/分级覆盖 0.30 · 质量健康 0.30 · SLA 达标 0.20 · 血缘完整度 0.20
 
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { introspectSchema } from "@/lib/genbi/schema";
 import { listAllClassifications } from "@/lib/governance/classification";
 import { parseScopedFqn, displayFqn } from "@/lib/governance/scoped-fqn";
@@ -89,9 +89,8 @@ const CACHE_MS = 60_000;
 // 最近一次质量 summary(每表)。Scan summary 行,按 runId 取每表最新。
 async function latestQualityByTable(wantTarget: string): Promise<Map<string, { score: number | null; slaBreached: boolean }>> {
   const out = new Map<string, { score: number | null; slaBreached: boolean; runId: string }>();
-  const { Items = [] } = await docClient
-    .send(new ScanCommand({ TableName: TABLES.QUALITY_RESULTS, FilterExpression: "kind = :k", ExpressionAttributeValues: { ":k": "summary" } }))
-    .catch(() => ({ Items: [] as any[] }));
+  const Items = await scanAll({ TableName: TABLES.QUALITY_RESULTS, FilterExpression: "kind = :k", ExpressionAttributeValues: { ":k": "summary" } })
+    .catch(() => [] as any[]);
   for (const it of Items as any[]) {
     // 🔴 按键上的区筛:落此后 fqn 是 `<targetId>:<fqn>`(home 裸 fqn)。
     // 不筛的话两个区的质量结果混算成一个平均分 —— 用户的词是「串味」。
@@ -109,9 +108,7 @@ async function latestQualityByTable(wantTarget: string): Promise<Map<string, { s
 // 存 bareKey(去 service 前缀)以便与表全集(OM 约定 FQN)口径一致比较,见 bareKey 注释。
 async function tablesWithLineage(wantTarget: string): Promise<Set<string>> {
   const set = new Set<string>();
-  const { Items = [] } = await docClient
-    .send(new ScanCommand({ TableName: LINEAGE_TABLE }))
-    .catch(() => ({ Items: [] as any[] }));
+  const Items = await scanAll({ TableName: LINEAGE_TABLE }).catch(() => [] as any[]);
   for (const it of Items as any[]) {
     // 🔴 血缘边的两端都是 scoped 键;只算**这个区**的边(否则别区的血缘会把这个区的完整度抬高)
     for (const raw of [it.targetFqn, it.sourceFqn]) {

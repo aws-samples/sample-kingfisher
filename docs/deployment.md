@@ -644,6 +644,12 @@ returning to `release-2026-10-13` is still only possible with `release-2026-10-1
 Platform only plus "Redeploy" on the page for every execution region; no new table, no `redeploy-agents.sh`. The platform container has four environment variables fewer (this only matters to those who set up a local development environment from `platform/.env.example`).
 Measured in two test environments: first start in an execution region until the replication task appears 527 / 544 seconds; endpoints removed 81 / 82 seconds after the delete; back to "Running" after a password change and a restart 79 / 115 seconds.
 
+### 7ter.1q Two things to know when upgrading to the version with "long scripts can be saved + lists read every page" (ships with 2.2.0)
+
+1. **Nothing extra to run**: the usual `redeploy-platform.sh` run updates the edge firewall stack (`BgpWafStack`, in us-east-1) and rolls the platform. No new table, no new permission, no `redeploy-agents.sh`, no redeployment of execution regions.
+2. **Limits the page now states when a save is too large**: one submission may carry up to 4 MB, and the content of a single object (a job script, a workflow canvas, a saved query, a sync task and so on) may be up to about 400 KB.
+   A save beyond either is rejected with a message and the previously saved content is kept. A script that goes beyond this should be split into dependency files placed in the scripts bucket and referenced from the job, or into several jobs.
+
 ### 7ter.1p Three things to know when upgrading to the version with "sync tasks keep their configuration when edited again + business-date variables of Redshift SQL jobs on the scheduled path" (ships with 2.2.0)
 
 1. **Publish the schedules of batch jobs and the workflows that are already published once more**: the replacement of business-date variables (`${ds}` and so on) in Redshift SQL job scripts and inline SQL nodes of a workflow on the scheduled / orchestrated path,
@@ -970,6 +976,12 @@ Measured in two test environments: first start in an execution region until the 
   Workaround in the production version: do not use these variables in Redshift SQL jobs that run on a schedule; use the warehouse's own date functions (for example `current_date - 1`). After upgrading to 2.2.0, publish the already published schedules and workflows once more (§7ter.1p).
 - **When a scheduled run of a batch job fails, its row in "Run History" has neither a failure reason nor a business date (2.1.2 and all earlier versions; fixed in 2.2.0)**:
   workaround in the production version: open "Logs" on that row to read the run log of the scheduler service.
+- **A batch job script of roughly 160 lines or more cannot be saved (2.1.2 and all earlier versions; fixed in 2.2.0)**: the save request body exceeds 8 KB and is blocked at the edge with 403, while the page says "too many requests, try again later";
+  saving EMR jobs, the orchestration canvas, reports and sync tasks with large content behaves the same. Workaround in the production version: split a long script into dependency files placed in the scripts bucket and reference them from the job, or split it into several jobs.
+- **"Save" on the orchestration canvas and "Save query" on the Redshift Query page report "Saved" without reading the server's answer (2.1.2 and all earlier versions; fixed in 2.2.0)**:
+  workaround in the production version: refresh the page after saving and confirm that the content is still there before publishing.
+- **Lists show only what the first read of their table returns (2.1.2 and all earlier versions; fixed in 2.2.0)**: once the content of a table (for example all batch jobs) exceeds 1 MB, the objects created last no longer appear in the list.
+  In the production version a single object is at most about 8 KB, so this takes well over a hundred objects; workaround: delete objects that are no longer used.
 - Deferred items (least-privilege narrowing, secret rotation, OpenSearch sizing and snapshots, alerting and so on) are recorded as deferred in the engineering defect records.
 
 ## Appendix A. Configuration reference

@@ -1,6 +1,7 @@
 "use client";
 // 页面删除读响应的唯一作者:失败呈现服务端原话,成功才提示「已删除」
 import { deleteJson } from "@/lib/http/delete-json";
+import { writeJson } from "@/lib/http/write-json";
 
 import { fetchExecTargets } from "@/lib/exec-env/exec-targets-client";
 // 顶栏「执行范围」= 本页执行目标的**默认值**(INTERACTION §9.4「默认范围跟随视角」)。
@@ -198,8 +199,14 @@ export default function RedshiftPage() {
 
   const handleSave = async () => {
     if (!taskName) { message.warning(t("请输入任务名称")); return; }
-    await fetch("/api/redshift/tasks", { method: "POST", headers: { "Content-Type": "application/json" }, // 🔴 保存时盖上**编辑器当前的执行目标**(不是页面视角):这条查询将来就该跑在那个区。
-      body: JSON.stringify({ name: taskName, sql, workgroupName: selectedWg, database: selectedDb, targetId: treeTarget }) });
+    try {
+      // 🔴 保存时盖上**编辑器当前的执行目标**(不是页面视角):这条查询将来就该跑在那个区。
+      await writeJson("/api/redshift/tasks", "POST", { name: taskName, sql, workgroupName: selectedWg, database: selectedDb, targetId: treeTarget });
+    } catch (e) {
+      // 服务端拒绝 ⇒ 原话呈现,任务名留着(此前不看应答就提示「已保存」)
+      message.error((e as Error).message || t("保存失败"));
+      return;
+    }
     message.success(t("已保存")); setTaskName(""); fetchTasks();
   };
 

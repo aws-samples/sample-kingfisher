@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { omRequest, isOmConfigured } from "@/lib/openmetadata/om-client";
 import { parseSqlLineage, tableFqn } from "@/lib/lineage/sql-lineage";
 import { apiOk, apiError } from "@/lib/api-response";
@@ -94,20 +94,18 @@ interface JobSql { id: string; name: string; resourceType: "etl-job" | "redshift
 async function scanSqlResources(): Promise<JobSql[]> {
   const out: JobSql[] = [];
   try {
-    const { Items = [] } = await docClient.send(
-      new ScanCommand({
-        TableName: TABLES.ETL_JOBS,
-        FilterExpression: "#t = :rt",
-        ExpressionAttributeNames: { "#t": "type" },
-        ExpressionAttributeValues: { ":rt": "redshift" },
-      })
-    );
+    const Items = await scanAll({
+      TableName: TABLES.ETL_JOBS,
+      FilterExpression: "#t = :rt",
+      ExpressionAttributeNames: { "#t": "type" },
+      ExpressionAttributeValues: { ":rt": "redshift" },
+    });
     for (const it of Items) {
       if (it.script) out.push({ id: it.jobId, name: it.name || it.jobId, resourceType: "etl-job", sql: it.script, database: it.redshiftConfig?.database , targets: (it as { targets?: unknown }).targets });
     }
   } catch { /* table-less / no access: skip enrichment */ }
   try {
-    const { Items = [] } = await docClient.send(new ScanCommand({ TableName: TABLES.REDSHIFT_TASKS }));
+    const Items = await scanAll({ TableName: TABLES.REDSHIFT_TASKS });
     for (const it of Items) {
       if (it.sql) out.push({ id: it.taskId, name: it.name || it.taskId, resourceType: "redshift-task", sql: it.sql, database: it.database , targets: (it as { targets?: unknown }).targets });
     }

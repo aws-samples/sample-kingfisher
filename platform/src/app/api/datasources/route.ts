@@ -4,8 +4,9 @@ import { NextRequest, NextResponse } from "next/server";
 // 落点只认点名(缺 ⇒ 400,不默认主控区)
 import { requestedTargetId } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
-import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { createSecret, deleteSecret, parseUserDsNetwork } from "@/lib/aws/datasource-service";
 import { apiOk, apiError } from "@/lib/api-response";
 // 探测方式闭合清单(表单 / 路由同一份)
@@ -81,12 +82,12 @@ export async function GET(req: NextRequest) {
       Object.assign(attrValues, sf.values);
     }
 
-    const { Items = [] } = await docClient.send(new ScanCommand({
+    const Items = await scanAll({
       TableName: TABLES.DATASOURCES,
       FilterExpression: filterParts.join(" AND "),
       ...(Object.keys(attrNames).length > 0 ? { ExpressionAttributeNames: attrNames } : {}),
       ExpressionAttributeValues: attrValues,
-    }));
+    });
     // 「经 Glue 连接验证中」的行读到就推进到结论(页面不再轮询时也能看到结果);非 testing 行零外部调用
     return apiOk(await settleGlueProbeRows(Items as DataSource[]));
   } catch (e: any) {

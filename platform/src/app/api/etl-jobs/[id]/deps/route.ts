@@ -18,10 +18,11 @@ import { bindingTargets, resolveGlueBinding, TargetBindingRejected } from "@/lib
 import { s3ClientFor } from "@/lib/exec-env/target-clients";
 import { placeErrorResponse } from "@/lib/place/route";
 import { PLATFORM_DEP_KEY_PREFIX } from "@/lib/execution-role/s3-uris";
+import { PAGE_UPLOAD_MAX_FILE_BYTES, PAYLOAD_TOO_LARGE_CODE, etlDepTooLargeMessage } from "@/lib/http/body-limits";
 
 const USER_ID = "default-user";
 
-const MAX_BYTES = 100 * 1024 * 1024; // 依赖文件 ≤100MB(更大的库建议预置到 S3 后直接填 URI)
+const MAX_BYTES = PAGE_UPLOAD_MAX_FILE_BYTES; // 经平台进程上传的单个文件的上限(更大的先放进 S3 再填地址);数值、文案与网关的请求体上限同一处定义
 const ALLOWED_EXT = /\.(jar|py|whl|zip|egg)$/i;
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
   if (!ALLOWED_EXT.test(file.name)) return apiError("仅支持 .jar / .py / .whl / .zip / .egg", 400);
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.length === 0) return apiError("文件为空", 400);
-  if (buf.length > MAX_BYTES) return apiError("文件过大(≤100MB)", 400);
+  if (buf.length > MAX_BYTES) return apiError(etlDepTooLargeMessage(buf.length), 413, { code: PAYLOAD_TOO_LARGE_CODE });
   // jar/whl/zip/egg 都是 zip 容器,校验魔数;.py 纯文本跳过。
   if (!/\.py$/i.test(file.name) && !(buf[0] === 0x50 && buf[1] === 0x4b)) return apiError("不是有效的 JAR/ZIP 文件", 400);
 

@@ -8,6 +8,7 @@ import { Table, Switch, Tag, message, Modal, Button, Space, Select, Badge, Input
 import { ReloadOutlined, ClockCircleOutlined, HistoryOutlined, SearchOutlined } from "@ant-design/icons";
 import CronEditor from "@/components/common/CronEditor";
 import { useT } from "@/lib/i18n/useT";
+import { writeJson } from "@/lib/http/write-json";
 // 🔴 调度面板与 `/sync`、`/workflow` 两页读的是**同一批行**,
 // 那两页已按执行范围过滤而这里没有 ⇒ 同一份数据在两个页面给出不同条数(用户看到的是「平台在自相矛盾」)。
 // 两条列表接口本来就支持 `?scope=`,此前只是没传。
@@ -183,8 +184,13 @@ export default function SchedulePanel({ active }: { active: boolean }) {
       d?.success !== false ? message.success(t("Cron 已保存，启用调度后生效")) : message.error(d?.error?.message || t("更新失败"));
     } else {
       const url = item.itemType === "sync" ? `/api/sync/${item.itemId}` : `/api/workflow/${item.itemId}`;
-      await fetch(url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cronExpression: cronModal.cron }) });
-      message.success(t("Cron 已保存，启用调度后生效"));
+      // 服务端拒绝 ⇒ 原话呈现(此前不看应答就提示「已保存」)
+      try {
+        await writeJson(url, "PUT", { cronExpression: cronModal.cron });
+        message.success(t("Cron 已保存，启用调度后生效"));
+      } catch (e) {
+        message.error((e as Error).message || t("更新失败"));
+      }
     }
     setCronModal({ open: false, cron: "" });
     fetchData();

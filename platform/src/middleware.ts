@@ -9,6 +9,15 @@ import { isAnalystOnly } from "@/lib/auth/roles";
 import { ANALYST_FORBIDDEN_MESSAGE, ADMIN_REQUIRED_MESSAGE } from "@/lib/auth/forbidden-messages";
 // 内部端点的头部判定(纯函数,零 node 内置,edge 安全)
 import { INTERNAL_API_PREFIX, internalSourceVerdict } from "@/lib/scheduler/internal-source";
+// 应用接口请求体上限(唯一作者;边缘不再按大小拦登录后的应用接口,由这里判并用人话报)
+import {
+  PAYLOAD_TOO_LARGE_CODE,
+  PUBLIC_API_PREFIX,
+  bodySizeVerdictByCount,
+  bodySizeVerdictByHeader,
+  maxBodyBytesFor,
+  type BodySizeVerdict,
+} from "@/lib/http/body-limits";
 
 // Platform-wide API auth gate. Every /api/* route requires a valid Cognito ID token,
 // EXCEPT /api/public/* (e.g. the runtime config endpoint used to bootstrap login).
@@ -87,13 +96,58 @@ function analystAllowed(pathname: string, method: string): boolean {
   return ANALYST_ALLOW.some((a) => pathname.startsWith(a.prefix) && a.methods.includes(method));
 }
 
+// 请求体大小:先看 Content-Length;请求头里没有可用的长度(分块传输等)就数实际读到的字节 —— 数到超过上限即停。
+// 读的是框架给网关的那一份副本,路由拿到的请求体不受影响。
+async function bodySizeVerdict(req: NextRequest): Promise<BodySizeVerdict> {
+  const { pathname } = req.nextUrl;
+  const byHeader = bodySizeVerdictByHeader(pathname, req.method, req.headers.get("content-length"));
+  if (byHeader) return byHeader;
+  const body = req.body;
+  if (!body) return { ok: true };
+  const limit = maxBodyBytesFor(pathname, req.method);
+  const reader = body.getReader();
+  let counted = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      counted += value ? value.byteLength : 0;
+      if (counted > limit) break;
+    }
+  } catch {
+    // 读不完(连接中断等)⇒ 按已数到的判;路由那边会拿到同样的中断
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  return bodySizeVerdictByCount(pathname, req.method, counted);
+}
+
+function payloadTooLarge(cid: string, message: string) {
+  return withCid(
+    NextResponse.json(
+      { success: false, error: { message, code: PAYLOAD_TOO_LARGE_CODE, correlationId: cid } },
+      { status: 413 }
+    ),
+    cid
+  );
+}
+
+// 登录校验通过(或显式关闭鉴权)之后的最后一步:请求体没超限才放行给路由。
+// (本文件只用行注释:上面几处行注释里写着带星号的路径,源码扫描类判据剥注释时会把它们当成块注释的开头,
+//   一直剥到后面第一个块注释的结尾 —— 中间的代码就从判据眼里消失了。)
+async function proceedIfBodyFits(req: NextRequest, cid: string): Promise<NextResponse> {
+  const verdict = await bodySizeVerdict(req);
+  if (!verdict.ok) return payloadTooLarge(cid, verdict.message);
+  return proceed(req, cid);
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   // Reuse an inbound correlation id (e.g. from an upstream / retry) or mint a new one.
   // It is propagated downstream to API routes and echoed on every response.
   const cid = req.headers.get(CORRELATION_HEADER) || newCorrelationId();
 
-  if (pathname.startsWith("/api/public/")) return proceed(req, cid); // bootstrap endpoints
+  if (pathname.startsWith(PUBLIC_API_PREFIX)) return proceed(req, cid); // bootstrap endpoints
   // 🔴 `/api/internal/**` 没有 Cognito 身份(调用方是主控区的分发 Lambda),鉴权由路由内的内部守卫做
   //    (共享密钥 + 来源)。这里先挡掉**一切经 CloudFront 进来的**请求(公网入口必带 X-Amz-Cf-Id)——
   //    公网上的人连密钥比对那一步都走不到。其余放行给路由守卫(纵深防御:路由会把这两道再判一遍)。
@@ -106,7 +160,7 @@ export async function middleware(req: NextRequest) {
   }
   if (req.method === "OPTIONS") return proceed(req, cid);
   const mode = authMode();
-  if (mode === "disabled") return proceed(req, cid); // 显式关闭(仅本机开发 / 单测)
+  if (mode === "disabled") return proceedIfBodyFits(req, cid); // 显式关闭(仅本机开发 / 单测)
   if (mode === "unconfigured") {
     return NextResponse.json(
       { success: false, error: { message: AUTH_UNCONFIGURED_MESSAGE, code: "UPSTREAM_ERROR" } },
@@ -133,10 +187,11 @@ export async function middleware(req: NextRequest) {
     // 与路由内 requireAdmin 守卫构成纵深防御(避免任何 /api/admin 子路由漏加守卫导致越权)。
     // 拒因要说「需要平台管理员」—— 研发 / 经理账号撞到这里时,套运营分析那句是错的解释。
     if (pathname.startsWith("/api/admin") && !groups.includes("bgp-admin")) return forbidden(cid, ADMIN_REQUIRED_MESSAGE);
-    return proceed(req, cid);
   } catch {
     return unauthorized(cid);
   }
+  // 身份与角色都过了,最后看请求体大小(超限 ⇒ 413 + 人话,不进路由)。放在 try 之外:这里出错不许被说成「未认证」。
+  return proceedIfBodyFits(req, cid);
 }
 
 export const config = {

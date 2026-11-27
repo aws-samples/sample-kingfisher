@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { orPayloadTooLarge } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { snapshotVersion } from "@/lib/versions/version-service";
 import { pushSqlLineageToOpenMetadata } from "@/lib/openmetadata/om-push";
@@ -29,16 +30,21 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const names = Object.fromEntries(fields.map((k, i) => [`#f${i}`, k]));
   const values = Object.fromEntries(fields.map((k, i) => [`:v${i}`, body[k]]));
 
-  const { Attributes } = await docClient.send(
-    new UpdateCommand({
-      TableName: TABLES.REDSHIFT_TASKS,
-      Key: { userId: USER_ID, taskId: params.id },
-      UpdateExpression: `SET ${expr}, #upd = :now`,
-      ExpressionAttributeNames: { ...names, "#upd": "updatedAt" },
-      ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
-      ReturnValues: "ALL_NEW",
-    })
+  // SQL 太大(超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500
+  const written = await orPayloadTooLarge(
+    docClient.send(
+      new UpdateCommand({
+        TableName: TABLES.REDSHIFT_TASKS,
+        Key: { userId: USER_ID, taskId: params.id },
+        UpdateExpression: `SET ${expr}, #upd = :now`,
+        ExpressionAttributeNames: { ...names, "#upd": "updatedAt" },
+        ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
+        ReturnValues: "ALL_NEW",
+      })
+    )
   );
+  if (written instanceof NextResponse) return written;
+  const { Attributes } = written;
   await snapshotVersion("redshift-task", params.id, Attributes as any, guard.identity.username, "保存").catch(() => {});
   // re-parse SQL → lineage on save (best-effort).
   const saved = Attributes as any;

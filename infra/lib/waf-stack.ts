@@ -10,17 +10,19 @@ import { Construct } from "constructs";
 // 注意:CloudFront 关联的 WAF 必须建在 us-east-1(scope=CLOUDFRONT)。本平台即部署在
 // us-east-1,故与其它栈同区。WebACL ARN 经 props 传给 PlatformStack 关联到分发。
 /**
- * 🔴🔴 **请求体 >8KB 的路由必须逐条登记在这里**(2026-09-13 真环境抓到的 P0)。
+ * 请求体大小在边缘怎么管(2026-11-26 改;此前是「一切 >8KB 的请求体都拦,逐条登记放行」)。
  *
- * 【为什么必须有这张表】托管通用规则集的 `SizeRestrictions_BODY` 会拦掉**一切 >8KB 的请求体**,
- * 而 CloudFront 拦下时回的是一张 **403 HTML 错误页** —— 应用层一个字都说不上,用户看到的是
- * 「保存失败」而查不出原因。改动前这里只有一条一次性放行(Flink 连接器上传);
- * 于是「会话卡片」——**平台第一个持久化查询结果行**的功能 —— 一上线就会在
- * 「对话稍微长一点」时被边缘层静默拦掉。
- *
- * 【纪律】新增任何会发大请求体的路由,**同笔提交**往这张表加一行;否则它会在真环境表现成
- * 「偶尔保存失败、日志里什么都没有」。每行的 `maxBytes` 必须 **> 应用层自己的上限** ——
- * 顺序反了就等于永远拿不到应用层那句人话(有门禁钉住,见 platform 侧 `waf-large-body-guard`)。
+ * 【缺陷原形】托管通用规则集的 `SizeRestrictions_BODY` 拦掉一切 >8KB 的请求体,CloudFront 回的是一张 403 HTML 错误页,
+ *   应用层一个字都说不上。放行靠下面这张清单逐条登记,而清单只会精确匹配路径 —— 带 id 的保存路由(离线作业脚本、
+ *   编排画布、报表、同步任务……)一条都登记不进来:离线作业脚本约 160 行就保存不了(2026-11-26 真实客户反馈),
+ *   页面提示的还是「请求过多」。「新增大请求体路由同笔登记」这条纪律只写在注释里,拦不住。
+ * 【规则】大小那一条改成**只计数、只打标签**(其余托管规则照常拦);紧随其后的一条规则只对两类路径按这个标签拦:
+ *   ① 不在 `/api/` 之下的(页面与静态资源 —— 它们没有理由带大请求体);
+ *   ② 登录之前就能打到的接口与内部回环接口(`EDGE_SIZE_LIMITED_API_PREFIXES`)。
+ *   其余 `/api/**` 要先过网关的登录校验,大小由应用层统一给上限并用人话报(platform 侧 `lib/http/body-limits.ts`)。
+ * 【下面这张清单还管什么】清单里的路由整条放行(Allow 是终止动作,连托管规则的内容检查与限速也跳过):上传的是
+ *   二进制文件 / 整段对话正文,内容检查没有意义。每行的 `maxBytes` 必须 **> 应用层自己的上限**
+ *   (顺序反了用户拿不到应用层那句人话;有门禁钉住,见 platform 侧 `waf-large-body-guard`)。
  */
 export const LARGE_BODY_ROUTES: ReadonlyArray<{
   name: string;
@@ -57,6 +59,33 @@ export const LARGE_BODY_ROUTES: ReadonlyArray<{
  */
 export const LARGE_BODY_PRIORITY_RESERVED = 20;
 
+/** 托管通用规则集里「请求体超过 8KB」那一条的名字,与它给请求打的标签(规则改成只计数之后标签照打)。 */
+export const SIZE_RESTRICTION_BODY_RULE = "SizeRestrictions_BODY";
+export const OVERSIZE_BODY_LABEL = "awswaf:managed:aws:core-rule-set:SizeRestrictions_Body";
+
+/** 应用接口的路径前缀:它之下的请求先过网关的登录校验,请求体大小由应用层管。 */
+export const APP_API_PREFIX = "/api/";
+
+/**
+ * `/api/` 之下**仍按 8KB 在边缘拦**的前缀:登录之前就能打到的公开接口,与只许平台内部回环调用的接口
+ * (后者本来就不许经公网入口进来)。与 platform 侧网关 `middleware.ts` 里免登录的两个前缀逐字相同(有门禁钉住)。
+ */
+export const EDGE_SIZE_LIMITED_API_PREFIXES: readonly string[] = ["/api/public/", "/api/internal/"];
+
+/** 固定规则的优先级(都 ≥ 放行预留区;带标签拦截的那一条必须排在托管通用规则集之后,标签才看得到)。 */
+export const OVERSIZE_BODY_BLOCK_PRIORITY = 23;
+
+function pathStartsWith(prefix: string) {
+  return {
+    byteMatchStatement: {
+      fieldToMatch: { uriPath: {} },
+      positionalConstraint: "STARTS_WITH",
+      searchString: prefix,
+      textTransformations: [{ priority: 0, type: "NONE" }],
+    },
+  };
+}
+
 /** CLOUDFRONT scope 的 WebACL 只能建在这个区(AWS 规则,与主控区无关)。 */
 export const CLOUDFRONT_WAF_REGION = "us-east-1";
 
@@ -77,9 +106,8 @@ export class WafStack extends cdk.Stack {
         sampledRequestsEnabled: true,
       },
       rules: [
-        // 0..n) 大请求体放行(**按 LARGE_BODY_ROUTES 生成,不再一条条手写**)。
-        //    Allow 是终止动作 ⇒ 命中即跳过后续所有规则(含托管规则集的 8KB body 限制);
-        //    其余所有路径仍受 8KB 保护。每条都带 `maxBytes` 上限防滥用。
+        // 0..n) 整条放行(**按 LARGE_BODY_ROUTES 生成,不再一条条手写**)。
+        //    Allow 是终止动作 ⇒ 命中即跳过后续所有规则(托管规则的内容检查与限速都不再看)。
         //    🔴 priority 从 0 起连续占用 LARGE_BODY_ROUTES.length 个,托管规则从其后开始。
         ...LARGE_BODY_ROUTES.map((r, idx) => ({
           name: r.name,
@@ -118,11 +146,18 @@ export class WafStack extends cdk.Stack {
           visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: r.name, sampledRequestsEnabled: true },
         })),
         // 20) AWS 托管:通用规则集(OWASP 常见攻击)。放行块占 0..19,固定规则一律 ≥ 20。
+        //     其中「请求体超过 8KB」那一条改成只计数(标签照打),拦不拦由下面优先级 23 的规则按路径决定;其余规则照常拦。
         {
           name: "AWSManagedCommon",
           priority: 20,
           overrideAction: { none: {} },
-          statement: { managedRuleGroupStatement: { vendorName: "AWS", name: "AWSManagedRulesCommonRuleSet" } },
+          statement: {
+            managedRuleGroupStatement: {
+              vendorName: "AWS",
+              name: "AWSManagedRulesCommonRuleSet",
+              ruleActionOverrides: [{ name: SIZE_RESTRICTION_BODY_RULE, actionToUse: { count: {} } }],
+            },
+          },
           visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: "AWSManagedCommon", sampledRequestsEnabled: true },
         },
         // 2) AWS 托管:已知坏输入。
@@ -140,6 +175,29 @@ export class WafStack extends cdk.Stack {
           overrideAction: { none: {} },
           statement: { managedRuleGroupStatement: { vendorName: "AWS", name: "AWSManagedRulesAmazonIpReputationList" } },
           visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: "AWSManagedIpReputation", sampledRequestsEnabled: true },
+        },
+        // 23) 请求体超过 8KB(带着上面打的标签)且路径属于「仍在边缘拦」的两类 ⇒ 拦:
+        //     不在 /api/ 之下(页面 / 静态资源),或在登录前公开接口 / 内部回环接口之下。其余 /api/** 放给应用层。
+        {
+          name: "BlockOversizeBodyOutsideAppApi",
+          priority: OVERSIZE_BODY_BLOCK_PRIORITY,
+          action: { block: {} },
+          statement: {
+            andStatement: {
+              statements: [
+                { labelMatchStatement: { scope: "LABEL", key: OVERSIZE_BODY_LABEL } },
+                {
+                  orStatement: {
+                    statements: [
+                      { notStatement: { statement: pathStartsWith(APP_API_PREFIX) } },
+                      ...EDGE_SIZE_LIMITED_API_PREFIXES.map(pathStartsWith),
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+          visibilityConfig: { cloudWatchMetricsEnabled: true, metricName: "BlockOversizeBodyOutsideAppApi", sampledRequestsEnabled: true },
         },
         // 4) 速率限制:单 IP 5 分钟内超 4000 请求即拦截(缓解 CC / 暴力扫描)。
         //    (用户 2026-10-20 定值 2000 → 4000):规则作用于整个 CloudFront 分发(含 _next/static 静态资源),

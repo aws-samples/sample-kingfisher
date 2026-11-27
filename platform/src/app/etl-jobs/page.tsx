@@ -56,6 +56,8 @@ import { useResidencyAck } from "@/components/residency/useResidencyAck";
 import { fetchWithResidencyAck } from "@/lib/residency/client";
 // 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
+// 页面上传的文件上限(与网关 / 上传路由同一处定义,页面写的数不许自己另写)
+import { PAGE_UPLOAD_MAX_FILE_BYTES, formatBytes } from "@/lib/http/body-limits";
 // 前端默认值也收编到命名 SSOT(与改动前**同值**,零行为变化)。
 // 🔴 待办:这里应改成"取当前执行目标的 workgroup"(env 覆盖与 per-target 实名都在服务端,
 //    客户端拿不到)—— 届时改这一个 import 的用法即可,不必再回来找字面量。
@@ -860,7 +862,7 @@ export default function EtlJobsPage() {
                                         } catch (err: any) { message.error(err?.message || t("上传失败")); }
                                         finally { setDepUploading(false); }
                                       }} />
-                                    <Text type="secondary" style={{ fontSize: 12 }}>{t("≤100MB;保存后随作业下发")}</Text>
+                                    <Text type="secondary" style={{ fontSize: 12 }}>{t("页面上传 ≤{max},更大的先放进 S3 再把地址填在上面;保存后随作业下发", { max: formatBytes(PAGE_UPLOAD_MAX_FILE_BYTES) })}</Text>
                                   </Space>
                                 </Space>
                               </div>

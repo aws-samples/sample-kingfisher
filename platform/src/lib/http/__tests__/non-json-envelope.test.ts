@@ -26,6 +26,14 @@ describe("🔴 normalizeApiResponse:≥ 400 且不是 JSON ⇒ 同状态码的�
     expect(body.error.message).not.toContain("<");
   });
 
+  it("403 的文案不许只说「请求过多」:边缘拦下的原因页面拿不到,访问频率与内容命中安全规则两种都写出来、各给下一步(2026-11-26 真实用户保存内容被拦,却被告知请求过多)", () => {
+    const msg = describeNonJson(403);
+    expect(msg).toContain("请求过多");
+    expect(msg).toContain("安全规则");
+    expect(msg).toContain("改写");
+    expect(msg).not.toContain("多为");
+  });
+
   it("网关 504 HTML ⇒ 文案说清是网关超时、code=UPSTREAM_TIMEOUT;502 / 503 同一类文案", async () => {
     const b504 = await (await normalizeApiResponse(html(504, "<html>504 Gateway Time-out</html>"))).json();
     expect(b504.error).toMatchObject({ code: "UPSTREAM_TIMEOUT" });

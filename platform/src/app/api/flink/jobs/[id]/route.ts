@@ -5,7 +5,7 @@ import { docClient, TABLES } from "@/lib/aws/dynamodb";
 // 执行角色 ARN 形态 / 保存期预检的唯一作者
 import { roleArnShapeRejection } from "@/lib/execution-role/resolve";
 import { preflightCustomRoleForTargets } from "@/lib/execution-role/preflight";
-import { apiOk, apiError } from "@/lib/api-response";
+import { apiOk, apiError, orPayloadTooLarge } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { normalizeFlinkSql, flinkJobTarget } from "@/lib/realtime/flink-service";
@@ -99,12 +99,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   }
   if (sets.length === 1) return apiError("没有可更新的字段", 400, { code: "VALIDATION_FAILED" });
 
-  await docClient.send(new UpdateCommand({
+  // SQL 太大(超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500
+  const written = await orPayloadTooLarge(docClient.send(new UpdateCommand({
     TableName: TABLES.FLINK_JOBS, Key: { userId: USER_ID, jobId: params.id },
     UpdateExpression: `SET ${sets.join(", ")}`,
     ...(Object.keys(names).length ? { ExpressionAttributeNames: names } : {}),
     ExpressionAttributeValues: values,
-  }));
+  })));
+  if (written instanceof NextResponse) return written;
   recordAudit(req, "flink.update", { resourceType: "flink", resourceId: params.id, detail: { name: body.name || job.name } }).catch(() => {});
   return apiOk({ jobId: params.id, updated: true });
 }

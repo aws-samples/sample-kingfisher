@@ -1,7 +1,8 @@
 // 报表 widget CRUD(bgp-bi-reports)。键式隔离:pk=projectId, sk=reportId(ULID)。
 // Query(pk=projectId) 天然 per-project 列表;更新走 version 乐观锁(照抄告警规则,并发一成功一 409)。
 
-import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { queryAll } from "@/lib/aws/read-all";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { isValidTargetId } from "@/lib/exec-env/target-id";
@@ -96,15 +97,12 @@ export function normalizeViz(input: any): WidgetViz {
 }
 
 export async function listReports(projectId: string): Promise<BiReport[]> {
-  const { Items = [] } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.BI_REPORTS,
-      KeyConditionExpression: "projectId = :pid",
-      ExpressionAttributeValues: { ":pid": projectId },
-      ScanIndexForward: false, // 新报表在前(reportId=ULID 时间序)
-    })
-  );
-  return Items as BiReport[];
+  return queryAll<BiReport>({
+    TableName: TABLES.BI_REPORTS,
+    KeyConditionExpression: "projectId = :pid",
+    ExpressionAttributeValues: { ":pid": projectId },
+    ScanIndexForward: false, // 新报表在前(reportId=ULID 时间序)
+  });
 }
 
 export async function getReport(projectId: string, reportId: string): Promise<BiReport | null> {

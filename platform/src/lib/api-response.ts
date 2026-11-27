@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isStoreItemTooLarge, STORE_ITEM_TOO_LARGE_MESSAGE, PAYLOAD_TOO_LARGE_CODE } from "@/lib/http/body-limits";
 
 // 统一 API 响应封装。
 //
@@ -41,6 +42,9 @@ export type ApiErrorCode =
   //   detail = { runs:[{runId,status,startedAt,targetId}], locks:[{targetId,expiresAt,renewedAgoMs}] };文案逐条列 runId 指路「等终态 / 先停止」。
   //   🔴 与 LONG_OP_IN_PROGRESS 分开:那是长操作框架的对象租约(提交段);这里是运行本身还没结束(Glue JobRun / EMR job-run 还在跑)。
   | "JOB_RUN_IN_PROGRESS"
+  // (413):这次提交的内容太大 —— 请求体超过应用接口的上限(网关判),或写库时超过单条记录的上限(下面 apiError 统一识别)。
+  //   🔴 用户可修(精简 / 拆分),文案给出上限与下一步;与 VALIDATION_FAILED 分开:内容本身没写错,只是太大。
+  | "PAYLOAD_TOO_LARGE"
   | "UPSTREAM_TIMEOUT" // 依赖(AWS/查询)超时
   | "UPSTREAM_ERROR" // 依赖调用失败
   // 执行范围三种拒因(50 SPEC v3.34 §2.6.5)。
@@ -120,10 +124,34 @@ export function apiOk(data: any, status = 200, meta?: object) {
 }
 
 // 兼容签名:第三参既可是旧式无(默认),也可传 { code, correlationId }。
+//
+// 存储层报「单条记录太大」(保存的定义超过约 400KB)时,各路由的 catch 传进来的是存储服务的英文原话、状态 500。
+// 把错误交给 apiError 的路由都经过这里 ⇒ 一处识别:改成人话 + 413 + PAYLOAD_TOO_LARGE(识别与文案的唯一作者 lib/http/body-limits.ts)。
+// 直接 await 写库、没有自己的 catch 的保存路由到不了这里 ⇒ 用下面的 orPayloadTooLarge 包一层
+// (判据钉住:路由文件里没包这一层的写库语句只减不增)。
 export function apiError(message: string, status = 400, opts: ApiErrorOptions = {}) {
+  if (isStoreItemTooLarge(message)) {
+    message = STORE_ITEM_TOO_LARGE_MESSAGE;
+    status = 413;
+    opts = { ...opts, code: PAYLOAD_TOO_LARGE_CODE };
+  }
   const error: { message: string; code?: ApiErrorCode; correlationId?: string; detail?: unknown } = { message };
   if (opts.code) error.code = opts.code;
   if (opts.correlationId) error.correlationId = opts.correlationId;
   if (opts.detail !== undefined) error.detail = opts.detail;
   return NextResponse.json({ success: false, error }, { status });
+}
+
+// 保存路由里没有自己的 catch 的写库调用包这一层。
+// 缺陷原形(2026-11-27 读代码):编排画布、数仓查询任务、同步任务、Flink 作业的保存直接 await 写库,
+//   存储层拒收时异常一路抛出去 ⇒ 框架回一张没有正文的 500,页面只能说「服务响应异常」,用户不知道是内容太大。
+// 存储层说「内容太大」⇒ 得到 413 + 人话的应答,调用方直接 return;别的错误原样抛(与不包时的行为相同)。
+export async function orPayloadTooLarge<T>(write: Promise<T>): Promise<T | NextResponse> {
+  try {
+    return await write;
+  } catch (e) {
+    const message = (e as { message?: unknown } | null)?.message;
+    if (isStoreItemTooLarge(message)) return apiError(String(message), 500);
+    throw e;
+  }
 }

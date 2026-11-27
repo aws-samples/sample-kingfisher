@@ -14,6 +14,7 @@ import { describeFlinkJob, readFlinkLogs, flinkHealthMetrics, flinkJobTarget } f
 import { buildDiagnosisGrounding } from "@/lib/incidents/grounding";
 // 证据里的 Glue 运行环境来自单一作者(缺省版本 + 可选清单),具体这次运行用的版本从 Glue JobRun 真值读
 import { GLUE_VERSIONS, glueRuntimeSummary } from "@/lib/sync/glue-version";
+import { PAGE_UPLOAD_MAX_FILE_BYTES, formatBytes } from "@/lib/http/body-limits";
 
 const region = homeRegion();
 const account = process.env.AWS_ACCOUNT_ID || "";
@@ -200,7 +201,7 @@ export async function buildFlinkIncidentContext(jobId: string, projectId?: strin
   lines.push(`- AWS 账号: ${account || "(本账号)"},区域: ${region}`);
   lines.push(`- 引擎: Amazon Managed Service for Apache Flink(MSAF),Flink 1.20,源为 Kinesis 数据流。`);
   lines.push(`- 自定义 sink(custom)的连接定义与网络可达性【由用户自管】:连接器 JAR 用户上传并在启动时与基础 runner 合并为 per-job uber-jar;VPC 接入由用户显式提供私有子网 + 安全组(平台透传给 MSAF VpcConfiguration)。`);
-  lines.push(`- 自定义 sink 接入前置条件:① 连接器 JAR 须为 Flink 1.20 兼容、含 META-INF/services SPI 工厂、≤250MB;② sink 目标须在私有子网且其安全组对 MSAF 子网放行对应端口、MSAF 子网经 NAT 出网到 Kinesis/CloudWatch;③ Flink SQL 须含 INSERT INTO,窗口聚合须 GROUP BY window_start, window_end。`);
+  lines.push(`- 自定义 sink 接入前置条件:① 连接器 JAR 须为 Flink 1.20 兼容、含 META-INF/services SPI 工厂、页面上传单个 ≤${formatBytes(PAGE_UPLOAD_MAX_FILE_BYTES)};② sink 目标须在私有子网且其安全组对 MSAF 子网放行对应端口、MSAF 子网经 NAT 出网到 Kinesis/CloudWatch;③ Flink SQL 须含 INSERT INTO,窗口聚合须 GROUP BY window_start, window_end。`);
   lines.push("");
   lines.push(`## 流作业`);
   lines.push(`- 名称: ${resourceName}`);

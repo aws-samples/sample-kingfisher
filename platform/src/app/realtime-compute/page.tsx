@@ -25,6 +25,8 @@ import { useT } from "@/lib/i18n/useT";
 import { adviseFailure } from "@/lib/realtime/failure-advisor";
 // 慢模型下服务端 45s 转 202,aiFetchJson 自动轮询到终态;网关 504 的 HTML 也包成可读错误
 import { aiFetchJson } from "@/lib/ai/client/ai-fetch";
+// 页面上传的文件上限(与网关 / 上传路由同一处定义,页面写的数不许自己另写)
+import { PAGE_UPLOAD_MAX_FILE_BYTES, formatBytes } from "@/lib/http/body-limits";
 
 const statusBadge: Record<string, any> = {
   draft: "default", starting: "processing", running: "success",
@@ -947,7 +949,7 @@ export default function RealtimeComputePage() {
             <Alert type="warning" showIcon style={{ marginBottom: 10 }}
               message={t("自定义 Sink 接入条件(平台只提供运行环境,sink 连接定义与网络可达性由你自管)")}
               description={<div style={{ fontSize: 12, lineHeight: 1.7 }}>
-                <div>① <b>{t("连接器 JAR")}</b>{t(":Flink 1.20 兼容、含 ")}<code>META-INF/services</code>{t(" SPI 工厂、单个 ≤250MB(合并后 uber-jar ≤512MB),在「连接器管理」上传。")}</div>
+                <div>① <b>{t("连接器 JAR")}</b>{t(":Flink 1.20 兼容、含 ")}<code>META-INF/services</code>{t(" SPI 工厂、页面上传单个 ≤{max}(合并后 uber-jar ≤512MB),在「连接器管理」上传。", { max: formatBytes(PAGE_UPLOAD_MAX_FILE_BYTES) })}</div>
                 <div>② <b>{t("网络")}</b>{t(":sink 目标须在")}<b>{t("私有子网")}</b>{t("且其安全组对下方 MSAF 子网放行对应端口;MSAF 子网经 NAT 出网到 Kinesis/CloudWatch。仅 web 对外,数据/计算组件不得公网暴露。")}</div>
                 <div>③ <b>SQL</b>{t(":多语句、须含 ")}<code>INSERT INTO</code>{t(";窗口聚合须 ")}<code>GROUP BY window_start, window_end</code>{t("。连接参数(hosts/index 等)由你按所用连接器填写;密钥用 ")}<code>${'{'}SINK_USER{'}'}/${'{'}SINK_PASSWORD{'}'}</code>{t(" 占位符 + 选「凭证数据源」可避免写进 SQL(不入库)。")}</div>
                 <div>④ {t("接入后若报错,可在作业详情用 ")}<b>{t("AI 诊断(DevOps Agent)")}</b>{t(" 定位根因,诊断记录会留痕可回看。")}</div>

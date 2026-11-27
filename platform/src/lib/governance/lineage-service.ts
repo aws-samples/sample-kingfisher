@@ -1,5 +1,6 @@
-import { PutCommand, QueryCommand, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { parseSqlLineage, type TableRef } from "@/lib/lineage/sql-lineage";
 
 const LINEAGE_TABLE = "bgp-lineage";
@@ -157,7 +158,7 @@ export async function recordComputeLineage(input: RecordComputeLineageInput): Pr
 // pushComputeLineageToOM(与实时双写同一函数)。幂等:OM 边重复 PUT 不会重复。返回统计。
 export async function backfillComputeLineageToOM(): Promise<{ targets: number; edgesPushed: number }> {
   const { pushComputeLineageToOM } = await import("@/lib/openmetadata/om-push");
-  const { Items = [] } = await docClient.send(new ScanCommand({ TableName: LINEAGE_TABLE }));
+  const Items = await scanAll({ TableName: LINEAGE_TABLE });
   // 只回填计算血缘(sql);同步血缘(sync)由 pushSyncToOpenMetadata 已负责,不重复。
   const compute = (Items as LineageEdge[]).filter((e) => e.lineageType === "sql");
   // 按 targetFqn 聚合上游。
@@ -190,7 +191,7 @@ export async function repushSyncLineageToOM(): Promise<{ tasks: number }> {
   const { pushSyncToOpenMetadata } = await import("@/lib/openmetadata/om-push");
   const { syncOmPlaceOf } = await import("@/lib/openmetadata/om-sync-coords");
   const USER_ID = "default-user"; // 与 sync/[id]/start 一致
-  const { Items: tasks = [] } = await docClient.send(new ScanCommand({ TableName: TABLES.SYNC_TASKS }));
+  const tasks = await scanAll({ TableName: TABLES.SYNC_TASKS });
   let done = 0;
   const { bindingTargets } = await import("@/lib/exec-env/data-plane-target");
   const { isHome } = await import("@/lib/exec-env/target-id");
@@ -250,11 +251,11 @@ export async function getLineage(fqn: string, depth = 2) {
 
     try {
       // Scan for downstream (sourceFqn is not PK, need scan or GSI)
-      const { Items = [] } = await docClient.send(new ScanCommand({
+      const Items = await scanAll({
         TableName: LINEAGE_TABLE,
         FilterExpression: "sourceFqn = :s",
         ExpressionAttributeValues: { ":s": sourceFqn },
-      }));
+      });
 
       for (const item of Items) {
         const tgtFqn = item.targetFqn as string;

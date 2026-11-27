@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject, projectFilter } from "@/lib/projects/guard";
 // 🔴 补数目标下拉必须按执行范围过滤。
@@ -21,11 +21,11 @@ export async function GET(req: NextRequest) {
   if (ctx instanceof NextResponse) return ctx;
   const pf = projectFilter(ctx.projectId);
   try {
-    const scan = (table: string) => docClient.send(new ScanCommand({
+    const scan = (table: string) => scanAll({
       TableName: table,
       FilterExpression: `userId = :uid AND ${pf.clause}`,
       ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values },
-    })).then((r) => r.Items || []).catch(() => []);
+    }).catch(() => [] as Array<Record<string, any>>);
 
     const [etlAll, engineAll, wfAll] = await Promise.all([scan(TABLES.ETL_JOBS), scan(TABLES.ENGINE_JOBS), scan(TABLES.WORKFLOWS)]);
     // 同步任务只在**显式要**时才列(`?include=sync-task`,补数页这么发)。

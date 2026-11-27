@@ -1,7 +1,8 @@
 // 仪表盘 CRUD(bgp-bi-dashboards)。键式隔离:pk=projectId, sk=dashboardId(ULID)。
 // 布局(引用 widget)+ 筛选器内嵌;更新走 version 乐观锁。widget 为弱引用(不做外键约束)。
 
-import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { queryAll } from "@/lib/aws/read-all";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { BiDashboard, DashboardFilter, DashboardLayoutItem } from "./types";
@@ -57,15 +58,12 @@ function normalizeFilters(input: any): DashboardFilter[] {
 }
 
 export async function listDashboards(projectId: string): Promise<BiDashboard[]> {
-  const { Items = [] } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.BI_DASHBOARDS,
-      KeyConditionExpression: "projectId = :pid",
-      ExpressionAttributeValues: { ":pid": projectId },
-      ScanIndexForward: false,
-    })
-  );
-  return Items as BiDashboard[];
+  return queryAll<BiDashboard>({
+    TableName: TABLES.BI_DASHBOARDS,
+    KeyConditionExpression: "projectId = :pid",
+    ExpressionAttributeValues: { ":pid": projectId },
+    ScanIndexForward: false,
+  });
 }
 
 export async function getDashboard(projectId: string, dashboardId: string): Promise<BiDashboard | null> {

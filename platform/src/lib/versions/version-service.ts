@@ -10,6 +10,7 @@
 
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { queryAll } from "@/lib/aws/read-all";
 
 const PARTITION = "default-user";
 
@@ -154,14 +155,16 @@ export interface VersionMeta {
 }
 
 export async function listVersions(type: ResourceType, id: string): Promise<VersionMeta[]> {
-  const { Items = [] } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.RESOURCE_VERSIONS,
-      KeyConditionExpression: "pk = :pk",
-      ExpressionAttributeValues: { ":pk": `${type}#${id}` },
-      ScanIndexForward: false, // newest first
-    })
-  );
+  // 读到完为止:每一版都带着整份定义,几版大脚本加起来就超过一次读取的上限,只读第一页会让较早的版本从历史里消失。
+  // 列表只用到这五个字段 ⇒ 只取它们(每一页读过的仍是整行,取回来的少)。
+  const Items = await queryAll({
+    TableName: TABLES.RESOURCE_VERSIONS,
+    KeyConditionExpression: "pk = :pk",
+    ExpressionAttributeValues: { ":pk": `${type}#${id}` },
+    ProjectionExpression: "versionNum, versionedAt, versionedBy, note, #n",
+    ExpressionAttributeNames: { "#n": "name" },
+    ScanIndexForward: false, // newest first
+  });
   return Items.map((v) => ({
     version: Number(v.versionNum),
     versionedAt: v.versionedAt,

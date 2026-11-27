@@ -1,7 +1,9 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
+import { orPayloadTooLarge } from "@/lib/api-response";
 import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/projects/guard";
 // 保存的 SQL 查询任务要有落点章。
 // 🔴 原来行上只有 `workgroupName`,没有区维:在 us-west-2 存的查询,回到主控区照样列出来,
@@ -26,14 +28,12 @@ export async function GET(req: NextRequest) {
   // 🔴 `readScope` 回 null(未传 `?scope=` / 全局)⇒ `sf` 为 null ⇒ 表达式与改动前逐字节相同(回滚点)。
   const scope = readScope(req);
   const sf = scope ? scopeFilter(scope, "redshiftTask") : null;
-  const { Items = [] } = await docClient.send(
-    new ScanCommand({
-      TableName: TABLES.REDSHIFT_TASKS,
-      FilterExpression: `userId = :uid AND ${pf.clause} AND ${ef.clause}${sf ? ` AND ${sf.clause}` : ""}`,
-      ExpressionAttributeNames: { "#env": "env", ...(sf ? sf.names : {}) },
-      ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values, ...ef.values, ...(sf ? sf.values : {}) },
-    })
-  );
+  const Items = await scanAll({
+    TableName: TABLES.REDSHIFT_TASKS,
+    FilterExpression: `userId = :uid AND ${pf.clause} AND ${ef.clause}${sf ? ` AND ${sf.clause}` : ""}`,
+    ExpressionAttributeNames: { "#env": "env", ...(sf ? sf.names : {}) },
+    ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values, ...ef.values, ...(sf ? sf.values : {}) },
+  });
   return NextResponse.json(Items);
 }
 
@@ -66,7 +66,9 @@ export async function POST(req: NextRequest) {
     createdAt: now,
     updatedAt: now,
   };
-  await docClient.send(new PutCommand({ TableName: TABLES.REDSHIFT_TASKS, Item: item }));
+  // SQL 太大(超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500
+  const stored = await orPayloadTooLarge(docClient.send(new PutCommand({ TableName: TABLES.REDSHIFT_TASKS, Item: item })));
+  if (stored instanceof NextResponse) return stored;
   await snapshotVersion("redshift-task", item.taskId, item, ctx.identity.username, "创建").catch(() => {});
   // auto-parse SQL → table-level lineage in OpenMetadata (best-effort).
   if (item.sql) {

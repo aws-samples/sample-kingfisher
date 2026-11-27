@@ -2,7 +2,8 @@
 // 键式隔离:pk=projectId, sk=analysisId(ULID);更新走 version 乐观锁(照抄 dashboards.ts,并发一成功一 409)。
 // 纯新增:旧 reports/dashboards 的表/lib/API 完全不动。视觉对象的 source/viz 复用 reports 的归一(不重造)。
 
-import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { queryAll } from "@/lib/aws/read-all";
 import { ulid } from "ulid";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { OptimisticLockError, normalizeSource, normalizeViz } from "./reports";
@@ -98,15 +99,12 @@ function normalizeLayout(input: any, widgetIds: Set<string>): AnalysisLayoutItem
 }
 
 export async function listAnalyses(projectId: string): Promise<BiAnalysis[]> {
-  const { Items = [] } = await docClient.send(
-    new QueryCommand({
-      TableName: TABLES.BI_ANALYSES,
-      KeyConditionExpression: "projectId = :pid",
-      ExpressionAttributeValues: { ":pid": projectId },
-      ScanIndexForward: false, // 新看板在前(analysisId=ULID 时间序)
-    })
-  );
-  return Items as BiAnalysis[];
+  return queryAll<BiAnalysis>({
+    TableName: TABLES.BI_ANALYSES,
+    KeyConditionExpression: "projectId = :pid",
+    ExpressionAttributeValues: { ":pid": projectId },
+    ScanIndexForward: false, // 新看板在前(analysisId=ULID 时间序)
+  });
 }
 
 export async function getAnalysis(projectId: string, analysisId: string): Promise<BiAnalysis | null> {

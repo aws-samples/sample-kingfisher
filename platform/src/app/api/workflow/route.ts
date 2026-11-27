@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
-import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { recordAudit } from "@/lib/audit";
+import { orPayloadTooLarge } from "@/lib/api-response";
 import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/projects/guard";
 import { requireMwaaForTargets, MwaaNotInstalled, mwaaErrorResponse } from "@/lib/scheduler/mwaa-endpoint";
 import { isValidTargetId, HOME_TARGET_ID } from "@/lib/exec-env/target-id";
@@ -54,12 +56,12 @@ export async function GET(req: NextRequest) {
     attrValues[":empty"] = null;
   }
 
-  const { Items = [] } = await docClient.send(new ScanCommand({
+  const Items = await scanAll({
     TableName: TABLES.WORKFLOWS,
     FilterExpression: filterParts.join(" AND "),
     ...(Object.keys(attrNames).length > 0 ? { ExpressionAttributeNames: attrNames } : {}),
     ExpressionAttributeValues: attrValues,
-  }));
+  });
   // 按执行范围过滤(内存侧,走 `bindingTargets` 三级回落)
   const rows = filterRowsByScope(Items as Array<Record<string, unknown>>, scope);
 
@@ -142,7 +144,9 @@ export async function POST(req: NextRequest) {
     createdAt: now,
     updatedAt: now,
   };
-  await docClient.send(new PutCommand({ TableName: TABLES.WORKFLOWS, Item: item }));
+  // 新建时带的画布太大(超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500
+  const stored = await orPayloadTooLarge(docClient.send(new PutCommand({ TableName: TABLES.WORKFLOWS, Item: item })));
+  if (stored instanceof NextResponse) return stored;
   await snapshotVersion("workflow", item.workflowId, item, ctx.identity.username, "创建").catch(() => {});
   recordAudit(req, "workflow.create", { resourceType: "workflow", resourceId: item.workflowId, detail: { name: item.name } }).catch(() => {});
   return NextResponse.json(item, { status: 201 });

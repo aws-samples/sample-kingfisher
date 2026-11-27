@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { apiOk, apiError } from "@/lib/api-response";
 import { assertBindableTargetsForEngine, TargetBindingRejected } from "@/lib/exec-env/data-plane-target";
 import { recordAudit } from "@/lib/audit";
@@ -34,14 +35,13 @@ export async function GET(req: NextRequest) {
     if (scope instanceof NextResponse) return scope;
     const pf = projectFilter(ctx.projectId);
     const ef = envFilter(getActiveEnv(req));
-    const { Items = [] } = await docClient.send(
-      new ScanCommand({
-        TableName: TABLES.ETL_JOBS,
-        FilterExpression: `userId = :uid AND ${pf.clause} AND ${ef.clause}`,
-        ExpressionAttributeNames: { "#env": "env" },
-        ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values, ...ef.values },
-      })
-    );
+    // 读到完为止:表里的内容加起来超过一次读取的上限时,只读第一页会让后建的作业在列表里消失
+    const Items = await scanAll({
+      TableName: TABLES.ETL_JOBS,
+      FilterExpression: `userId = :uid AND ${pf.clause} AND ${ef.clause}`,
+      ExpressionAttributeNames: { "#env": "env" },
+      ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values, ...ef.values },
+    });
     // 读时对账:对卡在 running 的作业查真实 Glue/Redshift 状态并回写,杜绝列表假 running。
     const reconciled = await Promise.all(Items.map((it: any) => reconcileEtlJob(it).catch(() => it)));
     // 🔴 **在对账之后**过滤,不在之前

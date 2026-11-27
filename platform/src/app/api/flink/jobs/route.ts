@@ -2,8 +2,9 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { requestedTargets } from "@/lib/place/resolve";
 import { placeErrorResponse } from "@/lib/place/route";
-import { PutCommand, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
@@ -34,12 +35,12 @@ export async function GET(req: NextRequest) {
     if (ctx instanceof NextResponse) return ctx;
     const pf = projectFilter(ctx.projectId);
     const ef = envFilter(getActiveEnv(req));
-    const { Items = [] } = await docClient.send(new ScanCommand({
+    const Items = await scanAll({
       TableName: TABLES.FLINK_JOBS,
       FilterExpression: ["userId = :uid", pf.clause, ef.clause].join(" AND "),
       ExpressionAttributeNames: { "#env": "env" },
       ExpressionAttributeValues: { ":uid": USER_ID, ...pf.values, ...ef.values },
-    }));
+    });
     // 🔴 `readScope` 回 null(未传 `?scope=` / 全局)⇒ 恒等过滤 ⇒ 与改动前逐字节相同(回滚点)。
     //    过滤放在**对账之前**:对账要对每个非终态作业打一次 MSAF,过滤掉的行不必打(省调用、省钱)。
     const scope = readScope(req);

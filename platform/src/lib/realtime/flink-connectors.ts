@@ -11,7 +11,8 @@ import { sdkClient } from "@/lib/aws/clients";
 import {
   S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand,
 } from "@aws-sdk/client-s3";
-import { PutCommand, GetCommand, DeleteCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import AdmZip from "adm-zip";
 import { createHash } from "crypto";
 import { ulid } from "ulid";
@@ -74,13 +75,13 @@ export async function createConnector(meta: Omit<FlinkConnector, "userId" | "con
 }
 
 export async function listConnectors(projectId: string, env: string): Promise<FlinkConnector[]> {
-  const { Items = [] } = await docClient.send(new ScanCommand({
+  const Items = await scanAll<FlinkConnector>({
     TableName: TABLES.FLINK_CONNECTORS,
     FilterExpression: "userId = :u AND projectId = :p AND #e = :env",
     ExpressionAttributeNames: { "#e": "env" },
     ExpressionAttributeValues: { ":u": USER_ID, ":p": projectId, ":env": env },
-  }));
-  return (Items as FlinkConnector[]).sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  });
+  return Items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
 }
 
 export async function getConnector(connectorId: string): Promise<FlinkConnector | null> {

@@ -10,8 +10,9 @@
 // Promotion into a protected environment (prod) goes through the module-13 approval flow
 // (type "deploy"); see /api/promote and /api/approvals/[id].
 
-import { ScanCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { ulid } from "ulid";
 import {
   ResourceType,
@@ -63,14 +64,13 @@ export async function findTargetByLineage(
   env: string
 ): Promise<Record<string, any> | null> {
   const m = getResourceMeta(type);
-  const { Items = [] } = await docClient.send(
-    new ScanCommand({
-      TableName: m.table,
-      FilterExpression: "lineageId = :lid AND #env = :env AND projectId = :pid",
-      ExpressionAttributeNames: { "#env": "env" },
-      ExpressionAttributeValues: { ":lid": lineageId, ":env": env, ":pid": projectId },
-    })
-  );
+  // 读到完为止:只读第一页时,目标环境那一份落在后面的页里就找不到 ⇒ 每次发布都再建一份
+  const Items = await scanAll({
+    TableName: m.table,
+    FilterExpression: "lineageId = :lid AND #env = :env AND projectId = :pid",
+    ExpressionAttributeNames: { "#env": "env" },
+    ExpressionAttributeValues: { ":lid": lineageId, ":env": env, ":pid": projectId },
+  });
   return (Items[0] as Record<string, any>) || null;
 }
 

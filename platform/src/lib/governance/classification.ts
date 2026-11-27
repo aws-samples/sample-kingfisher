@@ -4,8 +4,9 @@
 // data-access grants. The masking layer (masking.ts) reads these to decide what to mask;
 // the access-request flow (reusing bgp-approvals) writes grants on approval.
 
-import { GetCommand, PutCommand, QueryCommand, ScanCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 
 export type SensitivityLevel = "L1" | "L2" | "L3" | "L4";
 export type MaskStrategy = "none" | "full" | "partial" | "email" | "hash";
@@ -62,8 +63,7 @@ export async function getClassificationsForTable(fqn: string): Promise<ColumnCla
 }
 
 export async function listAllClassifications(): Promise<ColumnClassification[]> {
-  const { Items = [] } = await docClient.send(new ScanCommand({ TableName: TABLES.DATA_CLASSIFICATION }));
-  return Items as ColumnClassification[];
+  return scanAll<ColumnClassification>({ TableName: TABLES.DATA_CLASSIFICATION });
 }
 
 // Batch-load classifications for several tables → Map<fqn, Map<columnLower, classification>>.

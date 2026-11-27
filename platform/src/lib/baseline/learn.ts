@@ -5,6 +5,7 @@
 
 import { ScanCommand, QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { percentile, stdev, ewma, removeOutliersMAD, median } from "./stats";
 import type { BaselineRow, DurationStats, TargetBaseline } from "./types";
 // P4.0:在线隔离标常量(单一定义,copilot/plan/types.ts 零依赖,import 安全无循环)。
@@ -185,9 +186,9 @@ export async function listBaselines(projectId: string): Promise<BaselineRow[]> {
 // 各资源表名 join(与 ops-summary 同思路,best-effort)。
 async function loadTaskNames(): Promise<Record<string, string>> {
   const names: Record<string, string> = {};
-  const scan = (table: string, idKey: string) => docClient.send(new ScanCommand({
+  const scan = (table: string, idKey: string) => scanAll({
     TableName: table, ProjectionExpression: `${idKey}, #n`, ExpressionAttributeNames: { "#n": "name" },
-  })).then((r) => { for (const it of r.Items || []) names[(it as any)[idKey]] = (it as any).name; }).catch(() => {});
+  }).then((rows) => { for (const it of rows) names[(it as any)[idKey]] = (it as any).name; }).catch(() => {});
   await Promise.all([
     scan(TABLES.SYNC_TASKS, "taskId"), scan(TABLES.WORKFLOWS, "workflowId"),
     scan(TABLES.ETL_JOBS, "jobId"), scan(TABLES.ENGINE_JOBS, "jobId"),

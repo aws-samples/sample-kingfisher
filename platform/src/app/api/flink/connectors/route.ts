@@ -5,8 +5,9 @@ import { apiOk, apiError } from "@/lib/api-response";
 import { requireProject, getActiveEnv } from "@/lib/projects/guard";
 import { recordAudit } from "@/lib/audit";
 import { listConnectors, createConnector, uploadConnectorJar } from "@/lib/realtime/flink-connectors";
+import { PAGE_UPLOAD_MAX_FILE_BYTES, PAYLOAD_TOO_LARGE_CODE, flinkConnectorTooLargeMessage } from "@/lib/http/body-limits";
 
-const MAX_BYTES = 250 * 1024 * 1024; // 单个连接器 JAR ≤250MB(MSAF 合并后 uber-jar ≤512MB)
+const MAX_BYTES = PAGE_UPLOAD_MAX_FILE_BYTES; // 经平台进程上传的单个文件的上限;数值、文案与网关的请求体上限同一处定义
 
 // GET /api/flink/connectors — 列出当前项目+环境的自定义连接器。
 export async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
   const buf = Buffer.from(await file.arrayBuffer());
   if (buf.length === 0) return apiError("文件为空", 400);
-  if (buf.length > MAX_BYTES) return apiError("JAR 过大(≤250MB)", 400);
+  if (buf.length > MAX_BYTES) return apiError(flinkConnectorTooLargeMessage(buf.length), 413, { code: PAYLOAD_TOO_LARGE_CODE });
   if (!(buf[0] === 0x50 && buf[1] === 0x4b)) return apiError("不是有效的 JAR/ZIP 文件", 400);
 
   // 解析 JAR 内的 Flink 工厂 SPI(best-effort),供 UI 展示该连接器提供的工厂类。

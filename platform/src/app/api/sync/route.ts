@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
-import { PutCommand, ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { syncWorkRejection } from "@/lib/sync/task-shape";
 import { validateSyncWriteFields, overwritePreflight, OVERWRITE_CONFIRM_CODE, OVERWRITE_CONFIRM_KIND, overwriteConfirmMessage, writesS3Tables } from "@/lib/sync/target-table-guard";
 // 自带 Table Bucket 的准入(保存与启动同一份判定)
@@ -63,12 +64,12 @@ export async function GET(req: NextRequest) {
     if (scheduleEnabled === "true") { filterParts.push("scheduleEnabled = :se"); attrValues[":se"] = true; }
     else if (scheduleEnabled === "false") { filterParts.push("(attribute_not_exists(scheduleEnabled) OR scheduleEnabled = :se)"); attrValues[":se"] = false; }
 
-    const { Items = [] } = await docClient.send(new ScanCommand({
+    const Items = await scanAll({
       TableName: TABLES.SYNC_TASKS,
       FilterExpression: filterParts.join(" AND "),
       ...(Object.keys(attrNames).length > 0 ? { ExpressionAttributeNames: attrNames } : {}),
       ExpressionAttributeValues: attrValues,
-    }));
+    });
     // 读时对账:对 glue 通道卡 running 的任务查真实 Glue JobRun 并回写,杜绝列表假 running。
     const reconciled = await Promise.all(Items.map((it: any) => reconcileSyncTask(it).catch(() => it)));
     // 🔴 **在对账之后**过滤(与 `/api/etl-jobs` 同序):

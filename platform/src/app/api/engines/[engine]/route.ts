@@ -4,8 +4,9 @@ export const dynamic = "force-dynamic";
 // 执行层完全独立于 api/etl-jobs·api/sync；老代码零改动。
 
 import { NextRequest, NextResponse } from "next/server";
-import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { apiOk, apiError } from "@/lib/api-response";
 import { recordAudit } from "@/lib/audit";
 import { requireProject, projectFilter, getActiveEnv, envFilter } from "@/lib/projects/guard";
@@ -34,14 +35,12 @@ export async function GET(req: NextRequest, props: { params: Promise<{ engine: s
     if (scope instanceof NextResponse) return scope;
     const pf = projectFilter(ctx.projectId);
     const ef = envFilter(getActiveEnv(req));
-    const { Items = [] } = await docClient.send(
-      new ScanCommand({
-        TableName: TABLES.ENGINE_JOBS,
-        FilterExpression: `userId = :uid AND engine = :eng AND ${pf.clause} AND ${ef.clause}`,
-        ExpressionAttributeNames: { "#env": "env" },
-        ExpressionAttributeValues: { ":uid": USER_ID, ":eng": params.engine, ...pf.values, ...ef.values },
-      })
-    );
+    const Items = await scanAll({
+      TableName: TABLES.ENGINE_JOBS,
+      FilterExpression: `userId = :uid AND engine = :eng AND ${pf.clause} AND ${ef.clause}`,
+      ExpressionAttributeNames: { "#env": "env" },
+      ExpressionAttributeValues: { ":uid": USER_ID, ":eng": params.engine, ...pf.values, ...ef.values },
+    });
     // 读时对账：对卡在 running 的作业查真实 EMR 状态并回写，杜绝列表假 running。
     const provider = getProvider(params.engine);
     const reconciled = await Promise.all(Items.map((it: any) => provider.reconcile(it).catch(() => it)));

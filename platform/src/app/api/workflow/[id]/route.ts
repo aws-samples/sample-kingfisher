@@ -5,6 +5,7 @@ import { hasTargetsPatch, requestedTargets } from "@/lib/place/resolve";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES } from "@/lib/aws/dynamodb";
 import { recordAudit } from "@/lib/audit";
+import { orPayloadTooLarge } from "@/lib/api-response";
 import { guardResourceAccess } from "@/lib/projects/guard";
 import { snapshotVersion } from "@/lib/versions/version-service";
 import { getCorrelationId } from "@/lib/observability/logger";
@@ -78,16 +79,21 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   const names = Object.fromEntries(fields.map((k, i) => [`#f${i}`, k]));
   const values = Object.fromEntries(fields.map((k, i) => [`:v${i}`, body[k]]));
 
-  const { Attributes } = await docClient.send(
-    new UpdateCommand({
-      TableName: TABLES.WORKFLOWS,
-      Key: { userId: USER_ID, workflowId: params.id },
-      UpdateExpression: `SET ${expr}, #upd = :now`,
-      ExpressionAttributeNames: { ...names, "#upd": "updatedAt" },
-      ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
-      ReturnValues: "ALL_NEW",
-    })
+  // 画布太大(节点里的 SQL / 脚本加起来超过单条记录可保存的大小)⇒ 413 + 人话,不是一张空的 500
+  const written = await orPayloadTooLarge(
+    docClient.send(
+      new UpdateCommand({
+        TableName: TABLES.WORKFLOWS,
+        Key: { userId: USER_ID, workflowId: params.id },
+        UpdateExpression: `SET ${expr}, #upd = :now`,
+        ExpressionAttributeNames: { ...names, "#upd": "updatedAt" },
+        ExpressionAttributeValues: { ...values, ":now": new Date().toISOString() },
+        ReturnValues: "ALL_NEW",
+      })
+    )
   );
+  if (written instanceof NextResponse) return written;
+  const { Attributes } = written;
   await snapshotVersion("workflow", params.id, Attributes as any, guard.identity.username, "保存").catch(() => {});
   return NextResponse.json(Attributes);
 }

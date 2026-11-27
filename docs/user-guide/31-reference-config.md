@@ -146,7 +146,7 @@ The wizard has five steps: "Source configuration" → "Select Tables & Mapping" 
 | Execution Role | Which IAM role the job runs with; empty = platform default role | Dropdown with three groups: "Platform default (recommended, permissions complete)", "Created by Role Advisor", "Your own roles (must trust glue.amazonaws.com and be able to read the buckets your job depends on)"; "Refresh", "Enter ARN manually", "Check permissions" | Advanced Properties → Execution Role |
 | Lake table buckets | Which routes the job can use; none selected = all routes of this region | Multi-select `alias · tier · bucket`; "Read" / "Write" per bucket; "Default catalog"; "Catalogs available to this job"; "Copy three-part name example" | Advanced Properties → Lake table buckets |
 | Job parameters | Custom `--key` parameters read by the script via `getResolvedOptions`; `--conf` is appended after the platform Spark configuration | Parameter name (e.g. `src_table` or `--conf`) / value; platform reserved keys cannot be overridden (`--TempDir` `--datalake-formats` `--job-bookmark-option` `--extra-jars` `--extra-py-files` `--bgp_*` and the business date keys) | Advanced Properties → Job parameters |
-| Dependency libraries | S3 URI auto-filled after upload; JAR → `--extra-jars`, `.py/.whl/.zip` → `--extra-py-files` | "Upload dependency files", ≤100MB, shipped with the job after saving | Advanced Properties → Dependency libraries |
+| Dependency libraries | S3 URI auto-filled after upload; JAR → `--extra-jars`, `.py/.whl/.zip` → `--extra-py-files` | "Upload dependency files", up to 8 MB per file (larger: put it into S3 first and enter the address), shipped with the job after saving | Advanced Properties → Dependency libraries |
 
 ### 3.3 EMR Serverless jobs
 

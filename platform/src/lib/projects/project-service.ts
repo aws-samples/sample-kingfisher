@@ -7,11 +7,11 @@ import {
   GetCommand,
   PutCommand,
   QueryCommand,
-  ScanCommand,
   UpdateCommand,
   DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { docClient, TABLES, PROJECT_MEMBERS_BY_USER_INDEX } from "@/lib/aws/dynamodb";
+import { scanAll } from "@/lib/aws/read-all";
 import { ulid } from "ulid";
 import type { Identity } from "@/lib/auth/identity";
 import {
@@ -377,15 +377,14 @@ export async function listApprovals(filter: {
     parts.push("requestedBy = :rb");
     values[":rb"] = filter.requestedBy;
   }
-  const { Items = [] } = await docClient.send(
-    new ScanCommand({
-      TableName: TABLES.APPROVALS,
-      FilterExpression: parts.join(" AND "),
-      ...(filter.status ? { ExpressionAttributeNames: { "#s": "status" } } : {}),
-      ExpressionAttributeValues: values,
-    })
-  );
-  return (Items as Approval[]).sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1));
+  // 读到完为止:审批单只增不减,只读第一页时新提交的待审批单迟早会从清单里消失
+  const Items = await scanAll<Approval>({
+    TableName: TABLES.APPROVALS,
+    FilterExpression: parts.join(" AND "),
+    ...(filter.status ? { ExpressionAttributeNames: { "#s": "status" } } : {}),
+    ExpressionAttributeValues: values,
+  });
+  return Items.sort((a, b) => (a.requestedAt < b.requestedAt ? 1 : -1));
 }
 
 export async function decideApproval(

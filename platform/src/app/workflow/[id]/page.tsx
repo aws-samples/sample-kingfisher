@@ -20,6 +20,7 @@ import DiagnosisButton from "@/components/common/DiagnosisButton";
 import { useT } from "@/lib/i18n/useT";
 // 2026-11-04(B):错误信封文案的唯一读法(`xxx.error` 可能是 apiError / 非 JSON 信封拦截器的对象信封,直接递给 antd ⇒ React error #31 ⇒ 零提示)
 import { errorMessageOf } from "@/lib/http/error-envelope";
+import { writeJson } from "@/lib/http/write-json";
 import { NODE_REGISTRY, PALETTE_NODE_TYPES } from "@/lib/workflow/node-registry";
 // Airflow 控制台入口收成平台 admin 专用(服务端已硬拦,这里只是不让人白点)
 import { useAuth } from "@/lib/auth/AuthProvider";
@@ -273,10 +274,13 @@ export default function WorkflowEditorPage() {
     if (!cron) { message.warning(t("请输入 cron 表达式,如 */30 * * * *(每 30 分钟)")); return; }
     setActionLoading((p) => ({ ...p, publish: true }));
     try {
-      await fetch(`/api/workflow/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cronExpression: cron, scheduleEnabled: true }),
-      });
+      // cron 没存上就不发布(否则发布的是旧周期,提示却说新周期已应用)
+      try {
+        await writeJson(`/api/workflow/${id}`, "PUT", { cronExpression: cron, scheduleEnabled: true });
+      } catch (e) {
+        message.error((e as Error).message || t("保存失败"));
+        return;
+      }
       // cron 写进 DAG 的 schedule_interval,必须重新发布才生效。
       const res = await fetch(`/api/workflow/${id}/publish`, { method: "POST" });
       const data = await res.json();
@@ -301,32 +305,39 @@ export default function WorkflowEditorPage() {
   };
 
   const saveTriggers = async (triggers: string[]) => {
+    const before = workflow?.triggers;
     setWorkflow((w: any) => ({ ...w, triggers }));
     setSavingDeps(true);
     try {
-      await fetch(`/api/workflow/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ triggers }),
-      });
+      await writeJson(`/api/workflow/${id}`, "PUT", { triggers });
       message.success(t("已保存下游依赖"));
-    } catch {
-      message.error(t("保存失败"));
+    } catch (e) {
+      // 没存上 ⇒ 下拉回到保存前的样子(页面显示的只许是服务端真有的)
+      setWorkflow((w: any) => ({ ...w, triggers: before }));
+      message.error((e as Error).message || t("保存失败"));
     } finally {
       setSavingDeps(false);
     }
   };
 
+  // 把当前画布存到服务端。存上了才把画布标成「没有未保存的改动」;服务端拒绝 ⇒ 原话呈现、改动标记不动(回 false)。
+  // 「保存」按钮与「发布」前的静默保存共用这一个写法(此前两处都不看应答:没存上也提示「已保存」/ 照样发布旧画布)。
+  const saveCanvas = async (): Promise<boolean> => {
+    try {
+      await writeJson(`/api/workflow/${id}`, "PUT", { dagDefinition: { nodes: nodesRef.current, edges: edgesRef.current } });
+    } catch (e) {
+      message.error((e as Error).message || t("保存失败"));
+      return false;
+    }
+    savedRef.current = normalizeDag(nodesRef.current, edgesRef.current);
+    setDirty(false);
+    return true;
+  };
+
   const handleSave = async () => {
     setActionLoading((p) => ({ ...p, save: true }));
     try {
-      await fetch(`/api/workflow/${id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dagDefinition: { nodes: nodesRef.current, edges: edgesRef.current } }),
-      });
-      savedRef.current = normalizeDag(nodesRef.current, edgesRef.current);
-      setDirty(false);
-      message.success(t("已保存"));
+      if (await saveCanvas()) message.success(t("已保存"));
     } finally {
       setActionLoading((p) => ({ ...p, save: false }));
     }
@@ -360,15 +371,8 @@ export default function WorkflowEditorPage() {
   const doPublish = async () => {
     setActionLoading((p) => ({ ...p, publish: true }));
     try {
-      // 发布前若有未保存改动，先静默保存，确保发布的是当前画布。
-      if (dirty) {
-        await fetch(`/api/workflow/${id}`, {
-          method: "PUT", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dagDefinition: { nodes: nodesRef.current, edges: edgesRef.current } }),
-        });
-        savedRef.current = normalizeDag(nodesRef.current, edgesRef.current);
-        setDirty(false);
-      }
+      // 发布前若有未保存改动，先静默保存，确保发布的是当前画布。没存上就不发布(原因已提示)。
+      if (dirty && !(await saveCanvas())) return;
       const res = await fetch(`/api/workflow/${id}/publish`, { method: "POST" });
       const data = await res.json();
       if (data.success !== false && !data.error) {
